@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========== DESIGN SYSTEM TOKENS =========== */
+:root {
+  /* === PRIMARY — Relianz === */
+  --color-brand-blue:        #005FA2;
+  --color-brand-blue-dark:   #004A82;
+  --color-brand-blue-light:  #3380B8;
+  --color-brand-tan:         #BE9F86;
+  --color-brand-tan-dark:    #A88B74;
+
+  /* === SEMANTIC — A.M. CPA fill-ins === */
+  --color-success:           #377456;
+  --color-success-muted:     #CAD6BC;
+  --color-info:              #5CA8A3;
+  --color-info-muted:        #7A7C81;
+  --color-warm-dark:         #84724D;
+  --color-error:             #DD6B5F;
+
+  /* === NEUTRAL === */
+  --color-dark:              #3A3830;
+  --color-mid:               #797C80;
+  --color-light-blue-gray:   #9AA7B9;
+  --color-surface-warm:      #F0EBE5;
+  --color-surface-off-white: #F5F3F2;
+  --color-surface-cream:     #EAE5E3;
+  --color-white:             #FFFFFF;
+
+  /* === TYPOGRAPHY === */
+  --font-display-en:  'Baskerville', 'Baskerville Old Face', 'Big Caslon', Georgia, serif;
+  --font-body-en:     'Baskerville', Georgia, serif;
+  --font-display-zh:  'Noto Serif TC', '思源宋體', 'Songti TC', serif;
+  --font-body-zh:     'Noto Sans TC', '思源黑體', 'PingFang TC', 'Heiti TC', sans-serif;
+
+  /* === SPACING (8px base) === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-30: 120px;
+
+  /* === RADIUS === */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   10px;
+  --radius-xl:   16px;
+  --radius-pill: 9999px;
+
+  /* === TRANSITIONS === */
+  --transition-fast:  150ms ease;
+  --transition-base:  200ms ease;
+  --transition-slow:  350ms ease;
+}
+
+.doc-font {
+  font-family: 楷體-繁, 'STKaiti TC', 'DFKai-SB', 標楷體, 'DFKai-SB';
+}
+
+/* =========== TYPOGRAPHY =========== */
+
+/* CJK body 預設行高 1.75（DESIGN.md §3） */
+html,
+body {
+  background-color: var(--color-surface-off-white);
+}
+
+body {
+  line-height: 1.75;
+  color: var(--color-dark);
+}
+
+/* Heading 語意 class（搭配 Noto Serif TC） */
+.heading-display {
+  font-family: var(--font-display-zh);
+  font-size: clamp(64px, 8vw, 96px);
+  font-weight: 600;
+  line-height: 1.10;
+  letter-spacing: -0.5px;
+}
+
+.heading-section {
+  font-family: var(--font-display-zh);
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+}
+
+.heading-sub {
+  font-family: var(--font-display-zh);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.20;
+  letter-spacing: -0.2px;
+}
+
+.heading-card {
+  font-family: var(--font-display-zh);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.same-font {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* 隱藏 number input 原生上下箭頭（日期欄位等使用數字輸入但不需要步進控制的情境） */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield;
+}
