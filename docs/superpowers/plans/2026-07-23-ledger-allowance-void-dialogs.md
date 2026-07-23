@@ -993,6 +993,13 @@ EOF
 - Consumes: `../components/VoidConfirmDialog`（Task 3）
 - Produces: 無新對外介面（頁面內部行為變更）
 
+> **注意（2026-07-23 追加）：** 執行本 Task 前，`TransactionFormView.tsx` 已因另一個使用者請求
+> （交易編輯頁新增「折讓」區塊）多了 `import TransactionAllowanceCard from
+> './components/TransactionAllowanceCard';` 這行 import，以及 `<TransactionAmountCard .../>`
+> 與 sticky 按鈕列之間多了一行
+> `{side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}`。下面的「把」／「改成」
+> 區塊已同步反映這個現狀，照著比對即可。
+
 - [ ] **Step 1: 更新 import**
 
 把：
@@ -1005,6 +1012,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { Side } from '../types';
+import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionAmountCard from './components/TransactionAmountCard';
 ```
 
@@ -1019,6 +1027,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import VoidConfirmDialog from '../components/VoidConfirmDialog';
 import type { Side } from '../types';
+import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionAmountCard from './components/TransactionAmountCard';
 ```
 
