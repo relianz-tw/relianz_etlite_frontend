@@ -4,12 +4,16 @@ import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
 import { ChevronDown, ChevronRight, CircleX, DollarSign, FileMinus } from 'lucide-react';
+import { fmtCurrency } from '@/lib/utils';
+import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
-import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS, fmtCurrency } from '../data';
-import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import type { AllowanceRecord, PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
 import AddChannelDialog from './AddChannelDialog';
+import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
+import VoidConfirmDialog from './VoidConfirmDialog';
 
 const ADD_CHANNEL_OPTION = '+ 新增管道';
 
@@ -146,6 +150,11 @@ export default function LedgerTable(props: LedgerTableProps) {
   const [batchProject, setBatchProject] = useState('');
   const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
+  const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
+  const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
+  const [allowanceOverrides, setAllowanceOverrides] = useState<Record<string, AllowanceRecord[]>>({});
+  const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
+  const allowanceCountFor = (rowId: string, base: number) => base + (allowanceOverrides[rowId]?.length ?? 0);
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
   const toggleCheck = (id: string) => setChecked(c => ({ ...c, [id]: !c[id] }));
 
@@ -161,6 +170,16 @@ export default function LedgerTable(props: LedgerTableProps) {
     if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
     setAddChannelRowId(null);
   };
+  const handleAllowanceSubmit = (rowId: string, record: AllowanceRecord) => {
+    setAllowanceOverrides(o => ({ ...o, [rowId]: [...(o[rowId] ?? []), record] }));
+  };
+  const handleVoidConfirm = (rowId: string) => {
+    setVoidedOverrides(o => ({ ...o, [rowId]: true }));
+  };
+
+  const mergedAllowanceRow: SalesRow | null = allowanceRow
+    ? { ...allowanceRow, allowances: [...allowanceRow.allowances, ...(allowanceOverrides[allowanceRow.id] ?? [])] }
+    : null;
 
   const dialogs = (
     <>
@@ -171,6 +190,16 @@ export default function LedgerTable(props: LedgerTableProps) {
         row={manualEntryRow}
         onSubmit={() => setManualEntryRow(null)}
       />
+      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={mergedAllowanceRow} onSubmit={handleAllowanceSubmit} />
+      {voidRow && (
+        <VoidConfirmDialog
+          open
+          onClose={() => setVoidRow(null)}
+          onConfirm={() => handleVoidConfirm(voidRow.id)}
+          transactionId={voidRow.id}
+          amount={voidRow.amount}
+        />
+      )}
     </>
   );
 
@@ -222,7 +251,12 @@ export default function LedgerTable(props: LedgerTableProps) {
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
                       <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
-                      <span className="font-mono text-[13px] font-semibold">{row.id}</span>
+                      <Link
+                        href={`/ledger/${row.id}?side=sales`}
+                        className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
+                      >
+                        {row.id}
+                      </Link>
                     </div>
                   </td>
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
@@ -249,17 +283,19 @@ export default function LedgerTable(props: LedgerTableProps) {
                           手動入帳
                         </Button>
                       )}
-                      {row.voided ? (
+                      {row.voided || voidedOverrides[row.id] ? (
                         <Button size="sm" variant="ghost" disabled icon={CircleX} className="w-[84px]">
                           已作廢
                         </Button>
                       ) : (
-                        <Button size="sm" variant="ghost" icon={CircleX} className="w-[84px]">
+                        <Button size="sm" variant="ghost" icon={CircleX} className="w-[84px]" onClick={() => setVoidRow(row)}>
                           作廢
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" icon={FileMinus} className="w-[104px]">
-                        {row.allowanceCount > 0 ? `折讓 (${row.allowanceCount})` : '折讓'}
+                      <Button size="sm" variant="ghost" icon={FileMinus} className="w-[104px]" onClick={() => setAllowanceRow(row)}>
+                        {allowanceCountFor(row.id, row.allowances.length) > 0
+                          ? `折讓 (${allowanceCountFor(row.id, row.allowances.length)})`
+                          : '折讓'}
                       </Button>
                     </div>
                   </td>
@@ -366,7 +402,12 @@ export default function LedgerTable(props: LedgerTableProps) {
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
                       <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
-                      <span className="font-mono text-[13px] font-semibold">{row.id}</span>
+                      <Link
+                        href={`/ledger/${row.id}?side=purchase`}
+                        className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
+                      >
+                        {row.id}
+                      </Link>
                     </div>
                   </td>
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
