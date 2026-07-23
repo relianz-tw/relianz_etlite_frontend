@@ -1,14 +1,14 @@
 'use client';
 
-import Button from '@/components/ui/Button';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from 'lucide-react';
-import { useState } from 'react';
-import ExportRangeDialog from './ExportRangeDialog';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  /** 右側插槽，通常放各頁自己的「匯出總表」按鈕（含其對話框） */
+  rightSlot?: ReactNode;
 }
 
 function pageList(page: number, totalPages: number): (number | 'ellipsis')[] {
@@ -25,12 +25,9 @@ function pageList(page: number, totalPages: number): (number | 'ellipsis')[] {
 const pagerBtnClass =
   'grid h-8 w-8 place-items-center rounded-md border border-neutral-blue-gray/40 text-neutral-mid hover:bg-surface-cream disabled:cursor-not-allowed disabled:opacity-40';
 
-export default function Pagination({ page, totalPages, onPageChange }: PaginationProps) {
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
-
+export default function Pagination({ page, totalPages, onPageChange, rightSlot }: PaginationProps) {
   return (
     <div className="mt-4">
-      <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
       {/* 桌機：頁碼置中 */}
       <div className="hidden grid-cols-3 items-center nav:grid">
         <div />
@@ -65,9 +62,7 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
             <ChevronsRight size={15} />
           </button>
         </div>
-        <Button variant="ghost" icon={Download} className="justify-self-end" onClick={() => setExportDialogOpen(true)}>
-          匯出總表
-        </Button>
+        <div className="flex items-center justify-self-end gap-2">{rightSlot}</div>
       </div>
     </div>
   );

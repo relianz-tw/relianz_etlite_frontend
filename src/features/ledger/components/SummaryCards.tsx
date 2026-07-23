@@ -1,9 +1,10 @@
 'use client';
 
 import StatCard from '@/components/ui/StatCard';
-import { fmtCurrency, PURCHASE_DAILY, SALES_DAILY } from '../data';
+import TrendChart from '@/components/ui/TrendChart';
+import { fmtCurrency } from '@/lib/utils';
+import { PURCHASE_DAILY, SALES_DAILY } from '../data';
 import type { Side } from '../types';
-import LedgerTrendChart from './LedgerTrendChart';
 
 const SALES_TOTALS = { issued: 999462582, settled: 850000000, outstanding: 149462582 };
 const PURCHASE_TOTALS = { received: 999462582, paid: 850000000, payable: 149462582 };
@@ -11,7 +12,7 @@ const PURCHASE_TOTALS = { received: 999462582, paid: 850000000, payable: 1494625
 // 桌面版卡片有足夠寬度，趨勢圖預設顯示「日」；手機版卡片較窄，預設顯示「週」避免 62 根柱子擠爆
 function buildCards(side: Side, chartDefaultView: 'day' | 'week') {
   const dailyData = side === 'sales' ? SALES_DAILY : PURCHASE_DAILY;
-  const chart = <LedgerTrendChart data={dailyData} defaultView={chartDefaultView} />;
+  const chart = <TrendChart data={dailyData} defaultView={chartDefaultView} />;
 
   return side === 'sales'
     ? [

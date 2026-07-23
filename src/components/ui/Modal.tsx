@@ -26,20 +26,22 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
   if (!open) return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-neutral-dark/40 p-4"
-      onMouseDown={e => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className={`w-full ${widthClassName} rounded-lg bg-white p-6 shadow-level1`}>
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="font-notoSerif text-lg font-semibold text-neutral-dark">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="關閉" className="text-neutral-mid hover:text-neutral-dark">
-            <X size={18} />
-          </button>
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-neutral-dark/40">
+      <div
+        className="flex min-h-full items-center justify-center p-4"
+        onMouseDown={e => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className={`w-full ${widthClassName} rounded-lg bg-white p-6 shadow-level1`}>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <h2 className="font-notoSerif text-lg font-semibold text-neutral-dark">{title}</h2>
+            <button type="button" onClick={onClose} aria-label="關閉" className="text-neutral-mid hover:text-neutral-dark">
+              <X size={18} />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </div>,
     document.body,

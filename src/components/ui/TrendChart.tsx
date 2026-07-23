@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import { fmtCurrency, type DailyPoint } from '../data';
+import { fmtCurrency, type DailyPoint } from '@/lib/utils';
 
 type ChartView = 'day' | 'week';
 
@@ -24,7 +24,7 @@ function toWeekly(daily: DailyPoint[]): TrendPoint[] {
   return weeks;
 }
 
-export default function LedgerTrendChart({ data, defaultView }: { data: DailyPoint[]; defaultView: ChartView }) {
+export default function TrendChart({ data, defaultView }: { data: DailyPoint[]; defaultView: ChartView }) {
   const [view, setView] = useState<ChartView>(defaultView);
   const weekly = useMemo(() => toWeekly(data), [data]);
 

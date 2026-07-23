@@ -128,6 +128,16 @@ Border: 1.5px solid currentColor
 Border-radius: 6px
 ```
 
+**Focus (all variants)**
+```
+outline: none（不使用瀏覽器預設藍色外框）
+每個 variant 的 focus ring 採用該 variant 自己的主色，而非統一藍色：
+  primary → rgba(0, 95, 162, 0.3)     outline → rgba(0, 95, 162, 0.2)
+  warm    → rgba(168, 139, 116, 0.4)  ghost   → rgba(154, 167, 185, 0.5)
+  danger  → rgba(221, 107, 95, 0.3)
+僅鍵盤導覽（:focus-visible）觸發，滑鼠點擊不顯示，避免棕色等按鈕上出現不搭調的藍色外框
+```
+
 > Note: Pill variant (border-radius: 9999px) available for marketing / hero CTAs only.
 
 ### Cards & Containers
@@ -156,6 +166,19 @@ Focus border: #005FA2
 Focus shadow: 0 0 0 3px rgba(0, 95, 162, 0.15)
 Error border: #377456 inverted → use a warm red if needed; default to 權威灰 `#3A3830`
 ```
+
+**Textarea**（多行輸入，如備註）
+```
+Border: 1.5px solid #9AA7B9
+Border-radius: 6px（沿用 rounded-lg 視覺，同 TextInput）
+Padding: 8px 12px
+Font: Baskerville Regular / Noto Sans TC, 14px
+預設 4 rows，不可縮放（resize: none）
+Focus border: #005FA2
+Focus shadow: 0 0 0 3px rgba(0, 95, 162, 0.15)
+Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
+```
+對應元件：`src/components/ui/Textarea.tsx`。
 
 ### Navigation
 ```

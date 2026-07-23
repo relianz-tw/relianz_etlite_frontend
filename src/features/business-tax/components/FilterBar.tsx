@@ -3,15 +3,12 @@
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
-import { ChevronDown, ChevronUp, Plus, Search, Upload } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronUp, Download, Search } from 'lucide-react';
 import { useState } from 'react';
 import type { AdvancedFilter } from '../types';
-import type { Side } from '../types';
-import ImportInvoiceDialog from './ImportInvoiceDialog';
 
 export interface FilterBarProps {
-  side: Side;
+  onOpenReport: () => void;
   query: string;
   onQueryChange: (v: string) => void;
   onSearch: () => void;
@@ -22,15 +19,12 @@ export interface FilterBarProps {
 
 const STATUS_OPTIONS: { value: AdvancedFilter['status']; label: string }[] = [
   { value: 'all', label: '全部狀態' },
-  { value: 'normal', label: '正常' },
+  { value: 'pending', label: '待申報' },
   { value: 'voided', label: '已作廢' },
 ];
 
-export default function FilterBar({ side, query, onQueryChange, onSearch, advanced, onAdvancedChange, onAdvancedApply }: FilterBarProps) {
-  const router = useRouter();
-  const goToNewTransaction = () => router.push(`/ledger/new?side=${side}`);
+export default function FilterBar({ onOpenReport, query, onQueryChange, onSearch, advanced, onAdvancedChange, onAdvancedApply }: FilterBarProps) {
   const [advOpen, setAdvOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
 
   const handleClearAdvanced = () => {
     const cleared: AdvancedFilter = { status: 'all', minAmount: '', maxAmount: '' };
@@ -58,21 +52,16 @@ export default function FilterBar({ side, query, onQueryChange, onSearch, advanc
           onChange={e => onAdvancedChange({ ...advanced, maxAmount: e.target.value })}
         />
       </div>
-      {side === 'sales' && (
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-semibold text-neutral-mid">狀態</label>
-          <Select
-            value={advanced.status}
-            onValueChange={v => onAdvancedChange({ ...advanced, status: v as AdvancedFilter['status'] })}
-          >
-            {STATUS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
+      <div className="flex-1">
+        <label className="mb-1 block text-xs font-semibold text-neutral-mid">狀態</label>
+        <Select value={advanced.status} onValueChange={v => onAdvancedChange({ ...advanced, status: v as AdvancedFilter['status'] })}>
+          {STATUS_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      </div>
       <div className="flex gap-2.5">
         <Button variant="ghost" onClick={handleClearAdvanced}>
           清除
@@ -89,26 +78,10 @@ export default function FilterBar({ side, query, onQueryChange, onSearch, advanc
       {/* 桌機 */}
       <div className="hidden flex-col gap-3 nav:flex">
         <div className="flex items-center gap-2.5">
-          {side === 'sales' && (
-            <Select widthClassName="flex-[2]">
-              <option>交易期間：114/01/01 – 115/01/01</option>
-              <option>本月</option>
-              <option>本季</option>
-              <option>本年度</option>
-            </Select>
-          )}
-          <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
-            匯入電子發票
-          </Button>
-          <Button variant="warm" icon={Plus} className="flex-1" onClick={goToNewTransaction}>
-            新增交易
-          </Button>
-        </div>
-        <div className="flex items-center gap-2.5">
           <Select widthClassName="w-32">
-            <option>交易編號</option>
             <option>發票號碼</option>
             <option>統一編號</option>
+            <option>買受人</option>
           </Select>
           <div className="flex-1">
             <TextInput
@@ -124,22 +97,17 @@ export default function FilterBar({ side, query, onQueryChange, onSearch, advanc
           <Button variant="ghost" icon={advOpen ? ChevronUp : ChevronDown} iconPosition="right" onClick={() => setAdvOpen(o => !o)}>
             進階搜尋
           </Button>
+          <Button variant="warm" icon={Download} onClick={onOpenReport}>
+            轉出本期營業稅申報檔
+          </Button>
         </div>
         {advOpen && AdvancedPanel}
       </div>
 
       {/* 手機 */}
       <div className="flex flex-col gap-3 nav:hidden">
-        <div className="flex gap-2.5">
-          <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
-            匯入電子發票
-          </Button>
-          <Button variant="primary" icon={Plus} className="flex-1" onClick={goToNewTransaction}>
-            新增交易
-          </Button>
-        </div>
         <TextInput
-          placeholder="搜尋發票號碼、公司或金額"
+          placeholder="搜尋發票號碼或買受人"
           value={query}
           onChange={e => onQueryChange(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
@@ -159,9 +127,10 @@ export default function FilterBar({ side, query, onQueryChange, onSearch, advanc
           </Button>
         </div>
         {advOpen && AdvancedPanel}
+        <Button variant="warm" icon={Download} className="w-full" onClick={onOpenReport}>
+          轉出本期營業稅申報檔
+        </Button>
       </div>
-
-      <ImportInvoiceDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </>
   );
 }

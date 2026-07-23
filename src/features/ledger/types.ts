@@ -2,6 +2,13 @@ export type Side = 'sales' | 'purchase';
 export type SalesSubTab = 'receivable' | 'received';
 export type PurchaseSubTab = 'payable' | 'paid';
 
+/** 進階搜尋條件：金額區間 + 狀態（僅銷項可用，進項資料無作廢狀態） */
+export interface AdvancedFilter {
+  status: 'all' | 'normal' | 'voided';
+  minAmount: string;
+  maxAmount: string;
+}
+
 export interface SubRow {
   id: string;
   label?: string;
