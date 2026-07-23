@@ -452,16 +452,18 @@ export default function LedgerTable(props: LedgerTableProps) {
           })}
         </tbody>
         <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={4}>
-          <BatchUpdateRow
-            colSpan={7}
-            selectedCount={editableSelected.length}
-            selectedAmount={batchSelectedAmount}
-            batchCategory={batchCategory}
-            onBatchCategoryChange={setBatchCategory}
-            batchProject={batchProject}
-            onBatchProjectChange={setBatchProject}
-            onApply={handleBatchApply}
-          />
+          {editableSelected.length > 0 && (
+            <BatchUpdateRow
+              colSpan={7}
+              selectedCount={editableSelected.length}
+              selectedAmount={batchSelectedAmount}
+              batchCategory={batchCategory}
+              onBatchCategoryChange={setBatchCategory}
+              batchProject={batchProject}
+              onBatchProjectChange={setBatchProject}
+              onApply={handleBatchApply}
+            />
+          )}
         </TableFooter>
       </table>
     </div>
