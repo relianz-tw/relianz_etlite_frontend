@@ -6,6 +6,7 @@ import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import VoidConfirmDialog from '../components/VoidConfirmDialog';
 import type { Side } from '../types';
 import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionAmountCard from './components/TransactionAmountCard';
@@ -33,6 +34,7 @@ function initialForm(mode: TransactionMode, side: Side, transactionId?: string):
 export default function TransactionFormView({ mode, side, transactionId }: TransactionFormViewProps) {
   const router = useRouter();
   const [form, setForm] = useState<TransactionFormState>(() => initialForm(mode, side, transactionId));
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
 
   const handleChange = (patch: Partial<TransactionFormState>) => setForm(f => ({ ...f, ...patch }));
   const handleFileChange = (fileName: string, previewUrl: string) =>
@@ -42,6 +44,7 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
 
   // 視覺模擬：建立/更新/作廢/刪除皆不接後端，一律返回帳簿
   const backToLedger = () => router.push('/ledger');
+  const totalAmount = form.salesAmount + form.taxAmount;
 
   const breadcrumb = mode === 'create' ? `帳簿 / 新增${SIDE_LABEL[side]}交易` : `帳簿 / ${SIDE_LABEL[side]}交易細節`;
 
@@ -90,7 +93,11 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
               )}
               {mode === 'edit' && (
                 <>
-                  <Button variant="danger" className="flex-1 nav:flex-none" onClick={backToLedger}>
+                  <Button
+                    variant="danger"
+                    className="flex-1 nav:flex-none"
+                    onClick={side === 'sales' ? () => setVoidConfirmOpen(true) : backToLedger}
+                  >
                     {side === 'sales' ? '作廢' : '刪除'}
                   </Button>
                   <Button variant="primary" className="flex-1 nav:flex-none" onClick={backToLedger}>
@@ -102,6 +109,16 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
           </div>
         </div>
       </div>
+
+      {mode === 'edit' && side === 'sales' && (
+        <VoidConfirmDialog
+          open={voidConfirmOpen}
+          onClose={() => setVoidConfirmOpen(false)}
+          onConfirm={backToLedger}
+          transactionId={form.invoiceNumber}
+          amount={totalAmount}
+        />
+      )}
     </div>
   );
 }
