@@ -3,15 +3,19 @@
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
-import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, X } from 'lucide-react';
+import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
+import { fmtCurrency } from '@/lib/utils';
+import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS, fmtCurrency } from '../data';
-import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import type { AllowanceRecord, PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
 import { useLongPress } from '../useLongPress';
 import AddChannelDialog from './AddChannelDialog';
-import ExportRangeDialog from './ExportRangeDialog';
+import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
+import VoidConfirmDialog from './VoidConfirmDialog';
 
 const ADD_CHANNEL_OPTION = '+ 新增管道';
 
@@ -25,32 +29,36 @@ function CardShell({
   selectable,
   isSelected,
   onSelectToggle,
+  onCardClick,
   longPressHandlers,
 }: {
   children: ReactNode;
   selectable?: boolean;
   isSelected?: boolean;
   onSelectToggle?: () => void;
+  /** 非選取模式下點卡片本身（非內部控制項）觸發，用於導向交易編輯頁 */
+  onCardClick?: () => void;
   longPressHandlers: ReturnType<typeof useLongPress>;
 }) {
+  const handleClick = selectable ? onSelectToggle : onCardClick;
   return (
     <div
-      role={selectable ? 'button' : undefined}
-      tabIndex={selectable ? 0 : undefined}
-      onClick={selectable ? onSelectToggle : undefined}
+      role={handleClick ? 'button' : undefined}
+      tabIndex={handleClick ? 0 : undefined}
+      onClick={handleClick}
       onKeyDown={
-        selectable
+        handleClick
           ? e => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                onSelectToggle?.();
+                handleClick();
               }
             }
           : undefined
       }
       className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${
         isSelected ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray/30 bg-white'
-      } ${selectable ? 'cursor-pointer select-none' : ''}`}
+      } ${handleClick ? 'cursor-pointer select-none' : ''}`}
       {...longPressHandlers}
     >
       {selectable && (
@@ -66,7 +74,14 @@ function CardShell({
 function ExpandToggle({ hasChildren, expanded, onToggle }: { hasChildren: boolean; expanded: boolean; onToggle: () => void }) {
   if (!hasChildren) return null;
   return (
-    <button type="button" onClick={onToggle} className="text-neutral-mid">
+    <button
+      type="button"
+      onClick={e => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="text-neutral-mid"
+    >
       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
     </button>
   );
@@ -95,10 +110,15 @@ function SalesCard({
   channelValue,
   onChannelSelect,
   onManualEntry,
+  onCardClick,
   selectionMode,
   isSelected,
   onSelectToggle,
   onLongPressStart,
+  isVoided,
+  onVoid,
+  allowanceCount,
+  onAllowance,
 }: {
   row: SalesRow;
   subTab: SalesSubTab;
@@ -108,14 +128,25 @@ function SalesCard({
   channelValue: string;
   onChannelSelect: (value: string) => void;
   onManualEntry: () => void;
+  onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
   onSelectToggle: () => void;
   onLongPressStart: (id: string) => void;
+  isVoided: boolean;
+  onVoid: () => void;
+  allowanceCount: number;
+  onAllowance: () => void;
 }) {
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
   return (
-    <CardShell selectable={selectionMode} isSelected={isSelected} onSelectToggle={onSelectToggle} longPressHandlers={longPress}>
+    <CardShell
+      selectable={selectionMode}
+      isSelected={isSelected}
+      onSelectToggle={onSelectToggle}
+      onCardClick={onCardClick}
+      longPressHandlers={longPress}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
@@ -127,29 +158,34 @@ function SalesCard({
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
         {!selectionMode && (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap justify-end gap-1.5" onClick={e => e.stopPropagation()}>
             {subTab === 'receivable' && (
               <Button size="sm" variant="outline" icon={DollarSign} onClick={onManualEntry}>
                 入帳
               </Button>
             )}
-            {row.voided ? (
+            {isVoided ? (
               <span className="rounded-md bg-surface-cream px-2.5 py-1 text-xs font-semibold text-neutral-mid">已作廢</span>
             ) : (
-              <Button size="sm" variant="ghost" icon={CircleX}>
+              <Button size="sm" variant="ghost" icon={CircleX} onClick={onVoid}>
                 作廢
               </Button>
             )}
+            <Button size="sm" variant="ghost" icon={FileMinus} onClick={onAllowance}>
+              {allowanceCount > 0 ? `折讓 (${allowanceCount})` : '折讓'}
+            </Button>
           </div>
         )}
       </div>
       {!selectionMode && subTab === 'received' && (
-        <Select widthClassName="w-full" value={channelValue} onValueChange={onChannelSelect}>
-          {channels.map(c => (
-            <option key={c}>{c}</option>
-          ))}
-          <option>{ADD_CHANNEL_OPTION}</option>
-        </Select>
+        <div onClick={e => e.stopPropagation()}>
+          <Select widthClassName="w-full" value={channelValue} onValueChange={onChannelSelect}>
+            {channels.map(c => (
+              <option key={c}>{c}</option>
+            ))}
+            <option>{ADD_CHANNEL_OPTION}</option>
+          </Select>
+        </div>
       )}
       {!selectionMode && expanded && <ChildrenList children={row.children} />}
     </CardShell>
@@ -160,6 +196,7 @@ function PurchaseCard({
   row,
   expanded,
   onToggle,
+  onCardClick,
   selectionMode,
   isSelected,
   onSelectToggle,
@@ -172,6 +209,7 @@ function PurchaseCard({
   row: PurchaseRow;
   expanded: boolean;
   onToggle: () => void;
+  onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
   onSelectToggle: () => void;
@@ -184,7 +222,13 @@ function PurchaseCard({
   const locked = row.source !== 'invoice';
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
   return (
-    <CardShell selectable={selectionMode} isSelected={isSelected} onSelectToggle={onSelectToggle} longPressHandlers={longPress}>
+    <CardShell
+      selectable={selectionMode}
+      isSelected={isSelected}
+      onSelectToggle={onSelectToggle}
+      onCardClick={onCardClick}
+      longPressHandlers={longPress}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
@@ -195,7 +239,7 @@ function PurchaseCard({
       <div className="truncate text-[13px] text-neutral-mid">{row.party}</div>
       <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
       {!selectionMode && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
           <Select widthClassName="w-full" value={locked ? row.category : categoryValue} onValueChange={onCategorySelect} disabled={locked}>
             {locked ? <option>{row.category}</option> : EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
           </Select>
@@ -210,11 +254,18 @@ function PurchaseCard({
 }
 
 export default function LedgerCards(props: LedgerCardsProps) {
+  const router = useRouter();
+  const goToTransaction = (id: string) => router.push(`/ledger/${id}?side=${props.side}`);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [channels, setChannels] = useState(SALES_CHANNELS);
   const [channelOverrides, setChannelOverrides] = useState<Record<string, string>>({});
   const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
+  const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
+  const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
+  const [allowanceOverrides, setAllowanceOverrides] = useState<Record<string, AllowanceRecord[]>>({});
+  const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
+  const allowanceCountFor = (rowId: string, base: number) => base + (allowanceOverrides[rowId]?.length ?? 0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -236,6 +287,12 @@ export default function LedgerCards(props: LedgerCardsProps) {
     setChannels(c => [...c, name]);
     if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
     setAddChannelRowId(null);
+  };
+  const handleAllowanceSubmit = (rowId: string, record: AllowanceRecord) => {
+    setAllowanceOverrides(o => ({ ...o, [rowId]: [...(o[rowId] ?? []), record] }));
+  };
+  const handleVoidConfirm = (rowId: string) => {
+    setVoidedOverrides(o => ({ ...o, [rowId]: true }));
   };
 
   // 長按任一卡片進入選擇模式並選取該卡；再次長按或點擊其他卡片皆為切換選取
@@ -277,6 +334,25 @@ export default function LedgerCards(props: LedgerCardsProps) {
         onSubmit={() => setManualEntryRow(null)}
       />
       <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
+      <AllowanceDialog
+        open={allowanceRow !== null}
+        onClose={() => setAllowanceRow(null)}
+        row={
+          allowanceRow
+            ? { ...allowanceRow, allowances: [...allowanceRow.allowances, ...(allowanceOverrides[allowanceRow.id] ?? [])] }
+            : null
+        }
+        onSubmit={handleAllowanceSubmit}
+      />
+      {voidRow && (
+        <VoidConfirmDialog
+          open
+          onClose={() => setVoidRow(null)}
+          onConfirm={() => handleVoidConfirm(voidRow.id)}
+          transactionId={voidRow.id}
+          amount={voidRow.amount}
+        />
+      )}
 
       {/* 頂部摘要／選擇操作列：sticky 貼在 Navbar（h-16）下方 */}
       <div className="sticky top-16 z-40 flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
@@ -353,10 +429,15 @@ export default function LedgerCards(props: LedgerCardsProps) {
               channelValue={channelOverrides[row.id] ?? row.channel}
               onChannelSelect={v => handleChannelSelect(row.id, v)}
               onManualEntry={() => setManualEntryRow(row)}
+              onCardClick={() => goToTransaction(row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
               onLongPressStart={enterSelectionMode}
+              isVoided={row.voided || !!voidedOverrides[row.id]}
+              onVoid={() => setVoidRow(row)}
+              allowanceCount={allowanceCountFor(row.id, row.allowances.length)}
+              onAllowance={() => setAllowanceRow(row)}
             />
           ))
         : props.rows.map(row => (
@@ -365,6 +446,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
               row={row}
               expanded={!!expanded[row.id]}
               onToggle={() => toggleExpand(row.id)}
+              onCardClick={() => goToTransaction(row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
