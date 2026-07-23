@@ -9,6 +9,13 @@ export interface SubRow {
   date?: string;
 }
 
+export interface AllowanceRecord {
+  id: string;
+  date: string;
+  amount: number;
+  note: string;
+}
+
 export interface SalesRow {
   id: string;
   amount: number;
@@ -16,7 +23,7 @@ export interface SalesRow {
   date: string;
   channel: string;
   voided: boolean;
-  allowanceCount: number;
+  allowances: AllowanceRecord[];
   children?: SubRow[];
 }
 
