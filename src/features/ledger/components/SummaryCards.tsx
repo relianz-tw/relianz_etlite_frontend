@@ -16,12 +16,12 @@ function buildCards(side: Side, chartDefaultView: 'day' | 'week') {
 
   return side === 'sales'
     ? [
-        { label: '已開立發票金額', value: fmtCurrency(SALES_TOTALS.issued), chart },
+        { label: '已開立發票金額', value: fmtCurrency(SALES_TOTALS.issued), chart, detailHref: '/ledger/trend?side=sales' },
         { label: '已入帳金額', value: fmtCurrency(SALES_TOTALS.settled), valueClassName: 'text-semantic-success', caption: '平均收款週期 7 天' },
         { label: '應收帳款', value: fmtCurrency(SALES_TOTALS.outstanding), valueClassName: 'text-semantic-error', caption: '平均收款週期 7 天' },
       ]
     : [
-        { label: '已收取憑證金額', value: fmtCurrency(PURCHASE_TOTALS.received), chart },
+        { label: '已收取憑證金額', value: fmtCurrency(PURCHASE_TOTALS.received), chart, detailHref: '/ledger/trend?side=purchase' },
         { label: '已付款金額', value: fmtCurrency(PURCHASE_TOTALS.paid), valueClassName: 'text-semantic-success', caption: '平均付款週期 7 天' },
         { label: '應付金額', value: fmtCurrency(PURCHASE_TOTALS.payable), valueClassName: 'text-semantic-error', caption: '平均付款週期 7 天' },
       ];
