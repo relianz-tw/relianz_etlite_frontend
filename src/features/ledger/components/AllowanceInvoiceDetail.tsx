@@ -61,15 +61,15 @@ export default function AllowanceInvoiceDetail({ lineItems = ALLOWANCE_LINE_ITEM
                 <div className="grid flex-1 grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-neutral-mid">商品名稱</p>
-                    <p className="mt-1 font-semibold text-neutral-dark">{item.productName}</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-dark">{item.productName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-neutral-mid">可折讓餘額(未稅)</p>
-                    <p className="mt-1 font-semibold text-neutral-dark">{fmtCurrency(item.allowableNet)}</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-dark">{fmtCurrency(item.allowableNet)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-neutral-mid">可折讓稅額</p>
-                    <p className="mt-1 font-semibold text-neutral-dark">{fmtCurrency(item.allowableTax)}</p>
+                    <p className="mt-1 text-sm font-semibold text-neutral-dark">{fmtCurrency(item.allowableTax)}</p>
                   </div>
                 </div>
               </div>
