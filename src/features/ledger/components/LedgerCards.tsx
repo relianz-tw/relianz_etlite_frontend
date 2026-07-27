@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
+import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
 import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -267,6 +268,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportSelectedOpen, setExportSelectedOpen] = useState(false);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
   const [projectOverrides, setProjectOverrides] = useState<Record<string, string>>({});
   const [batchCategory, setBatchCategory] = useState('');
@@ -329,6 +331,13 @@ export default function LedgerCards(props: LedgerCardsProps) {
         onSubmit={() => setManualEntryRow(null)}
       />
       <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
+      <ExportSelectedDialog
+        open={exportSelectedOpen}
+        onClose={() => setExportSelectedOpen(false)}
+        selectedCount={selectedCount}
+        selectedAmount={selectedAmount}
+        onExport={() => setExportSelectedOpen(false)}
+      />
       <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
       {voidRow && (
         <VoidConfirmDialog
@@ -354,9 +363,20 @@ export default function LedgerCards(props: LedgerCardsProps) {
                 <span className="font-mono font-semibold tabular-nums text-neutral-dark">{selectedAmount}</span>
               </span>
             </div>
-            <Button variant="ghost" size="sm" icon={X} onClick={exitSelectionMode}>
-              取消
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="warm"
+                size="sm"
+                icon={Download}
+                disabled={selectedCount === 0}
+                onClick={() => setExportSelectedOpen(true)}
+              >
+                匯出所選
+              </Button>
+              <Button variant="ghost" size="sm" icon={X} onClick={exitSelectionMode}>
+                取消
+              </Button>
+            </div>
           </>
         ) : (
           <>

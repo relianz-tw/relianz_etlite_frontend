@@ -2,8 +2,9 @@
 
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import Select from '@/components/ui/Select';
-import { ChevronDown, ChevronRight, CircleX, DollarSign, FileMinus } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
 import { fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
@@ -139,6 +140,42 @@ function BatchUpdateRow({
   );
 }
 
+/** 已選取交易的操作列：顯示已選筆數與金額，並提供「匯出所選」與「取消選取」 */
+function SelectionExportRow({
+  colSpan,
+  selectedCount,
+  selectedAmount,
+  onExport,
+  onClear,
+}: {
+  colSpan: number;
+  selectedCount: number;
+  selectedAmount: string;
+  onExport: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <tr className="border-t border-neutral-blue-gray/20 bg-white">
+      <td colSpan={colSpan} className={tdClass}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-neutral-mid">
+            已選 <span className="font-semibold text-neutral-dark">{selectedCount}</span> 筆{' '}
+            <span className="font-mono font-semibold tabular-nums text-neutral-dark">{selectedAmount}</span>
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={onClear}>
+              取消選取
+            </Button>
+            <Button size="sm" variant="warm" icon={Download} onClick={onExport}>
+              匯出所選
+            </Button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function LedgerTable(props: LedgerTableProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -153,8 +190,37 @@ export default function LedgerTable(props: LedgerTableProps) {
   const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
   const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
   const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
+  const [exportOpen, setExportOpen] = useState(false);
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
   const toggleCheck = (id: string) => setChecked(c => ({ ...c, [id]: !c[id] }));
+
+  // 選取狀態：涵蓋目前分頁的全部列（含進項的勞報／薪資列），供全選與「匯出所選」共用
+  const allIds = props.rows.map(r => r.id);
+  const selectedRows = props.rows.filter(r => checked[r.id]);
+  const selectedCount = selectedRows.length;
+  const selectedAmount = fmtCurrency(selectedRows.reduce((sum, r) => sum + r.amount, 0));
+  const allSelected = allIds.length > 0 && selectedCount === allIds.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+  const toggleSelectAll = () => {
+    setChecked(c => {
+      if (allSelected) return {};
+      const next = { ...c };
+      allIds.forEach(id => {
+        next[id] = true;
+      });
+      return next;
+    });
+  };
+  const clearSelection = () => setChecked({});
+  const exportDialog = (
+    <ExportSelectedDialog
+      open={exportOpen}
+      onClose={() => setExportOpen(false)}
+      selectedCount={selectedCount}
+      selectedAmount={selectedAmount}
+      onExport={() => setExportOpen(false)}
+    />
+  );
 
   const handleChannelSelect = (rowId: string, value: string) => {
     if (value === ADD_CHANNEL_OPTION) {
@@ -200,6 +266,7 @@ export default function LedgerTable(props: LedgerTableProps) {
     return (
       <>
       {dialogs}
+      {exportDialog}
       <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
         <table className="w-full table-fixed border-collapse">
           <colgroup>
@@ -213,7 +280,15 @@ export default function LedgerTable(props: LedgerTableProps) {
           </colgroup>
           <thead className="bg-surface-off-white">
             <tr className="border-b border-neutral-blue-gray/40">
-              <th className={thClass} />
+              <th className={thClass}>
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={toggleSelectAll}
+                  disabled={allIds.length === 0}
+                  aria-label="全選"
+                />
+              </th>
               <th className={thClass}>
                 <SortHeader label="交易編號" />
               </th>
@@ -303,7 +378,17 @@ export default function LedgerTable(props: LedgerTableProps) {
               </Fragment>
             ))}
           </tbody>
-          <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={showChannel ? 4 : 3} />
+          <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={showChannel ? 4 : 3}>
+            {selectedCount > 0 && (
+              <SelectionExportRow
+                colSpan={showChannel ? 7 : 6}
+                selectedCount={selectedCount}
+                selectedAmount={selectedAmount}
+                onExport={() => setExportOpen(true)}
+                onClear={clearSelection}
+              />
+            )}
+          </TableFooter>
         </table>
       </div>
       </>
@@ -320,20 +405,9 @@ export default function LedgerTable(props: LedgerTableProps) {
     setBatchCategory('');
     setBatchProject('');
   };
-  const editableIds = rows.filter(r => r.source === 'invoice').map(r => r.id);
-  const selectedEditableCount = editableIds.filter(id => checked[id]).length;
-  const allEditableSelected = editableIds.length > 0 && selectedEditableCount === editableIds.length;
-  const someEditableSelected = selectedEditableCount > 0 && !allEditableSelected;
-  const toggleSelectAll = () => {
-    setChecked(c => {
-      const next = { ...c };
-      editableIds.forEach(id => {
-        next[id] = !allEditableSelected;
-      });
-      return next;
-    });
-  };
   return (
+    <>
+    {exportDialog}
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
         <colgroup>
@@ -349,10 +423,10 @@ export default function LedgerTable(props: LedgerTableProps) {
           <tr className="border-b border-neutral-blue-gray/40">
             <th className={thClass}>
               <Checkbox
-                checked={allEditableSelected}
-                indeterminate={someEditableSelected}
+                checked={allSelected}
+                indeterminate={someSelected}
                 onChange={toggleSelectAll}
-                disabled={editableIds.length === 0}
+                disabled={allIds.length === 0}
                 aria-label="全選"
               />
             </th>
@@ -381,12 +455,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   className={`border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
                 >
                   <td className={tdClass}>
-                    <Checkbox
-                      checked={locked ? true : !!checked[row.id]}
-                      onChange={() => !locked && toggleCheck(row.id)}
-                      disabled={locked}
-                      aria-label={`選取 ${row.id}`}
-                    />
+                    <Checkbox checked={!!checked[row.id]} onChange={() => toggleCheck(row.id)} aria-label={`選取 ${row.id}`} />
                   </td>
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
@@ -441,6 +510,15 @@ export default function LedgerTable(props: LedgerTableProps) {
           })}
         </tbody>
         <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={4}>
+          {selectedCount > 0 && (
+            <SelectionExportRow
+              colSpan={7}
+              selectedCount={selectedCount}
+              selectedAmount={selectedAmount}
+              onExport={() => setExportOpen(true)}
+              onClear={clearSelection}
+            />
+          )}
           {editableSelected.length > 0 && (
             <BatchUpdateRow
               colSpan={7}
@@ -456,5 +534,6 @@ export default function LedgerTable(props: LedgerTableProps) {
         </TableFooter>
       </table>
     </div>
+    </>
   );
 }
