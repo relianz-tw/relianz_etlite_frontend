@@ -1,5 +1,5 @@
 import { generateDailyTrend } from '@/lib/utils';
-import type { AllowanceRecord, PurchaseRow, SalesRow } from './types';
+import type { AllowanceLineItem, AllowanceRecord, PurchaseRow, SalesRow } from './types';
 
 export const EXPENSE_CATEGORIES = ['進貨', '文具用品', '修繕費', '雜項購置'];
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
@@ -16,6 +16,9 @@ const SPLIT_CHILDREN = [
   { id: 'S26XH743195002', amount: 2000, date: '115/03/29' },
   { id: '可折讓餘額（含稅）', label: '可折讓餘額（含稅）', amount: 7500 },
 ];
+
+/** 銷貨折讓退回單「發票明細」的可折讓商品假資料 */
+export const ALLOWANCE_LINE_ITEMS: AllowanceLineItem[] = [{ id: 'ALI-01', productName: '測試商品A', allowableNet: 952, allowableTax: 48 }];
 
 const UA40435903_ALLOWANCES: AllowanceRecord[] = [
   { id: 'ALW-UA40435903-01', date: '115/03/28', amount: 500, note: '出貨數量認列錯誤，折讓部分金額' },

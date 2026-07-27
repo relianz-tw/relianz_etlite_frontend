@@ -130,6 +130,14 @@ export default function FilterBar({ side, query, onQueryChange, onSearch, advanc
 
       {/* 手機 */}
       <div className="flex flex-col gap-3 nav:hidden">
+        {side === 'sales' && (
+          <Select>
+            <option>交易期間：114/01/01 – 115/01/01</option>
+            <option>本月</option>
+            <option>本季</option>
+            <option>本年度</option>
+          </Select>
+        )}
         <div className="flex gap-2.5">
           <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
             匯入電子發票

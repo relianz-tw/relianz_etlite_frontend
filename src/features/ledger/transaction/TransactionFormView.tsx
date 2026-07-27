@@ -77,10 +77,10 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
         <div className="nav:grid nav:grid-cols-[380px_1fr] nav:items-start nav:gap-8">
           <div className="mb-5 flex flex-col gap-4 nav:sticky nav:top-20 nav:mb-0">
             <VoucherUpload mode={mode} fileName={form.voucherFileName} previewUrl={form.voucherPreviewUrl} onFileChange={handleFileChange} />
-            {mode === 'edit' && <TransactionStatusSummary side={side} />}
           </div>
 
           <div className="flex flex-col gap-5">
+            {mode === 'edit' && <TransactionStatusSummary side={side} />}
             <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
             <TransactionAmountCard side={side} form={form} onChange={handleChange} />
             {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}

@@ -23,6 +23,14 @@ export interface AllowanceRecord {
   note: string;
 }
 
+/** 可折讓的發票商品明細（未稅餘額 + 稅額），供「發票明細」折讓退回單使用 */
+export interface AllowanceLineItem {
+  id: string;
+  productName: string;
+  allowableNet: number;
+  allowableTax: number;
+}
+
 export interface SalesRow {
   id: string;
   amount: number;

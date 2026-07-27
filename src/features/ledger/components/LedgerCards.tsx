@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
-import type { AllowanceRecord, PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
 import { useLongPress } from '../useLongPress';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
@@ -263,9 +263,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
   const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
   const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
-  const [allowanceOverrides, setAllowanceOverrides] = useState<Record<string, AllowanceRecord[]>>({});
   const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
-  const allowanceCountFor = (rowId: string, base: number) => base + (allowanceOverrides[rowId]?.length ?? 0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -287,9 +285,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
     setChannels(c => [...c, name]);
     if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
     setAddChannelRowId(null);
-  };
-  const handleAllowanceSubmit = (rowId: string, record: AllowanceRecord) => {
-    setAllowanceOverrides(o => ({ ...o, [rowId]: [...(o[rowId] ?? []), record] }));
   };
   const handleVoidConfirm = (rowId: string) => {
     setVoidedOverrides(o => ({ ...o, [rowId]: true }));
@@ -334,16 +329,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
         onSubmit={() => setManualEntryRow(null)}
       />
       <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
-      <AllowanceDialog
-        open={allowanceRow !== null}
-        onClose={() => setAllowanceRow(null)}
-        row={
-          allowanceRow
-            ? { ...allowanceRow, allowances: [...allowanceRow.allowances, ...(allowanceOverrides[allowanceRow.id] ?? [])] }
-            : null
-        }
-        onSubmit={handleAllowanceSubmit}
-      />
+      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
       {voidRow && (
         <VoidConfirmDialog
           open
@@ -436,7 +422,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
               onLongPressStart={enterSelectionMode}
               isVoided={row.voided || !!voidedOverrides[row.id]}
               onVoid={() => setVoidRow(row)}
-              allowanceCount={allowanceCountFor(row.id, row.allowances.length)}
+              allowanceCount={row.allowances.length}
               onAllowance={() => setAllowanceRow(row)}
             />
           ))

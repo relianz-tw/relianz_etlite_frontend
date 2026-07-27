@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
-import type { AllowanceRecord, PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
@@ -152,9 +152,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
   const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
   const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
-  const [allowanceOverrides, setAllowanceOverrides] = useState<Record<string, AllowanceRecord[]>>({});
   const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
-  const allowanceCountFor = (rowId: string, base: number) => base + (allowanceOverrides[rowId]?.length ?? 0);
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
   const toggleCheck = (id: string) => setChecked(c => ({ ...c, [id]: !c[id] }));
 
@@ -170,16 +168,9 @@ export default function LedgerTable(props: LedgerTableProps) {
     if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
     setAddChannelRowId(null);
   };
-  const handleAllowanceSubmit = (rowId: string, record: AllowanceRecord) => {
-    setAllowanceOverrides(o => ({ ...o, [rowId]: [...(o[rowId] ?? []), record] }));
-  };
   const handleVoidConfirm = (rowId: string) => {
     setVoidedOverrides(o => ({ ...o, [rowId]: true }));
   };
-
-  const mergedAllowanceRow: SalesRow | null = allowanceRow
-    ? { ...allowanceRow, allowances: [...allowanceRow.allowances, ...(allowanceOverrides[allowanceRow.id] ?? [])] }
-    : null;
 
   const dialogs = (
     <>
@@ -190,7 +181,7 @@ export default function LedgerTable(props: LedgerTableProps) {
         row={manualEntryRow}
         onSubmit={() => setManualEntryRow(null)}
       />
-      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={mergedAllowanceRow} onSubmit={handleAllowanceSubmit} />
+      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
       {voidRow && (
         <VoidConfirmDialog
           open
@@ -293,9 +284,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" icon={FileMinus} className="w-[104px]" onClick={() => setAllowanceRow(row)}>
-                        {allowanceCountFor(row.id, row.allowances.length) > 0
-                          ? `折讓 (${allowanceCountFor(row.id, row.allowances.length)})`
-                          : '折讓'}
+                        {row.allowances.length > 0 ? `折讓 (${row.allowances.length})` : '折讓'}
                       </Button>
                     </div>
                   </td>

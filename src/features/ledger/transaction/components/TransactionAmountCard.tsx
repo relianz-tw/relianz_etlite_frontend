@@ -21,7 +21,7 @@ export default function TransactionAmountCard({ side, form, onChange }: Transact
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <h2 className="mb-5 text-base font-semibold text-neutral-dark">金額</h2>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-4 nav:grid-cols-2">
+      <div className="flex flex-col gap-4">
         <Field label="營業稅">
           <Select widthClassName="w-full" value={TAX_RATE_LABEL} disabled onValueChange={() => {}}>
             <option value={TAX_RATE_LABEL}>{TAX_RATE_LABEL}</option>
@@ -53,7 +53,7 @@ export default function TransactionAmountCard({ side, form, onChange }: Transact
           <MoneyInput value={totalAmount} disabled readOnly />
         </Field>
 
-        <Field label="備註" className="nav:col-span-2">
+        <Field label="備註">
           <Textarea value={form.note} onChange={e => onChange({ note: e.target.value })} placeholder="備註（選填）" />
         </Field>
       </div>

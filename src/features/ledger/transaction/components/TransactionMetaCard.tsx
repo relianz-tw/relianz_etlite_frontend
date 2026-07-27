@@ -230,7 +230,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
         </Field>
 
         {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-1 gap-x-8 gap-y-4 nav:grid-cols-2">
+          <div key={i} className="flex flex-col gap-4">
             {row[0]}
             {row[1]}
           </div>
