@@ -1,5 +1,15 @@
+import type { SortDir } from '@/lib/utils';
+
 export type TaxSide = 'sales' | 'purchase';
 export type InvoiceStatus = 'pending' | 'voided';
+
+/** 表格可排序欄位 */
+export type SortKey = 'date' | 'id';
+
+export interface SortState {
+  key: SortKey | null;
+  dir: SortDir;
+}
 
 /** 進階搜尋條件：金額區間 + 狀態 */
 export interface AdvancedFilter {

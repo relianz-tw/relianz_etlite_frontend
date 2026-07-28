@@ -3,19 +3,26 @@
 import Badge from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
 import { fmtCurrency } from '@/lib/utils';
-import { Ban, ChevronDown, ChevronRight, CircleCheck } from 'lucide-react';
+import { Ban, ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleCheck } from 'lucide-react';
 import { Fragment, useState } from 'react';
-import type { TaxInvoiceRow, TaxSide } from '../types';
+import type { SortKey, SortState, TaxInvoiceRow, TaxSide } from '../types';
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
-function SortHeader({ label }: { label: string }) {
+/** 可排序表頭：三態循環 none → asc → desc → none；active 時文字與圖示轉城信藍（見 DESIGN.md「Sortable Table Header」） */
+function SortHeader({ label, sortKey, sort, onToggle }: { label: string; sortKey: SortKey; sort: SortState; onToggle: (key: SortKey) => void }) {
+  const active = sort.key === sortKey;
+  const Icon = active ? (sort.dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
   return (
-    <span className="inline-flex items-center gap-1">
+    <button
+      type="button"
+      onClick={() => onToggle(sortKey)}
+      className={`inline-flex items-center gap-1 hover:text-brand-blue ${active ? 'text-brand-blue' : 'text-neutral-mid'}`}
+    >
       {label}
-      <ChevronDown size={12} className="text-neutral-blue-gray" />
-    </span>
+      <Icon size={12} className={active ? 'text-brand-blue' : 'text-neutral-blue-gray'} />
+    </button>
   );
 }
 
@@ -50,11 +57,15 @@ export default function InvoiceTable({
   rows,
   totalCount,
   totalAmount,
+  sort,
+  onSortToggle,
 }: {
   side: TaxSide;
   rows: TaxInvoiceRow[];
   totalCount: number;
   totalAmount: string;
+  sort: SortState;
+  onSortToggle: (key: SortKey) => void;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
@@ -77,10 +88,10 @@ export default function InvoiceTable({
           <tr className="border-b border-neutral-blue-gray/40">
             <th className={thClass} />
             <th className={thClass}>
-              <SortHeader label="開立日期" />
+              <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
             </th>
             <th className={thClass}>
-              <SortHeader label="發票號碼" />
+              <SortHeader label="發票號碼" sortKey="id" sort={sort} onToggle={onSortToggle} />
             </th>
             <th className={`${thClass} text-right`}>未稅金額</th>
             <th className={`${thClass} text-right`}>營業稅額</th>
@@ -105,7 +116,7 @@ export default function InvoiceTable({
                 <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.untaxed)}</td>
                 <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.tax)}</td>
                 <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.total)}</td>
-                <td className={`${tdClass} truncate`}>{row.counterparty}</td>
+                <td className={`${tdClass} truncate`} title={row.counterparty}>{row.counterparty}</td>
                 <td className={tdClass}>
                   <StatusBadge status={row.status} />
                 </td>

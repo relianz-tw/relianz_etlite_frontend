@@ -5,7 +5,7 @@ import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import { fmtCurrency } from '@/lib/utils';
+import { fmtCurrency, sortRows } from '@/lib/utils';
 import { Download } from 'lucide-react';
 import { useState } from 'react';
 import FilterBar from './components/FilterBar';
@@ -14,7 +14,7 @@ import InvoiceTable from './components/InvoiceTable';
 import SummaryCards from './components/SummaryCards';
 import TaxReportDialog from './components/TaxReportDialog';
 import { FILING_PERIODS, PURCHASE_INVOICES, REPORT_SUMMARY, SALES_INVOICES } from './data';
-import type { AdvancedFilter, TaxInvoiceRow, TaxSide } from './types';
+import type { AdvancedFilter, SortKey, SortState, TaxInvoiceRow, TaxSide } from './types';
 
 const SIDE_TABS: { value: TaxSide; label: string }[] = [
   { value: 'purchase', label: '進項（含折讓）' },
@@ -23,6 +23,11 @@ const SIDE_TABS: { value: TaxSide; label: string }[] = [
 
 const TOTAL_PAGES = 20;
 const EMPTY_ADVANCED_FILTER: AdvancedFilter = { status: 'all', minAmount: '', maxAmount: '' };
+const DEFAULT_SORT: SortState = { key: null, dir: 'none' };
+const SORT_KEY_FN: Record<SortKey, (row: TaxInvoiceRow) => string | number> = {
+  date: row => row.date,
+  id: row => row.id,
+};
 
 /** 依關鍵字與進階條件過濾發票列：關鍵字比對發票號碼／往來對象／金額 */
 function filterRows(rows: TaxInvoiceRow[], query: string, advanced: AdvancedFilter): TaxInvoiceRow[] {
@@ -53,6 +58,7 @@ export default function BusinessTaxView() {
   const [appliedQuery, setAppliedQuery] = useState('');
   const [advanced, setAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
   const [appliedAdvanced, setAppliedAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
   const handleSearch = () => {
     setAppliedQuery(query);
@@ -63,9 +69,26 @@ export default function BusinessTaxView() {
     setAppliedAdvanced(next ?? advanced);
     setPage(1);
   };
+  // 桌機表頭三態循環：none → asc → desc → none
+  const handleSortToggle = (key: SortKey) => {
+    setSort(prev => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return DEFAULT_SORT;
+    });
+  };
+  // 手機排序入口：下拉直接指定欄位（預設 asc），方向鈕只切換 asc/desc
+  const handleSortFieldChange = (key: SortKey | null) => setSort(key ? { key, dir: 'asc' } : DEFAULT_SORT);
+  const handleSortDirToggle = () => setSort(prev => (prev.key ? { key: prev.key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : prev));
+  // 切換銷項／進項時重置排序，避免帶著上一個身分別的排序狀態
+  const handleSideChange = (v: TaxSide) => {
+    setSide(v);
+    setSort(DEFAULT_SORT);
+  };
 
   const rawRows = side === 'sales' ? SALES_INVOICES : PURCHASE_INVOICES;
-  const rows = filterRows(rawRows, appliedQuery, appliedAdvanced);
+  const filteredRows = filterRows(rawRows, appliedQuery, appliedAdvanced);
+  const rows = sort.key ? sortRows(filteredRows, SORT_KEY_FN[sort.key], sort.dir) : filteredRows;
   const totalAmount = fmtCurrency(rows.reduce((sum, r) => sum + r.total, 0));
 
   return (
@@ -103,11 +126,19 @@ export default function BusinessTaxView() {
         </div>
 
         <div className="mb-3 w-64">
-          <SegmentedControl options={SIDE_TABS} value={side} onChange={setSide} size="md" />
+          <SegmentedControl options={SIDE_TABS} value={side} onChange={handleSideChange} size="md" />
         </div>
 
-        <InvoiceTable side={side} rows={rows} totalCount={rows.length} totalAmount={totalAmount} />
-        <InvoiceCards side={side} rows={rows} totalCount={rows.length} totalAmount={totalAmount} />
+        <InvoiceTable side={side} rows={rows} totalCount={rows.length} totalAmount={totalAmount} sort={sort} onSortToggle={handleSortToggle} />
+        <InvoiceCards
+          side={side}
+          rows={rows}
+          totalCount={rows.length}
+          totalAmount={totalAmount}
+          sort={sort}
+          onSortFieldChange={handleSortFieldChange}
+          onSortDirToggle={handleSortDirToggle}
+        />
 
         <Pagination
           page={page}
