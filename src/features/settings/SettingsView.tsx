@@ -2,7 +2,7 @@
 
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import BasicInfoTab from './components/BasicInfoTab';
 import BillingTab from './components/BillingTab';
@@ -42,8 +42,26 @@ function renderActiveTab(tab: SettingsTab): ReactNode {
   }
 }
 
+const DEFAULT_TAB: SettingsTab = 'basic';
+
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return SETTINGS_TABS.some(tab => tab.value === value);
+}
+
 export default function SettingsView() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('basic');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 分頁狀態存在網址 ?tab= 參數，可重新整理保留、可分享深連結；缺省或無效值一律回退預設分頁
+  const tabParam = searchParams.get('tab');
+  const activeTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : DEFAULT_TAB;
+
+  const setActiveTab = (tab: SettingsTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-surface-off-white">

@@ -1,5 +1,8 @@
+'use client';
+
 import Button from '@/components/ui/Button';
 import { CircleCheck, CreditCard } from 'lucide-react';
+import { useState } from 'react';
 import {
   PLAN_CARD_EXPIRY,
   PLAN_CARD_LAST4,
@@ -8,8 +11,12 @@ import {
   PLAN_QUANTITY_LABEL,
   PLAN_SERVICE_ITEMS,
 } from '../data';
+import ChangeCardDialog from './ChangeCardDialog';
 
 export default function PlanDetailTab() {
+  const [card, setCard] = useState({ last4: PLAN_CARD_LAST4, expiry: PLAN_CARD_EXPIRY });
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   return (
     <div className="grid grid-cols-1 gap-5 nav:grid-cols-2">
       <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
@@ -41,16 +48,18 @@ export default function PlanDetailTab() {
             VISA
           </span>
           <div className="text-sm text-neutral-dark">
-            <p>**** **** **** {PLAN_CARD_LAST4}</p>
-            <p className="mt-1 text-xs text-neutral-mid">到期日期 {PLAN_CARD_EXPIRY}</p>
+            <p>**** **** **** {card.last4}</p>
+            <p className="mt-1 text-xs text-neutral-mid">到期日期 {card.expiry}</p>
           </div>
         </div>
         <div className="mt-4 flex justify-end">
-          <Button size="sm" variant="outline" icon={CreditCard}>
+          <Button size="sm" variant="outline" icon={CreditCard} onClick={() => setDialogOpen(true)}>
             變更付款信用卡
           </Button>
         </div>
       </div>
+
+      <ChangeCardDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSubmit={setCard} />
     </div>
   );
 }
