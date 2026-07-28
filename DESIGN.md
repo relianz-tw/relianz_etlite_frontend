@@ -164,7 +164,15 @@ Padding: 10px 14px
 Font: Baskerville Regular / Noto Sans TC, 16px
 Focus border: #005FA2
 Focus shadow: 0 0 0 3px rgba(0, 95, 162, 0.15)
-Error border: #377456 inverted → use a warm red if needed; default to 權威灰 `#3A3830`
+Error border: #DD6B5F（開創紅，semantic-error）
+```
+
+**Error Message**（欄位下方驗證錯誤提示，如必填未填、密碼不一致）
+```
+Color: #DD6B5F（開創紅，semantic-error）
+Font: Noto Sans TC 12px（text-xs）
+Margin-top: 4px（mt-1）
+不使用圖示，僅文字；輸入框本身可疊加 Error border
 ```
 
 **Textarea**（多行輸入，如備註）
@@ -214,6 +222,26 @@ Font: Noto Sans TC 12px, font-weight 600
 - 成功／正面／已完成／開業 → success
 - 錯誤／停業 → error
 - 進行中狀態／復業 → info
+
+### Sortable Table Header
+
+用於可點擊排序的表格欄位標題（如帳簿、營業稅中心的列表表頭）。
+
+```
+未排序（預設）：
+  文字色：#3A3830（權威灰，同一般表頭）
+  圖示：ChevronsUpDown，#9AA7B9（親切藍 / neutral-blue-gray）
+
+已排序（active）：
+  文字色：#005FA2（城信藍 / brand-blue）
+  圖示：ChevronUp（asc）或 ChevronDown（desc），#005FA2
+
+Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
+點擊行為：三態循環 none → asc → desc → none
+圖示大小：12px，緊貼文字右側（gap 4px）
+```
+
+對應元件：`src/features/ledger/components/LedgerTable.tsx`、`src/features/business-tax/components/InvoiceTable.tsx` 的 `SortHeader`。
 
 ---
 

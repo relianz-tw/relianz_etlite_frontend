@@ -9,6 +9,25 @@ export function cn(...inputs: ClassValue[]) {
 /** 金額格式化：統一加上 $ 與千分位，供各頁面金額顯示使用 */
 export const fmtCurrency = (n: number) => `$${n.toLocaleString('en-US')}`;
 
+/** 表格可排序表頭的排序方向；'none' 代表未排序（維持原始順序） */
+export type SortDir = 'asc' | 'desc' | 'none';
+
+/**
+ * 依 keyFn 取出的值對陣列排序，供帳簿／營業稅中心表格與手機卡片共用。
+ * dir 為 'none' 時回傳原陣列（不排序）；數值依大小排序，字串依 localeCompare 排序
+ * （民國年 YYY/MM/DD 零補位日期字串本身即符合時間序，無需轉 Date）。
+ */
+export function sortRows<T>(rows: T[], keyFn: (row: T) => string | number, dir: SortDir): T[] {
+  if (dir === 'none') return rows;
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const va = keyFn(a);
+    const vb = keyFn(b);
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign;
+    return String(va).localeCompare(String(vb)) * sign;
+  });
+}
+
 export interface DailyPoint {
   date: string; // 'M/D'
   value: number;
