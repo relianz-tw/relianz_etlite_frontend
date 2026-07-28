@@ -4,13 +4,13 @@ import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import Select from '@/components/ui/Select';
-import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
 import { fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
-import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
@@ -18,7 +18,7 @@ import VoidConfirmDialog from './VoidConfirmDialog';
 
 const ADD_CHANNEL_OPTION = '+ 新增管道';
 
-type LedgerTableProps = { totalCount: number; totalAmount: string } & (
+type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
   | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[] }
   | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
 );
@@ -26,12 +26,33 @@ type LedgerTableProps = { totalCount: number; totalAmount: string } & (
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
-function SortHeader({ label }: { label: string }) {
+/** 可排序表頭：三態循環 none → asc → desc → none；active 時文字與圖示轉城信藍（見 DESIGN.md「Sortable Table Header」） */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onToggle,
+  align = 'left',
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onToggle: (key: SortKey) => void;
+  align?: 'left' | 'right';
+}) {
+  const active = sort.key === sortKey;
+  const Icon = active ? (sort.dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
   return (
-    <span className="inline-flex items-center gap-1">
+    <button
+      type="button"
+      onClick={() => onToggle(sortKey)}
+      className={`inline-flex items-center gap-1 hover:text-brand-blue ${align === 'right' ? 'flex-row-reverse' : ''} ${
+        active ? 'text-brand-blue' : 'text-neutral-mid'
+      }`}
+    >
       {label}
-      <ChevronDown size={12} className="text-neutral-blue-gray" />
-    </span>
+      <Icon size={12} className={active ? 'text-brand-blue' : 'text-neutral-blue-gray'} />
+    </button>
   );
 }
 
@@ -261,7 +282,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   );
 
   if (props.side === 'sales') {
-    const { subTab, rows, totalCount, totalAmount } = props;
+    const { subTab, rows, totalCount, totalAmount, sort, onSortToggle } = props;
     const showChannel = subTab === 'received';
     return (
       <>
@@ -290,17 +311,17 @@ export default function LedgerTable(props: LedgerTableProps) {
                 />
               </th>
               <th className={thClass}>
-                <SortHeader label="交易編號" />
+                <SortHeader label="交易編號" sortKey="id" sort={sort} onToggle={onSortToggle} />
               </th>
               <th className={`${thClass} text-right`}>
-                <SortHeader label="交易金額" />
+                <SortHeader label="交易金額" sortKey="amount" sort={sort} onToggle={onSortToggle} align="right" />
               </th>
               <th className={thClass}>
-                <SortHeader label="買受人" />
+                <SortHeader label="買受人" sortKey="counterparty" sort={sort} onToggle={onSortToggle} />
               </th>
               {showChannel && <th className={thClass}>銷售管道</th>}
               <th className={thClass}>
-                <SortHeader label="開立日期" />
+                <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
               </th>
               <th className={`${thClass} text-right`}>動作</th>
             </tr>
@@ -326,7 +347,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                     </div>
                   </td>
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
-                  <td className={`${tdClass} truncate`}>{row.counterparty}</td>
+                  <td className={`${tdClass} truncate`} title={row.counterparty}>{row.counterparty}</td>
                   {showChannel && (
                     <td className={tdClass}>
                       <Select
@@ -395,7 +416,7 @@ export default function LedgerTable(props: LedgerTableProps) {
     );
   }
 
-  const { rows, totalCount, totalAmount } = props;
+  const { rows, totalCount, totalAmount, sort, onSortToggle } = props;
   const editableSelected = rows.filter(r => checked[r.id] && r.source === 'invoice');
   const batchSelectedAmount = fmtCurrency(editableSelected.reduce((sum, r) => sum + r.amount, 0));
   const handleBatchApply = () => {
@@ -431,18 +452,23 @@ export default function LedgerTable(props: LedgerTableProps) {
               />
             </th>
             <th className={thClass}>
-              <SortHeader label="交易編號" />
+              <SortHeader label="交易編號" sortKey="id" sort={sort} onToggle={onSortToggle} />
             </th>
             <th className={`${thClass} text-right`}>
-              <SortHeader label="交易金額" />
+              <SortHeader label="交易金額" sortKey="amount" sort={sort} onToggle={onSortToggle} align="right" />
             </th>
             <th className={thClass}>
-              <SortHeader label={props.subTab === 'paid' ? '賣家名稱' : '交易敘述'} />
+              <SortHeader
+                label={props.subTab === 'paid' ? '賣家名稱' : '交易敘述'}
+                sortKey="counterparty"
+                sort={sort}
+                onToggle={onSortToggle}
+              />
             </th>
             <th className={thClass}>費用類別</th>
             <th className={thClass}>專案名稱</th>
             <th className={thClass}>
-              <SortHeader label="開立日期" />
+              <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
             </th>
           </tr>
         </thead>
@@ -469,7 +495,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                     </div>
                   </td>
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
-                  <td className={`${tdClass} truncate`}>{row.party}</td>
+                  <td className={`${tdClass} truncate`} title={row.party}>{row.party}</td>
                   <td className={tdClass}>
                     <Select
                       widthClassName="w-32"

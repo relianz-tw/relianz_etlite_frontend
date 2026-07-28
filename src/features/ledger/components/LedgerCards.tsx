@@ -6,12 +6,12 @@ import Select from '@/components/ui/Select';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
-import { ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
-import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab } from '../types';
+import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { useLongPress } from '../useLongPress';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
@@ -20,10 +20,50 @@ import VoidConfirmDialog from './VoidConfirmDialog';
 
 const ADD_CHANNEL_OPTION = '+ 新增管道';
 
-type LedgerCardsProps = { totalCount: number; totalAmount: string } & (
+const SORT_KEY_LABELS: Record<SortKey, string> = {
+  id: '交易編號',
+  amount: '交易金額',
+  counterparty: '往來對象',
+  date: '開立日期',
+};
+const SORT_KEYS: SortKey[] = ['id', 'amount', 'counterparty', 'date'];
+
+type LedgerCardsProps = {
+  totalCount: number;
+  totalAmount: string;
+  sort: SortState;
+  onSortFieldChange: (key: SortKey | null) => void;
+  onSortDirToggle: () => void;
+} & (
   | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[] }
   | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
 );
+
+/** 手機排序入口：下拉選欄位（預設 asc）＋方向鈕（僅切換 asc/desc），與桌機表格共用同一份排序資料 */
+function MobileSortControl({
+  sort,
+  onFieldChange,
+  onDirToggle,
+}: {
+  sort: SortState;
+  onFieldChange: (key: SortKey | null) => void;
+  onDirToggle: () => void;
+}) {
+  const DirIcon = sort.dir === 'asc' ? ArrowUp : sort.dir === 'desc' ? ArrowDown : ArrowUpDown;
+  return (
+    <div className="flex items-center gap-1.5">
+      <Select widthClassName="w-32" value={sort.key ?? ''} onValueChange={v => onFieldChange(v ? (v as SortKey) : null)}>
+        <option value="">不排序</option>
+        {SORT_KEYS.map(key => (
+          <option key={key} value={key}>
+            {SORT_KEY_LABELS[key]}
+          </option>
+        ))}
+      </Select>
+      <Button variant="ghost" size="sm" icon={DirIcon} disabled={!sort.key} onClick={onDirToggle} aria-label="切換排序方向" />
+    </div>
+  );
+}
 
 function CardShell({
   children,
@@ -155,7 +195,7 @@ function SalesCard({
         </div>
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
-      <div className="truncate text-[13px] text-neutral-mid">{row.counterparty}</div>
+      <div className="truncate text-[13px] text-neutral-mid" title={row.counterparty}>{row.counterparty}</div>
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
         {!selectionMode && (
@@ -237,7 +277,7 @@ function PurchaseCard({
         </div>
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
-      <div className="truncate text-[13px] text-neutral-mid">{row.party}</div>
+      <div className="truncate text-[13px] text-neutral-mid" title={row.party}>{row.party}</div>
       <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
@@ -380,10 +420,13 @@ export default function LedgerCards(props: LedgerCardsProps) {
           </>
         ) : (
           <>
-            <span className="text-sm text-neutral-mid">
-              目前顯示 <span className="font-semibold text-neutral-dark">{props.totalCount}</span> 筆{' '}
-              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{props.totalAmount}</span>
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="whitespace-nowrap text-sm text-neutral-mid">
+                目前顯示 <span className="font-semibold text-neutral-dark">{props.totalCount}</span> 筆{' '}
+                <span className="font-mono font-semibold tabular-nums text-neutral-dark">{props.totalAmount}</span>
+              </span>
+              <MobileSortControl sort={props.sort} onFieldChange={props.onSortFieldChange} onDirToggle={props.onSortDirToggle} />
+            </div>
             <Button variant="warm" size="sm" icon={Download} onClick={() => setExportDialogOpen(true)}>
               匯出總表
             </Button>

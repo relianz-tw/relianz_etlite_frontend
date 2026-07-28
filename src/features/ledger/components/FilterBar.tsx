@@ -2,6 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import DatePicker, { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import { ChevronDown, ChevronUp, Plus, Search, Upload, X } from 'lucide-react';
@@ -43,6 +44,21 @@ const PURCHASE_QUICK_FIELDS: { value: QuickSearchField; label: string; placehold
   { value: 'project', label: '專案名稱', placeholder: '請選擇專案名稱' },
 ];
 
+type PeriodType = 'month' | 'year';
+
+const PERIOD_TYPE_OPTIONS: { value: PeriodType; label: string }[] = [
+  { value: 'month', label: '月' },
+  { value: 'year', label: '年' },
+];
+
+/** 依當下日期計算「本月」或「本年度」的起訖日期，供交易期間選擇自動對應日期區間 */
+function getPeriodRange(type: PeriodType, today: Date): [Date, Date] {
+  if (type === 'month') {
+    return [new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getFullYear(), today.getMonth() + 1, 0)];
+  }
+  return [new Date(today.getFullYear(), 0, 1), new Date(today.getFullYear(), 11, 31)];
+}
+
 const EMPTY_ADVANCED: AdvancedFilter = {
   status: 'all',
   minAmount: '',
@@ -71,6 +87,17 @@ export default function FilterBar({
   const goToNewTransaction = () => router.push(`/ledger/new?side=${side}`);
   const [advOpen, setAdvOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+
+  // 交易期間：預設為「月」，切換月／年時自動對應到當下該月／該年的起訖日期，日期亦可再手動調整
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  const [periodFrom, setPeriodFrom] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[0]);
+  const [periodTo, setPeriodTo] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[1]);
+  const handlePeriodTypeChange = (type: PeriodType) => {
+    setPeriodType(type);
+    const [start, end] = getPeriodRange(type, new Date());
+    setPeriodFrom(start);
+    setPeriodTo(end);
+  };
 
   const quickFields = side === 'sales' ? SALES_QUICK_FIELDS : PURCHASE_QUICK_FIELDS;
   const activeField = quickFields.find(f => f.value === quickField) ?? quickFields[0];
@@ -227,12 +254,14 @@ export default function FilterBar({
       <div className="hidden flex-col gap-3 nav:flex">
         <div className="flex items-center gap-2.5">
           {side === 'sales' && (
-            <Select widthClassName="flex-[2]">
-              <option>交易期間：114/01/01 – 115/01/01</option>
-              <option>本月</option>
-              <option>本季</option>
-              <option>本年度</option>
-            </Select>
+            <div className="flex flex-[2] items-center gap-2">
+              <div className="w-24 shrink-0">
+                <SegmentedControl options={PERIOD_TYPE_OPTIONS} value={periodType} onChange={handlePeriodTypeChange} size="sm" />
+              </div>
+              <DatePicker value={periodFrom} onChange={setPeriodFrom} placeholder="起" />
+              <span className="shrink-0 text-sm text-neutral-mid">–</span>
+              <DatePicker value={periodTo} onChange={setPeriodTo} placeholder="迄" />
+            </div>
           )}
           <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
             匯入電子發票
@@ -262,12 +291,14 @@ export default function FilterBar({
       {/* 手機 */}
       <div className="flex flex-col gap-3 nav:hidden">
         {side === 'sales' && (
-          <Select>
-            <option>交易期間：114/01/01 – 115/01/01</option>
-            <option>本月</option>
-            <option>本季</option>
-            <option>本年度</option>
-          </Select>
+          <div className="flex flex-col gap-2">
+            <SegmentedControl options={PERIOD_TYPE_OPTIONS} value={periodType} onChange={handlePeriodTypeChange} size="sm" />
+            <div className="flex items-center gap-2">
+              <DatePicker value={periodFrom} onChange={setPeriodFrom} placeholder="起" />
+              <span className="shrink-0 text-sm text-neutral-mid">–</span>
+              <DatePicker value={periodTo} onChange={setPeriodTo} placeholder="迄" />
+            </div>
+          </div>
         )}
         <div className="flex gap-2.5">
           <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>

@@ -1,6 +1,16 @@
+import type { SortDir } from '@/lib/utils';
+
 export type Side = 'sales' | 'purchase';
 export type SalesSubTab = 'receivable' | 'received';
 export type PurchaseSubTab = 'payable' | 'paid';
+
+/** 表格可排序欄位：counterparty 對應銷項 counterparty／進項 party（買受人/賣家名稱/交易敘述） */
+export type SortKey = 'id' | 'amount' | 'counterparty' | 'date';
+
+export interface SortState {
+  key: SortKey | null;
+  dir: SortDir;
+}
 
 /** 簡易搜尋可選欄位：交易編號／往來對象為銷項與進項共用，其餘依身分別顯示 */
 export type QuickSearchField = 'id' | 'counterparty' | 'channel' | 'category' | 'project';
