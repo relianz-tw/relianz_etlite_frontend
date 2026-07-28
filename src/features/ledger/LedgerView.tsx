@@ -12,24 +12,47 @@ import LedgerCards from './components/LedgerCards';
 import LedgerTable from './components/LedgerTable';
 import SummaryCards from './components/SummaryCards';
 import { PURCHASE_PAID, PURCHASE_PAYABLE, SALES_RECEIVABLE, SALES_RECEIVED } from './data';
-import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, SalesRow, SalesSubTab, Side } from './types';
+import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side } from './types';
 
-const EMPTY_ADVANCED_FILTER: AdvancedFilter = { status: 'all', minAmount: '', maxAmount: '' };
+const EMPTY_ADVANCED_FILTER: AdvancedFilter = {
+  status: 'all',
+  minAmount: '',
+  maxAmount: '',
+  dateFrom: '',
+  dateTo: '',
+  counterparty: '',
+  channel: '',
+  category: '',
+  project: '',
+};
 
-/** 依關鍵字與進階條件過濾帳簿列：關鍵字比對交易編號／往來對象／金額，狀態與金額區間僅套用於銷項 */
-function filterRows<T extends SalesRow | PurchaseRow>(rows: T[], query: string, advanced: AdvancedFilter): T[] {
-  const keyword = query.trim().toLowerCase();
+const getCounterparty = (row: SalesRow | PurchaseRow) => ('counterparty' in row ? row.counterparty : row.party);
+
+/** 依簡易搜尋（單一欄位）與進階條件（可組合套用）過濾帳簿列；side 專屬欄位（銷售管道／費用類別／專案）僅在對應資料上生效 */
+function filterRows<T extends SalesRow | PurchaseRow>(rows: T[], quickField: QuickSearchField, quickValue: string, advanced: AdvancedFilter): T[] {
+  const keyword = quickValue.trim().toLowerCase();
   const min = advanced.minAmount ? Number(advanced.minAmount) : undefined;
   const max = advanced.maxAmount ? Number(advanced.maxAmount) : undefined;
+  const counterpartyKeyword = advanced.counterparty.trim().toLowerCase();
 
   return rows.filter(row => {
     if (keyword) {
-      const counterparty = 'counterparty' in row ? row.counterparty : row.party;
-      const haystack = `${row.id} ${counterparty} ${row.amount}`.toLowerCase();
-      if (!haystack.includes(keyword)) return false;
+      let value = '';
+      if (quickField === 'id') value = row.id;
+      else if (quickField === 'counterparty') value = getCounterparty(row);
+      else if (quickField === 'channel' && 'channel' in row) value = row.channel;
+      else if (quickField === 'category' && 'category' in row) value = row.category;
+      else if (quickField === 'project' && 'project' in row) value = row.project;
+      if (!value.toLowerCase().includes(keyword)) return false;
     }
     if (min !== undefined && row.amount < min) return false;
     if (max !== undefined && row.amount > max) return false;
+    if (advanced.dateFrom && row.date < advanced.dateFrom) return false;
+    if (advanced.dateTo && row.date > advanced.dateTo) return false;
+    if (counterpartyKeyword && !getCounterparty(row).toLowerCase().includes(counterpartyKeyword)) return false;
+    if (advanced.channel && 'channel' in row && row.channel !== advanced.channel) return false;
+    if (advanced.category && 'category' in row && row.category !== advanced.category) return false;
+    if (advanced.project && 'project' in row && row.project !== advanced.project) return false;
     if (advanced.status !== 'all' && 'voided' in row) {
       const isVoided = row.voided;
       if (advanced.status === 'voided' && !isVoided) return false;
@@ -57,14 +80,22 @@ export default function LedgerView() {
   const [page, setPage] = useState(1);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  // 搜尋關鍵字：query 是輸入框當下內容，appliedQuery 是按下「搜尋」後才套用的條件
+  // 簡易搜尋：quickField/query 是輸入框當下內容，appliedQuickField/appliedQuery 是按下「搜尋」後才套用的條件
+  const [quickField, setQuickField] = useState<QuickSearchField>('id');
   const [query, setQuery] = useState('');
+  const [appliedQuickField, setAppliedQuickField] = useState<QuickSearchField>('id');
   const [appliedQuery, setAppliedQuery] = useState('');
   const [advanced, setAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
   const [appliedAdvanced, setAppliedAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
 
   const handleSearch = () => {
+    setAppliedQuickField(quickField);
     setAppliedQuery(query);
+    setPage(1);
+  };
+  const handleClearQuick = () => {
+    setQuery('');
+    setAppliedQuery('');
     setPage(1);
   };
   // next 供「清除」按鈕使用：避免 onAdvancedChange 與 onAdvancedApply 連續呼叫時讀到尚未更新的 state
@@ -73,8 +104,13 @@ export default function LedgerView() {
     setPage(1);
   };
 
+  // 銷售管道／費用類別／專案為身分別專屬欄位，切換銷項／進項時重設簡易搜尋，避免帶著不相干欄位查詢
   const handleSideChange = (v: Side) => {
     setSide(v);
+    setQuickField('id');
+    setQuery('');
+    setAppliedQuickField('id');
+    setAppliedQuery('');
     setPage(1);
   };
   const handleSalesSubTabChange = (v: SalesSubTab) => {
@@ -88,9 +124,9 @@ export default function LedgerView() {
 
   const rawSalesRows = salesSubTab === 'received' ? SALES_RECEIVED : SALES_RECEIVABLE;
   const rawPurchaseRows = purchaseSubTab === 'paid' ? PURCHASE_PAID : PURCHASE_PAYABLE;
-  const salesRows = filterRows(rawSalesRows, appliedQuery, appliedAdvanced);
-  // 進項無 voided 欄位，狀態條件對進項無效果，僅套用關鍵字與金額區間
-  const purchaseRows = filterRows(rawPurchaseRows, appliedQuery, appliedAdvanced);
+  const salesRows = filterRows(rawSalesRows, appliedQuickField, appliedQuery, appliedAdvanced);
+  // 進項無 voided 欄位，狀態條件對進項無效果
+  const purchaseRows = filterRows(rawPurchaseRows, appliedQuickField, appliedQuery, appliedAdvanced);
   const rows = side === 'sales' ? salesRows : purchaseRows;
   const totalAmount = fmtCurrency(rows.reduce((sum, r) => sum + r.amount, 0));
 
@@ -109,9 +145,12 @@ export default function LedgerView() {
         <div className="mb-5">
           <FilterBar
             side={side}
+            quickField={quickField}
+            onQuickFieldChange={setQuickField}
             query={query}
             onQueryChange={setQuery}
             onSearch={handleSearch}
+            onClearQuick={handleClearQuick}
             advanced={advanced}
             onAdvancedChange={setAdvanced}
             onAdvancedApply={handleAdvancedApply}

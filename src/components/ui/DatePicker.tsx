@@ -16,7 +16,7 @@ interface DatePickerProps {
 }
 
 /** Date → 民國年 YYY/MM/DD */
-function formatRocDate(date: Date | undefined): string {
+export function formatRocDate(date: Date | undefined): string {
   if (!date) return '';
   const year = date.getFullYear() - 1911;
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -33,7 +33,7 @@ function applyFormat(raw: string): string {
 }
 
 /** 民國年字串 → Date（無效回傳 undefined） */
-function parseRocDate(text: string): Date | undefined {
+export function parseRocDate(text: string): Date | undefined {
   const digits = text.replace(/\D/g, '');
   if (digits.length !== 7) return undefined;
   const year = parseInt(digits.slice(0, 3)) + 1911;

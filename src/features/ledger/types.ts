@@ -2,11 +2,23 @@ export type Side = 'sales' | 'purchase';
 export type SalesSubTab = 'receivable' | 'received';
 export type PurchaseSubTab = 'payable' | 'paid';
 
-/** 進階搜尋條件：金額區間 + 狀態（僅銷項可用，進項資料無作廢狀態） */
+/** 簡易搜尋可選欄位：交易編號／往來對象為銷項與進項共用，其餘依身分別顯示 */
+export type QuickSearchField = 'id' | 'counterparty' | 'channel' | 'category' | 'project';
+
+/**
+ * 進階搜尋條件：可與簡易搜尋同時套用
+ * channel（銷售管道）僅銷項適用；category／project（費用類別／專案）僅進項適用；status（狀態）僅銷項適用
+ */
 export interface AdvancedFilter {
   status: 'all' | 'normal' | 'voided';
   minAmount: string;
   maxAmount: string;
+  dateFrom: string;
+  dateTo: string;
+  counterparty: string;
+  channel: string;
+  category: string;
+  project: string;
 }
 
 export interface SubRow {
