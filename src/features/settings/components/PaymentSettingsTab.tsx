@@ -9,6 +9,7 @@ import { SALES_CHANNELS } from '@/features/ledger/data';
 import { CirclePlus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import BankAccountCard from './BankAccountCard';
+import VendorSection from './VendorSection';
 import { BANK_CODE_OPTIONS, SEED_BANK_ACCOUNTS } from '../data';
 import type { BankAccountRecord } from '../data';
 
@@ -154,6 +155,8 @@ export default function PaymentSettingsTab() {
         onClose={() => setChannelDialogOpen(false)}
         onSubmit={name => setChannels(list => [...list, name])}
       />
+
+      <VendorSection />
     </div>
   );
 }

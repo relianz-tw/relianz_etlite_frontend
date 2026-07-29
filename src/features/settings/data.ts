@@ -149,3 +149,37 @@ export const SEED_BANK_ACCOUNTS: BankAccountRecord[] = [
     updatedDate: '115/1/1',
   },
 ];
+
+export interface VendorRecord {
+  id: string;
+  taxId: string;
+  name: string;
+  address: string;
+  bankAccountName: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
+}
+
+export const SETTINGS_VENDORS: VendorRecord[] = [
+  {
+    id: 'V001',
+    taxId: '12345678',
+    name: '友信創新股份有限公司',
+    address: '台北市信義區松高路1號',
+    bankAccountName: '友信創新股份有限公司',
+    bankName: '中國信託',
+    bankBranch: '港墅分行',
+    bankAccountNumber: '822-01256789012',
+  },
+  {
+    id: 'V002',
+    taxId: '',
+    name: '名子很長很長很長很長股份有限公司',
+    address: '',
+    bankAccountName: '',
+    bankName: '',
+    bankBranch: '',
+    bankAccountNumber: '',
+  },
+];

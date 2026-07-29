@@ -39,6 +39,11 @@ export const SALES_RECEIVABLE: SalesRow[] = [
   { id: 'UA40435901', amount: 6800, counterparty: '台積開發股份有限公司', date: '115/03/23', channel: '', voided: false, allowances: [] },
   { id: 'UA40435902', amount: 999500999, counterparty: '我的另一間公司', date: '115/03/25', channel: '', voided: false, allowances: [] },
   { id: 'UA40435903', amount: 10000, counterparty: '名子很長很長很長很長股份有限公司', date: '115/03/26', channel: '', voided: false, allowances: UA40435903_ALLOWANCES, children: SPLIT_CHILDREN },
+  { id: 'UA40436010', amount: 85000, counterparty: '大立科技有限公司', date: '115/07/03', channel: '現金', voided: false, allowances: [] },
+  { id: 'UA40436011', amount: 320000, counterparty: '晶采設計工作室', date: '115/07/08', channel: '匯票', voided: false, allowances: [] },
+  { id: 'UA40436012', amount: 12500, counterparty: '陳先生', date: '115/07/15', channel: '國泰信用卡', voided: false, allowances: [] },
+  { id: 'UA40436013', amount: 67800, counterparty: '悅讀書店有限公司', date: '115/07/22', channel: 'MoMo', voided: false, allowances: [] },
+  { id: 'UA40436014', amount: 45000, counterparty: '匯入待歸類客戶股份有限公司', date: '115/07/26', channel: '', voided: false, allowances: [] },
 ];
 
 export const PURCHASE_PAID: PurchaseRow[] = [
@@ -56,4 +61,8 @@ export const PURCHASE_PAYABLE: PurchaseRow[] = [
   { id: 'WHT-115-A102', amount: 4500, party: '勞報單 - 陳小柬', date: '115/03/26', category: '代扣稅款', project: '', source: 'labor' },
   { id: 'WHT-115-A103', amount: 350000, party: '薪資 - 2月份', date: '115/03/26', category: '員工薪資', project: '', source: 'salary' },
   { id: 'WHT-115-A104', amount: 50000, party: '薪資 - 2月份', date: '115/03/26', category: '勞健保費', project: '', source: 'salary' },
+  { id: 'UA40436020', amount: 158000, party: '友信創新股份有限公司', date: '115/07/05', category: '進貨', project: '台北旗艦店擴建', source: 'invoice' },
+  { id: 'UA40436021', amount: 23400, party: '快印設計印刷行', date: '115/07/11', category: '文具用品', project: '', source: 'invoice' },
+  { id: 'UA40436022', amount: 76500, party: '名子很長很長很長很長股份有限公司', date: '115/07/18', category: '修繕費', project: '', source: 'invoice' },
+  { id: 'UA40436023', amount: 9800, party: '', date: '115/07/24', category: '雜項購置', project: '', source: 'invoice' },
 ];

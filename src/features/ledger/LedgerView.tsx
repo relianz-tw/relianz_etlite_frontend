@@ -4,8 +4,9 @@ import Button from '@/components/ui/Button';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import SummaryReconDialog from '@/features/reconciliation/components/SummaryReconDialog';
 import { fmtCurrency, sortRows } from '@/lib/utils';
-import { Download } from 'lucide-react';
+import { Download, HandCoins } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import FilterBar from './components/FilterBar';
 import LedgerCards from './components/LedgerCards';
@@ -89,6 +90,7 @@ export default function LedgerView() {
   const [purchaseSubTab, setPurchaseSubTab] = useState<PurchaseSubTab>('paid');
   const [page, setPage] = useState(1);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [reconDialogOpen, setReconDialogOpen] = useState(false);
 
   // 簡易搜尋：quickField/query 是輸入框當下內容，appliedQuickField/appliedQuery 是按下「搜尋」後才套用的條件
   const [quickField, setQuickField] = useState<QuickSearchField>('id');
@@ -185,7 +187,7 @@ export default function LedgerView() {
           />
         </div>
 
-        <div className="mb-3 flex flex-col gap-2 nav:flex-row nav:gap-3">
+        <div className="mb-3 flex flex-col gap-2 nav:flex-row nav:items-center nav:gap-3">
           <div className="w-full nav:w-56">
             <SegmentedControl
               options={[
@@ -205,7 +207,17 @@ export default function LedgerView() {
               size="md"
             />
           </div>
+          {((side === 'sales' && salesSubTab === 'receivable') || (side === 'purchase' && purchaseSubTab === 'payable')) && (
+            <Button variant="warm" icon={HandCoins} onClick={() => setReconDialogOpen(true)} className="nav:ml-auto">
+              匯總沖帳
+            </Button>
+          )}
         </div>
+        <SummaryReconDialog
+          open={reconDialogOpen}
+          onClose={() => setReconDialogOpen(false)}
+          side={side === 'sales' ? 'receivable' : 'payable'}
+        />
 
         {side === 'sales' ? (
           <Fragment key={`sales-${salesSubTab}`}>
