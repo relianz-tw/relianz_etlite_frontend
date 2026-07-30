@@ -85,8 +85,16 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
   };
 }
 
+/** 銷項發票號碼由「發票簿」選項字串解析出字軌與流水號，格式如「三聯式 TW56789900」→ 字軌 TW + 流水號 56789900 */
+function buildReceivableInvoice(form: TransactionFormState): Pick<CreateReceivableBody, 'alphabeticLetter' | 'invoiceNum'> {
+  const match = form.invoiceNumber.match(/([A-Za-z]+)(\d+)\s*$/);
+  if (!match) return { invoiceNum: form.invoiceNumber };
+  return { alphabeticLetter: match[1], invoiceNum: match[2] };
+}
+
 function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableBody, 'companyUuid'> {
   return {
+    ...buildReceivableInvoice(form),
     counterpartyName: form.buyerName,
     counterpartyTaxId: form.buyerTaxId || undefined,
     counterpartyType: form.buyerTaxId ? 0 : 1,
@@ -94,7 +102,6 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
     entryDate: formatYmd(form.payDate),
     ifDebit: form.isAllowance,
     invoiceDate: formatYmd(form.issueDate)!,
-    invoiceNum: form.invoiceNumber,
     memo: form.note || undefined,
     netAmount: form.salesAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
