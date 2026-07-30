@@ -21,6 +21,7 @@ export interface TransactionFormState {
   project: string;
   expenseCategory: SubjectOption | null;
   salesAmount: number;
+  exemptSalesAmount: number;
   taxAmount: number;
   note: string;
   voucherFileName: string | null;

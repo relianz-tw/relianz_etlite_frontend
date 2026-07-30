@@ -147,26 +147,32 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Select>
         </Field>,
         <Field key="invoiceNumber" label="發票號碼" helper="發票範本：電子發票、手開發票、收銀機發票">
-          <div className="grid grid-cols-2 gap-2">
-            <TextInput
-              placeholder="字軌"
-              maxLength={2}
-              value={form.invoiceTrack}
-              onChange={e => onChange({ invoiceTrack: e.target.value })}
-            />
-            <TextInput
-              placeholder="流水號"
-              maxLength={8}
-              value={form.invoiceSerial}
-              onChange={e => onChange({ invoiceSerial: e.target.value })}
-            />
-          </div>
+          {form.voucherType === VOUCHER_TYPES[0] ? (
+            <div className="flex gap-2">
+              <TextInput
+                widthClassName="w-16"
+                placeholder="字軌"
+                maxLength={2}
+                value={form.invoiceTrack}
+                onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
+              />
+              <TextInput
+                widthClassName="flex-1"
+                placeholder="流水號"
+                maxLength={8}
+                value={form.invoiceSerial}
+                onChange={e => onChange({ invoiceSerial: e.target.value })}
+              />
+            </div>
+          ) : (
+            <TextInput placeholder="憑證編號" value={form.invoiceNumber} onChange={e => onChange({ invoiceNumber: e.target.value })} />
+          )}
         </Field>,
       ],
       [
         issueDateField,
         <Field key="payDate" label="付款日期" helper="系統會依照付款日期自動入帳，如希望後續手動入帳請留空">
-          <DatePicker value={form.payDate} onChange={d => onChange({ payDate: d })} />
+          <DatePicker value={form.payDate} onChange={d => onChange({ payDate: d })} disabled />
         </Field>,
       ],
       [sellerTaxIdField, sellerNameField],

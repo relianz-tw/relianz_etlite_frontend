@@ -37,8 +37,8 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   voucherType: VOUCHER_TYPES[0],
   invoiceTrack: '',
   invoiceSerial: '',
-  // 新增銷項的發票號碼為單選發票簿下拉；新增進項改用上方的字軌／流水號輸入框，不吃這個欄位
-  invoiceNumber: SALES_INVOICE_BOOK_OPTIONS[0],
+  // 新增銷項的發票號碼為單選發票簿下拉（僅一個選項，瀏覽器會自動帶入）；新增進項若憑證種類非一般發票則改用這個欄位輸入憑證編號
+  invoiceNumber: '',
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
   issueDate: undefined,
   payDate: undefined,
@@ -50,6 +50,7 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   project: PROJECT_PLACEHOLDER,
   expenseCategory: null,
   salesAmount: 0,
+  exemptSalesAmount: 0,
   taxAmount: 0,
   note: '',
   voucherFileName: null,

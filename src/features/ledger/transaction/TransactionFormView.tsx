@@ -44,7 +44,7 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
 
   // 視覺模擬：建立/更新/作廢/刪除皆不接後端，一律返回帳簿
   const backToLedger = () => router.push('/ledger');
-  const totalAmount = form.salesAmount + form.taxAmount;
+  const totalAmount = form.salesAmount + form.exemptSalesAmount + form.taxAmount;
 
   const breadcrumb = mode === 'create' ? `帳簿 / 新增${SIDE_LABEL[side]}交易` : `帳簿 / ${SIDE_LABEL[side]}交易細節`;
 

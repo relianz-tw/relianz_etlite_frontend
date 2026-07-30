@@ -16,7 +16,7 @@ interface TransactionAmountCardProps {
 }
 
 export default function TransactionAmountCard({ side, form, onChange }: TransactionAmountCardProps) {
-  const totalAmount = form.salesAmount + form.taxAmount;
+  const totalAmount = form.salesAmount + form.exemptSalesAmount + form.taxAmount;
 
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
@@ -40,6 +40,10 @@ export default function TransactionAmountCard({ side, form, onChange }: Transact
 
         <Field label="銷售額">
           <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} />
+        </Field>
+
+        <Field label="免稅銷售額">
+          <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} />
         </Field>
 
         <Field label="稅額">
