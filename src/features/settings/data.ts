@@ -156,9 +156,13 @@ export interface VendorRecord {
   name: string;
   address: string;
   bankAccountName: string;
+  /** 銀行代碼，對應 BANK_CODE_OPTIONS 的 code；後端建立/更新廠商時為必填欄位 */
+  bankCode: string;
   bankName: string;
   bankBranch: string;
   bankAccountNumber: string;
+  remark: string;
+  isActive: boolean;
 }
 
 export const SETTINGS_VENDORS: VendorRecord[] = [
@@ -168,9 +172,12 @@ export const SETTINGS_VENDORS: VendorRecord[] = [
     name: '友信創新股份有限公司',
     address: '台北市信義區松高路1號',
     bankAccountName: '友信創新股份有限公司',
+    bankCode: '822',
     bankName: '中國信託',
     bankBranch: '港墅分行',
     bankAccountNumber: '822-01256789012',
+    remark: '',
+    isActive: true,
   },
   {
     id: 'V002',
@@ -178,8 +185,11 @@ export const SETTINGS_VENDORS: VendorRecord[] = [
     name: '名子很長很長很長很長股份有限公司',
     address: '',
     bankAccountName: '',
+    bankCode: '',
     bankName: '',
     bankBranch: '',
     bankAccountNumber: '',
+    remark: '',
+    isActive: true,
   },
 ];

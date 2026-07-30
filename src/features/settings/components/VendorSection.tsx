@@ -1,17 +1,53 @@
 'use client';
 
+import { createVendor, listVendors, updateVendor } from '@/api/vendors';
+import type { VendorDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import { CirclePlus, Pencil } from 'lucide-react';
-import { useState } from 'react';
-import { SETTINGS_VENDORS } from '../data';
+import { useEffect, useState } from 'react';
 import type { VendorRecord } from '../data';
 import VendorDialog from './VendorDialog';
 
+/**
+ * 後端 VendorDto 轉為畫面用的 VendorRecord。
+ * 未填寫的選填欄位（如分行、帳號）後端會回傳 null，畫面一律以空字串顯示，避免出現字面上的 "null"。
+ */
+function toVendorRecord(dto: VendorDto): VendorRecord {
+  return {
+    id: dto.uuid,
+    taxId: dto.taxId ?? '',
+    name: dto.name ?? '',
+    address: dto.registeredAddress ?? '',
+    bankAccountName: dto.bankAccountName ?? '',
+    bankCode: dto.bankCode ?? '',
+    bankName: dto.bankName ?? '',
+    bankBranch: dto.branchName ?? '',
+    bankAccountNumber: dto.accountNo ?? '',
+    remark: dto.remark ?? '',
+    isActive: dto.isActive,
+  };
+}
+
 /** 廠商管理：應付帳款依廠商分類，維護廠商資料以利帳簿頁「匯總沖帳」選擇廠商與繳費管理 */
 export default function VendorSection() {
-  const [vendors, setVendors] = useState<VendorRecord[]>(SETTINGS_VENDORS);
+  const [vendors, setVendors] = useState<VendorRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<VendorRecord | undefined>(undefined);
+
+  const loadVendors = () => {
+    setLoading(true);
+    setLoadError('');
+    listVendors()
+      .then(list => setVendors(list.map(toVendorRecord)))
+      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadVendors();
+  }, []);
 
   const openNew = () => {
     setEditing(undefined);
@@ -21,12 +57,35 @@ export default function VendorSection() {
     setEditing(vendor);
     setDialogOpen(true);
   };
-  const handleSubmit = (data: Omit<VendorRecord, 'id'>) => {
+  const handleSubmit = async (data: Omit<VendorRecord, 'id'>) => {
     if (editing) {
-      setVendors(list => list.map(v => (v.id === editing.id ? { ...editing, ...data } : v)));
+      await updateVendor({
+        uuid: editing.id,
+        taxId: data.taxId,
+        name: data.name,
+        registeredAddress: data.address,
+        bankAccountName: data.bankAccountName,
+        bankCode: data.bankCode,
+        bankName: data.bankName,
+        branchName: data.bankBranch,
+        accountNo: data.bankAccountNumber,
+        remark: data.remark,
+        isActive: data.isActive,
+      });
     } else {
-      setVendors(list => [...list, { ...data, id: `V${String(list.length + 1).padStart(3, '0')}` }]);
+      await createVendor({
+        taxId: data.taxId,
+        name: data.name,
+        registeredAddress: data.address,
+        bankAccountName: data.bankAccountName,
+        bankCode: data.bankCode,
+        bankName: data.bankName,
+        branchName: data.bankBranch,
+        accountNo: data.bankAccountNumber,
+        remark: data.remark,
+      });
     }
+    loadVendors();
   };
 
   return (
@@ -41,7 +100,11 @@ export default function VendorSection() {
         </Button>
       </div>
 
-      {vendors.length === 0 ? (
+      {loading ? (
+        <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+      ) : loadError ? (
+        <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{loadError}</div>
+      ) : vendors.length === 0 ? (
         <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">目前沒有廠商資料</div>
       ) : (
         <>

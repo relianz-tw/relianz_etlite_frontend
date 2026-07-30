@@ -3,14 +3,18 @@
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Modal from '@/components/ui/Modal';
+import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
+import { vendorExists } from '@/api/vendors';
 import { useEffect, useState } from 'react';
+import { BANK_CODE_OPTIONS } from '../data';
 import type { VendorRecord } from '../data';
 
 interface VendorDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (vendor: Omit<VendorRecord, 'id'>) => void;
+  /** 呼叫端負責實際送出 API；失敗時 throw Error，對話框會攔截並顯示錯誤訊息、不關閉 */
+  onSubmit: (vendor: Omit<VendorRecord, 'id'>) => Promise<void>;
   /** 帶入此值代表編輯既有廠商；不帶則為新增 */
   initial?: VendorRecord;
 }
@@ -20,15 +24,19 @@ const EMPTY_FORM: Omit<VendorRecord, 'id'> = {
   name: '',
   address: '',
   bankAccountName: '',
+  bankCode: '',
   bankName: '',
   bankBranch: '',
   bankAccountNumber: '',
+  remark: '',
+  isActive: true,
 };
 
 export default function VendorDialog({ open, onClose, onSubmit, initial }: VendorDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [sameAsName, setSameAsName] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // 每次開啟對話框時，依 initial 重新帶入表單（新增為空白、編輯為既有值）
   useEffect(() => {
@@ -36,18 +44,38 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
       setForm(initial ?? EMPTY_FORM);
       setSameAsName(!!initial && !!initial.name && initial.bankAccountName === initial.name);
       setError('');
+      setSubmitting(false);
     }
   }, [open, initial]);
 
   if (!open) return null;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.taxId.trim() && !form.name.trim()) {
       setError('統編或名稱請至少擇一填寫');
       return;
     }
-    onSubmit({ ...form, bankAccountName: sameAsName ? form.name : form.bankAccountName });
-    onClose();
+    setSubmitting(true);
+    setError('');
+    try {
+      // 新增廠商前先檢查統編／名稱是否已存在，避免建立重複廠商
+      if (!initial) {
+        const { exists } = await vendorExists({
+          taxId: form.taxId.trim() || undefined,
+          name: form.taxId.trim() ? undefined : form.name.trim() || undefined,
+        });
+        if (exists) {
+          setError('此廠商已存在於名單中');
+          setSubmitting(false);
+          return;
+        }
+      }
+      await onSubmit({ ...form, bankAccountName: sameAsName ? form.name : form.bankAccountName });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '操作失敗');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -109,7 +137,20 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <TextInput placeholder="銀行名稱" value={form.bankName} onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))} />
+              <Select
+                value={form.bankCode}
+                onValueChange={code => {
+                  const bank = BANK_CODE_OPTIONS.find(b => b.code === code);
+                  setForm(f => ({ ...f, bankCode: code, bankName: bank?.name ?? '' }));
+                }}
+              >
+                <option value="">請選擇銀行</option>
+                {BANK_CODE_OPTIONS.map(bank => (
+                  <option key={bank.code} value={bank.code}>
+                    {bank.code} {bank.name}
+                  </option>
+                ))}
+              </Select>
               <TextInput placeholder="分行" value={form.bankBranch} onChange={e => setForm(f => ({ ...f, bankBranch: e.target.value }))} />
             </div>
             <TextInput
@@ -119,13 +160,25 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
             />
           </div>
         </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
+          <TextInput placeholder="備註（選填）" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
+        </div>
+
+        {initial && (
+          <label className="flex items-center gap-1.5 text-sm text-neutral-dark">
+            <Checkbox checked={form.isActive} onChange={() => setForm(f => ({ ...f, isActive: !f.isActive }))} />
+            啟用中
+          </label>
+        )}
       </div>
       <div className="mt-6 flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={onClose} disabled={submitting}>
           取消
         </Button>
-        <Button variant="primary" onClick={handleSubmit}>
-          儲存
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+          {submitting ? '儲存中…' : '儲存'}
         </Button>
       </div>
     </Modal>
