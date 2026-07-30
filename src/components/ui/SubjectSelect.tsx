@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 
 export interface SubjectOption {
+  /** 官方科目 id（送出 API 時對應 officialAccountingSubjectId）；SubjectNameSelect 純字串情境無此值 */
+  id?: number;
   subjectCode: string;
   name: string;
 }
@@ -179,7 +181,7 @@ function SubjectRow({ subject, selected, frequent, onSelect }: SubjectRowProps) 
       type="button"
       role="option"
       aria-selected={selected}
-      onClick={() => onSelect({ subjectCode: subject.subjectCode, name: subject.name })}
+      onClick={() => onSelect({ id: subject.id, subjectCode: subject.subjectCode, name: subject.name })}
       className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
         selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'
       }`}

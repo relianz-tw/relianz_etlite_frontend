@@ -1,5 +1,7 @@
 'use client';
 
+import { createPayable, createReceivable } from '@/api/ledger';
+import type { CreatePayableBody, CreateReceivableBody } from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { ChevronLeft } from 'lucide-react';
@@ -13,7 +15,7 @@ import TransactionAmountCard from './components/TransactionAmountCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
 import TransactionStatusSummary from './components/TransactionStatusSummary';
 import VoucherUpload from './components/VoucherUpload';
-import { EDIT_PURCHASE_FORM, EDIT_SALES_FORM, EMPTY_TRANSACTION_FORM } from './data';
+import { EDIT_PURCHASE_FORM, EDIT_SALES_FORM, EMPTY_TRANSACTION_FORM, formatYmd, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
 import type { TransactionFormState, TransactionMode } from './types';
 
 interface TransactionFormViewProps {
@@ -23,6 +25,7 @@ interface TransactionFormViewProps {
 }
 
 const SIDE_LABEL: Record<Side, string> = { sales: '銷項', purchase: '進項' };
+const IMPORT_VOUCHER_TYPE = VOUCHER_TYPES[3]; // 進口稅單
 
 function initialForm(mode: TransactionMode, side: Side, transactionId?: string): TransactionFormState {
   if (mode === 'create') return EMPTY_TRANSACTION_FORM;
@@ -31,10 +34,84 @@ function initialForm(mode: TransactionMode, side: Side, transactionId?: string):
   return transactionId ? { ...base, invoiceNumber: transactionId, voucherFileName: `${transactionId}.jpg` } : base;
 }
 
+/** 送出前檢查必填欄位，回傳第一個錯誤訊息；全部通過回傳 null */
+function validateForm(side: Side, form: TransactionFormState): string | null {
+  const counterpartyName = side === 'purchase' ? form.sellerName : form.buyerName;
+  if (!counterpartyName.trim()) return side === 'purchase' ? '請輸入賣家名稱' : '請輸入交易對象名稱';
+  if (!form.issueDate) return '請選擇開立日期';
+  if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
+  if (side === 'purchase') {
+    const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
+    const invoiceNum = form.voucherType === VOUCHER_TYPES[0] ? form.invoiceSerial : form.invoiceNumber;
+    if (!isImport && !invoiceNum.trim()) return '請輸入發票號碼';
+  } else if (!form.invoiceNumber.trim()) {
+    return '請輸入發票號碼';
+  }
+  return null;
+}
+
+/** 進項發票號碼組裝：一般發票拆為字軌+流水號，其他憑證種類以憑證編號當純號碼 */
+function buildPayableInvoice(form: TransactionFormState): Pick<CreatePayableBody, 'alphabeticLetter' | 'invoiceNum'> {
+  if (form.voucherType === VOUCHER_TYPES[0]) {
+    return { alphabeticLetter: form.invoiceTrack || undefined, invoiceNum: form.invoiceSerial || undefined };
+  }
+  return { invoiceNum: form.invoiceNumber || undefined };
+}
+
+function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, 'companyUuid'> {
+  const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
+  return {
+    ...buildPayableInvoice(form),
+    counterpartyName: form.sellerName,
+    counterpartyTaxId: form.sellerTaxId || undefined,
+    // 有填統編視為廠商(0)，否則視為個人(1)
+    counterpartyType: form.sellerTaxId ? 0 : 1,
+    datetime: formatYmd(form.issueDate)!,
+    deductible: form.deductible,
+    entryDate: formatYmd(form.payDate),
+    ifDebit: form.isAllowance,
+    importTaxNumber: isImport ? form.importTaxNumber || undefined : undefined,
+    invoiceDate: formatYmd(form.issueDate)!,
+    isReturnGoods: isImport ? false : undefined,
+    memo: form.note || undefined,
+    netAmount: form.salesAmount,
+    officialAccountingSubjectId: form.expenseCategory!.id!,
+    others: isImport ? form.others : undefined,
+    taxAmount: form.taxAmount,
+    taxFreeAmount: form.exemptSalesAmount,
+    totalAmount: form.salesAmount + form.exemptSalesAmount + form.taxAmount,
+    unreportedReason: form.deductible ? undefined : form.unreportedReason || undefined,
+    voucherKind: VOUCHER_KIND_MAP[form.voucherType] ?? 1,
+  };
+}
+
+function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableBody, 'companyUuid'> {
+  return {
+    counterpartyName: form.buyerName,
+    counterpartyTaxId: form.buyerTaxId || undefined,
+    counterpartyType: form.buyerTaxId ? 0 : 1,
+    datetime: formatYmd(form.issueDate)!,
+    entryDate: formatYmd(form.payDate),
+    ifDebit: form.isAllowance,
+    invoiceDate: formatYmd(form.issueDate)!,
+    invoiceNum: form.invoiceNumber,
+    memo: form.note || undefined,
+    netAmount: form.salesAmount,
+    officialAccountingSubjectId: form.expenseCategory!.id!,
+    paymentChannelUuid: form.channel || undefined,
+    taxAmount: form.taxAmount,
+    taxFreeAmount: form.exemptSalesAmount,
+    totalAmount: form.salesAmount + form.exemptSalesAmount + form.taxAmount,
+    voucherKind: 1,
+  };
+}
+
 export default function TransactionFormView({ mode, side, transactionId }: TransactionFormViewProps) {
   const router = useRouter();
   const [form, setForm] = useState<TransactionFormState>(() => initialForm(mode, side, transactionId));
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleChange = (patch: Partial<TransactionFormState>) => setForm(f => ({ ...f, ...patch }));
   const handleFileChange = (fileName: string, previewUrl: string) =>
@@ -42,9 +119,31 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
 
   const handleSideChange = (next: Side) => router.push(`/ledger/new?side=${next}`);
 
-  // 視覺模擬：建立/更新/作廢/刪除皆不接後端，一律返回帳簿
+  // 編輯畫面（更新/作廢/刪除）本次未串接後端，維持既有視覺模擬
   const backToLedger = () => router.push('/ledger');
   const totalAmount = form.salesAmount + form.exemptSalesAmount + form.taxAmount;
+
+  const handleCreate = async () => {
+    const error = validateForm(side, form);
+    if (error) {
+      setSubmitError(error);
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      if (side === 'purchase') {
+        await createPayable(buildPayableBody(form));
+      } else {
+        await createReceivable(buildReceivableBody(form));
+      }
+      router.push('/ledger');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const breadcrumb = mode === 'create' ? `帳簿 / 新增${SIDE_LABEL[side]}交易` : `帳簿 / ${SIDE_LABEL[side]}交易細節`;
 
@@ -85,10 +184,12 @@ export default function TransactionFormView({ mode, side, transactionId }: Trans
             <TransactionAmountCard side={side} form={form} onChange={handleChange} />
             {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
 
+            {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
+
             <div className="sticky bottom-0 -mx-4 flex justify-end gap-3 border-t border-neutral-blue-gray/20 bg-surface-off-white px-4 py-4 nav:static nav:mx-0 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
               {mode === 'create' && (
-                <Button variant="primary" className="w-full nav:w-auto" onClick={backToLedger}>
-                  建立交易
+                <Button variant="primary" className="w-full nav:w-auto" onClick={handleCreate} disabled={submitting}>
+                  {submitting ? '建立中…' : '建立交易'}
                 </Button>
               )}
               {mode === 'edit' && (

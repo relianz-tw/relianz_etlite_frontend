@@ -1,11 +1,15 @@
 'use client';
 
+import { listChannelRules } from '@/api/channelRules';
+import type { ChannelRuleDto } from '@/api/types';
 import DatePicker from '@/components/ui/DatePicker';
+import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import type { ReactNode } from 'react';
-import { PROJECT_NAMES, SALES_CHANNELS } from '../../data';
+import { useEffect, useState } from 'react';
+import { PROJECT_NAMES } from '../../data';
 import type { Side } from '../../types';
 import {
   DECLARE_PERIOD_OPTIONS,
@@ -13,7 +17,6 @@ import {
   PROJECT_PLACEHOLDER,
   PURCHASE_INVOICE_NUMBER_OPTIONS,
   SALES_INVOICE_BOOK_OPTIONS,
-  SELLER_OPTIONS,
   TAG_PLACEHOLDER,
   VOUCHER_TYPES,
 } from '../data';
@@ -33,14 +36,31 @@ const ALLOWANCE_OPTIONS = [
 ] as const;
 
 export default function TransactionMetaCard({ side, mode, form, onChange }: TransactionMetaCardProps) {
-  const handleSellerSelect = (name: string) => {
-    const seller = SELLER_OPTIONS.find(s => s.name === name);
-    onChange({ sellerName: name, sellerTaxId: seller?.taxId ?? form.sellerTaxId });
-  };
+  const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
+  const [channelError, setChannelError] = useState('');
+
+  // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
+  useEffect(() => {
+    if (side !== 'sales') return;
+    listChannelRules()
+      .then(list => setChannelRules(list.filter(c => c.isActive)))
+      .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
+  }, [side]);
 
   const issueDateField = (
     <Field label="開立日期">
       <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} />
+    </Field>
+  );
+
+  // 交易付款日/收款日對應 API entryDate：兩側皆選填，開放使用者輸入或留空由系統依設定自動入帳
+  const entryDateField = (
+    <Field
+      key="payDate"
+      label={side === 'sales' ? '收款日期' : '付款日期'}
+      helper={`系統會依照${side === 'sales' ? '收款' : '付款'}日期自動入帳，如希望後續手動入帳請留空`}
+    >
+      <DatePicker value={form.payDate} onChange={d => onChange({ payDate: d })} />
     </Field>
   );
 
@@ -52,28 +72,72 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   const sellerNameField = (
     <Field label="賣家名稱">
-      <Select widthClassName="w-full" value={form.sellerName} onValueChange={handleSellerSelect}>
-        <option value="">請選擇賣家</option>
-        {SELLER_OPTIONS.map(s => (
-          <option key={s.name} value={s.name}>
-            {s.name}
-          </option>
-        ))}
-      </Select>
+      <TextInput placeholder="請輸入賣家名稱" value={form.sellerName} onChange={e => onChange({ sellerName: e.target.value })} />
+    </Field>
+  );
+
+  const buyerTaxIdField = (
+    <Field label="買家統一編號">
+      <TextInput placeholder="請輸入買家統一編號" value={form.buyerTaxId} onChange={e => onChange({ buyerTaxId: e.target.value })} />
+    </Field>
+  );
+
+  const buyerNameField = (
+    <Field label="交易對象名稱">
+      <TextInput placeholder="請輸入交易對象名稱" value={form.buyerName} onChange={e => onChange({ buyerName: e.target.value })} />
     </Field>
   );
 
   const channelField = (
     <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
       <Select widthClassName="w-full" value={form.channel} onValueChange={v => onChange({ channel: v })}>
-        {SALES_CHANNELS.map(v => (
-          <option key={v} value={v}>
-            {v}
+        <option value="">不指定</option>
+        {channelRules.map(c => (
+          <option key={c.uuid} value={c.uuid}>
+            {c.channelName}
           </option>
         ))}
       </Select>
+      {channelError && <p className="mt-1 text-xs text-semantic-error">{channelError}</p>}
     </Field>
   );
+
+  // 可否扣抵；選擇不可扣抵時才顯示「不可扣抵原因」輸入框，對應 API deductible/unreportedReason
+  const deductibleField = (
+    <Field label="可否扣抵">
+      <SegmentedControl
+        options={[
+          { value: 'yes', label: '可扣抵' },
+          { value: 'no', label: '不可扣抵' },
+        ]}
+        value={form.deductible ? 'yes' : 'no'}
+        onChange={v => onChange({ deductible: v === 'yes' })}
+      />
+      {!form.deductible && (
+        <div className="mt-3">
+          <TextInput
+            placeholder="請輸入不可扣抵原因"
+            value={form.unreportedReason}
+            onChange={e => onChange({ unreportedReason: e.target.value })}
+          />
+        </div>
+      )}
+    </Field>
+  );
+
+  // 進口專用欄位，僅憑證種類為「進口稅單」時顯示，對應 API importTaxNumber/others
+  const importFields: [ReactNode, ReactNode] = [
+    <Field key="importTaxNumber" label="海關證號" helper="海關代徵營業稅繳納證號碼">
+      <TextInput
+        placeholder="請輸入海關代徵營業稅繳納證號碼"
+        value={form.importTaxNumber}
+        onChange={e => onChange({ importTaxNumber: e.target.value })}
+      />
+    </Field>,
+    <Field key="others" label="其他稅費">
+      <MoneyInput value={form.others} onChange={v => onChange({ others: v })} />
+    </Field>,
+  ];
 
   const tagField = (
     <Field label="標籤">
@@ -125,12 +189,8 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Select>
         </Field>,
       ],
-      [
-        issueDateField,
-        <Field key="buyerTaxId" label="買家統一編號">
-          <TextInput placeholder="請輸入買家統一編號" value={form.buyerTaxId} onChange={e => onChange({ buyerTaxId: e.target.value })} />
-        </Field>,
-      ],
+      [buyerNameField, buyerTaxIdField],
+      [issueDateField, entryDateField],
       [channelField, tagField],
       [projectField],
     ];
@@ -169,15 +229,15 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           )}
         </Field>,
       ],
-      [
-        issueDateField,
-        <Field key="payDate" label="付款日期" helper="系統會依照付款日期自動入帳，如希望後續手動入帳請留空">
-          <DatePicker value={form.payDate} onChange={d => onChange({ payDate: d })} disabled />
-        </Field>,
-      ],
+      [issueDateField, entryDateField],
       [sellerTaxIdField, sellerNameField],
       [tagField, projectField],
+      [deductibleField],
     ];
+    // 進口稅單需另外填寫海關證號與其他稅費，其他憑證種類不顯示
+    if (form.voucherType === VOUCHER_TYPES[3]) {
+      rows.push(importFields);
+    }
   } else if (mode === 'edit' && side === 'sales') {
     rows = [
       [issueDateField, channelField],

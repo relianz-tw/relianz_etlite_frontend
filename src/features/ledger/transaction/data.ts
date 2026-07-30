@@ -1,4 +1,3 @@
-import { PURCHASE_PAID, SALES_CHANNELS } from '../data';
 import type { AllowanceRecord, Side } from '../types';
 import type { TransactionFormState } from './types';
 
@@ -18,18 +17,26 @@ export const DECLARE_PERIOD_OPTIONS = ['115/02/09', '115/01/09', '115/03/09'];
 
 export const VOUCHER_TYPES = ['一般發票', '交通通聯', '水電瓦斯', '進口稅單', '收據 (無稅額)'];
 
-export const SALES_INVOICE_BOOK_OPTIONS = ['三聯式 TW56789900'];
-export const PURCHASE_INVOICE_NUMBER_OPTIONS = ['VG-12345678'];
+/** 進項憑證種類 → API voucherKind 數字對照（0收據 1統一發票 2交通 3水電 4進口） */
+export const VOUCHER_KIND_MAP: Record<string, number> = {
+  一般發票: 1,
+  交通通聯: 2,
+  水電瓦斯: 3,
+  進口稅單: 4,
+  '收據 (無稅額)': 0,
+};
 
-interface SellerOption {
-  name: string;
-  taxId: string;
+/** Date → API 需要的西元 YYYYMMDD 字串 */
+export function formatYmd(date: Date | undefined): string | undefined {
+  if (!date) return undefined;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
 }
 
-// 賣家名單沿用帳簿既有進項假資料的交易對象名稱，維持全站假資料一致（排除勞報單/薪資等非發票來源）
-export const SELLER_OPTIONS: SellerOption[] = Array.from(
-  new Set(PURCHASE_PAID.filter(row => row.source === 'invoice' && row.party).map(row => row.party)),
-).map((name, i) => ({ name, taxId: `9379015${i}` }));
+export const SALES_INVOICE_BOOK_OPTIONS = ['三聯式 TW56789900'];
+export const PURCHASE_INVOICE_NUMBER_OPTIONS = ['VG-12345678'];
 
 export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   isAllowance: false,
@@ -43,15 +50,22 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   issueDate: undefined,
   payDate: undefined,
   buyerTaxId: '',
+  buyerName: '',
   sellerTaxId: '',
   sellerName: '',
-  channel: SALES_CHANNELS[0],
+  // 銷售管道改為串接真實銷售管道 API 後才有可選值，預設空字串代表「不指定」
+  channel: '',
   tag: TAG_PLACEHOLDER,
   project: PROJECT_PLACEHOLDER,
   expenseCategory: null,
   salesAmount: 0,
   exemptSalesAmount: 0,
   taxAmount: 0,
+  // 未特別勾選「不可扣抵」前，依 API 慣例視為可扣抵
+  deductible: true,
+  unreportedReason: '',
+  importTaxNumber: '',
+  others: 0,
   note: '',
   voucherFileName: null,
   voucherPreviewUrl: null,

@@ -28,15 +28,13 @@ export default function TransactionAmountCard({ side, form, onChange }: Transact
           </Select>
         </Field>
 
-        {side === 'purchase' && (
-          <Field label="費用類別">
-            <SubjectSelect
-              value={form.expenseCategory}
-              onChange={s => onChange({ expenseCategory: s })}
-              year={officialSubjectYear(form.issueDate)}
-            />
-          </Field>
-        )}
+        <Field label={side === 'purchase' ? '費用類別' : '收入科目'}>
+          <SubjectSelect
+            value={form.expenseCategory}
+            onChange={s => onChange({ expenseCategory: s })}
+            year={officialSubjectYear(form.issueDate)}
+          />
+        </Field>
 
         <Field label="銷售額">
           <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} />
