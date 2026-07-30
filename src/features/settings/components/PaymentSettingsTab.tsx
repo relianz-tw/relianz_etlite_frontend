@@ -1,5 +1,7 @@
 'use client';
 
+import { createBankAccount, listBankAccounts, updateBankAccount } from '@/api/bankAccounts';
+import type { BankAccountDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Select from '@/components/ui/Select';
@@ -7,40 +9,158 @@ import TextInput from '@/components/ui/TextInput';
 import AddChannelDialog from '@/features/ledger/components/AddChannelDialog';
 import { SALES_CHANNELS } from '@/features/ledger/data';
 import { CirclePlus, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import BankAccountCard from './BankAccountCard';
 import VendorSection from './VendorSection';
-import { BANK_CODE_OPTIONS, SEED_BANK_ACCOUNTS } from '../data';
+import { BANK_CODE_OPTIONS } from '../data';
 import type { BankAccountRecord } from '../data';
 
-const EMPTY_NEW_ACCOUNT: Omit<BankAccountRecord, 'id' | 'updatedDate'> = {
+const EMPTY_NEW_ACCOUNT: Omit<BankAccountRecord, 'id' | 'lastBalanceUpdateDate' | 'isActive' | 'isDefaultReceivingAccount' | 'isDefaultPaymentAccount'> = {
   nickname: '',
   bankCode: BANK_CODE_OPTIONS[0].code,
   bankName: BANK_CODE_OPTIONS[0].name,
+  bankBranch: '',
   accountNumber: '',
   balance: 0,
+  remark: '',
 };
 
+/** 後端 BankAccountDto 轉為畫面用的 BankAccountRecord */
+function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
+  return {
+    id: dto.uuid,
+    nickname: dto.accountName ?? '',
+    bankCode: dto.bankCode ?? '',
+    bankName: dto.bankName ?? '',
+    bankBranch: dto.branchName ?? '',
+    accountNumber: dto.accountNo ?? '',
+    balance: dto.currentBalance,
+    lastBalanceUpdateDate: dto.lastBalanceUpdateDate ?? '',
+    remark: dto.remark ?? '',
+    isActive: dto.isActive,
+    isDefaultReceivingAccount: dto.isDefaultReceivingAccount,
+    isDefaultPaymentAccount: dto.isDefaultPaymentAccount,
+  };
+}
+
 export default function PaymentSettingsTab() {
-  const [accounts, setAccounts] = useState<BankAccountRecord[]>(SEED_BANK_ACCOUNTS);
+  const [accounts, setAccounts] = useState<BankAccountRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<BankAccountRecord | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
   const [adding, setAdding] = useState(false);
   const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT);
   const [channels, setChannels] = useState<string[]>(SALES_CHANNELS);
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
 
-  const updateAccount = (id: string, patch: Partial<BankAccountRecord>) => {
-    setAccounts(list => list.map(a => (a.id === id ? { ...a, ...patch } : a)));
+  const loadAccounts = () => {
+    setLoading(true);
+    setLoadError('');
+    listBankAccounts()
+      .then(list => setAccounts(list.map(toBankAccountRecord)))
+      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .finally(() => setLoading(false));
   };
-  const removeAccount = (id: string) => {
-    setAccounts(list => list.filter(a => a.id !== id));
-    setEditingId(current => (current === id ? null : current));
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const startEdit = (account: BankAccountRecord) => {
+    setEditingId(account.id);
+    setDraft({ ...account });
+    setActionError('');
   };
-  const saveNewAccount = () => {
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraft(null);
+  };
+  const updateDraft = (patch: Partial<BankAccountRecord>) => setDraft(d => (d ? { ...d, ...patch } : d));
+
+  const saveEdit = async () => {
+    if (!draft) return;
+    setSaving(true);
+    setActionError('');
+    try {
+      await updateBankAccount({
+        uuid: draft.id,
+        accountName: draft.nickname,
+        bankCode: draft.bankCode,
+        accountNo: draft.accountNumber,
+        bankName: draft.bankName,
+        branchName: draft.bankBranch,
+        currentBalance: draft.balance,
+        // 本次未提供餘額異動功能，回填原值避免覆寫既有更新日期
+        lastBalanceUpdateDate: draft.lastBalanceUpdateDate,
+        isDefaultReceivingAccount: draft.isDefaultReceivingAccount,
+        isDefaultPaymentAccount: draft.isDefaultPaymentAccount,
+        isActive: draft.isActive,
+        remark: draft.remark,
+      });
+      setEditingId(null);
+      setDraft(null);
+      loadAccounts();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deactivateAccount = async (account: BankAccountRecord) => {
+    setSaving(true);
+    setActionError('');
+    try {
+      await updateBankAccount({
+        uuid: account.id,
+        accountName: account.nickname,
+        bankCode: account.bankCode,
+        accountNo: account.accountNumber,
+        bankName: account.bankName,
+        branchName: account.bankBranch,
+        currentBalance: account.balance,
+        lastBalanceUpdateDate: account.lastBalanceUpdateDate,
+        isDefaultReceivingAccount: account.isDefaultReceivingAccount,
+        isDefaultPaymentAccount: account.isDefaultPaymentAccount,
+        isActive: false,
+        remark: account.remark,
+      });
+      loadAccounts();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveNewAccount = async () => {
     if (!newAccount.nickname.trim() || !newAccount.accountNumber.trim()) return;
-    setAccounts(list => [...list, { ...newAccount, id: `acc-${list.length + 1}`, updatedDate: '首次設定' }]);
-    setNewAccount(EMPTY_NEW_ACCOUNT);
-    setAdding(false);
+    setSaving(true);
+    setActionError('');
+    try {
+      await createBankAccount({
+        accountName: newAccount.nickname,
+        bankCode: newAccount.bankCode,
+        accountNo: newAccount.accountNumber,
+        bankName: newAccount.bankName,
+        branchName: newAccount.bankBranch,
+        currentBalance: newAccount.balance,
+        isDefaultReceivingAccount: false,
+        isDefaultPaymentAccount: false,
+        isActive: true,
+        remark: newAccount.remark,
+      });
+      setNewAccount(EMPTY_NEW_ACCOUNT);
+      setAdding(false);
+      loadAccounts();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -49,15 +169,24 @@ export default function PaymentSettingsTab() {
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="text-base font-semibold text-neutral-dark">銀行帳戶管理</h2>
         </div>
+        {actionError && <p className="mb-4 text-sm text-semantic-error">{actionError}</p>}
+        {loading ? (
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+        ) : loadError ? (
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{loadError}</div>
+        ) : (
         <div className="flex flex-col gap-4">
           {accounts.map(account => (
             <BankAccountCard
               key={account.id}
-              account={account}
+              account={editingId === account.id && draft ? draft : account}
               editing={editingId === account.id}
-              onToggleEdit={() => setEditingId(id => (id === account.id ? null : account.id))}
-              onChange={patch => updateAccount(account.id, patch)}
-              onRemove={() => removeAccount(account.id)}
+              saving={saving}
+              onStartEdit={() => startEdit(account)}
+              onCancelEdit={cancelEdit}
+              onChange={updateDraft}
+              onSave={saveEdit}
+              onDeactivate={() => deactivateAccount(account)}
             />
           ))}
 
@@ -91,6 +220,10 @@ export default function PaymentSettingsTab() {
                   </Select>
                 </div>
                 <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
+                  <TextInput value={newAccount.bankBranch} onChange={e => setNewAccount(a => ({ ...a, bankBranch: e.target.value }))} />
+                </div>
+                <div>
                   <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行帳號</label>
                   <TextInput
                     placeholder="請輸入完整帳號，不要輸入符號"
@@ -103,10 +236,19 @@ export default function PaymentSettingsTab() {
                   <MoneyInput value={newAccount.balance} onChange={v => setNewAccount(a => ({ ...a, balance: v }))} />
                   <p className="mt-1 text-xs text-neutral-mid">僅限於首次設定時使用，系統將不再詢問</p>
                 </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
+                  <TextInput
+                    placeholder="備註（選填）"
+                    value={newAccount.remark}
+                    onChange={e => setNewAccount(a => ({ ...a, remark: e.target.value }))}
+                  />
+                </div>
               </div>
               <div className="mt-5 flex justify-end gap-3">
                 <Button
                   variant="danger"
+                  disabled={saving}
                   onClick={() => {
                     setAdding(false);
                     setNewAccount(EMPTY_NEW_ACCOUNT);
@@ -114,8 +256,8 @@ export default function PaymentSettingsTab() {
                 >
                   取消
                 </Button>
-                <Button variant="primary" onClick={saveNewAccount}>
-                  儲存
+                <Button variant="primary" onClick={saveNewAccount} disabled={saving}>
+                  {saving ? '儲存中…' : '儲存'}
                 </Button>
               </div>
             </div>
@@ -132,6 +274,7 @@ export default function PaymentSettingsTab() {
             </button>
           )}
         </div>
+        )}
       </div>
 
       <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">

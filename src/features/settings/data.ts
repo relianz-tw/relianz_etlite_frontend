@@ -1,26 +1,5 @@
-export interface BasicInfoField {
-  label: string;
-  value: string;
-}
-
-export const BASIC_INFO_FIELDS: BasicInfoField[] = [
-  { label: '組織型態', value: '有限公司' },
-  { label: '統一編號', value: '93790155' },
-  { label: '稅籍編號', value: '323232332' },
-  { label: '登記名稱', value: '測試有限公司' },
-  { label: '負責人姓名', value: '彭建彰' },
-  { label: '健保投保單位代號', value: '153959516' },
-];
-
-export const BASIC_INFO_ZIP = '114';
-export const BASIC_INFO_ADDRESS = '臺北市內湖區瑞光路358巷30弄6號6樓';
+/** 職災費率類別後端無對應欄位，維持前端唯讀 mock */
 export const BASIC_INFO_LABOR_RISK = '運輸輔助業（報關業及船務代理業、陸上運輸輔助業除外）、倉儲業（0.23%）';
-
-export const BASIC_INFO_CONTACT: BasicInfoField[] = [
-  { label: '聯絡人全名', value: '彭建彰' },
-  { label: '聯絡人電話', value: '0900000000' },
-];
-export const BASIC_INFO_EMAIL = 'shuyuan.chuang@relianz.tw';
 
 export interface ProjectRecord {
   id: string;
@@ -115,9 +94,16 @@ export interface BankAccountRecord {
   nickname: string;
   bankCode: string;
   bankName: string;
+  bankBranch: string;
   accountNumber: string;
   balance: number;
-  updatedDate: string;
+  /** 最後更新餘額日期，YYYYMMDD；尚無紀錄時為空字串 */
+  lastBalanceUpdateDate: string;
+  remark: string;
+  isActive: boolean;
+  /** 目前介面未提供設定入口，僅用於更新時回填原值，避免覆寫後端既有設定 */
+  isDefaultReceivingAccount: boolean;
+  isDefaultPaymentAccount: boolean;
 }
 
 // 註：僅列常見銀行供下拉選單使用，非官方完整清單；正式清單需另外對照
@@ -136,18 +122,6 @@ export const BANK_CODE_OPTIONS = [
   { code: '807', name: '永豐商業銀行' },
   { code: '808', name: '玉山商業銀行' },
   { code: '812', name: '台新國際商業銀行' },
-];
-
-export const SEED_BANK_ACCOUNTS: BankAccountRecord[] = [
-  {
-    id: 'acc1',
-    nickname: '收款用中國信託港墅分行',
-    bankCode: '822',
-    bankName: '中國信託',
-    accountNumber: '01256789012',
-    balance: 3736519,
-    updatedDate: '115/1/1',
-  },
 ];
 
 export interface VendorRecord {

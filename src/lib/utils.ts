@@ -9,6 +9,12 @@ export function cn(...inputs: ClassValue[]) {
 /** 金額格式化：統一加上 $ 與千分位，供各頁面金額顯示使用 */
 export const fmtCurrency = (n: number) => `$${n.toLocaleString('en-US')}`;
 
+/** 後端 YYYYMMDD 字串轉為 YYYY/MM/DD 顯示；空字串或格式不符時原樣回傳 */
+export function formatYyyymmdd(value: string): string {
+  if (!/^\d{8}$/.test(value)) return value;
+  return `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`;
+}
+
 /** 表格可排序表頭的排序方向；'none' 代表未排序（維持原始順序） */
 export type SortDir = 'asc' | 'desc' | 'none';
 

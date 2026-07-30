@@ -1,59 +1,121 @@
 'use client';
 
+import { getBasicSetting, updateBasicSetting } from '@/api/basicSettings';
+import type { BasicSettingDto } from '@/api/types';
 import TextInput from '@/components/ui/TextInput';
 import { Check, KeyRound, Pencil, X } from 'lucide-react';
-import { useState } from 'react';
-import {
-  BASIC_INFO_ADDRESS,
-  BASIC_INFO_CONTACT,
-  BASIC_INFO_EMAIL,
-  BASIC_INFO_FIELDS,
-  BASIC_INFO_LABOR_RISK,
-  BASIC_INFO_ZIP,
-} from '../data';
-import type { BasicInfoField } from '../data';
+import { useEffect, useState } from 'react';
+import { BASIC_INFO_LABOR_RISK } from '../data';
 import ChangePasswordDialog from './ChangePasswordDialog';
 
-interface Snapshot {
-  fields: BasicInfoField[];
-  zip: string;
-  address: string;
-  laborRisk: string;
-  contact: BasicInfoField[];
-  email: string;
+/** 後端唯讀欄位（僅在 GET 回應出現、PATCH 不接受），介面一律唯讀顯示 */
+interface ReadonlyFields {
+  orgType: string;
+  taxIdNumber: string; // 統一編號
+  taxId: string; // 稅籍編號
+  companyName: string;
+  companyAddrPostal: string;
+  companyAddr: string;
+}
+
+/** 後端可透過 PATCH /basic/companySetting/reconciliationMethod 更新的欄位 */
+interface EditableFields {
+  headName: string;
+  nhiInsuranceCode: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+}
+
+function toReadonlyFields(dto: BasicSettingDto): ReadonlyFields {
+  return {
+    orgType: dto.orgType ?? '',
+    taxIdNumber: dto.taxIdNumber ?? '',
+    taxId: dto.taxId ?? '',
+    companyName: dto.companyName ?? '',
+    companyAddrPostal: dto.companyAddrPostal ?? '',
+    companyAddr: dto.companyAddr ?? '',
+  };
+}
+
+function toEditableFields(dto: BasicSettingDto): EditableFields {
+  return {
+    headName: dto.headName ?? '',
+    nhiInsuranceCode: dto.nhiInsuranceCode ?? '',
+    contactName: dto.contactName ?? '',
+    contactPhone: dto.contactPhone ?? '',
+    contactEmail: dto.contactEmail ?? '',
+  };
 }
 
 export default function BasicInfoTab() {
-  const [fields, setFields] = useState<BasicInfoField[]>(BASIC_INFO_FIELDS);
-  const [zip, setZip] = useState(BASIC_INFO_ZIP);
-  const [address, setAddress] = useState(BASIC_INFO_ADDRESS);
-  const [laborRisk, setLaborRisk] = useState(BASIC_INFO_LABOR_RISK);
-  const [contact, setContact] = useState<BasicInfoField[]>(BASIC_INFO_CONTACT);
-  const [email, setEmail] = useState(BASIC_INFO_EMAIL);
+  const [readonlyFields, setReadonlyFields] = useState<ReadonlyFields | null>(null);
+  const [editableFields, setEditableFields] = useState<EditableFields | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  // 職災費率類別後端無對應欄位，維持唯讀 mock，不隨表單送出
+  const [laborRisk] = useState(BASIC_INFO_LABOR_RISK);
 
   const [editing, setEditing] = useState(false);
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<EditableFields | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
-  const updateField = (index: number, value: string) => setFields(list => list.map((f, i) => (i === index ? { ...f, value } : f)));
-  const updateContact = (index: number, value: string) => setContact(list => list.map((f, i) => (i === index ? { ...f, value } : f)));
+  useEffect(() => {
+    setLoading(true);
+    setLoadError('');
+    getBasicSetting()
+      .then(dto => {
+        setReadonlyFields(toReadonlyFields(dto));
+        setEditableFields(toEditableFields(dto));
+      })
+      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const updateEditable = (patch: Partial<EditableFields>) => setEditableFields(f => (f ? { ...f, ...patch } : f));
 
   const startEdit = () => {
-    setSnapshot({ fields, zip, address, laborRisk, contact, email });
+    if (!editableFields) return;
+    setSnapshot(editableFields);
+    setSaveError('');
     setEditing(true);
   };
   const cancelEdit = () => {
-    if (snapshot) {
-      setFields(snapshot.fields);
-      setZip(snapshot.zip);
-      setAddress(snapshot.address);
-      setLaborRisk(snapshot.laborRisk);
-      setContact(snapshot.contact);
-      setEmail(snapshot.email);
-    }
+    if (snapshot) setEditableFields(snapshot);
     setEditing(false);
   };
-  const saveEdit = () => setEditing(false);
+  const saveEdit = async () => {
+    if (!editableFields) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      await updateBasicSetting(editableFields);
+      setEditing(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
+        <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+      </div>
+    );
+  }
+
+  if (loadError || !readonlyFields || !editableFields) {
+    return (
+      <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
+        <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{loadError || '操作失敗'}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
@@ -62,13 +124,23 @@ export default function BasicInfoTab() {
         <div className="flex items-center gap-4 text-sm">
           {editing ? (
             <>
-              <button type="button" onClick={cancelEdit} className="flex items-center gap-1.5 text-neutral-mid hover:text-neutral-dark">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={saving}
+                className="flex items-center gap-1.5 text-neutral-mid hover:text-neutral-dark disabled:opacity-50"
+              >
                 <X size={14} />
                 取消
               </button>
-              <button type="button" onClick={saveEdit} className="flex items-center gap-1.5 font-semibold text-brand-blue">
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={saving}
+                className="flex items-center gap-1.5 font-semibold text-brand-blue disabled:opacity-50"
+              >
                 <Check size={14} />
-                儲存
+                {saving ? '儲存中…' : '儲存'}
               </button>
             </>
           ) : (
@@ -86,44 +158,86 @@ export default function BasicInfoTab() {
         </div>
       </div>
 
+      {saveError && <p className="mb-4 text-sm text-semantic-error">{saveError}</p>}
+
       <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-2">
-        {fields.map((field, i) => (
-          <div key={field.label}>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">{field.label}</label>
-            <TextInput value={field.value} onChange={e => updateField(i, e.target.value)} disabled={!editing} readOnly={!editing} />
-          </div>
-        ))}
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">組織型態</label>
+          <TextInput value={readonlyFields.orgType} disabled readOnly />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">統一編號</label>
+          <TextInput value={readonlyFields.taxIdNumber} disabled readOnly />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">稅籍編號</label>
+          <TextInput value={readonlyFields.taxId} disabled readOnly />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">登記名稱</label>
+          <TextInput value={readonlyFields.companyName} disabled readOnly />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">負責人姓名</label>
+          <TextInput value={editableFields.headName} onChange={e => updateEditable({ headName: e.target.value })} disabled={!editing} readOnly={!editing} />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">健保投保單位代號</label>
+          <TextInput
+            value={editableFields.nhiInsuranceCode}
+            onChange={e => updateEditable({ nhiInsuranceCode: e.target.value })}
+            disabled={!editing}
+            readOnly={!editing}
+          />
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-[120px_1fr]">
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">郵遞區號</label>
-          <TextInput value={zip} onChange={e => setZip(e.target.value)} disabled={!editing} readOnly={!editing} />
+          <TextInput value={readonlyFields.companyAddrPostal} disabled readOnly />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">登記地址</label>
-          <TextInput value={address} onChange={e => setAddress(e.target.value)} disabled={!editing} readOnly={!editing} />
+          <TextInput value={readonlyFields.companyAddr} disabled readOnly />
         </div>
       </div>
 
       <div className="mt-5">
         <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">職災費率類別</label>
-        <TextInput value={laborRisk} onChange={e => setLaborRisk(e.target.value)} disabled={!editing} readOnly={!editing} />
+        <TextInput value={laborRisk} disabled readOnly />
       </div>
 
       <div className="mt-6 rounded-md bg-surface-cream p-4">
         <h3 className="mb-4 text-sm font-semibold text-neutral-dark">聯絡資訊</h3>
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-2">
-          {contact.map((field, i) => (
-            <div key={field.label}>
-              <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">{field.label}</label>
-              <TextInput value={field.value} onChange={e => updateContact(i, e.target.value)} disabled={!editing} readOnly={!editing} />
-            </div>
-          ))}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">聯絡人全名</label>
+            <TextInput
+              value={editableFields.contactName}
+              onChange={e => updateEditable({ contactName: e.target.value })}
+              disabled={!editing}
+              readOnly={!editing}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">聯絡人電話</label>
+            <TextInput
+              value={editableFields.contactPhone}
+              onChange={e => updateEditable({ contactPhone: e.target.value })}
+              disabled={!editing}
+              readOnly={!editing}
+            />
+          </div>
         </div>
         <div className="mt-5">
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">電子郵件信箱</label>
-          <TextInput value={email} onChange={e => setEmail(e.target.value)} disabled={!editing} readOnly={!editing} />
+          <TextInput
+            value={editableFields.contactEmail}
+            onChange={e => updateEditable({ contactEmail: e.target.value })}
+            disabled={!editing}
+            readOnly={!editing}
+          />
         </div>
       </div>
 
