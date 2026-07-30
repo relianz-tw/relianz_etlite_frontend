@@ -4,12 +4,13 @@ import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import Select from '@/components/ui/Select';
+import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
 import { fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
-import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
@@ -130,14 +131,14 @@ function BatchUpdateRow({
             <span className="font-mono font-semibold tabular-nums text-neutral-dark">{selectedAmount}</span>
           </span>
           <div className="flex items-center gap-2">
-            <Select widthClassName="w-40" value={batchCategory} onValueChange={onBatchCategoryChange}>
-              <option value="">變更費用類別</option>
-              {EXPENSE_CATEGORIES.map(c => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
+            <div className="w-48">
+              <SubjectNameSelect
+                value={batchCategory}
+                onChange={onBatchCategoryChange}
+                year={officialSubjectYear(new Date())}
+                placeholder="變更費用類別"
+              />
+            </div>
             <Select widthClassName="w-40" value={batchProject} onValueChange={onBatchProjectChange}>
               <option value="">變更專案</option>
               {PROJECT_NAMES.filter(Boolean).map(p => (
@@ -436,7 +437,7 @@ export default function LedgerTable(props: LedgerTableProps) {
           <col className="w-[160px]" />
           <col className="w-[150px]" />
           <col />
-          <col className="w-[150px]" />
+          <col className="w-[190px]" />
           <col className="w-[150px]" />
           <col className="w-[120px]" />
         </colgroup>
@@ -497,14 +498,14 @@ export default function LedgerTable(props: LedgerTableProps) {
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
                   <td className={`${tdClass} truncate`} title={row.party}>{row.party}</td>
                   <td className={tdClass}>
-                    <Select
-                      widthClassName="w-32"
-                      value={locked ? row.category : categoryOverrides[row.id] ?? row.category}
-                      onValueChange={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
-                      disabled={locked}
-                    >
-                      {locked ? <option>{row.category}</option> : EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                    </Select>
+                    <div className="w-44">
+                      <SubjectNameSelect
+                        value={locked ? row.category : categoryOverrides[row.id] ?? row.category}
+                        onChange={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
+                        year={officialSubjectYearFromRocDate(row.date)}
+                        disabled={locked}
+                      />
+                    </div>
                   </td>
                   <td className={tdClass}>
                     <Select

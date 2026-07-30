@@ -3,6 +3,7 @@
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
+import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
@@ -10,7 +11,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Do
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { useLongPress } from '../useLongPress';
 import AddChannelDialog from './AddChannelDialog';
@@ -281,9 +282,12 @@ function PurchaseCard({
       <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
-          <Select widthClassName="w-full" value={locked ? row.category : categoryValue} onValueChange={onCategorySelect} disabled={locked}>
-            {locked ? <option>{row.category}</option> : EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </Select>
+          <SubjectNameSelect
+            value={locked ? row.category : categoryValue}
+            onChange={onCategorySelect}
+            year={officialSubjectYearFromRocDate(row.date)}
+            disabled={locked}
+          />
           <Select widthClassName="w-full" value={locked ? row.project || '未指定專案' : projectValue} onValueChange={onProjectSelect} disabled={locked}>
             {locked ? <option>{row.project || '未指定專案'}</option> : PROJECT_NAMES.map(p => <option key={p || 'none'}>{p || '未指定專案'}</option>)}
           </Select>
@@ -437,14 +441,12 @@ export default function LedgerCards(props: LedgerCardsProps) {
       {selectionMode && props.side === 'purchase' && (
         <div className="flex flex-col gap-2 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
           <div className="grid grid-cols-2 gap-2">
-            <Select widthClassName="w-full" value={batchCategory} onValueChange={setBatchCategory}>
-              <option value="">變更費用類別</option>
-              {EXPENSE_CATEGORIES.map(c => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
+            <SubjectNameSelect
+              value={batchCategory}
+              onChange={setBatchCategory}
+              year={officialSubjectYear(new Date())}
+              placeholder="變更費用類別"
+            />
             <Select widthClassName="w-full" value={batchProject} onValueChange={setBatchProject}>
               <option value="">變更專案</option>
               {PROJECT_NAMES.filter(Boolean).map(p => (

@@ -1,10 +1,22 @@
 import { generateDailyTrend } from '@/lib/utils';
 import type { AllowanceLineItem, AllowanceRecord, PurchaseRow, SalesRow } from './types';
 
-export const EXPENSE_CATEGORIES = ['進貨', '文具用品', '修繕費', '雜項購置'];
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
 export const SALES_CHANNELS = ['現金', '匯票', '國泰信用卡', 'MoMo'];
 export const BANK_ACCOUNTS = ['中國信託港墅分行 (822-01256789012)', '國泰世華敦南分行 (013-98765432101)', '現金'];
+
+/** 日期 → /ael/subject/official/list 需要的民國年（依規格取該日期年度的前一年）；未提供日期回傳 undefined */
+export function officialSubjectYear(date: Date | undefined): number | undefined {
+  if (!date) return undefined;
+  const rocYear = date.getFullYear() - 1911;
+  return rocYear - 1;
+}
+
+/** 表格列 ROC 日期字串（如 '115/03/26'）→ /ael/subject/official/list 需要的年度（該筆交易年度的前一年） */
+export function officialSubjectYearFromRocDate(rocDate: string): number {
+  const rocYear = parseInt(rocDate.split('/')[0], 10);
+  return rocYear - 1;
+}
 
 const TREND_END_DATE = '2026/03/27'; // 對齊既有假資料中最新的交易日期，趨勢圖固定顯示兩個月（62 天）每日金額
 

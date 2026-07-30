@@ -1,3 +1,5 @@
+import type { SubjectOption } from '@/components/ui/SubjectSelect';
+
 export type TransactionMode = 'create' | 'edit';
 
 /** 新增/編輯交易表單的本地狀態，欄位涵蓋銷項與進項全部情境（依 side 顯示對應子集） */
@@ -17,7 +19,7 @@ export interface TransactionFormState {
   channel: string;
   tag: string;
   project: string;
-  expenseCategory: string;
+  expenseCategory: SubjectOption | null;
   salesAmount: number;
   taxAmount: number;
   note: string;

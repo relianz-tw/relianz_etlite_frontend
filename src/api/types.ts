@@ -142,3 +142,28 @@ export interface UpdateBasicSettingBody {
   contactEmail?: string;
   nhiInsuranceCode?: string;
 }
+
+/**
+ * 官方費用科目 DTO（/ael/subject/official/list），依 year（民國年）帶出該年度科目清單。
+ * debitCreditType／remark 目前皆為 null，本次介面不使用。
+ */
+export interface OfficialSubjectDto {
+  id: number;
+  year: number;
+  subjectCode: string;
+  name: string;
+  debitCreditType: string | null;
+  remark: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 使用者常用科目 DTO（/ael/subject/usage），依 rank 由小到大排序即為常用程度排名 */
+export interface SubjectUsageDto {
+  acUuid: string;
+  rank: number;
+  subjectName: string;
+  useCount: number;
+  createTime: string;
+  updateTime: string;
+}

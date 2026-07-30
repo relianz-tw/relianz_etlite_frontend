@@ -2,6 +2,8 @@ import { PURCHASE_PAID, SALES_CHANNELS } from '../data';
 import type { AllowanceRecord, Side } from '../types';
 import type { TransactionFormState } from './types';
 
+export { officialSubjectYear } from '../data';
+
 /** 路由 searchParams 的 side 參數解析：非 'purchase' 一律視為 'sales'，供新增/編輯頁共用 */
 export function parseSideParam(value: string | string[] | undefined): Side {
   return value === 'purchase' ? 'purchase' : 'sales';
@@ -10,7 +12,6 @@ export function parseSideParam(value: string | string[] | undefined): Side {
 export const TAX_RATE_LABEL = '應稅 5%';
 export const TAG_PLACEHOLDER = '新增一般標籤';
 export const PROJECT_PLACEHOLDER = '選擇專案';
-export const EXPENSE_CATEGORY_PLACEHOLDER = '請選擇大分類';
 
 export const INVOICE_PERIOD_OPTIONS = ['115 年 01 - 02 月份', '115 年 03 - 04 月份', '115 年 05 - 06 月份'];
 export const DECLARE_PERIOD_OPTIONS = ['115/02/09', '115/01/09', '115/03/09'];
@@ -47,7 +48,7 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   channel: SALES_CHANNELS[0],
   tag: TAG_PLACEHOLDER,
   project: PROJECT_PLACEHOLDER,
-  expenseCategory: EXPENSE_CATEGORY_PLACEHOLDER,
+  expenseCategory: null,
   salesAmount: 0,
   taxAmount: 0,
   note: '',
@@ -92,6 +93,7 @@ export const EDIT_PURCHASE_FORM: TransactionFormState = {
   invoiceNumber: PURCHASE_INVOICE_NUMBER_OPTIONS[0],
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
   issueDate: new Date(2026, 1, 9),
+  expenseCategory: { subjectCode: '0100010', name: '薪資支出' },
   salesAmount: 1400,
   taxAmount: 100,
   voucherFileName: '發票掃描檔.jpg',

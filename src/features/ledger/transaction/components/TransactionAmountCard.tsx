@@ -2,10 +2,10 @@
 
 import MoneyInput from '@/components/ui/MoneyInput';
 import Select from '@/components/ui/Select';
+import SubjectSelect from '@/components/ui/SubjectSelect';
 import Textarea from '@/components/ui/Textarea';
-import { EXPENSE_CATEGORIES } from '../../data';
 import type { Side } from '../../types';
-import { EXPENSE_CATEGORY_PLACEHOLDER, TAX_RATE_LABEL } from '../data';
+import { officialSubjectYear, TAX_RATE_LABEL } from '../data';
 import type { TransactionFormState } from '../types';
 import Field from './Field';
 
@@ -30,14 +30,11 @@ export default function TransactionAmountCard({ side, form, onChange }: Transact
 
         {side === 'purchase' && (
           <Field label="費用類別">
-            <Select widthClassName="w-full" value={form.expenseCategory} onValueChange={v => onChange({ expenseCategory: v })}>
-              <option value={EXPENSE_CATEGORY_PLACEHOLDER}>{EXPENSE_CATEGORY_PLACEHOLDER}</option>
-              {EXPENSE_CATEGORIES.map(v => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </Select>
+            <SubjectSelect
+              value={form.expenseCategory}
+              onChange={s => onChange({ expenseCategory: s })}
+              year={officialSubjectYear(form.issueDate)}
+            />
           </Field>
         )}
 

@@ -4,11 +4,12 @@ import Button from '@/components/ui/Button';
 import DatePicker, { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
+import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import TextInput from '@/components/ui/TextInput';
 import { ChevronDown, ChevronUp, Plus, Search, Upload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { EXPENSE_CATEGORIES, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import { officialSubjectYear, PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { AdvancedFilter, QuickSearchField, Side } from '../types';
 import ImportInvoiceDialog from './ImportInvoiceDialog';
 
@@ -124,14 +125,7 @@ export default function FilterBar({
         ))}
       </Select>
     ) : activeField.value === 'category' ? (
-      <Select value={query} onValueChange={onQueryChange}>
-        <option value="">全部費用類別</option>
-        {EXPENSE_CATEGORIES.map(c => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </Select>
+      <SubjectNameSelect value={query} onChange={onQueryChange} year={officialSubjectYear(new Date())} placeholder="全部費用類別" />
     ) : activeField.value === 'project' ? (
       <Select value={query} onValueChange={onQueryChange}>
         <option value="">全部專案</option>
@@ -203,14 +197,12 @@ export default function FilterBar({
           <>
             <div>
               <label className="mb-1 block text-xs font-semibold text-neutral-mid">費用類別</label>
-              <Select value={advanced.category || 'all'} onValueChange={v => onAdvancedChange({ ...advanced, category: v === 'all' ? '' : v })}>
-                <option value="all">全部費用類別</option>
-                {EXPENSE_CATEGORIES.map(c => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
+              <SubjectNameSelect
+                value={advanced.category}
+                onChange={v => onAdvancedChange({ ...advanced, category: v })}
+                year={officialSubjectYear(new Date())}
+                placeholder="全部費用類別"
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-neutral-mid">專案名稱</label>
