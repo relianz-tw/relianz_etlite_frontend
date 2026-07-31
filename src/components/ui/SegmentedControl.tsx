@@ -13,6 +13,7 @@ interface SegmentedControlProps<T extends string> {
   /** true 時每個選項依文字內容自適應寬度並保留間距，不強制等寬（適合選項多或長度不一時使用） */
   fit?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 const SIZE_CLASS = {
@@ -28,6 +29,7 @@ export default function SegmentedControl<T extends string>({
   size = 'md',
   fit = false,
   className = '',
+  disabled = false,
 }: SegmentedControlProps<T>) {
   return (
     <div
@@ -40,8 +42,9 @@ export default function SegmentedControl<T extends string>({
           <button
             key={option.value}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
-            className={`whitespace-nowrap rounded-[4px] font-semibold transition-colors ${SIZE_CLASS[size]} ${fit ? 'px-4' : ''} ${
+            className={`whitespace-nowrap rounded-[4px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${SIZE_CLASS[size]} ${fit ? 'px-4' : ''} ${
               active ? 'bg-brand-blue text-white' : 'text-neutral-mid hover:text-neutral-dark'
             }`}
           >

@@ -4,13 +4,14 @@ import TrendDetailView from '@/components/ui/TrendDetailView';
 import { fmtCurrency } from '@/lib/utils';
 import { PURCHASE_DAILY, SALES_DAILY } from '../data';
 import type { Side } from '../types';
+import { resolveLedgerBackHref } from '../urlState';
 
 const SIDE_CONFIG: Record<Side, { title: string; label: string }> = {
   sales: { title: '已開立發票金額趨勢', label: '已開立發票金額' },
   purchase: { title: '已收取憑證金額趨勢', label: '已收取憑證金額' },
 };
 
-export default function TrendDetailPageView({ side }: { side: Side }) {
+export default function TrendDetailPageView({ side, returnQuery }: { side: Side; returnQuery?: string }) {
   const { title, label } = SIDE_CONFIG[side];
   const data = side === 'sales' ? SALES_DAILY : PURCHASE_DAILY;
   const rows = data.map(point => ({ date: point.date, amount: fmtCurrency(point.value) }));
@@ -19,7 +20,7 @@ export default function TrendDetailPageView({ side }: { side: Side }) {
     <TrendDetailView
       title={title}
       subtitle="帳簿"
-      backHref="/ledger"
+      backHref={resolveLedgerBackHref(returnQuery)}
       series={[{ key: 'amount', label, color: 'blue', data }]}
       table={{
         columns: [

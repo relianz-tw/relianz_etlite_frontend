@@ -1,29 +1,45 @@
 'use client';
 
 import { createBankAccount, listBankAccounts, updateBankAccount } from '@/api/bankAccounts';
-import type { BankAccountDto } from '@/api/types';
+import type { BankAccountDto, UpdateBankAccountBody } from '@/api/types';
 import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
-import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
-import AddChannelDialog from '@/features/ledger/components/AddChannelDialog';
-import { SALES_CHANNELS } from '@/features/ledger/data';
-import { CirclePlus, Plus } from 'lucide-react';
+import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import BankAccountCard from './BankAccountCard';
+import ChannelRuleSection from './ChannelRuleSection';
 import VendorSection from './VendorSection';
-import { BANK_CODE_OPTIONS } from '../data';
 import type { BankAccountRecord } from '../data';
 
 const EMPTY_NEW_ACCOUNT: Omit<BankAccountRecord, 'id' | 'lastBalanceUpdateDate' | 'isActive' | 'isDefaultReceivingAccount' | 'isDefaultPaymentAccount'> = {
   nickname: '',
-  bankCode: BANK_CODE_OPTIONS[0].code,
-  bankName: BANK_CODE_OPTIONS[0].name,
+  bankCode: '',
+  bankName: '',
   bankBranch: '',
   accountNumber: '',
   balance: 0,
   remark: '',
 };
+
+/** BankAccountRecord 轉為 updateBankAccount() 所需的 PATCH body（不含 companyUuid，由 API 層補上） */
+function toUpdateBody(record: BankAccountRecord): Omit<UpdateBankAccountBody, 'companyUuid'> {
+  return {
+    uuid: record.id,
+    accountName: record.nickname,
+    bankCode: record.bankCode,
+    accountNo: record.accountNumber,
+    bankName: record.bankName,
+    branchName: record.bankBranch,
+    currentBalance: record.balance,
+    // 本次未提供餘額異動功能，回填原值避免覆寫既有更新日期
+    lastBalanceUpdateDate: record.lastBalanceUpdateDate,
+    isDefaultReceivingAccount: record.isDefaultReceivingAccount,
+    isDefaultPaymentAccount: record.isDefaultPaymentAccount,
+    isActive: record.isActive,
+    remark: record.remark,
+  };
+}
 
 /** 後端 BankAccountDto 轉為畫面用的 BankAccountRecord */
 function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
@@ -53,8 +69,6 @@ export default function PaymentSettingsTab() {
   const [actionError, setActionError] = useState('');
   const [adding, setAdding] = useState(false);
   const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT);
-  const [channels, setChannels] = useState<string[]>(SALES_CHANNELS);
-  const [channelDialogOpen, setChannelDialogOpen] = useState(false);
 
   const loadAccounts = () => {
     setLoading(true);
@@ -85,21 +99,7 @@ export default function PaymentSettingsTab() {
     setSaving(true);
     setActionError('');
     try {
-      await updateBankAccount({
-        uuid: draft.id,
-        accountName: draft.nickname,
-        bankCode: draft.bankCode,
-        accountNo: draft.accountNumber,
-        bankName: draft.bankName,
-        branchName: draft.bankBranch,
-        currentBalance: draft.balance,
-        // 本次未提供餘額異動功能，回填原值避免覆寫既有更新日期
-        lastBalanceUpdateDate: draft.lastBalanceUpdateDate,
-        isDefaultReceivingAccount: draft.isDefaultReceivingAccount,
-        isDefaultPaymentAccount: draft.isDefaultPaymentAccount,
-        isActive: draft.isActive,
-        remark: draft.remark,
-      });
+      await updateBankAccount(toUpdateBody(draft));
       setEditingId(null);
       setDraft(null);
       loadAccounts();
@@ -114,20 +114,26 @@ export default function PaymentSettingsTab() {
     setSaving(true);
     setActionError('');
     try {
-      await updateBankAccount({
-        uuid: account.id,
-        accountName: account.nickname,
-        bankCode: account.bankCode,
-        accountNo: account.accountNumber,
-        bankName: account.bankName,
-        branchName: account.bankBranch,
-        currentBalance: account.balance,
-        lastBalanceUpdateDate: account.lastBalanceUpdateDate,
-        isDefaultReceivingAccount: account.isDefaultReceivingAccount,
-        isDefaultPaymentAccount: account.isDefaultPaymentAccount,
-        isActive: false,
-        remark: account.remark,
-      });
+      await updateBankAccount(toUpdateBody({ ...account, isActive: false }));
+      loadAccounts();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** 設定預設付款／收款戶頭：同類型只能有一個，前端先解除舊預設再設定新的 */
+  const setDefaultAccount = async (target: BankAccountRecord, kind: 'payment' | 'receiving') => {
+    const field = kind === 'payment' ? 'isDefaultPaymentAccount' : 'isDefaultReceivingAccount';
+    setSaving(true);
+    setActionError('');
+    try {
+      const prevDefault = accounts.find(a => a[field] && a.id !== target.id);
+      if (prevDefault) {
+        await updateBankAccount(toUpdateBody({ ...prevDefault, [field]: false }));
+      }
+      await updateBankAccount(toUpdateBody({ ...target, [field]: true }));
       loadAccounts();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : '操作失敗');
@@ -187,6 +193,8 @@ export default function PaymentSettingsTab() {
               onChange={updateDraft}
               onSave={saveEdit}
               onDeactivate={() => deactivateAccount(account)}
+              onSetDefaultPayment={() => setDefaultAccount(account, 'payment')}
+              onSetDefaultReceiving={() => setDefaultAccount(account, 'receiving')}
             />
           ))}
 
@@ -203,33 +211,31 @@ export default function PaymentSettingsTab() {
                   <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
-                  <Select
-                    widthClassName="w-full"
-                    value={newAccount.bankCode}
-                    onValueChange={v => {
-                      const bank = BANK_CODE_OPTIONS.find(b => b.code === v);
-                      setNewAccount(a => ({ ...a, bankCode: v, bankName: bank?.name ?? a.bankName }));
-                    }}
-                  >
-                    {BANK_CODE_OPTIONS.map(bank => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.code} - {bank.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行名稱</label>
+                  <TextInput value={newAccount.bankName} onChange={e => setNewAccount(a => ({ ...a, bankName: e.target.value }))} />
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
-                  <TextInput value={newAccount.bankBranch} onChange={e => setNewAccount(a => ({ ...a, bankBranch: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行帳號</label>
-                  <TextInput
-                    placeholder="請輸入完整帳號，不要輸入符號"
-                    value={newAccount.accountNumber}
-                    onChange={e => setNewAccount(a => ({ ...a, accountNumber: e.target.value }))}
-                  />
+                <div className="grid grid-cols-1 gap-3 nav:grid-cols-[120px_1fr_1fr]">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
+                    <TextInput
+                      value={newAccount.bankCode}
+                      inputMode="numeric"
+                      maxLength={3}
+                      onChange={e => setNewAccount(a => ({ ...a, bankCode: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行帳號</label>
+                    <TextInput
+                      placeholder="請輸入完整帳號，不要輸入符號"
+                      value={newAccount.accountNumber}
+                      onChange={e => setNewAccount(a => ({ ...a, accountNumber: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
+                    <TextInput value={newAccount.bankBranch} onChange={e => setNewAccount(a => ({ ...a, bankBranch: e.target.value }))} />
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
@@ -277,27 +283,7 @@ export default function PaymentSettingsTab() {
         )}
       </div>
 
-      <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-base font-semibold text-neutral-dark">銷售管道暨收款方式</h2>
-          <Button size="sm" icon={Plus} onClick={() => setChannelDialogOpen(true)}>
-            新增銷售管道
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {channels.map(channel => (
-            <span key={channel} className="rounded-sm bg-surface-cream px-3 py-1.5 text-sm text-neutral-dark">
-              {channel}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <AddChannelDialog
-        open={channelDialogOpen}
-        onClose={() => setChannelDialogOpen(false)}
-        onSubmit={name => setChannels(list => [...list, name])}
-      />
+      <ChannelRuleSection accounts={accounts.filter(a => a.isActive)} />
 
       <VendorSection />
     </div>

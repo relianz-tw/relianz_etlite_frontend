@@ -1,5 +1,7 @@
 'use client';
 
+import { settlePayable, settleReceivable } from '@/api/ledger';
+import type { ReceivableAllocation } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
@@ -8,10 +10,12 @@ import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
 import { fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
+import { withReturnParam } from '../urlState';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
@@ -20,8 +24,8 @@ import VoidConfirmDialog from './VoidConfirmDialog';
 const ADD_CHANNEL_OPTION = '+ 新增管道';
 
 type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
-  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[] }
-  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
+  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void }
+  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[]; onPayableSettled?: () => void }
 );
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
@@ -199,6 +203,7 @@ function SelectionExportRow({
 }
 
 export default function LedgerTable(props: LedgerTableProps) {
+  const searchParams = useSearchParams();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [channels, setChannels] = useState(SALES_CHANNELS);
@@ -208,7 +213,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   const [batchCategory, setBatchCategory] = useState('');
   const [batchProject, setBatchProject] = useState('');
   const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
-  const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
+  const [manualEntryRow, setManualEntryRow] = useState<SalesRow | PurchaseRow | null>(null);
   const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
   const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
   const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
@@ -259,6 +264,17 @@ export default function LedgerTable(props: LedgerTableProps) {
   const handleVoidConfirm = (rowId: string) => {
     setVoidedOverrides(o => ({ ...o, [rowId]: true }));
   };
+  // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
+  // 成功後觸發父層重新查詢應收/應付帳款列表
+  const handleManualSettle = async (allocation: ReceivableAllocation) => {
+    if (props.side === 'sales') {
+      await settleReceivable({ allocations: [allocation], memo: '' });
+      props.onReceivableSettled?.();
+    } else {
+      await settlePayable({ allocations: [allocation], memo: '' });
+      props.onPayableSettled?.();
+    }
+  };
 
   const dialogs = (
     <>
@@ -266,8 +282,9 @@ export default function LedgerTable(props: LedgerTableProps) {
       <ManualEntryDialog
         open={manualEntryRow !== null}
         onClose={() => setManualEntryRow(null)}
+        side={props.side}
         row={manualEntryRow}
-        onSubmit={() => setManualEntryRow(null)}
+        onSubmit={handleManualSettle}
       />
       <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
       {voidRow && (
@@ -340,7 +357,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                     <div className="flex items-center gap-1.5">
                       <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
                       <Link
-                        href={`/ledger/${row.id}?side=sales`}
+                        href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=sales`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
                       >
                         {row.id}
@@ -417,7 +434,8 @@ export default function LedgerTable(props: LedgerTableProps) {
     );
   }
 
-  const { rows, totalCount, totalAmount, sort, onSortToggle } = props;
+  const { rows, subTab, totalCount, totalAmount, sort, onSortToggle } = props;
+  const showAction = subTab === 'payable';
   const editableSelected = rows.filter(r => checked[r.id] && r.source === 'invoice');
   const batchSelectedAmount = fmtCurrency(editableSelected.reduce((sum, r) => sum + r.amount, 0));
   const handleBatchApply = () => {
@@ -429,6 +447,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   };
   return (
     <>
+    {dialogs}
     {exportDialog}
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
@@ -440,6 +459,7 @@ export default function LedgerTable(props: LedgerTableProps) {
           <col className="w-[190px]" />
           <col className="w-[150px]" />
           <col className="w-[120px]" />
+          {showAction && <col className="w-[140px]" />}
         </colgroup>
         <thead className="bg-surface-off-white">
           <tr className="border-b border-neutral-blue-gray/40">
@@ -460,7 +480,7 @@ export default function LedgerTable(props: LedgerTableProps) {
             </th>
             <th className={thClass}>
               <SortHeader
-                label={props.subTab === 'paid' ? '賣家名稱' : '交易敘述'}
+                label={subTab === 'paid' ? '賣家名稱' : '交易敘述'}
                 sortKey="counterparty"
                 sort={sort}
                 onToggle={onSortToggle}
@@ -471,6 +491,7 @@ export default function LedgerTable(props: LedgerTableProps) {
             <th className={thClass}>
               <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
             </th>
+            {showAction && <th className={`${thClass} text-right`}>動作</th>}
           </tr>
         </thead>
         <tbody>
@@ -488,7 +509,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                     <div className="flex items-center gap-1.5">
                       <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
                       <Link
-                        href={`/ledger/${row.id}?side=purchase`}
+                        href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=purchase`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
                       >
                         {row.id}
@@ -520,6 +541,13 @@ export default function LedgerTable(props: LedgerTableProps) {
                     </Select>
                   </td>
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
+                  {showAction && (
+                    <td className={`${tdClass} text-right`}>
+                      <Button size="sm" variant="outline" icon={DollarSign} className="w-[104px]" onClick={() => setManualEntryRow(row)}>
+                        手動入帳
+                      </Button>
+                    </td>
+                  )}
                 </tr>
                 {expanded[row.id] &&
                   row.children?.map(child => (
@@ -527,7 +555,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                       <td className={tdClass} />
                       <td className={`${tdClass} pl-8 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
                       <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.amount)}</td>
-                      <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={4}>
+                      <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={showAction ? 5 : 4}>
                         {child.date ?? ''}
                       </td>
                     </tr>
@@ -536,10 +564,10 @@ export default function LedgerTable(props: LedgerTableProps) {
             );
           })}
         </tbody>
-        <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={4}>
+        <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={showAction ? 5 : 4}>
           {selectedCount > 0 && (
             <SelectionExportRow
-              colSpan={7}
+              colSpan={showAction ? 8 : 7}
               selectedCount={selectedCount}
               selectedAmount={selectedAmount}
               onExport={() => setExportOpen(true)}
@@ -548,7 +576,7 @@ export default function LedgerTable(props: LedgerTableProps) {
           )}
           {editableSelected.length > 0 && (
             <BatchUpdateRow
-              colSpan={7}
+              colSpan={showAction ? 8 : 7}
               selectedCount={editableSelected.length}
               selectedAmount={batchSelectedAmount}
               batchCategory={batchCategory}

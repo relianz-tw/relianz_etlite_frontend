@@ -4,11 +4,9 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import MoneyInput from '@/components/ui/MoneyInput';
-import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import { formatYyyymmdd } from '@/lib/utils';
-import { Check, Pencil, PowerOff, X } from 'lucide-react';
-import { BANK_CODE_OPTIONS } from '../data';
+import { Check, HandCoins, Pencil, PowerOff, Wallet, X } from 'lucide-react';
 import type { BankAccountRecord } from '../data';
 
 interface BankAccountCardProps {
@@ -21,6 +19,8 @@ interface BankAccountCardProps {
   onChange: (patch: Partial<BankAccountRecord>) => void;
   onSave: () => void;
   onDeactivate: () => void;
+  onSetDefaultPayment: () => void;
+  onSetDefaultReceiving: () => void;
 }
 
 export default function BankAccountCard({
@@ -32,56 +32,59 @@ export default function BankAccountCard({
   onChange,
   onSave,
   onDeactivate,
+  onSetDefaultPayment,
+  onSetDefaultReceiving,
 }: BankAccountCardProps) {
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 p-4">
-      <div className="flex flex-col gap-4 nav:flex-row nav:items-start nav:justify-between">
-        <div className="flex-1 space-y-4">
+      <div className="space-y-4">
+        <div>
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <label className="block text-sm font-semibold text-neutral-dark">帳戶暱名</label>
+            {!account.isActive && (
+              <Badge tone="neutral" variant="muted">
+                已停用
+              </Badge>
+            )}
+            {account.isDefaultPaymentAccount && (
+              <Badge tone="info" variant="muted">
+                預設付款戶頭
+              </Badge>
+            )}
+            {account.isDefaultReceivingAccount && (
+              <Badge tone="success" variant="muted">
+                預設收款戶頭
+              </Badge>
+            )}
+          </div>
+          <TextInput
+            value={account.nickname}
+            disabled={!editing}
+            readOnly={!editing}
+            onChange={e => onChange({ nickname: e.target.value })}
+          />
+          {editing && <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>}
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行名稱</label>
+          <TextInput
+            value={account.bankName}
+            disabled={!editing}
+            readOnly={!editing}
+            onChange={e => onChange({ bankName: e.target.value })}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 nav:grid-cols-[120px_1fr_1fr]">
           <div>
-            <div className="mb-1.5 flex items-center gap-2">
-              <label className="block text-sm font-semibold text-neutral-dark">帳戶暱名</label>
-              {!account.isActive && (
-                <Badge tone="neutral" variant="muted">
-                  已停用
-                </Badge>
-              )}
-            </div>
+            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
             <TextInput
-              value={account.nickname}
+              value={account.bankCode}
               disabled={!editing}
               readOnly={!editing}
-              onChange={e => onChange({ nickname: e.target.value })}
+              inputMode="numeric"
+              maxLength={3}
+              onChange={e => onChange({ bankCode: e.target.value.replace(/\D/g, '').slice(0, 3) })}
             />
-            {editing && <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
-              <Select
-                widthClassName="w-full"
-                value={account.bankCode}
-                disabled={!editing}
-                onValueChange={v => {
-                  const bank = BANK_CODE_OPTIONS.find(b => b.code === v);
-                  onChange({ bankCode: v, bankName: bank?.name ?? account.bankName });
-                }}
-              >
-                {BANK_CODE_OPTIONS.map(bank => (
-                  <option key={bank.code} value={bank.code}>
-                    {bank.code} - {bank.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
-              <TextInput
-                value={account.bankBranch}
-                disabled={!editing}
-                readOnly={!editing}
-                onChange={e => onChange({ bankBranch: e.target.value })}
-              />
-            </div>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行帳號</label>
@@ -93,52 +96,72 @@ export default function BankAccountCard({
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
-            <MoneyInput value={account.balance} disabled readOnly />
-            <p className="mt-1 text-xs text-neutral-mid">
-              更新日期：{account.lastBalanceUpdateDate ? formatYyyymmdd(account.lastBalanceUpdateDate) : '尚無紀錄'}
-            </p>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
+            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
             <TextInput
-              value={account.remark}
+              value={account.bankBranch}
               disabled={!editing}
               readOnly={!editing}
-              placeholder="備註（選填）"
-              onChange={e => onChange({ remark: e.target.value })}
+              onChange={e => onChange({ bankBranch: e.target.value })}
             />
           </div>
-          {editing && (
-            <label className="flex items-center gap-1.5 text-sm text-neutral-dark">
-              <Checkbox checked={account.isActive} onChange={() => onChange({ isActive: !account.isActive })} />
-              啟用中
-            </label>
-          )}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 nav:flex-col">
-          {editing ? (
-            <>
-              <Button size="sm" variant="outline" icon={X} onClick={onCancelEdit} disabled={saving}>
-                取消
-              </Button>
-              <Button size="sm" variant="primary" icon={Check} onClick={onSave} disabled={saving}>
-                {saving ? '儲存中…' : '儲存'}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size="sm" variant="ghost" icon={Pencil} onClick={onStartEdit}>
-                編輯
-              </Button>
-              {account.isActive && (
-                <Button size="sm" variant="danger" icon={PowerOff} onClick={onDeactivate}>
-                  停用
-                </Button>
-              )}
-            </>
-          )}
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
+          <MoneyInput value={account.balance} disabled readOnly />
+          <p className="mt-1 text-xs text-neutral-mid">
+            更新日期：{account.lastBalanceUpdateDate ? formatYyyymmdd(account.lastBalanceUpdateDate) : '尚無紀錄'}
+          </p>
         </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
+          <TextInput
+            value={account.remark}
+            disabled={!editing}
+            readOnly={!editing}
+            placeholder="備註（選填）"
+            onChange={e => onChange({ remark: e.target.value })}
+          />
+        </div>
+        {editing && (
+          <label className="flex items-center gap-1.5 text-sm text-neutral-dark">
+            <Checkbox checked={account.isActive} onChange={() => onChange({ isActive: !account.isActive })} />
+            啟用中
+          </label>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-neutral-blue-gray/20 pt-4">
+        {editing ? (
+          <>
+            <Button size="sm" variant="outline" icon={X} onClick={onCancelEdit} disabled={saving}>
+              取消
+            </Button>
+            <Button size="sm" variant="primary" icon={Check} onClick={onSave} disabled={saving}>
+              {saving ? '儲存中…' : '儲存'}
+            </Button>
+          </>
+        ) : (
+          <>
+            {account.isActive && !account.isDefaultPaymentAccount && (
+              <Button size="sm" variant="outline" icon={Wallet} onClick={onSetDefaultPayment} disabled={saving}>
+                設為預設付款
+              </Button>
+            )}
+            {account.isActive && !account.isDefaultReceivingAccount && (
+              <Button size="sm" variant="outline" icon={HandCoins} onClick={onSetDefaultReceiving} disabled={saving}>
+                設為預設收款
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" icon={Pencil} onClick={onStartEdit}>
+              編輯
+            </Button>
+            {account.isActive && (
+              <Button size="sm" variant="danger" icon={PowerOff} onClick={onDeactivate}>
+                停用
+              </Button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 'use client';
 
+import { settlePayable, settleReceivable } from '@/api/ledger';
+import type { ReceivableAllocation } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
@@ -8,11 +10,12 @@ import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
+import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
 import AddChannelDialog from './AddChannelDialog';
 import AllowanceDialog from './AllowanceDialog';
@@ -36,8 +39,8 @@ type LedgerCardsProps = {
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
 } & (
-  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[] }
-  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
+  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void }
+  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[]; onPayableSettled?: () => void }
 );
 
 /** 手機排序入口：下拉選欄位（預設 asc）＋方向鈕（僅切換 asc/desc），與桌機表格共用同一份排序資料 */
@@ -236,8 +239,10 @@ function SalesCard({
 
 function PurchaseCard({
   row,
+  subTab,
   expanded,
   onToggle,
+  onManualEntry,
   onCardClick,
   selectionMode,
   isSelected,
@@ -249,8 +254,10 @@ function PurchaseCard({
   onProjectSelect,
 }: {
   row: PurchaseRow;
+  subTab: PurchaseSubTab;
   expanded: boolean;
   onToggle: () => void;
+  onManualEntry: () => void;
   onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
@@ -279,7 +286,16 @@ function PurchaseCard({
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.party}>{row.party}</div>
-      <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+        {!selectionMode && subTab === 'payable' && (
+          <div onClick={e => e.stopPropagation()}>
+            <Button size="sm" variant="outline" icon={DollarSign} onClick={onManualEntry}>
+              入帳
+            </Button>
+          </div>
+        )}
+      </div>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
           <SubjectNameSelect
@@ -300,12 +316,13 @@ function PurchaseCard({
 
 export default function LedgerCards(props: LedgerCardsProps) {
   const router = useRouter();
-  const goToTransaction = (id: string) => router.push(`/ledger/${id}?side=${props.side}`);
+  const searchParams = useSearchParams();
+  const goToTransaction = (id: string) => router.push(withReturnParam(`/ledger/${id}?side=${props.side}`, searchParams));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [channels, setChannels] = useState(SALES_CHANNELS);
   const [channelOverrides, setChannelOverrides] = useState<Record<string, string>>({});
   const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
-  const [manualEntryRow, setManualEntryRow] = useState<SalesRow | null>(null);
+  const [manualEntryRow, setManualEntryRow] = useState<SalesRow | PurchaseRow | null>(null);
   const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
   const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
   const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
@@ -334,6 +351,17 @@ export default function LedgerCards(props: LedgerCardsProps) {
   };
   const handleVoidConfirm = (rowId: string) => {
     setVoidedOverrides(o => ({ ...o, [rowId]: true }));
+  };
+  // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
+  // 成功後觸發父層重新查詢應收/應付帳款列表
+  const handleManualSettle = async (allocation: ReceivableAllocation) => {
+    if (props.side === 'sales') {
+      await settleReceivable({ allocations: [allocation], memo: '' });
+      props.onReceivableSettled?.();
+    } else {
+      await settlePayable({ allocations: [allocation], memo: '' });
+      props.onPayableSettled?.();
+    }
   };
 
   // 長按任一卡片進入選擇模式並選取該卡；再次長按或點擊其他卡片皆為切換選取
@@ -371,8 +399,9 @@ export default function LedgerCards(props: LedgerCardsProps) {
       <ManualEntryDialog
         open={manualEntryRow !== null}
         onClose={() => setManualEntryRow(null)}
+        side={props.side}
         row={manualEntryRow}
-        onSubmit={() => setManualEntryRow(null)}
+        onSubmit={handleManualSettle}
       />
       <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
       <ExportSelectedDialog
@@ -480,7 +509,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
               channelValue={channelOverrides[row.id] ?? row.channel}
               onChannelSelect={v => handleChannelSelect(row.id, v)}
               onManualEntry={() => setManualEntryRow(row)}
-              onCardClick={() => goToTransaction(row.id)}
+              onCardClick={() => goToTransaction(row.uuid ?? row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
@@ -495,9 +524,11 @@ export default function LedgerCards(props: LedgerCardsProps) {
             <PurchaseCard
               key={row.id}
               row={row}
+              subTab={props.subTab}
               expanded={!!expanded[row.id]}
               onToggle={() => toggleExpand(row.id)}
-              onCardClick={() => goToTransaction(row.id)}
+              onManualEntry={() => setManualEntryRow(row)}
+              onCardClick={() => goToTransaction(row.uuid ?? row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}

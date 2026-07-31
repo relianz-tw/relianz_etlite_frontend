@@ -16,7 +16,7 @@ export interface SubjectOption {
 interface SubjectSelectProps {
   value: SubjectOption | null;
   onChange: (value: SubjectOption) => void;
-  /** 民國年，決定要抓哪個年度的官方科目清單；未提供（例如尚未選開立日期）時下拉停用 */
+  /** 西元年，決定要抓哪個年度的官方科目清單；未提供（例如尚未選開立日期）時下拉停用 */
   year?: number;
   disabled?: boolean;
   placeholder?: string;

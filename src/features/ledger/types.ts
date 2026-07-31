@@ -12,23 +12,16 @@ export interface SortState {
   dir: SortDir;
 }
 
-/** 簡易搜尋可選欄位：交易編號／往來對象為銷項與進項共用，其餘依身分別顯示 */
-export type QuickSearchField = 'id' | 'counterparty' | 'channel' | 'category' | 'project';
+/** 簡易搜尋可選欄位：對應後端 filterType（0 交易編號、1 發票號碼） */
+export type QuickSearchField = 'id' | 'invoice';
 
-/**
- * 進階搜尋條件：可與簡易搜尋同時套用
- * channel（銷售管道）僅銷項適用；category／project（費用類別／專案）僅進項適用；status（狀態）僅銷項適用
- */
+/** 進階搜尋條件：可與簡易搜尋同時套用，欄位對齊後端 filter API 支援範圍（金額區間、日期區間） */
 export interface AdvancedFilter {
-  status: 'all' | 'normal' | 'voided';
   minAmount: string;
   maxAmount: string;
+  /** ROC 'YYY/MM/DD'，送 API 前需轉為西元 YYYYMMDD */
   dateFrom: string;
   dateTo: string;
-  counterparty: string;
-  channel: string;
-  category: string;
-  project: string;
 }
 
 export interface SubRow {
@@ -55,6 +48,8 @@ export interface AllowanceLineItem {
 
 export interface SalesRow {
   id: string;
+  /** 應收帳款真實 uuid（來自 /ael/ledger/receivables/filter）；假資料或已收款列未提供 */
+  uuid?: string;
   amount: number;
   counterparty: string;
   date: string;
@@ -66,6 +61,8 @@ export interface SalesRow {
 
 export interface PurchaseRow {
   id: string;
+  /** 進項交易真實 uuid（來自 /ael/ledger/payables/filter）；假資料列未提供 */
+  uuid?: string;
   amount: number;
   party: string;
   date: string;

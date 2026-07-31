@@ -144,7 +144,7 @@ export interface UpdateBasicSettingBody {
 }
 
 /**
- * 官方費用科目 DTO（/ael/subject/official/list），依 year（民國年）帶出該年度科目清單。
+ * 官方費用科目 DTO（/ael/subject/official/list），依 year（西元年）帶出該年度科目清單。
  * debitCreditType／remark 目前皆為 null，本次介面不使用。
  */
 export interface OfficialSubjectDto {
@@ -292,4 +292,196 @@ export interface CreateReceivableBody {
   unreportedReason?: string;
   /** 銷項憑證類型；實務可傳 1（統一發票） */
   voucherKind: number;
+}
+
+/** 查詢進項應付交易列表（POST /ael/ledger/payables/filter）body */
+export interface PayablesFilterBody {
+  /** 金額下限 */
+  amountFrom?: number;
+  /** 金額上限 */
+  amountTo?: number;
+  companyUuid: string;
+  /** 日期起，YYYYMMDD */
+  dateFrom?: string;
+  /** 日期迄，YYYYMMDD */
+  dateTo?: string;
+  /** 0 交易編號、1 發票號碼；兩者皆空＝不篩；必須和 filterValue 一起傳，只傳一邊 → 400 */
+  filterType?: number;
+  /** 篩選值 */
+  filterValue?: string;
+  /** 一頁筆數 */
+  limit: number;
+  /** 頁碼 */
+  page: number;
+}
+
+/** 進項應付交易列表單筆項目 */
+export interface PayableListItemDto {
+  uuid: string;
+  orderCode: string;
+  /** 交易付款日 YYYYMMDD；未入帳時為 null */
+  entryDate: string | null;
+  entryType: number;
+  entryKind: number;
+  direction: number;
+  status: number;
+  counterpartyName: string;
+  counterpartyType: number;
+  counterpartyUuid: string | null;
+  totalAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  taxFreeAmount: number;
+  settledAmount: number;
+  remainingAmount: number;
+  settlementStatus: number;
+  officialAccountingSubjectId: number;
+  memo: string;
+  createdAt: string;
+}
+
+/** 查詢進項應付交易列表回應（data 內容） */
+export interface PayablesFilterResult {
+  items: PayableListItemDto[];
+  total: number;
+  limit: number;
+  page: number;
+  /** 已收憑證金額（彙總） */
+  receivedVoucherAmount: number;
+  /** 已付款金額（彙總） */
+  paidAmount: number;
+  /** 應付帳款金額（彙總） */
+  payableAmount: number;
+}
+
+/** 查詢銷項應收交易列表（POST /ael/ledger/receivables/filter）body */
+export interface ReceivablesFilterBody {
+  /** 金額下限 */
+  amountFrom?: number;
+  /** 金額上限 */
+  amountTo?: number;
+  companyUuid: string;
+  /** 日期起，YYYYMMDD */
+  dateFrom?: string;
+  /** 日期迄，YYYYMMDD */
+  dateTo?: string;
+  /** 0 交易編號、1 發票號碼；兩者皆空＝不篩；必須和 filterValue 一起傳，只傳一邊 → 400 */
+  filterType?: number;
+  /** 篩選值 */
+  filterValue?: string;
+  /** 一頁筆數 */
+  limit: number;
+  /** 頁碼 */
+  page: number;
+}
+
+/** 銷項應收交易列表單筆項目 */
+export interface ReceivableListItemDto {
+  uuid: string;
+  orderCode: string;
+  /** 交易收款日 YYYYMMDD；未入帳時為 null */
+  entryDate: string | null;
+  entryType: number;
+  entryKind: number;
+  direction: number;
+  status: number;
+  counterpartyName: string;
+  counterpartyType: number;
+  counterpartyUuid: string | null;
+  /** 銷售管道 uuid；未指定時為 null */
+  paymentChannelUuid: string | null;
+  totalAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  taxFreeAmount: number;
+  settledAmount: number;
+  remainingAmount: number;
+  settlementStatus: number;
+  officialAccountingSubjectId: number;
+  memo: string;
+  createdAt: string;
+}
+
+/** 查詢銷項應收交易列表回應（data 內容） */
+export interface ReceivablesFilterResult {
+  items: ReceivableListItemDto[];
+  total: number;
+  limit: number;
+  page: number;
+  /** 已開立憑證金額（彙總） */
+  issuedVoucherAmount: number;
+  /** 已收款金額（彙總） */
+  collectedAmount: number;
+  /** 應收帳款金額（彙總） */
+  receivableAmount: number;
+}
+
+/** 應收帳款手動入帳沖帳物件 */
+export interface ReceivableAllocation {
+  /** 金額 */
+  amount: number;
+  /** 銀行帳戶 uuid */
+  bankAccountUuid: string;
+  /** 實際存入金額 */
+  depositAmount: number;
+  /** 手續費 */
+  feeAmount: number;
+  /** YYYYMMDD */
+  paymentDate: string;
+  /** 應收帳款 uuid */
+  receivableLedgerUuid: string;
+}
+
+/** 應收帳款手動入帳（POST /ael/ledger/receivables/settle）body */
+export interface SettleReceivableBody {
+  /** 沖帳物件 */
+  allocations: ReceivableAllocation[];
+  companyUuid: string;
+  /** 備註 */
+  memo: string;
+}
+
+/**
+ * 應付帳款手動入帳（POST /ael/ledger/payables/settle）body。
+ * 後端沖帳物件與應收帳款共用同一 Allocation 結構（含欄位名稱 receivableLedgerUuid），
+ * 呼叫端傳入應付帳款 uuid 即可，非命名錯誤。
+ */
+export interface SettlePayableBody {
+  /** 沖帳物件 */
+  allocations: ReceivableAllocation[];
+  companyUuid: string;
+  /** 備註 */
+  memo: string;
+}
+
+/** GET /ael/ledger/entries/detail 回應的 invoice 區塊；僅型別化本次會使用的欄位 */
+export interface EntryInvoiceDetailDto {
+  invoiceTrack: string;
+  invoiceNumber: string;
+  /** 民國年 */
+  year: number;
+  month: number;
+  day: number;
+  /** 銷售額 */
+  sales: number;
+  /** 稅額 */
+  businessTax: number;
+  taxFreeAmount: number;
+  /** 憑證圖片網址，無圖時為空字串 */
+  invoicePicUrl: string;
+  remark: string;
+  buyerTaxIdNumber: string;
+  sellerTaxIdNumber: string;
+  /** 賣家名稱（進項適用） */
+  companyName: string;
+  /** 申報年度（民國年） */
+  cmsYear: number;
+  /** 申報期別代碼：1/3/5/7/9/11，對應雙月期間 */
+  cmsPhase: number;
+}
+
+/** GET /ael/ledger/entries/detail 回應（僅型別化 invoice 區塊，entry/settlements 本次不使用）；
+ *  invoice 沒有關聯發票的交易（如未開立發票的應收帳款）會是 null */
+export interface EntryDetailResult {
+  invoice: EntryInvoiceDetailDto | null;
 }

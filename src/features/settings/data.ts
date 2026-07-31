@@ -101,7 +101,7 @@ export interface BankAccountRecord {
   lastBalanceUpdateDate: string;
   remark: string;
   isActive: boolean;
-  /** 目前介面未提供設定入口，僅用於更新時回填原值，避免覆寫後端既有設定 */
+  /** 預設收款／付款戶頭，各自全站唯一；設定新的預設時由前端負責先解除舊帳戶的旗標 */
   isDefaultReceivingAccount: boolean;
   isDefaultPaymentAccount: boolean;
 }
@@ -123,6 +123,42 @@ export const BANK_CODE_OPTIONS = [
   { code: '808', name: '玉山商業銀行' },
   { code: '812', name: '台新國際商業銀行' },
 ];
+
+export interface ChannelRuleRecord {
+  id: string;
+  channelName: string;
+  /** 入帳規則類型，0:固定延遲天數，1:每週固定星期，2:每月固定日期 */
+  settlementStyle: number;
+  settlementAmount: number;
+  /** 收款帳戶 uuid，對應 BankAccountRecord.id */
+  receivingAccountUuid: string;
+  /** 手續費基點／固定金額，本次介面暫不編輯，固定為 0 */
+  feeRateBps: number;
+  feeFixedAmount: number;
+  remark: string;
+  isActive: boolean;
+}
+
+export const SETTLEMENT_STYLE = {
+  AFTER_INVOICE_DAYS: 0,
+  WEEKLY: 1,
+  MONTHLY: 2,
+} as const;
+
+// 註：sale.md 未定義 settlementStyle=1（每週）星期數字對應，暫採 1=週一…7=週日，日後需與後端確認
+export const SETTLEMENT_WEEKDAYS = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+export const SETTLEMENT_MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+/** 入帳規則轉為顯示文字，例：「發票開立後 7 天」／「每週三」／「每月 15 號」 */
+export function formatSettlement(style: number, amount: number): string {
+  if (style === SETTLEMENT_STYLE.WEEKLY) {
+    return `每週${SETTLEMENT_WEEKDAYS[amount - 1] ? SETTLEMENT_WEEKDAYS[amount - 1].replace('週', '') : amount}`;
+  }
+  if (style === SETTLEMENT_STYLE.MONTHLY) {
+    return `每月 ${amount} 號`;
+  }
+  return `發票開立後 ${amount} 天`;
+}
 
 export interface VendorRecord {
   id: string;

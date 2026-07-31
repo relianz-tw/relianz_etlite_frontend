@@ -1,9 +1,7 @@
 import Badge from '@/components/ui/Badge';
-import { fmtCurrency } from '@/lib/utils';
 import { Bell, Calendar, CircleDollarSign, Landmark, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Side } from '../../types';
-import { PURCHASE_STATUS_SUMMARY, SALES_STATUS_SUMMARY } from '../data';
 
 interface StatusRow {
   icon: typeof Bell;
@@ -11,37 +9,28 @@ interface StatusRow {
   value: ReactNode;
 }
 
-export default function TransactionStatusSummary({ side }: { side: Side }) {
+/** 交易明細 API 目前只提供 invoice 區塊，entry 的申報狀態／入帳/付款金額等無對應資料，先標記尚未串接 */
+const NOT_WIRED_BADGE = (
+  <Badge tone="neutral" variant="muted">
+    尚未串接
+  </Badge>
+);
+
+export default function TransactionStatusSummary({ side, declarePeriod }: { side: Side; declarePeriod: string }) {
   const rows: StatusRow[] =
     side === 'sales'
       ? [
-          {
-            icon: Bell,
-            label: '申報狀態',
-            value: (
-              <Badge tone="neutral" variant="muted">
-                {SALES_STATUS_SUMMARY.declareStatus}
-              </Badge>
-            ),
-          },
-          { icon: Calendar, label: '申報日期', value: SALES_STATUS_SUMMARY.declareDate },
-          { icon: Calendar, label: '入帳日期', value: SALES_STATUS_SUMMARY.postedDate },
-          { icon: CircleDollarSign, label: '入帳金額', value: fmtCurrency(SALES_STATUS_SUMMARY.postedAmount) },
-          { icon: Landmark, label: '手續費', value: fmtCurrency(SALES_STATUS_SUMMARY.fee) },
+          { icon: Bell, label: '申報狀態', value: NOT_WIRED_BADGE },
+          { icon: Calendar, label: '申報期間', value: declarePeriod },
+          { icon: Calendar, label: '入帳日期', value: NOT_WIRED_BADGE },
+          { icon: CircleDollarSign, label: '入帳金額', value: NOT_WIRED_BADGE },
+          { icon: Landmark, label: '手續費', value: NOT_WIRED_BADGE },
         ]
       : [
-          {
-            icon: Bell,
-            label: '申報狀態',
-            value: (
-              <Badge tone="success" variant="muted">
-                {PURCHASE_STATUS_SUMMARY.declareStatus}
-              </Badge>
-            ),
-          },
-          { icon: Calendar, label: '申報日期', value: PURCHASE_STATUS_SUMMARY.declareDate },
-          { icon: Calendar, label: '付款日期', value: PURCHASE_STATUS_SUMMARY.payDate },
-          { icon: Wallet, label: '付款金額', value: fmtCurrency(PURCHASE_STATUS_SUMMARY.payAmount) },
+          { icon: Bell, label: '申報狀態', value: NOT_WIRED_BADGE },
+          { icon: Calendar, label: '申報期間', value: declarePeriod },
+          { icon: Calendar, label: '付款日期', value: NOT_WIRED_BADGE },
+          { icon: Wallet, label: '付款金額', value: NOT_WIRED_BADGE },
         ];
 
   return (

@@ -1,5 +1,6 @@
 import { parseSideParam } from '@/features/ledger/transaction/data';
 import TransactionFormView from '@/features/ledger/transaction/TransactionFormView';
+import { parseReturnQueryParam } from '@/features/ledger/urlState';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -11,8 +12,9 @@ export default function TransactionDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { side?: string | string[] };
+  searchParams: { side?: string | string[]; from?: string | string[] };
 }) {
   const side = parseSideParam(searchParams.side);
-  return <TransactionFormView mode="edit" side={side} transactionId={params.id} />;
+  const returnQuery = parseReturnQueryParam(searchParams.from);
+  return <TransactionFormView mode="edit" side={side} transactionId={params.id} returnQuery={returnQuery} />;
 }

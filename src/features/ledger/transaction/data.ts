@@ -1,3 +1,4 @@
+import type { EntryInvoiceDetailDto } from '@/api/types';
 import type { AllowanceRecord, Side } from '../types';
 import type { TransactionFormState } from './types';
 
@@ -71,58 +72,40 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   voucherPreviewUrl: null,
 };
 
-/** 編輯銷項的假資料種子：入帳金額 $1,473 + 手續費 $27 = 交易總金額 $1,500（與編輯進項種子對齊，方便對照） */
-export const EDIT_SALES_FORM: TransactionFormState = {
-  ...EMPTY_TRANSACTION_FORM,
-  invoiceNumber: SALES_INVOICE_BOOK_OPTIONS[0],
-  issueDate: new Date(2026, 1, 9),
-  channel: 'MoMo',
-  salesAmount: 1400,
-  taxAmount: 100,
-  voucherFileName: '發票掃描檔.jpg',
-};
-
-export interface SalesStatusSummary {
-  declareStatus: string;
-  declareDate: string;
-  postedDate: string;
-  postedAmount: number;
-  fee: number;
-}
-export const SALES_STATUS_SUMMARY: SalesStatusSummary = {
-  declareStatus: '尚未申報',
-  declareDate: '115-3',
-  postedDate: '115-2-9',
-  postedAmount: 1473,
-  fee: 27,
-};
-
 /** 編輯銷項交易的折讓歷史紀錄假資料 */
 export const TRANSACTION_ALLOWANCES: AllowanceRecord[] = [
   { id: 'ALW-EDIT-01', date: '115/02/15', amount: 200, note: '出貨數量認列錯誤，折讓部分金額' },
 ];
 
-/** 編輯進項的假資料種子：賣家統編/名稱維持空白（沿用原型呈現的待補值狀態） */
-export const EDIT_PURCHASE_FORM: TransactionFormState = {
-  ...EMPTY_TRANSACTION_FORM,
-  invoiceNumber: PURCHASE_INVOICE_NUMBER_OPTIONS[0],
-  declarePeriod: DECLARE_PERIOD_OPTIONS[0],
-  issueDate: new Date(2026, 1, 9),
-  expenseCategory: { subjectCode: '0100010', name: '薪資支出' },
-  salesAmount: 1400,
-  taxAmount: 100,
-  voucherFileName: '發票掃描檔.jpg',
-};
-
-export interface PurchaseStatusSummary {
-  declareStatus: string;
-  declareDate: string;
-  payDate: string;
-  payAmount: number;
+/** cmsPhase 雙月期別代碼（1/3/5/7/9/11）→ 申報期間顯示字串，如 "115 年 01 - 02 月份" */
+function formatDeclarePeriod(cmsYear: number, cmsPhase: number): string {
+  const start = String(cmsPhase).padStart(2, '0');
+  const end = String(cmsPhase + 1).padStart(2, '0');
+  return `${cmsYear} 年 ${start} - ${end} 月份`;
 }
-export const PURCHASE_STATUS_SUMMARY: PurchaseStatusSummary = {
-  declareStatus: '已申報完成',
-  declareDate: '115-3',
-  payDate: '115-2-9',
-  payAmount: 1500,
-};
+
+/**
+ * GET /ael/ledger/entries/detail 回應的 invoice 區塊 → 交易表單狀態。
+ * entry／settlements 區塊本次未使用；invoice 沒有對應資料的欄位（標籤/專案/銷售管道/是否為折讓/
+ * 費用類別/營業稅等）維持 EMPTY_TRANSACTION_FORM 預設值，畫面上以「尚未串接」標記提醒。
+ * invoice 為 null（該筆交易尚未關聯發票）時整份表單維持 EMPTY_TRANSACTION_FORM，不視為錯誤。
+ */
+export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDto | null): TransactionFormState {
+  if (!invoice) return EMPTY_TRANSACTION_FORM;
+  const common: TransactionFormState = {
+    ...EMPTY_TRANSACTION_FORM,
+    invoiceTrack: invoice.invoiceTrack,
+    invoiceSerial: invoice.invoiceNumber,
+    invoiceNumber: `${invoice.invoiceTrack}${invoice.invoiceNumber}`,
+    declarePeriod: formatDeclarePeriod(invoice.cmsYear, invoice.cmsPhase),
+    issueDate: new Date(invoice.year + 1911, invoice.month - 1, invoice.day),
+    salesAmount: invoice.sales,
+    exemptSalesAmount: invoice.taxFreeAmount,
+    taxAmount: invoice.businessTax,
+    note: invoice.remark,
+    voucherPreviewUrl: invoice.invoicePicUrl || null,
+  };
+  return side === 'sales'
+    ? { ...common, buyerTaxId: invoice.buyerTaxIdNumber }
+    : { ...common, sellerTaxId: invoice.sellerTaxIdNumber, sellerName: invoice.companyName };
+}

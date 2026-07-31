@@ -2,6 +2,7 @@
 
 import { listChannelRules } from '@/api/channelRules';
 import type { ChannelRuleDto } from '@/api/types';
+import Badge from '@/components/ui/Badge';
 import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -34,6 +35,13 @@ const ALLOWANCE_OPTIONS = [
   { value: 'no', label: '否' },
   { value: 'yes', label: '是' },
 ] as const;
+
+/** 交易明細 API（invoice 區塊）尚未提供對應資料的欄位，統一標記提醒目前仍是假資料 */
+const NOT_WIRED_BADGE = (
+  <Badge tone="neutral" variant="muted">
+    尚未串接
+  </Badge>
+);
 
 export default function TransactionMetaCard({ side, mode, form, onChange }: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
@@ -88,8 +96,12 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     </Field>
   );
 
+  // channelField/tagField/projectField 為新增與編輯共用欄位；「尚未串接」標記只在編輯（交易明細）畫面顯示，
+  // 因為只有編輯頁的資料來自 invoice（目前沒有對應欄位），新增頁這幾個欄位本來就是使用者自行輸入、非未串接狀態
+  const editBadge = mode === 'edit' ? NOT_WIRED_BADGE : undefined;
+
   const channelField = (
-    <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
+    <Field label="銷售管道" badge={editBadge} helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
       <Select widthClassName="w-full" value={form.channel} onValueChange={v => onChange({ channel: v })}>
         <option value="">不指定</option>
         {channelRules.map(c => (
@@ -140,7 +152,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   ];
 
   const tagField = (
-    <Field label="標籤">
+    <Field label="標籤" badge={editBadge}>
       <Select widthClassName="w-full" value={form.tag} onValueChange={v => onChange({ tag: v })}>
         <option value={TAG_PLACEHOLDER}>{TAG_PLACEHOLDER}</option>
       </Select>
@@ -148,7 +160,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   );
 
   const projectField = (
-    <Field label="專案">
+    <Field label="專案" badge={editBadge}>
       <Select widthClassName="w-full" value={form.project} onValueChange={v => onChange({ project: v })}>
         <option value={PROJECT_PLACEHOLDER}>{PROJECT_PLACEHOLDER}</option>
         {PROJECT_NAMES.filter(Boolean).map(v => (
@@ -175,22 +187,28 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
             ))}
           </Select>
         </Field>,
-        <Field
-          key="invoiceNumber"
-          label="發票號碼"
-          helper="發票號碼為系統自動帶入，請直接選擇發票簿；如需作廢發票請選退下一順號，系統會自動選擇下一順號，發票日期不得停在上一張發票之前"
-        >
-          <Select widthClassName="w-full" value={form.invoiceNumber} onValueChange={v => onChange({ invoiceNumber: v })}>
-            {SALES_INVOICE_BOOK_OPTIONS.map(v => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </Select>
+        <Field key="invoiceNumber" label="發票號碼">
+          <div className="flex gap-2">
+            <TextInput
+              widthClassName="w-16"
+              placeholder="字軌"
+              maxLength={2}
+              value={form.invoiceTrack}
+              onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
+            />
+            <TextInput
+              widthClassName="flex-1"
+              placeholder="流水號"
+              maxLength={8}
+              value={form.invoiceSerial}
+              onChange={e => onChange({ invoiceSerial: e.target.value })}
+            />
+          </div>
         </Field>,
       ],
       [buyerNameField, buyerTaxIdField],
-      [issueDateField, entryDateField],
+      // 收款日期欄位暫時隱藏（需求方要求），僅保留開立日期
+      [issueDateField],
       [channelField, tagField],
       [projectField],
     ];
@@ -249,7 +267,8 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       [
         <Field key="declarePeriod" label="申報期間">
           <Select widthClassName="w-full" value={form.declarePeriod} onValueChange={v => onChange({ declarePeriod: v })}>
-            {DECLARE_PERIOD_OPTIONS.map(v => (
+            {/* 交易明細 API 帶出的真實申報期間不一定在假選單內，確保它一定被列為可顯示/選取的選項 */}
+            {Array.from(new Set([form.declarePeriod, ...DECLARE_PERIOD_OPTIONS])).map(v => (
               <option key={v} value={v}>
                 {v}
               </option>
@@ -287,7 +306,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Field>
         )}
 
-        <Field label="是否為折讓？" helper="如要一部或全部退款/退貨請選是">
+        <Field label="是否為折讓？" badge={editBadge} helper="如要一部或全部退款/退貨請選是">
           <SegmentedControl
             options={[...ALLOWANCE_OPTIONS]}
             value={form.isAllowance ? 'yes' : 'no'}
