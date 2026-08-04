@@ -23,8 +23,8 @@ interface ChannelRuleDialogProps {
 function emptyForm(accounts: BankAccountRecord[]): Omit<ChannelRuleRecord, 'id'> {
   return {
     channelName: '',
-    settlementStyle: SETTLEMENT_STYLE.AFTER_INVOICE_DAYS,
-    settlementAmount: 7,
+    settlementStyle: SETTLEMENT_STYLE.WEEKLY,
+    settlementAmount: 1,
     receivingAccountUuid: accounts[0]?.id ?? '',
     remark: '',
     isActive: true,
@@ -90,27 +90,13 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
             onValueChange={v => {
               const style = Number(v);
               // 切換入帳規則類型時，settlementAmount 需帶入該類型合理的預設值
-              const defaultAmount = style === SETTLEMENT_STYLE.WEEKLY ? 1 : style === SETTLEMENT_STYLE.MONTHLY ? 1 : 7;
-              setForm(f => ({ ...f, settlementStyle: style, settlementAmount: defaultAmount }));
+              setForm(f => ({ ...f, settlementStyle: style, settlementAmount: 1 }));
             }}
           >
-            <option value={String(SETTLEMENT_STYLE.AFTER_INVOICE_DAYS)}>發票開立後固定天數</option>
             <option value={String(SETTLEMENT_STYLE.WEEKLY)}>每週固定星期</option>
             <option value={String(SETTLEMENT_STYLE.MONTHLY)}>每月固定日期</option>
           </Select>
 
-          {form.settlementStyle === SETTLEMENT_STYLE.AFTER_INVOICE_DAYS && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-mid">發票開立後</span>
-              <TextInput
-                type="number"
-                widthClassName="w-24"
-                value={form.settlementAmount}
-                onChange={e => setForm(f => ({ ...f, settlementAmount: Number(e.target.value) }))}
-              />
-              <span className="text-sm text-neutral-mid">天自動入帳</span>
-            </div>
-          )}
           {form.settlementStyle === SETTLEMENT_STYLE.WEEKLY && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-neutral-mid">每週星期</span>
