@@ -24,6 +24,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Easytax Lite',
   description: 'Easytax Lite',
+  icons: {
+    icon: [
+      { url: '/favicon/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon/android-icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    shortcut: '/favicon/favicon.ico',
+    apple: '/favicon/apple-icon-180x180.png',
+  },
 };
 
 export default function RootLayout({
