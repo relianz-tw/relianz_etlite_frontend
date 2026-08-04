@@ -139,18 +139,66 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
                 </tr>
               </thead>
               <tbody>
-                {rules.map((rule, i) => (
-                  <tr
-                    key={rule.id}
-                    className={`border-b border-neutral-blue-gray/20 last:border-0 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
-                  >
-                    <td className="truncate px-4 py-3.5 font-semibold text-neutral-dark" title={rule.channelName}>
-                      {rule.channelName || '—'}
-                    </td>
-                    <td className="truncate px-4 py-3.5 text-neutral-mid" title={accountLabel(rule.receivingAccountUuid)}>
-                      {accountLabel(rule.receivingAccountUuid)}
-                    </td>
-                    <td className="px-4 py-3.5">
+                {rules.map((rule, i) => {
+                  const isOtherChannel = rule.channelName === '其他';
+                  return (
+                    <tr
+                      key={rule.id}
+                      className={`border-b border-neutral-blue-gray/20 last:border-0 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
+                    >
+                      <td className="truncate px-4 py-3.5 font-semibold text-neutral-dark" title={rule.channelName}>
+                        {rule.channelName || '—'}
+                      </td>
+                      <td className="truncate px-4 py-3.5 text-neutral-mid" title={accountLabel(rule.receivingAccountUuid)}>
+                        {accountLabel(rule.receivingAccountUuid)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {rule.isActive ? (
+                          <Badge tone="success" variant="muted">
+                            啟用中
+                          </Badge>
+                        ) : (
+                          <Badge tone="neutral" variant="muted">
+                            已停用
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button size="sm" variant="ghost" disabled={isOtherChannel} onClick={() => openEdit(rule)}>
+                            編輯
+                          </Button>
+                          {rule.isActive ? (
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              disabled={isOtherChannel || savingId === rule.id}
+                              onClick={() => setPendingDeactivate(rule)}
+                            >
+                              停用
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
+                              啟用
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col gap-2.5 nav:hidden">
+            {rules.map(rule => {
+              const isOtherChannel = rule.channelName === '其他';
+              return (
+                <div key={rule.id} className="flex flex-col gap-1.5 rounded-lg border border-neutral-blue-gray/30 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="truncate font-semibold text-neutral-dark">{rule.channelName}</span>
                       {rule.isActive ? (
                         <Badge tone="success" variant="muted">
                           啟用中
@@ -160,64 +208,32 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
                           已停用
                         </Badge>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(rule)}>
-                          編輯
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button size="sm" variant="ghost" disabled={isOtherChannel} onClick={() => openEdit(rule)}>
+                        編輯
+                      </Button>
+                      {rule.isActive ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={isOtherChannel || savingId === rule.id}
+                          onClick={() => setPendingDeactivate(rule)}
+                        >
+                          停用
                         </Button>
-                        {rule.isActive ? (
-                          <Button size="sm" variant="danger" disabled={savingId === rule.id} onClick={() => setPendingDeactivate(rule)}>
-                            停用
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
-                            啟用
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-col gap-2.5 nav:hidden">
-            {rules.map(rule => (
-              <div key={rule.id} className="flex flex-col gap-1.5 rounded-lg border border-neutral-blue-gray/30 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="truncate font-semibold text-neutral-dark">{rule.channelName}</span>
-                    {rule.isActive ? (
-                      <Badge tone="success" variant="muted">
-                        啟用中
-                      </Badge>
-                    ) : (
-                      <Badge tone="neutral" variant="muted">
-                        已停用
-                      </Badge>
-                    )}
+                      ) : (
+                        <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
+                          啟用
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(rule)}>
-                      編輯
-                    </Button>
-                    {rule.isActive ? (
-                      <Button size="sm" variant="danger" disabled={savingId === rule.id} onClick={() => setPendingDeactivate(rule)}>
-                        停用
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
-                        啟用
-                      </Button>
-                    )}
-                  </div>
+                  <div className="text-xs text-neutral-mid">{formatSettlement(rule.settlementStyle, rule.settlementAmount)}</div>
+                  <div className="truncate text-xs text-neutral-mid">收款帳戶：{accountLabel(rule.receivingAccountUuid)}</div>
                 </div>
-                <div className="text-xs text-neutral-mid">{formatSettlement(rule.settlementStyle, rule.settlementAmount)}</div>
-                <div className="truncate text-xs text-neutral-mid">收款帳戶：{accountLabel(rule.receivingAccountUuid)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
