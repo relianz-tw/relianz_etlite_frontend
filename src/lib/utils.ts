@@ -9,10 +9,14 @@ export function cn(...inputs: ClassValue[]) {
 /** 金額格式化：統一加上 $ 與千分位，供各頁面金額顯示使用 */
 export const fmtCurrency = (n: number) => `$${n.toLocaleString('en-US')}`;
 
-/** 後端 YYYYMMDD 字串轉為 YYYY/MM/DD 顯示；空字串或格式不符時原樣回傳 */
+/** 後端 YYYYMMDD 字串轉為 YYYY/MM/DD 顯示；部分端點（如 entries/detail 的 settlement.entryDate）
+ *  回傳的是 ISO 日期時間字串（如 "2026-07-29T00:00:00Z"），一併取出日期部分格式化；
+ *  空字串或格式皆不符時原樣回傳 */
 export function formatYyyymmdd(value: string): string {
-  if (!/^\d{8}$/.test(value)) return value;
-  return `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`;
+  if (/^\d{8}$/.test(value)) return `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`;
+  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}/${isoMatch[2]}/${isoMatch[3]}`;
+  return value;
 }
 
 /** 回傳今天日期的 YYYYMMDD 字串，供需要送出此格式的 API（如銀行帳戶餘額更新日）使用 */
