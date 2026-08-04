@@ -500,8 +500,39 @@ export interface EntryInvoiceDetailDto {
   cmsPhase: number;
 }
 
-/** GET /ael/ledger/entries/detail 回應（僅型別化 invoice 區塊，entry/settlements 本次不使用）；
+/** GET /ael/ledger/entries/detail 回應的 entry 區塊；僅型別化本次會使用的沖帳狀態欄位 */
+export interface EntryDetailEntryDto {
+  /** 已沖金額（元） */
+  settledAmount: number;
+  /** 未沖金額（元） */
+  remainingAmount: number;
+  /** 0平衡 1超沖 2少沖 */
+  settlementStatus: number;
+}
+
+/** GET /ael/ledger/entries/detail 回應的單筆沖帳關聯；僅型別化本次會使用的欄位 */
+export interface EntryDetailSettlementDto {
+  /** receivable_payable_relations.uuid，供列表 key 使用 */
+  relationUuid: string;
+  /** 沖之前剩餘 */
+  beforeSettlementAmount: number;
+  /** 沖之後剩餘 */
+  afterSettlementAmount: number;
+  /** 本次沖帳金額 */
+  settlementAmount: number;
+  /** true＝沖完後原單仍有餘額；false＝已結清（含超沖） */
+  isOpen: boolean;
+  /** 關聯備註 */
+  remark: string | null;
+  /** 結算帳 header；本次只使用 entryDate（入帳日期） */
+  settlement: { entryDate: string | null } | null;
+}
+
+/** GET /ael/ledger/entries/detail 回應；僅型別化 invoice 區塊與沖帳相關子集
+ *  （entry／settlements 其餘欄位如 direction／entryType／status 等本次不使用）。
  *  invoice 沒有關聯發票的交易（如未開立發票的應收帳款）會是 null */
 export interface EntryDetailResult {
+  entry: EntryDetailEntryDto;
   invoice: EntryInvoiceDetailDto | null;
+  settlements: EntryDetailSettlementDto[];
 }
