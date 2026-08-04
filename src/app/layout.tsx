@@ -1,5 +1,5 @@
 import './globals.css';
-import Navbar from '@/components/navBar';
+import AppShell from '@/components/AppShell';
 import type { Metadata, Viewport } from 'next';
 import { Noto_Sans_TC, Noto_Serif_TC } from 'next/font/google';
 
@@ -36,8 +36,7 @@ export default function RootLayout({
       <body
         className={`${notoSansTC.variable} ${notoSerifTC.variable} font-notoSans`}
       >
-        <Navbar />
-        <div className='pt-16'>{children}</div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

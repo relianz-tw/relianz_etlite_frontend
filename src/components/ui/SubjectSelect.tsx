@@ -16,41 +16,34 @@ export interface SubjectOption {
 interface SubjectSelectProps {
   value: SubjectOption | null;
   onChange: (value: SubjectOption) => void;
-  /** 西元年，決定要抓哪個年度的官方科目清單；未提供（例如尚未選開立日期）時下拉停用 */
-  year?: number;
   disabled?: boolean;
   placeholder?: string;
 }
 
 /** 可搜尋的會計科目選擇器：串接官方科目清單與使用者常用科目，常用科目獨立分區並以星號標示 */
-export default function SubjectSelect({ value, onChange, year, disabled, placeholder = '請選擇科目' }: SubjectSelectProps) {
+export default function SubjectSelect({ value, onChange, disabled, placeholder = '請選擇科目' }: SubjectSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [official, setOfficial] = useState<OfficialSubjectDto[]>([]);
   const [frequentNames, setFrequentNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [loadedYear, setLoadedYear] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  // 開啟下拉且該年度尚未載入過時才抓取，避免每次開關都重打 API
+  // 開啟下拉且尚未載入過時才抓取，避免每次開關都重打 API
   useEffect(() => {
-    if (!open || year === undefined || loadedYear === year) return;
+    if (!open || loaded) return;
     setLoading(true);
     setError('');
-    Promise.all([listOfficialSubjects(year), listSubjectUsage()])
+    Promise.all([listOfficialSubjects(), listSubjectUsage()])
       .then(([officialList, usageList]) => {
         setOfficial(officialList);
         setFrequentNames(usageList.map(u => u.subjectName));
-        setLoadedYear(year);
+        setLoaded(true);
       })
       .catch(err => setError(err instanceof Error ? err.message : '操作失敗'))
       .finally(() => setLoading(false));
-  }, [open, year, loadedYear]);
-
-  // 開立日期變動導致年度改變時，清空快取讓下次開啟重新抓取該年度清單
-  useEffect(() => {
-    setLoadedYear(null);
-  }, [year]);
+  }, [open, loaded]);
 
   const q = query.trim();
   const matches = (s: OfficialSubjectDto) => !q || s.subjectCode.includes(q) || s.name.includes(q);
@@ -66,14 +59,8 @@ export default function SubjectSelect({ value, onChange, year, disabled, placeho
   );
   const allOptions = useMemo(() => official.filter(matches), [official, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isDisabled = disabled || year === undefined;
-  const triggerLabel = value
-    ? value.subjectCode
-      ? `${value.subjectCode} ${value.name}`
-      : value.name
-    : year === undefined
-      ? '請先選擇開立日期'
-      : placeholder;
+  const isDisabled = disabled;
+  const triggerLabel = value ? (value.subjectCode ? `${value.subjectCode} ${value.name}` : value.name) : placeholder;
 
   // value 若無 subjectCode（例如 SubjectNameSelect 只有名稱可比對），退回以名稱比對選中項
   const isSelected = (s: OfficialSubjectDto) => (value ? (value.subjectCode ? value.subjectCode === s.subjectCode : value.name === s.name) : false);
@@ -147,7 +134,6 @@ export default function SubjectSelect({ value, onChange, year, disabled, placeho
 interface SubjectNameSelectProps {
   value: string;
   onChange: (name: string) => void;
-  year?: number;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -156,12 +142,11 @@ interface SubjectNameSelectProps {
  * SubjectSelect 的字串版本：適用於只需要科目名稱、不追蹤代碼的場景（帳簿篩選條件、表格列內編輯／批次操作），
  * 這些欄位目前的資料模型仍是純字串，改用物件會牽動既有欄位型別與假資料，故在此做名稱字串轉接。
  */
-export function SubjectNameSelect({ value, onChange, year, disabled, placeholder }: SubjectNameSelectProps) {
+export function SubjectNameSelect({ value, onChange, disabled, placeholder }: SubjectNameSelectProps) {
   return (
     <SubjectSelect
       value={value ? { subjectCode: '', name: value } : null}
       onChange={s => onChange(s.name)}
-      year={year}
       disabled={disabled}
       placeholder={placeholder}
     />

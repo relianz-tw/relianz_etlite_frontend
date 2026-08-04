@@ -12,7 +12,15 @@ export interface NavLink {
 
 export const navLinks: NavLink[] = [
   { name: '開立電子發票', path: '/einvoice', icon: 'plus' },
-  { name: '帳簿', path: '/ledger' },
+  {
+    name: '帳簿',
+    path: '/ledger',
+    children: [
+      { name: '帳簿總覽', path: '/ledger' },
+      { name: '匯總沖帳', path: '/ledger/reconciliation' },
+    ],
+  },
+  { name: '銀行帳戶總覽', path: '/bank-accounts' },
   { name: '營業稅中心', path: '/business-tax' },
   {
     name: '各類扣繳中心',

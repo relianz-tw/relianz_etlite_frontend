@@ -1,13 +1,11 @@
 'use client';
 
 import Button from '@/components/ui/Button';
-import Checkbox from '@/components/ui/Checkbox';
 import Modal from '@/components/ui/Modal';
-import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { vendorExists } from '@/api/vendors';
 import { useEffect, useState } from 'react';
-import { BANK_CODE_OPTIONS } from '../data';
 import type { VendorRecord } from '../data';
 
 interface VendorDialogProps {
@@ -34,7 +32,6 @@ const EMPTY_FORM: Omit<VendorRecord, 'id'> = {
 
 export default function VendorDialog({ open, onClose, onSubmit, initial }: VendorDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
-  const [sameAsName, setSameAsName] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,7 +39,6 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
   useEffect(() => {
     if (open) {
       setForm(initial ?? EMPTY_FORM);
-      setSameAsName(!!initial && !!initial.name && initial.bankAccountName === initial.name);
       setError('');
       setSubmitting(false);
     }
@@ -70,7 +66,7 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
           return;
         }
       }
-      await onSubmit({ ...form, bankAccountName: sameAsName ? form.name : form.bankAccountName });
+      await onSubmit(form);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失敗');
@@ -107,50 +103,29 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
         </div>
         {error && <p className="-mt-2 text-xs text-semantic-error">{error}</p>}
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">登記地址</label>
-          <TextInput placeholder="登記地址" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">地址</label>
+          <TextInput placeholder="地址" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
         </div>
 
-        <div className="rounded-md border border-neutral-blue-gray/30 p-4">
+        <div>
           <span className="mb-3 block text-sm font-semibold text-neutral-dark">銀行資訊</span>
           <div className="flex flex-col gap-3">
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="text-sm text-neutral-dark">戶名</label>
-                <label className="flex items-center gap-1.5 text-xs text-neutral-mid">
-                  <Checkbox
-                    checked={sameAsName}
-                    onChange={() => {
-                      const next = !sameAsName;
-                      setSameAsName(next);
-                      if (next) setForm(f => ({ ...f, bankAccountName: f.name }));
-                    }}
-                  />
-                  同名稱
-                </label>
-              </div>
+            <TextInput
+              placeholder="銀行戶名"
+              value={form.bankAccountName}
+              onChange={e => setForm(f => ({ ...f, bankAccountName: e.target.value }))}
+            />
+            <div className="grid grid-cols-1 gap-3 nav:grid-cols-3">
               <TextInput
-                placeholder="銀行戶名"
-                value={sameAsName ? form.name : form.bankAccountName}
-                disabled={sameAsName}
-                onChange={e => setForm(f => ({ ...f, bankAccountName: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Select
+                placeholder="銀行代碼"
                 value={form.bankCode}
-                onValueChange={code => {
-                  const bank = BANK_CODE_OPTIONS.find(b => b.code === code);
-                  setForm(f => ({ ...f, bankCode: code, bankName: bank?.name ?? '' }));
-                }}
-              >
-                <option value="">請選擇銀行</option>
-                {BANK_CODE_OPTIONS.map(bank => (
-                  <option key={bank.code} value={bank.code}>
-                    {bank.code} {bank.name}
-                  </option>
-                ))}
-              </Select>
+                onChange={e => setForm(f => ({ ...f, bankCode: e.target.value }))}
+              />
+              <TextInput
+                placeholder="銀行名稱"
+                value={form.bankName}
+                onChange={e => setForm(f => ({ ...f, bankName: e.target.value }))}
+              />
               <TextInput placeholder="分行" value={form.bankBranch} onChange={e => setForm(f => ({ ...f, bankBranch: e.target.value }))} />
             </div>
             <TextInput
@@ -163,15 +138,8 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
 
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
-          <TextInput placeholder="備註（選填）" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
+          <Textarea placeholder="備註（選填）" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
         </div>
-
-        {initial && (
-          <label className="flex items-center gap-1.5 text-sm text-neutral-dark">
-            <Checkbox checked={form.isActive} onChange={() => setForm(f => ({ ...f, isActive: !f.isActive }))} />
-            啟用中
-          </label>
-        )}
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="outline" onClick={onClose} disabled={submitting}>

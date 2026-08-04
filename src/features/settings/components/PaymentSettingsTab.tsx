@@ -4,11 +4,14 @@ import { createBankAccount, listBankAccounts, updateBankAccount } from '@/api/ba
 import type { BankAccountDto, UpdateBankAccountBody } from '@/api/types';
 import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
+import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
+import { numberToChineseNumeral, todayYyyymmdd } from '@/lib/utils';
 import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import BankAccountCard from './BankAccountCard';
 import ChannelRuleSection from './ChannelRuleSection';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 import VendorSection from './VendorSection';
 import type { BankAccountRecord } from '../data';
 
@@ -69,6 +72,7 @@ export default function PaymentSettingsTab() {
   const [actionError, setActionError] = useState('');
   const [adding, setAdding] = useState(false);
   const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT);
+  const [pendingDeactivate, setPendingDeactivate] = useState<BankAccountRecord | null>(null);
 
   const loadAccounts = () => {
     setLoading(true);
@@ -99,7 +103,13 @@ export default function PaymentSettingsTab() {
     setSaving(true);
     setActionError('');
     try {
-      await updateBankAccount(toUpdateBody(draft));
+      const original = accounts.find(a => a.id === draft.id);
+      const body = toUpdateBody(draft);
+      // 餘額有實際變動時才把更新日改為今天，未變動則沿用原值，避免覆蓋既有紀錄
+      if (original && original.balance !== draft.balance) {
+        body.lastBalanceUpdateDate = todayYyyymmdd();
+      }
+      await updateBankAccount(body);
       setEditingId(null);
       setDraft(null);
       loadAccounts();
@@ -115,6 +125,19 @@ export default function PaymentSettingsTab() {
     setActionError('');
     try {
       await updateBankAccount(toUpdateBody({ ...account, isActive: false }));
+      loadAccounts();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const activateAccount = async (account: BankAccountRecord) => {
+    setSaving(true);
+    setActionError('');
+    try {
+      await updateBankAccount(toUpdateBody({ ...account, isActive: true }));
       loadAccounts();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : '操作失敗');
@@ -182,39 +205,49 @@ export default function PaymentSettingsTab() {
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{loadError}</div>
         ) : (
         <div className="flex flex-col gap-4">
-          {accounts.map(account => (
-            <BankAccountCard
-              key={account.id}
-              account={editingId === account.id && draft ? draft : account}
-              editing={editingId === account.id}
-              saving={saving}
-              onStartEdit={() => startEdit(account)}
-              onCancelEdit={cancelEdit}
-              onChange={updateDraft}
-              onSave={saveEdit}
-              onDeactivate={() => deactivateAccount(account)}
-              onSetDefaultPayment={() => setDefaultAccount(account, 'payment')}
-              onSetDefaultReceiving={() => setDefaultAccount(account, 'receiving')}
-            />
+          {accounts.map((account, i) => (
+            <div key={account.id}>
+              <h3 className="mb-2 text-sm font-semibold text-neutral-dark">帳戶{numberToChineseNumeral(i + 1)}</h3>
+              <BankAccountCard
+                account={editingId === account.id && draft ? draft : account}
+                editing={editingId === account.id}
+                saving={saving}
+                onStartEdit={() => startEdit(account)}
+                onCancelEdit={cancelEdit}
+                onChange={updateDraft}
+                onSave={saveEdit}
+                onDeactivate={() => setPendingDeactivate(account)}
+                onActivate={() => activateAccount(account)}
+                onSetDefaultPayment={() => setDefaultAccount(account, 'payment')}
+                onSetDefaultReceiving={() => setDefaultAccount(account, 'receiving')}
+              />
+            </div>
           ))}
 
           {adding && (
             <div className="rounded-md border border-dashed border-neutral-blue-gray/50 p-4">
               <div className="space-y-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">帳戶暱名</label>
-                  <TextInput
-                    placeholder="例：付款用國泰世華內科分行"
-                    value={newAccount.nickname}
-                    onChange={e => setNewAccount(a => ({ ...a, nickname: e.target.value }))}
-                  />
-                  <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>
+                <div className="grid grid-cols-1 gap-3 nav:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">帳戶暱名</label>
+                    <TextInput
+                      placeholder="例：付款用國泰世華內科分行"
+                      value={newAccount.nickname}
+                      onChange={e => setNewAccount(a => ({ ...a, nickname: e.target.value }))}
+                    />
+                    <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
+                    <MoneyInput value={newAccount.balance} onChange={v => setNewAccount(a => ({ ...a, balance: v }))} />
+                    <p className="mt-1 text-xs text-neutral-mid">僅限於首次設定時使用，系統將不再詢問</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行名稱</label>
-                  <TextInput value={newAccount.bankName} onChange={e => setNewAccount(a => ({ ...a, bankName: e.target.value }))} />
-                </div>
-                <div className="grid grid-cols-1 gap-3 nav:grid-cols-[120px_1fr_1fr]">
+                <div className="grid grid-cols-1 gap-3 nav:grid-cols-[1fr_120px_1fr_1fr]">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行名稱</label>
+                    <TextInput value={newAccount.bankName} onChange={e => setNewAccount(a => ({ ...a, bankName: e.target.value }))} />
+                  </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
                     <TextInput
@@ -238,13 +271,8 @@ export default function PaymentSettingsTab() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
-                  <MoneyInput value={newAccount.balance} onChange={v => setNewAccount(a => ({ ...a, balance: v }))} />
-                  <p className="mt-1 text-xs text-neutral-mid">僅限於首次設定時使用，系統將不再詢問</p>
-                </div>
-                <div>
                   <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
-                  <TextInput
+                  <Textarea
                     placeholder="備註（選填）"
                     value={newAccount.remark}
                     onChange={e => setNewAccount(a => ({ ...a, remark: e.target.value }))}
@@ -286,6 +314,17 @@ export default function PaymentSettingsTab() {
       <ChannelRuleSection accounts={accounts.filter(a => a.isActive)} />
 
       <VendorSection />
+
+      <ConfirmDeleteDialog
+        open={!!pendingDeactivate}
+        onClose={() => setPendingDeactivate(null)}
+        onConfirm={() => {
+          if (pendingDeactivate) deactivateAccount(pendingDeactivate);
+        }}
+        title="停用銀行帳戶"
+        message={`確定要停用「${pendingDeactivate?.nickname}」嗎？停用後可於帳戶清單重新啟用。`}
+        confirmLabel="確定停用"
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Do
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import { PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
@@ -298,12 +298,7 @@ function PurchaseCard({
       </div>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
-          <SubjectNameSelect
-            value={locked ? row.category : categoryValue}
-            onChange={onCategorySelect}
-            year={officialSubjectYearFromRocDate(row.date)}
-            disabled={locked}
-          />
+          <SubjectNameSelect value={locked ? row.category : categoryValue} onChange={onCategorySelect} disabled={locked} />
           <Select widthClassName="w-full" value={locked ? row.project || '未指定專案' : projectValue} onValueChange={onProjectSelect} disabled={locked}>
             {locked ? <option>{row.project || '未指定專案'}</option> : PROJECT_NAMES.map(p => <option key={p || 'none'}>{p || '未指定專案'}</option>)}
           </Select>
@@ -470,12 +465,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
       {selectionMode && props.side === 'purchase' && (
         <div className="flex flex-col gap-2 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
           <div className="grid grid-cols-2 gap-2">
-            <SubjectNameSelect
-              value={batchCategory}
-              onChange={setBatchCategory}
-              year={officialSubjectYear(new Date())}
-              placeholder="變更費用類別"
-            />
+            <SubjectNameSelect value={batchCategory} onChange={setBatchCategory} placeholder="變更費用類別" />
             <Select widthClassName="w-full" value={batchProject} onValueChange={setBatchProject}>
               <option value="">變更專案</option>
               {PROJECT_NAMES.filter(Boolean).map(p => (

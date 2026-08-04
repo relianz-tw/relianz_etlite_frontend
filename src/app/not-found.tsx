@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <main className='flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 text-center'>
+    <main className='flex min-h-screen flex-col items-center justify-center px-4 text-center'>
       <SearchX size={40} strokeWidth={1.5} className='text-brand-tan' />
       <p className='mt-6 font-display-en text-7xl font-semibold text-neutral-dark'>
         404

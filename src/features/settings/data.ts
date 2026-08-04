@@ -132,9 +132,6 @@ export interface ChannelRuleRecord {
   settlementAmount: number;
   /** 收款帳戶 uuid，對應 BankAccountRecord.id */
   receivingAccountUuid: string;
-  /** 手續費基點／固定金額，本次介面暫不編輯，固定為 0 */
-  feeRateBps: number;
-  feeFixedAmount: number;
   remark: string;
   isActive: boolean;
 }

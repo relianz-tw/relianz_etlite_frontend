@@ -1,11 +1,13 @@
 'use client';
 
 import { createVendor, listVendors, updateVendor } from '@/api/vendors';
-import type { VendorDto } from '@/api/types';
+import type { UpdateVendorBody, VendorDto } from '@/api/types';
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { CirclePlus, Pencil } from 'lucide-react';
+import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { VendorRecord } from '../data';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 import VendorDialog from './VendorDialog';
 
 /**
@@ -28,6 +30,23 @@ function toVendorRecord(dto: VendorDto): VendorRecord {
   };
 }
 
+/** VendorRecord 轉為 updateVendor() 所需的 PATCH body（不含 companyUuid，由 API 層補上） */
+function toUpdateVendorBody(record: VendorRecord): Omit<UpdateVendorBody, 'companyUuid'> {
+  return {
+    uuid: record.id,
+    taxId: record.taxId,
+    name: record.name,
+    registeredAddress: record.address,
+    bankAccountName: record.bankAccountName,
+    bankCode: record.bankCode,
+    bankName: record.bankName,
+    branchName: record.bankBranch,
+    accountNo: record.bankAccountNumber,
+    remark: record.remark,
+    isActive: record.isActive,
+  };
+}
+
 /** 廠商管理：應付帳款依廠商分類，維護廠商資料以利帳簿頁「匯總沖帳」選擇廠商與繳費管理 */
 export default function VendorSection() {
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
@@ -35,6 +54,9 @@ export default function VendorSection() {
   const [loadError, setLoadError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<VendorRecord | undefined>(undefined);
+  const [actionError, setActionError] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [pendingDeactivate, setPendingDeactivate] = useState<VendorRecord | null>(null);
 
   const loadVendors = () => {
     setLoading(true);
@@ -59,19 +81,7 @@ export default function VendorSection() {
   };
   const handleSubmit = async (data: Omit<VendorRecord, 'id'>) => {
     if (editing) {
-      await updateVendor({
-        uuid: editing.id,
-        taxId: data.taxId,
-        name: data.name,
-        registeredAddress: data.address,
-        bankAccountName: data.bankAccountName,
-        bankCode: data.bankCode,
-        bankName: data.bankName,
-        branchName: data.bankBranch,
-        accountNo: data.bankAccountNumber,
-        remark: data.remark,
-        isActive: data.isActive,
-      });
+      await updateVendor(toUpdateVendorBody({ ...data, id: editing.id }));
     } else {
       await createVendor({
         taxId: data.taxId,
@@ -88,6 +98,32 @@ export default function VendorSection() {
     loadVendors();
   };
 
+  const deactivateVendor = async (vendor: VendorRecord) => {
+    setSavingId(vendor.id);
+    setActionError('');
+    try {
+      await updateVendor(toUpdateVendorBody({ ...vendor, isActive: false }));
+      loadVendors();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const activateVendor = async (vendor: VendorRecord) => {
+    setSavingId(vendor.id);
+    setActionError('');
+    try {
+      await updateVendor(toUpdateVendorBody({ ...vendor, isActive: true }));
+      loadVendors();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -99,6 +135,8 @@ export default function VendorSection() {
           新增廠商
         </Button>
       </div>
+
+      {actionError && <p className="mb-4 text-sm text-semantic-error">{actionError}</p>}
 
       {loading ? (
         <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
@@ -113,16 +151,18 @@ export default function VendorSection() {
               <colgroup>
                 <col className="w-[120px]" />
                 <col />
-                <col className="w-[220px]" />
-                <col className="w-[240px]" />
-                <col className="w-16" />
+                <col className="w-[280px]" />
+                <col className="w-[300px]" />
+                <col className="w-[96px]" />
+                <col className="w-[168px]" />
               </colgroup>
               <thead className="bg-surface-off-white">
                 <tr className="border-b border-neutral-blue-gray/40">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">統編</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">名稱</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">登記地址</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">地址</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">銀行資訊</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">狀態</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-mid">操作</th>
                 </tr>
               </thead>
@@ -142,15 +182,32 @@ export default function VendorSection() {
                     <td className="truncate px-4 py-3.5 text-neutral-mid">
                       {vendor.bankName ? `${vendor.bankName} ${vendor.bankBranch}（${vendor.bankAccountNumber}）` : '—'}
                     </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(vendor)}
-                        aria-label={`編輯廠商 ${vendor.name || vendor.taxId}`}
-                        className="text-neutral-mid hover:text-brand-blue"
-                      >
-                        <Pencil size={14} />
-                      </button>
+                    <td className="px-4 py-3.5">
+                      {vendor.isActive ? (
+                        <Badge tone="success" variant="muted">
+                          啟用中
+                        </Badge>
+                      ) : (
+                        <Badge tone="neutral" variant="muted">
+                          已停用
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
+                          編輯
+                        </Button>
+                        {vendor.isActive ? (
+                          <Button size="sm" variant="danger" disabled={savingId === vendor.id} onClick={() => setPendingDeactivate(vendor)}>
+                            停用
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled={savingId === vendor.id} onClick={() => activateVendor(vendor)}>
+                            啟用
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -162,13 +219,35 @@ export default function VendorSection() {
             {vendors.map(vendor => (
               <div key={vendor.id} className="flex flex-col gap-1.5 rounded-lg border border-neutral-blue-gray/30 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-semibold text-neutral-dark">{vendor.name || vendor.taxId}</span>
-                  <button type="button" onClick={() => openEdit(vendor)} aria-label="編輯廠商" className="shrink-0 text-neutral-mid">
-                    <Pencil size={14} />
-                  </button>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate font-semibold text-neutral-dark">{vendor.name || vendor.taxId}</span>
+                    {vendor.isActive ? (
+                      <Badge tone="success" variant="muted">
+                        啟用中
+                      </Badge>
+                    ) : (
+                      <Badge tone="neutral" variant="muted">
+                        已停用
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
+                      編輯
+                    </Button>
+                    {vendor.isActive ? (
+                      <Button size="sm" variant="danger" disabled={savingId === vendor.id} onClick={() => setPendingDeactivate(vendor)}>
+                        停用
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" disabled={savingId === vendor.id} onClick={() => activateVendor(vendor)}>
+                        啟用
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="text-xs text-neutral-mid">統編　{vendor.taxId || '—'}</div>
-                <div className="truncate text-xs text-neutral-mid">{vendor.address || '登記地址未填寫'}</div>
+                <div className="truncate text-xs text-neutral-mid">{vendor.address || '地址未填寫'}</div>
                 <div className="truncate text-xs text-neutral-mid">
                   {vendor.bankName ? `${vendor.bankName} ${vendor.bankBranch}（${vendor.bankAccountNumber}）` : '尚未填寫銀行資訊'}
                 </div>
@@ -179,6 +258,17 @@ export default function VendorSection() {
       )}
 
       <VendorDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSubmit={handleSubmit} initial={editing} />
+
+      <ConfirmDeleteDialog
+        open={!!pendingDeactivate}
+        onClose={() => setPendingDeactivate(null)}
+        onConfirm={() => {
+          if (pendingDeactivate) deactivateVendor(pendingDeactivate);
+        }}
+        title="停用廠商"
+        message={`確定要停用「${pendingDeactivate?.name || pendingDeactivate?.taxId}」嗎？停用後可於清單重新啟用。`}
+        confirmLabel="確定停用"
+      />
     </div>
   );
 }

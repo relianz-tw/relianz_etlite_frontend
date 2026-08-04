@@ -1,5 +1,5 @@
 import { listOfficialSubjects } from '@/api/subjects';
-import type { PayableListItemDto, ReceivableListItemDto } from '@/api/types';
+import type { LedgerEntryInvoiceDto, PayableListItemDto, ReceivableListItemDto } from '@/api/types';
 import { formatRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
 import type { AllowanceLineItem, AllowanceRecord, PurchaseRow, SalesRow } from './types';
@@ -7,18 +7,6 @@ import type { AllowanceLineItem, AllowanceRecord, PurchaseRow, SalesRow } from '
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
 export const SALES_CHANNELS = ['現金', '匯票', '國泰信用卡', 'MoMo'];
 export const BANK_ACCOUNTS = ['中國信託港墅分行 (822-01256789012)', '國泰世華敦南分行 (013-98765432101)', '現金'];
-
-/** 日期 → /ael/subject/official/list 需要的西元年（依規格取該日期年度的前一年）；未提供日期回傳 undefined */
-export function officialSubjectYear(date: Date | undefined): number | undefined {
-  if (!date) return undefined;
-  return date.getFullYear() - 1;
-}
-
-/** 表格列 ROC 日期字串（如 '115/03/26'）→ /ael/subject/official/list 需要的西元年度（該筆交易年度的前一年） */
-export function officialSubjectYearFromRocDate(rocDate: string): number {
-  const rocYear = parseInt(rocDate.split('/')[0], 10);
-  return rocYear + 1910;
-}
 
 /** /ael/ledger/payables/filter 回傳的 YYYYMMDD 或 ISO 日期字串 → Date */
 function parseApiDate(value: string): Date | undefined {
@@ -32,10 +20,15 @@ function parseApiDate(value: string): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** 憑證號碼＝發票字軌＋號碼（無字軌的憑證類型 invoiceTrack 為空字串，串接後自然只剩號碼）；無對應憑證時回傳 undefined */
+function voucherNumberFromInvoice(invoice: LedgerEntryInvoiceDto | null): string | undefined {
+  return invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : undefined;
+}
+
 /**
  * /ael/ledger/payables/filter 一批項目 → 表格 PurchaseRow[]。
- * officialAccountingSubjectId 依各筆交易年度（減一年，同 officialSubjectYearFromRocDate）向 /ael/subject/official/list
- * 查詢科目清單反查名稱；查無對應年度清單或科目時，退回以編號顯示。專案欄位 API 未提供，故留空。
+ * officialAccountingSubjectId 向 /ael/subject/official/list/latest 查詢最新科目清單反查名稱；
+ * 查無對應科目時，退回以編號顯示。專案欄位 API 未提供，故留空。
  * source 標為 'invoice'：費用類別／專案下拉與現有假資料列一致可就地編輯（表格既有編輯皆僅存本地狀態，未串接更新 API）。
  * uuid 帶入真實 uuid 供交易明細頁查詢使用。
  */
@@ -45,12 +38,9 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
     return { item, rocDate: formatRocDate(date) };
   });
 
-  const years = Array.from(new Set(dated.map(({ rocDate }) => officialSubjectYearFromRocDate(rocDate)))).filter(
-    year => !Number.isNaN(year),
-  );
-  const subjectLists = await Promise.all(years.map(year => listOfficialSubjects(year)));
+  const subjectList = await listOfficialSubjects();
   const subjectNameById = new Map<number, string>();
-  subjectLists.flat().forEach(subject => subjectNameById.set(subject.id, subject.name));
+  subjectList.forEach(subject => subjectNameById.set(subject.id, subject.name));
 
   return dated.map(({ item, rocDate }) => ({
     id: item.orderCode,
@@ -61,6 +51,8 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
     category: subjectNameById.get(item.officialAccountingSubjectId) ?? `科目 #${item.officialAccountingSubjectId}`,
     project: '',
     source: 'invoice',
+    counterpartyUuid: item.counterpartyUuid,
+    voucherNumber: voucherNumberFromInvoice(item.invoice),
   }));
 }
 
@@ -79,6 +71,8 @@ export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesR
       counterparty: item.counterpartyName,
       date: formatRocDate(date),
       channel: '',
+      paymentChannelUuid: item.paymentChannelUuid,
+      voucherNumber: voucherNumberFromInvoice(item.invoice),
       voided: false,
       allowances: [],
     };

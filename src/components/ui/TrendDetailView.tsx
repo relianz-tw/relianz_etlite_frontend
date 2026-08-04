@@ -108,7 +108,7 @@ export default function TrendDetailView({ title, subtitle, backHref, series, tab
   const [granularity, setGranularity] = useState<Granularity>('day');
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-surface-off-white">
+    <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
         <Link href={backHref} className="mb-4 inline-flex items-center gap-1.5 text-sm text-neutral-mid hover:text-brand-blue">
           <ArrowLeft size={15} />

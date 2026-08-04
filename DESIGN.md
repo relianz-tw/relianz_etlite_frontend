@@ -188,12 +188,37 @@ Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
 ```
 對應元件：`src/components/ui/Textarea.tsx`。
 
-### Navigation
+### Navigation — Sidebar（側邊欄導覽）
+
+全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +
+`src/components/AppShell.tsx`。
+
 ```
-Font: Baskerville Semibold / Noto Serif TC, 18px
-Color: #3A3830
-Active / hover: #005FA2
-Background: #FFFFFF with 1px bottom border #EAE5E3
+寬度：展開 256px（w-64，8px 系統倍數）
+背景：#FFFFFF
+邊框：右側 1px #EAE5E3（surface-cream），取代原頂部列的 bottom border
+文字：Noto Sans TC 14px，#3A3830（權威灰）
+Active / hover：文字 #005FA2（城信藍）+ 背景 #EAE5E3（surface-cream）
+項目：垂直排列，rounded-md（6px）、px-3 py-2
+
+結構（由上至下）：
+  1. Logo（頁首，含收合鈕）
+  2. 導覽項目（可捲動區）
+  3. 登出（頁尾，固定）
+
+下拉子項目：向下展開於父項目下方，縮排 + 左側 1px #EAE5E3 分隔線
+開關鈕：關閉時浮動於畫面左上角（Menu 圖示）；開啟時側邊欄頁首內為收合鈕（PanelLeftClose / X）
+圖示：一律 lucide-react
+
+深度：
+  桌面（Push，側邊欄為版面一部分）→ 扁平，僅右側 1px 邊框，無陰影
+  手機（Overlay，浮於內容上）→ shadow-level1（唯一陰影例外，同浮動選單規則）
+
+行為：
+  桌面（≥ nav 1000px）：Push — 展開時主內容向右推移 256px（ml-64），收合時佔滿全寬（ml-0）
+  手機（< nav 1000px）：Overlay — 側邊欄浮於內容上 + 半透明遮罩（bg-neutral-dark/40），主內容不位移
+
+過渡：側邊欄 transition-transform；主內容 transition-[margin]
 ```
 
 ### Status Badge
@@ -242,6 +267,22 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 ```
 
 對應元件：`src/features/ledger/components/LedgerTable.tsx`、`src/features/business-tax/components/InvoiceTable.tsx` 的 `SortHeader`。
+
+### Tab Bar (Underline)
+
+用途：附著於資料表格頂部的檢視切換（如帳簿應收/已收款、應付/已付款）。
+與主層級切換（`SegmentedControl` 藍底白字）在視覺上明確區隔，避免兩層切換樣式雷同難以分辨。
+
+```
+未選取：文字 #797C80（neutral-mid），底線透明
+        hover：文字轉 #3A3830（neutral-dark）
+已選取（active）：文字 #005FA2（城信藍 / brand-blue），下方 2px #005FA2 底線
+基線：分頁列底部 1px 淺灰（neutral-blue-gray/40，同表頭分隔線），active 底線壓在基線上
+字體：Noto Sans TC 14px, font-weight 600
+間距：每個分頁 px 12px、py 12px；分頁間 gap 4px
+```
+
+對應元件：`src/components/ui/TabBar.tsx`。
 
 ---
 

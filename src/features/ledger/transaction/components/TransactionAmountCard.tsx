@@ -6,7 +6,7 @@ import Select from '@/components/ui/Select';
 import SubjectSelect from '@/components/ui/SubjectSelect';
 import Textarea from '@/components/ui/Textarea';
 import type { Side } from '../../types';
-import { officialSubjectYear, TAX_RATE_LABEL } from '../data';
+import { TAX_RATE_LABEL } from '../data';
 import type { TransactionFormState, TransactionMode } from '../types';
 import Field from './Field';
 
@@ -39,11 +39,7 @@ export default function TransactionAmountCard({ side, mode, form, onChange }: Tr
         </Field>
 
         <Field label={side === 'purchase' ? '費用類別' : '收入科目'} badge={editBadge}>
-          <SubjectSelect
-            value={form.expenseCategory}
-            onChange={s => onChange({ expenseCategory: s })}
-            year={officialSubjectYear(form.issueDate)}
-          />
+          <SubjectSelect value={form.expenseCategory} onChange={s => onChange({ expenseCategory: s })} />
         </Field>
 
         <Field label="銷售額">

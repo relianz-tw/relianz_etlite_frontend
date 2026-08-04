@@ -4,11 +4,12 @@ import { createChannelRule, listChannelRules, updateChannelRule } from '@/api/ch
 import type { ChannelRuleDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { CirclePlus, Pencil, PowerOff } from 'lucide-react';
+import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
 import { formatSettlement } from '../data';
 import ChannelRuleDialog from './ChannelRuleDialog';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 
 interface ChannelRuleSectionProps {
   /** 收款帳戶下拉選項與表格解析用，僅傳入啟用中的實際銀行帳戶 */
@@ -23,8 +24,6 @@ function toChannelRuleRecord(dto: ChannelRuleDto): ChannelRuleRecord {
     settlementStyle: dto.settlementStyle,
     settlementAmount: dto.settlementAmount,
     receivingAccountUuid: dto.receivingAccountUuid ?? '',
-    feeRateBps: dto.feeRateBps,
-    feeFixedAmount: dto.feeFixedAmount,
     remark: dto.remark ?? '',
     isActive: dto.isActive,
   };
@@ -39,6 +38,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
   const [editing, setEditing] = useState<ChannelRuleRecord | undefined>(undefined);
   const [actionError, setActionError] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [pendingDeactivate, setPendingDeactivate] = useState<ChannelRuleRecord | null>(null);
 
   const loadRules = () => {
     setLoading(true);
@@ -86,6 +86,20 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     }
   };
 
+  const activateRule = async (rule: ChannelRuleRecord) => {
+    setSavingId(rule.id);
+    setActionError('');
+    try {
+      const { id, ...body } = rule;
+      await updateChannelRule({ ...body, uuid: id, isActive: true });
+      loadRules();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -112,15 +126,13 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
             <table className="w-full table-fixed border-collapse text-sm">
               <colgroup>
                 <col />
-                <col className="w-[180px]" />
-                <col className="w-[220px]" />
+                <col className="w-[280px]" />
                 <col className="w-[96px]" />
-                <col className="w-24" />
+                <col className="w-[168px]" />
               </colgroup>
               <thead className="bg-surface-off-white">
                 <tr className="border-b border-neutral-blue-gray/40">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">管道名稱</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">入帳規則</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">收款帳戶</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-neutral-mid">狀態</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-neutral-mid">操作</th>
@@ -134,9 +146,6 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
                   >
                     <td className="truncate px-4 py-3.5 font-semibold text-neutral-dark" title={rule.channelName}>
                       {rule.channelName || '—'}
-                    </td>
-                    <td className="truncate px-4 py-3.5 text-neutral-mid">
-                      {formatSettlement(rule.settlementStyle, rule.settlementAmount)}
                     </td>
                     <td className="truncate px-4 py-3.5 text-neutral-mid" title={accountLabel(rule.receivingAccountUuid)}>
                       {accountLabel(rule.receivingAccountUuid)}
@@ -153,25 +162,18 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
                       )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(rule)}
-                          aria-label={`編輯銷售管道 ${rule.channelName}`}
-                          className="text-neutral-mid hover:text-brand-blue"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        {rule.isActive && (
-                          <button
-                            type="button"
-                            onClick={() => deactivateRule(rule)}
-                            disabled={savingId === rule.id}
-                            aria-label={`停用銷售管道 ${rule.channelName}`}
-                            className="text-neutral-mid hover:text-semantic-error disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <PowerOff size={14} />
-                          </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(rule)}>
+                          編輯
+                        </Button>
+                        {rule.isActive ? (
+                          <Button size="sm" variant="danger" disabled={savingId === rule.id} onClick={() => setPendingDeactivate(rule)}>
+                            停用
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
+                            啟用
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -197,20 +199,18 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
                       </Badge>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <button type="button" onClick={() => openEdit(rule)} aria-label="編輯銷售管道" className="text-neutral-mid">
-                      <Pencil size={14} />
-                    </button>
-                    {rule.isActive && (
-                      <button
-                        type="button"
-                        onClick={() => deactivateRule(rule)}
-                        disabled={savingId === rule.id}
-                        aria-label="停用銷售管道"
-                        className="text-neutral-mid disabled:opacity-50"
-                      >
-                        <PowerOff size={14} />
-                      </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(rule)}>
+                      編輯
+                    </Button>
+                    {rule.isActive ? (
+                      <Button size="sm" variant="danger" disabled={savingId === rule.id} onClick={() => setPendingDeactivate(rule)}>
+                        停用
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" disabled={savingId === rule.id} onClick={() => activateRule(rule)}>
+                        啟用
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -223,6 +223,17 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
       )}
 
       <ChannelRuleDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSubmit={handleSubmit} initial={editing} accounts={accounts} />
+
+      <ConfirmDeleteDialog
+        open={!!pendingDeactivate}
+        onClose={() => setPendingDeactivate(null)}
+        onConfirm={() => {
+          if (pendingDeactivate) deactivateRule(pendingDeactivate);
+        }}
+        title="停用銷售管道"
+        message={`確定要停用「${pendingDeactivate?.channelName}」嗎？停用後可於清單重新啟用。`}
+        confirmLabel="確定停用"
+      />
     </div>
   );
 }

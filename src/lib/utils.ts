@@ -15,6 +15,30 @@ export function formatYyyymmdd(value: string): string {
   return `${value.slice(0, 4)}/${value.slice(4, 6)}/${value.slice(6, 8)}`;
 }
 
+/** 回傳今天日期的 YYYYMMDD 字串，供需要送出此格式的 API（如銀行帳戶餘額更新日）使用 */
+export function todayYyyymmdd(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
+
+const CHINESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+/** 阿拉伯數字（1-99）轉中文數字，供帳戶等列表的流水號大標題（帳戶一、帳戶二…）使用 */
+export function numberToChineseNumeral(n: number): string {
+  if (n <= 0) return String(n);
+  if (n < 10) return CHINESE_DIGITS[n];
+  if (n < 20) return `十${n === 10 ? '' : CHINESE_DIGITS[n - 10]}`;
+  if (n < 100) {
+    const tens = Math.floor(n / 10);
+    const ones = n % 10;
+    return `${CHINESE_DIGITS[tens]}十${ones === 0 ? '' : CHINESE_DIGITS[ones]}`;
+  }
+  return String(n);
+}
+
 /** 表格可排序表頭的排序方向；'none' 代表未排序（維持原始順序） */
 export type SortDir = 'asc' | 'desc' | 'none';
 

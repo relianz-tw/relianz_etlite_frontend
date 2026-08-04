@@ -175,7 +175,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   const breadcrumb = mode === 'create' ? `帳簿 / 新增${SIDE_LABEL[side]}交易` : `帳簿 / ${SIDE_LABEL[side]}交易細節`;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-surface-off-white">
+    <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
         <div className="mb-6 flex flex-col gap-4 nav:flex-row nav:items-start nav:justify-between">
           <div>

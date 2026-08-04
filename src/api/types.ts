@@ -144,7 +144,7 @@ export interface UpdateBasicSettingBody {
 }
 
 /**
- * 官方費用科目 DTO（/ael/subject/official/list），依 year（西元年）帶出該年度科目清單。
+ * 官方費用科目 DTO（/ael/subject/official/list/latest），帶出最新一版科目清單，不需帶 year 參數。
  * debitCreditType／remark 目前皆為 null，本次介面不使用。
  */
 export interface OfficialSubjectDto {
@@ -170,7 +170,7 @@ export interface SubjectUsageDto {
 
 /**
  * 銷售管道規則 DTO，對應 sale.md 內嵌 OpenAPI 規格（/ael/payment/channelRules 群組）。
- * feeRateBps／feeFixedAmount（手續費）本次介面暫不編輯，一律傳 0，留待日後補上。
+ * feeRateBps／feeFixedAmount（手續費）本次介面暫不編輯，建立/更新時一律不帶這兩個欄位，留待日後補上。
  */
 export interface ChannelRuleDto {
   uuid: string;
@@ -183,9 +183,9 @@ export interface ChannelRuleDto {
   /** 關聯公司銀行帳戶 uuid */
   receivingAccountUuid: string;
   /** 手續費基點（2.75%=275），本次介面暫不編輯 */
-  feeRateBps: number;
+  feeRateBps: number | null;
   /** 固定手續費(元)，本次介面暫不編輯 */
-  feeFixedAmount: number;
+  feeFixedAmount: number | null;
   isActive: boolean;
   remark: string;
   createdAt: string;
@@ -194,7 +194,7 @@ export interface ChannelRuleDto {
 
 export type CreateChannelRuleBody = Pick<
   ChannelRuleDto,
-  'companyUuid' | 'channelName' | 'settlementStyle' | 'settlementAmount' | 'receivingAccountUuid' | 'feeRateBps' | 'feeFixedAmount' | 'isActive' | 'remark'
+  'companyUuid' | 'channelName' | 'settlementStyle' | 'settlementAmount' | 'receivingAccountUuid' | 'isActive' | 'remark'
 >;
 
 export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'uuid'>;
@@ -316,6 +316,24 @@ export interface PayablesFilterBody {
 }
 
 /** 進項應付交易列表單筆項目 */
+/**
+ * 應收/應付交易內嵌的憑證資訊（隨 /ael/ledger/receivables|payables/filter 一併回傳，非另一支 API）；
+ * 交易尚未有對應憑證（如手動入帳、無票收據）時為 null。
+ */
+export interface LedgerEntryInvoiceDto {
+  uuid: string;
+  /** 發票字軌；二聯式/三聯式發票才有，收據等其他憑證類型可能為空字串 */
+  invoiceTrack: string;
+  invoiceNumber: string;
+  /** 民國年 YYYMMDD，如 1150717 */
+  date: string;
+  amount: number;
+  businessTax: number;
+  buyOrSell: number;
+  ourInvoiceType: number;
+  counterpartyTaxId: string;
+}
+
 export interface PayableListItemDto {
   uuid: string;
   orderCode: string;
@@ -338,6 +356,7 @@ export interface PayableListItemDto {
   officialAccountingSubjectId: number;
   memo: string;
   createdAt: string;
+  invoice: LedgerEntryInvoiceDto | null;
 }
 
 /** 查詢進項應付交易列表回應（data 內容） */
@@ -400,6 +419,7 @@ export interface ReceivableListItemDto {
   officialAccountingSubjectId: number;
   memo: string;
   createdAt: string;
+  invoice: LedgerEntryInvoiceDto | null;
 }
 
 /** 查詢銷項應收交易列表回應（data 內容） */

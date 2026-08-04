@@ -2,8 +2,6 @@ import type { EntryInvoiceDetailDto } from '@/api/types';
 import type { AllowanceRecord, Side } from '../types';
 import type { TransactionFormState } from './types';
 
-export { officialSubjectYear } from '../data';
-
 /** 路由 searchParams 的 side 參數解析：非 'purchase' 一律視為 'sales'，供新增/編輯頁共用 */
 export function parseSideParam(value: string | string[] | undefined): Side {
   return value === 'purchase' ? 'purchase' : 'sales';

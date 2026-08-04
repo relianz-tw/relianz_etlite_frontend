@@ -54,6 +54,10 @@ export interface SalesRow {
   counterparty: string;
   date: string;
   channel: string;
+  /** 銷售管道真實 uuid（來自 /ael/ledger/receivables/filter 的 paymentChannelUuid）；供匯總沖帳依 uuid 分組比對 */
+  paymentChannelUuid?: string | null;
+  /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
+  voucherNumber?: string;
   voided: boolean;
   allowances: AllowanceRecord[];
   children?: SubRow[];
@@ -69,5 +73,9 @@ export interface PurchaseRow {
   category: string;
   project: string;
   source: 'invoice' | 'labor' | 'salary';
+  /** 廠商真實 uuid（來自 /ael/ledger/payables/filter 的 counterpartyUuid）；供匯總沖帳依 uuid 分組比對 */
+  counterpartyUuid?: string | null;
+  /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
+  voucherNumber?: string;
   children?: SubRow[];
 }

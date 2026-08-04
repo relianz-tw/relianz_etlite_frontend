@@ -1,9 +1,9 @@
 'use client';
 
 import Button from '@/components/ui/Button';
-import Checkbox from '@/components/ui/Checkbox';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
+import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { useEffect, useState } from 'react';
 import { SETTLEMENT_MONTH_DAYS, SETTLEMENT_STYLE, SETTLEMENT_WEEKDAYS } from '../data';
@@ -26,9 +26,6 @@ function emptyForm(accounts: BankAccountRecord[]): Omit<ChannelRuleRecord, 'id'>
     settlementStyle: SETTLEMENT_STYLE.AFTER_INVOICE_DAYS,
     settlementAmount: 7,
     receivingAccountUuid: accounts[0]?.id ?? '',
-    // 手續費本次介面暫不編輯，固定帶 0
-    feeRateBps: 0,
-    feeFixedAmount: 0,
     remark: '',
     isActive: true,
   };
@@ -86,71 +83,68 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
           />
         </div>
 
-        <div className="rounded-md border border-neutral-blue-gray/30 p-4">
-          <span className="mb-2 block text-sm font-semibold text-neutral-dark">入帳規則</span>
-          <div className="flex flex-col gap-3">
-            <Select
-              widthClassName="w-full"
-              value={String(form.settlementStyle)}
-              onValueChange={v => {
-                const style = Number(v);
-                // 切換入帳規則類型時，settlementAmount 需帶入該類型合理的預設值
-                const defaultAmount = style === SETTLEMENT_STYLE.WEEKLY ? 1 : style === SETTLEMENT_STYLE.MONTHLY ? 1 : 7;
-                setForm(f => ({ ...f, settlementStyle: style, settlementAmount: defaultAmount }));
-              }}
-            >
-              <option value={String(SETTLEMENT_STYLE.AFTER_INVOICE_DAYS)}>發票開立後固定天數</option>
-              <option value={String(SETTLEMENT_STYLE.WEEKLY)}>每週固定星期</option>
-              <option value={String(SETTLEMENT_STYLE.MONTHLY)}>每月固定日期</option>
-            </Select>
+        <div className="flex flex-col gap-3">
+          <Select
+            widthClassName="w-full"
+            value={String(form.settlementStyle)}
+            onValueChange={v => {
+              const style = Number(v);
+              // 切換入帳規則類型時，settlementAmount 需帶入該類型合理的預設值
+              const defaultAmount = style === SETTLEMENT_STYLE.WEEKLY ? 1 : style === SETTLEMENT_STYLE.MONTHLY ? 1 : 7;
+              setForm(f => ({ ...f, settlementStyle: style, settlementAmount: defaultAmount }));
+            }}
+          >
+            <option value={String(SETTLEMENT_STYLE.AFTER_INVOICE_DAYS)}>發票開立後固定天數</option>
+            <option value={String(SETTLEMENT_STYLE.WEEKLY)}>每週固定星期</option>
+            <option value={String(SETTLEMENT_STYLE.MONTHLY)}>每月固定日期</option>
+          </Select>
 
-            {form.settlementStyle === SETTLEMENT_STYLE.AFTER_INVOICE_DAYS && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-mid">發票開立後</span>
-                <TextInput
-                  type="number"
-                  widthClassName="w-24"
-                  value={form.settlementAmount}
-                  onChange={e => setForm(f => ({ ...f, settlementAmount: Number(e.target.value) }))}
-                />
-                <span className="text-sm text-neutral-mid">天自動入帳</span>
-              </div>
-            )}
-            {form.settlementStyle === SETTLEMENT_STYLE.WEEKLY && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-mid">每週星期</span>
-                <Select
-                  widthClassName="w-28"
-                  value={String(form.settlementAmount)}
-                  onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
-                >
-                  {SETTLEMENT_WEEKDAYS.map((label, i) => (
-                    <option key={label} value={String(i + 1)}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-                <span className="text-sm text-neutral-mid">自動入帳</span>
-              </div>
-            )}
-            {form.settlementStyle === SETTLEMENT_STYLE.MONTHLY && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-mid">每月</span>
-                <Select
-                  widthClassName="w-24"
-                  value={String(form.settlementAmount)}
-                  onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
-                >
-                  {SETTLEMENT_MONTH_DAYS.map(day => (
-                    <option key={day} value={String(day)}>
-                      {day} 號
-                    </option>
-                  ))}
-                </Select>
-                <span className="text-sm text-neutral-mid">自動入帳</span>
-              </div>
-            )}
-          </div>
+          {form.settlementStyle === SETTLEMENT_STYLE.AFTER_INVOICE_DAYS && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-mid">發票開立後</span>
+              <TextInput
+                type="number"
+                widthClassName="w-24"
+                value={form.settlementAmount}
+                onChange={e => setForm(f => ({ ...f, settlementAmount: Number(e.target.value) }))}
+              />
+              <span className="text-sm text-neutral-mid">天自動入帳</span>
+            </div>
+          )}
+          {form.settlementStyle === SETTLEMENT_STYLE.WEEKLY && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-mid">每週星期</span>
+              <Select
+                widthClassName="w-28"
+                value={String(form.settlementAmount)}
+                onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
+              >
+                {SETTLEMENT_WEEKDAYS.map((label, i) => (
+                  <option key={label} value={String(i + 1)}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+              <span className="text-sm text-neutral-mid">自動入帳</span>
+            </div>
+          )}
+          {form.settlementStyle === SETTLEMENT_STYLE.MONTHLY && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-mid">每月</span>
+              <Select
+                widthClassName="w-24"
+                value={String(form.settlementAmount)}
+                onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
+              >
+                {SETTLEMENT_MONTH_DAYS.map(day => (
+                  <option key={day} value={String(day)}>
+                    {day} 號
+                  </option>
+                ))}
+              </Select>
+              <span className="text-sm text-neutral-mid">自動入帳</span>
+            </div>
+          )}
         </div>
 
         <div>
@@ -179,19 +173,12 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
 
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
-          <TextInput
+          <Textarea
             placeholder="備註（選填）"
             value={form.remark}
             onChange={e => setForm(f => ({ ...f, remark: e.target.value }))}
           />
         </div>
-
-        {initial && (
-          <label className="flex items-center gap-1.5 text-sm text-neutral-dark">
-            <Checkbox checked={form.isActive} onChange={() => setForm(f => ({ ...f, isActive: !f.isActive }))} />
-            啟用中
-          </label>
-        )}
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="outline" onClick={onClose} disabled={submitting}>

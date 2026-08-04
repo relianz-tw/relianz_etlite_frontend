@@ -92,7 +92,7 @@ export default function BusinessTaxView() {
   const totalAmount = fmtCurrency(rows.reduce((sum, r) => sum + r.total, 0));
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-surface-off-white">
+    <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
         <div className="mb-6">
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">營業稅中心</h1>

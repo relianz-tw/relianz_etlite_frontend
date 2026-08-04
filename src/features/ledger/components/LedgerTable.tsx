@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
-import { officialSubjectYear, officialSubjectYearFromRocDate, PROJECT_NAMES, SALES_CHANNELS } from '../data';
+import { PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import AddChannelDialog from './AddChannelDialog';
@@ -136,12 +136,7 @@ function BatchUpdateRow({
           </span>
           <div className="flex items-center gap-2">
             <div className="w-48">
-              <SubjectNameSelect
-                value={batchCategory}
-                onChange={onBatchCategoryChange}
-                year={officialSubjectYear(new Date())}
-                placeholder="變更費用類別"
-              />
+              <SubjectNameSelect value={batchCategory} onChange={onBatchCategoryChange} placeholder="變更費用類別" />
             </div>
             <Select widthClassName="w-40" value={batchProject} onValueChange={onBatchProjectChange}>
               <option value="">變更專案</option>
@@ -306,7 +301,8 @@ export default function LedgerTable(props: LedgerTableProps) {
       <>
       {dialogs}
       {exportDialog}
-      <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
+      {/* 上緣接續 LedgerView 渲染的底線分頁列（TabBar），故不設上圓角、不設上邊框 */}
+      <div className="hidden overflow-hidden rounded-b-md border border-t-0 border-neutral-blue-gray/30 bg-white nav:block">
         <table className="w-full table-fixed border-collapse">
           <colgroup>
             <col className="w-10" />
@@ -449,7 +445,8 @@ export default function LedgerTable(props: LedgerTableProps) {
     <>
     {dialogs}
     {exportDialog}
-    <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
+    {/* 上緣接續 LedgerView 渲染的底線分頁列（TabBar），故不設上圓角、不設上邊框 */}
+    <div className="hidden overflow-hidden rounded-b-md border border-t-0 border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
         <colgroup>
           <col className="w-10" />
@@ -523,7 +520,6 @@ export default function LedgerTable(props: LedgerTableProps) {
                       <SubjectNameSelect
                         value={locked ? row.category : categoryOverrides[row.id] ?? row.category}
                         onChange={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
-                        year={officialSubjectYearFromRocDate(row.date)}
                         disabled={locked}
                       />
                     </div>

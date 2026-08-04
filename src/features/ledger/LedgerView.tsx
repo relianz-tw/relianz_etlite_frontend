@@ -7,9 +7,9 @@ import { parseRocDate } from '@/components/ui/DatePicker';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import SummaryReconDialog from '@/features/reconciliation/components/SummaryReconDialog';
+import TabBar from '@/components/ui/TabBar';
 import { fmtCurrency, sortRows } from '@/lib/utils';
-import { Download, HandCoins } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import FilterBar from './components/FilterBar';
@@ -74,7 +74,6 @@ export default function LedgerView() {
   const filters = useMemo(() => parseLedgerFilters(searchParams), [searchParams.toString()]);
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [reconDialogOpen, setReconDialogOpen] = useState(false);
 
   // 簡易搜尋／進階搜尋輸入框內容：使用者「送出前」的草稿，掛載時取網址目前值作初始值，
   // 送出（搜尋／套用）後才寫回網址；網址本身不再需要對應的「已套用」local state
@@ -181,7 +180,7 @@ export default function LedgerView() {
   const handleSettled = () => setReloadKey(k => k + 1);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-surface-off-white">
+    <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
         <div className="mb-6">
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">帳簿</h1>
@@ -207,42 +206,35 @@ export default function LedgerView() {
           />
         </div>
 
-        <div className="mb-3 flex flex-col gap-2 nav:flex-row nav:items-center nav:gap-3">
-          <div className="w-full nav:w-56">
-            <SegmentedControl
-              options={[
-                { value: 'sales', label: '銷項' },
-                { value: 'purchase', label: '進項' },
-              ]}
-              value={filters.side}
-              onChange={handleSideChange}
-              size="md"
-            />
-          </div>
-          <div className="w-full nav:w-56">
-            <SegmentedControl
-              options={filters.side === 'sales' ? SALES_SUB_TABS : PURCHASE_SUB_TABS}
-              value={filters.subTab}
-              onChange={v => (filters.side === 'sales' ? handleSalesSubTabChange(v as SalesSubTab) : handlePurchaseSubTabChange(v as PurchaseSubTab))}
-              size="md"
-            />
-          </div>
-          {((filters.side === 'sales' && filters.subTab === 'receivable') || (filters.side === 'purchase' && filters.subTab === 'payable')) && (
-            <Button variant="warm" icon={HandCoins} onClick={() => setReconDialogOpen(true)} className="nav:ml-auto">
-              匯總沖帳
-            </Button>
-          )}
+        <div className="mb-5 w-full nav:w-56">
+          <SegmentedControl
+            options={[
+              { value: 'sales', label: '銷項' },
+              { value: 'purchase', label: '進項' },
+            ]}
+            value={filters.side}
+            onChange={handleSideChange}
+            size="md"
+          />
         </div>
-        <SummaryReconDialog
-          open={reconDialogOpen}
-          onClose={() => setReconDialogOpen(false)}
-          side={filters.side === 'sales' ? 'receivable' : 'payable'}
-        />
+        {/* 表格檢視切換：底線分頁附著於下方表格卡片頂部，與上方主切換（銷項/進項）視覺區隔；
+            手機無下方桌機表格可接續，維持四角圓角獨立列，桌機則去除下緣圓角以接續表格 */}
+        <div className="mb-3 flex items-stretch gap-3 rounded-md border border-neutral-blue-gray/30 bg-white px-2 nav:mb-0 nav:rounded-b-none">
+          <TabBar
+            options={filters.side === 'sales' ? SALES_SUB_TABS : PURCHASE_SUB_TABS}
+            value={filters.subTab}
+            onChange={v => (filters.side === 'sales' ? handleSalesSubTabChange(v as SalesSubTab) : handlePurchaseSubTabChange(v as PurchaseSubTab))}
+          />
+        </div>
 
         {loading ? (
-          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid nav:rounded-t-none nav:border nav:border-t-0 nav:border-neutral-blue-gray/30">
+            載入中…
+          </div>
         ) : error ? (
-          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{error}</div>
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error nav:rounded-t-none nav:border nav:border-t-0 nav:border-neutral-blue-gray/30">
+            {error}
+          </div>
         ) : filters.side === 'sales' ? (
           <Fragment key={`sales-${filters.subTab}`}>
             <LedgerTable

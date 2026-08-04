@@ -9,10 +9,12 @@ interface ConfirmDeleteDialogProps {
   onConfirm: () => void;
   title: string;
   message: string;
+  /** 確認按鈕文字，預設「確定刪除」；供停用等其他二次確認情境自訂（如「確定停用」） */
+  confirmLabel?: string;
 }
 
 /** 共用刪除確認對話框：供設定頁各分頁（標籤與專案／發票簿／營業狀態紀錄）刪除項目前二次確認 */
-export default function ConfirmDeleteDialog({ open, onClose, onConfirm, title, message }: ConfirmDeleteDialogProps) {
+export default function ConfirmDeleteDialog({ open, onClose, onConfirm, title, message, confirmLabel = '確定刪除' }: ConfirmDeleteDialogProps) {
   if (!open) return null;
 
   const handleConfirm = () => {
@@ -28,7 +30,7 @@ export default function ConfirmDeleteDialog({ open, onClose, onConfirm, title, m
           取消
         </Button>
         <Button variant="danger" onClick={handleConfirm}>
-          確定刪除
+          {confirmLabel}
         </Button>
       </div>
     </Modal>
