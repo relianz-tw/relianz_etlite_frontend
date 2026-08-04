@@ -1,7 +1,7 @@
 'use client';
 
 import { createPayable, createReceivable, fetchEntryDetail } from '@/api/ledger';
-import type { CreatePayableBody, CreateReceivableBody } from '@/api/types';
+import type { CreatePayableBody, CreateReceivableBody, EntryDetailEntryDto, EntryDetailSettlementDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { ChevronLeft } from 'lucide-react';
@@ -14,6 +14,8 @@ import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
 import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionAmountCard from './components/TransactionAmountCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
+import TransactionSettlementHistory from './components/TransactionSettlementHistory';
+import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import TransactionStatusSummary from './components/TransactionStatusSummary';
 import VoucherUpload from './components/VoucherUpload';
 import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
@@ -117,6 +119,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   // 編輯畫面掛載時向 GET /ael/ledger/entries/detail 取得真實資料；新增畫面不需要，維持 EMPTY_TRANSACTION_FORM
   const [detailLoading, setDetailLoading] = useState(mode === 'edit');
   const [detailError, setDetailError] = useState('');
+  const [entryDetail, setEntryDetail] = useState<EntryDetailEntryDto | null>(null);
+  const [settlements, setSettlements] = useState<EntryDetailSettlementDto[]>([]);
 
   useEffect(() => {
     if (mode !== 'edit' || !transactionId) return;
@@ -127,6 +131,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       .then(result => {
         if (cancelled) return;
         setForm(mapInvoiceDetailToForm(side, result.invoice));
+        setEntryDetail(result.entry);
+        setSettlements(result.settlements);
       })
       .catch(err => {
         if (cancelled) return;
@@ -212,9 +218,11 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
 
             <div className="flex flex-col gap-5">
               {mode === 'edit' && <TransactionStatusSummary side={side} declarePeriod={form.declarePeriod} />}
+              {mode === 'edit' && entryDetail && <TransactionSettlementStatus entry={entryDetail} />}
               <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
               <TransactionAmountCard side={side} mode={mode} form={form} onChange={handleChange} />
               {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
+              {mode === 'edit' && <TransactionSettlementHistory settlements={settlements} />}
 
               {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
 
