@@ -122,10 +122,6 @@ function ManualEntryDialogContent({
     <Modal open onClose={onClose} title="交易手動入帳" widthClassName="max-w-[420px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">預定入帳日期</label>
-          <DatePicker value={scheduledDate} onChange={() => {}} disabled />
-        </div>
-        <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">手動入帳日期</label>
           <DatePicker value={entryDate} onChange={setEntryDate} />
         </div>
