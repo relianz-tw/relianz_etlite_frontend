@@ -125,6 +125,7 @@ function TxnRow({
       {expanded && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
           <div className="flex flex-col gap-1.5">
+            <InfoRow label="交易號碼" value={row.orderCode || '—'} />
             <InfoRow label="開立日期" value={row.date} />
             <InfoRow label={side === 'payable' ? '項目摘要' : '買受人'} value={secondaryText} />
             <InfoRow label="憑證號碼" value={row.voucherNumber || '—'} />
