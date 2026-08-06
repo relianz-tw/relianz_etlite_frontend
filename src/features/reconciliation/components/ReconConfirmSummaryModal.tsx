@@ -12,6 +12,9 @@ interface ReconConfirmSummaryModalProps {
   matchedAmount: number;
   pool: number;
   remaining: number;
+  /** 銷項且選到真實管道時，確認送出會實際呼叫後端沖帳 API，需顯示送出中狀態與錯誤訊息 */
+  submitting?: boolean;
+  submitError?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -25,6 +28,8 @@ export default function ReconConfirmSummaryModal({
   matchedAmount,
   pool,
   remaining,
+  submitting,
+  submitError,
   onCancel,
   onConfirm,
 }: ReconConfirmSummaryModalProps) {
@@ -48,12 +53,13 @@ export default function ReconConfirmSummaryModal({
           </div>
         ))}
       </div>
+      {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
       <div className="mt-6 flex flex-col gap-3 nav:flex-row nav:justify-end">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>
           取消
         </Button>
-        <Button variant="primary" onClick={onConfirm}>
-          確認送出
+        <Button variant="primary" onClick={onConfirm} disabled={submitting}>
+          {submitting ? '送出中…' : '確認送出'}
         </Button>
       </div>
     </Modal>

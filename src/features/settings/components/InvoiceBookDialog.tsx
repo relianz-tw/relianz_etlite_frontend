@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import TextInput from '@/components/ui/TextInput';
 import { useEffect, useState } from 'react';
@@ -42,7 +43,7 @@ export default function InvoiceBookDialog({ open, onClose, onSubmit, initial }: 
     <Modal open onClose={onClose} title={initial ? '編輯發票本' : '新增本期發票本'} widthClassName="max-w-[400px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">名稱</label>
+          <Label required>名稱</Label>
           <TextInput
             placeholder="例：三聯式手開"
             value={form.name}
@@ -51,11 +52,11 @@ export default function InvoiceBookDialog({ open, onClose, onSubmit, initial }: 
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">字軌</label>
+            <Label required>字軌</Label>
             <TextInput placeholder="例：CA" value={form.trackCode} onChange={e => setForm(f => ({ ...f, trackCode: e.target.value }))} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">起號</label>
+            <Label required>起號</Label>
             <TextInput
               placeholder="例：32323200"
               value={form.startNumber}

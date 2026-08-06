@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
@@ -44,7 +45,7 @@ export default function ProjectDialog({ open, onClose, onSubmit, initial }: Proj
     <Modal open onClose={onClose} title={initial ? '編輯專案' : '新增專案'} widthClassName="max-w-[420px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">專案名稱</label>
+          <Label required>專案名稱</Label>
           <TextInput
             placeholder="例：測試專案"
             value={form.name}

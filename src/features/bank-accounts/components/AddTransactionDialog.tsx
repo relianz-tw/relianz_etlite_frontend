@@ -2,6 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -95,6 +96,12 @@ export default function AddTransactionDialog({ open, onClose, bankAccountUuid, o
         expense: form.direction === 'expense' ? form.amount : null,
         deposit: form.direction === 'deposit' ? form.amount : null,
         remark: form.remark.trim(),
+        // 手動新增的交易尚無對應帳簿分錄，關聯清單留空
+        linkedTransactions: [],
+        // 手動新增交易由使用者親自登打，非銀行系統匯入
+        channel: '手動輸入',
+        handler: '本人操作',
+        voucherImage: null,
       });
       onClose();
     } catch (err) {
@@ -108,22 +115,22 @@ export default function AddTransactionDialog({ open, onClose, bankAccountUuid, o
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">交易時間</label>
+            <Label required>交易時間</Label>
             <DatePicker value={form.transactionDate} onChange={date => setForm(f => ({ ...f, transactionDate: date }))} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">帳務時間</label>
+            <Label required>帳務時間</Label>
             <DatePicker value={form.accountingDate} onChange={date => setForm(f => ({ ...f, accountingDate: date }))} />
           </div>
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">摘要</label>
+          <Label required>摘要</Label>
           <TextInput placeholder="例：貨款收入" value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">收支方向與金額</label>
+          <Label required>收支方向與金額</Label>
           <div className="mb-2 w-40">
             <SegmentedControl options={DIRECTION_OPTIONS} value={form.direction} onChange={v => setForm(f => ({ ...f, direction: v }))} size="sm" />
           </div>

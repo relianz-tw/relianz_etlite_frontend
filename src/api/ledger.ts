@@ -15,6 +15,10 @@ import type {
   ReceivablesFilterResult,
   SettlePayableBody,
   SettleReceivableBody,
+  SettleReceivablePreviewBody,
+  SettleReceivablePreviewResult,
+  SettleReceivableSummaryBody,
+  SettleReceivableSummaryResult,
 } from './types';
 
 export function createPayable(body: Omit<CreatePayableBody, 'companyUuid'>): Promise<unknown> {
@@ -68,6 +72,22 @@ export function settleReceivable(body: Omit<SettleReceivableBody, 'companyUuid'>
 
 export function settlePayable(body: Omit<SettlePayableBody, 'companyUuid'>): Promise<unknown> {
   return apiFetch<unknown>('/ael/ledger/payables/settle', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 匯總沖帳（銷項）預覽拆帳：依 settleAmount 由舊到新試算各原單分配結果，不實際入帳 */
+export function previewSettleReceivable(body: Omit<SettleReceivablePreviewBody, 'companyUuid'>): Promise<SettleReceivablePreviewResult> {
+  return apiFetch<SettleReceivablePreviewResult>('/ael/ledger/reconciliation/receivables/settle/preview', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 匯總沖帳（銷項）真正執行沖帳：依勾選的原單 uuid 與存入銀行帳戶入帳，非預覽 */
+export function settleReceivableSummary(body: Omit<SettleReceivableSummaryBody, 'companyUuid'>): Promise<SettleReceivableSummaryResult> {
+  return apiFetch<SettleReceivableSummaryResult>('/ael/ledger/reconciliation/receivables/settle/summary', {
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });

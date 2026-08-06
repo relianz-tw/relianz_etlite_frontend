@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import TextInput from '@/components/ui/TextInput';
 import { useState } from 'react';
@@ -40,7 +41,7 @@ export default function ChangeCardDialog({ open, onClose, onSubmit }: ChangeCard
     <Modal open onClose={onClose} title="變更付款信用卡" widthClassName="max-w-[400px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">卡號</label>
+          <Label required>卡號</Label>
           <TextInput
             placeholder="請輸入完整卡號"
             value={cardNumber}
@@ -51,7 +52,7 @@ export default function ChangeCardDialog({ open, onClose, onSubmit }: ChangeCard
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">到期日期</label>
+          <Label required>到期日期</Label>
           <TextInput
             placeholder="MM/YY"
             value={expiry}

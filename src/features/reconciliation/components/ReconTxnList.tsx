@@ -1,10 +1,11 @@
 'use client';
 
+import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
-import Select from '@/components/ui/Select';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { ChevronRight } from 'lucide-react';
-import type { ReconGroupOption, ReconSubGroup } from '../data';
+import { ChevronDown, FileSearch } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import type { ReconSubGroup } from '../data';
 import type { ReconSide, ReconTxnRef } from '../types';
 
 interface ReconTxnListProps {
@@ -20,44 +21,34 @@ interface ReconTxnListProps {
   emptyMessage: string;
   pool: number;
   remaining: number;
-  /** 每列固定的「銷售管道」欄位可選項（啟用中管道/廠商） */
-  channelOptions: ReconGroupOption[];
-  /** 含停用/未知管道的完整名稱反查表，供顯示目前非啟用中管道時仍能呈現名稱而非 uuid */
+  /** 含停用/未知管道的完整名稱反查表，供顯示該筆交易目前所屬管道／廠商名稱 */
   channelNameByUuid: Map<string, string>;
-  onChannelChange: (uuid: string, channelUuid: string) => void;
-  onRowClick: (row: ReconTxnRef) => void;
+  /** 目前展開中的交易 uuid，一次僅展開一列；null 代表全部收合 */
+  expandedUuid: string | null;
+  onToggleExpand: (uuid: string) => void;
 }
 
 const HEADER_CLASS = 'text-xs font-semibold text-neutral-mid';
-const UNCLASSIFIED_VALUE = '';
 
-function ChannelSelect({
-  row,
-  widthClassName,
-  channelOptions,
-  channelNameByUuid,
-  onChannelChange,
-}: {
-  row: ReconTxnRef;
-  widthClassName: string;
-  channelOptions: ReconGroupOption[];
-  channelNameByUuid: Map<string, string>;
-  onChannelChange: (channelUuid: string) => void;
-}) {
-  const currentInList = channelOptions.some(o => o.uuid === row.channelUuid);
-  // 目前管道已停用或不在啟用清單中時，額外補一個選項顯示其名稱，避免下拉直接露出 uuid 原始字串
-  const extraOption = row.channelUuid && !currentInList ? { uuid: row.channelUuid, name: channelNameByUuid.get(row.channelUuid) ?? '未知管道' } : null;
+function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>): string {
+  if (!row.channelUuid) return '未分類';
+  return channelNameByUuid.get(row.channelUuid) ?? '未知';
+}
 
+/** 交易明細頁網址：帶 side 供頁面判斷欄位標籤／稅籍方向，帶 name 沿用清單既有買受人/賣方名稱（發票明細 API 對銷項不含買受人名稱） */
+function buildDetailHref(row: ReconTxnRef, side: ReconSide): string {
+  const params = new URLSearchParams({ side, name: row.counterparty ?? '' });
+  return `/ledger/reconciliation/${row.uuid}?${params.toString()}`;
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <Select widthClassName={widthClassName} value={row.channelUuid ?? UNCLASSIFIED_VALUE} onValueChange={onChannelChange}>
-      <option value={UNCLASSIFIED_VALUE}>未分類</option>
-      {extraOption && <option value={extraOption.uuid}>{extraOption.name}（非啟用中）</option>}
-      {channelOptions.map(opt => (
-        <option key={opt.uuid} value={opt.uuid}>
-          {opt.name}
-        </option>
-      ))}
-    </Select>
+    <div className="flex items-center justify-between gap-4">
+      <span className="shrink-0 text-neutral-mid">{label}</span>
+      <span className="truncate text-right font-medium text-neutral-dark" title={value}>
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -69,10 +60,10 @@ function TxnRow({
   disabled,
   overage,
   onToggle,
-  channelOptions,
   channelNameByUuid,
-  onChannelChange,
-  onOpenDetail,
+  expanded,
+  onToggleExpand,
+  onViewDetail,
 }: {
   row: ReconTxnRef;
   side: ReconSide;
@@ -81,40 +72,33 @@ function TxnRow({
   disabled: boolean;
   overage: number;
   onToggle: () => void;
-  channelOptions: ReconGroupOption[];
   channelNameByUuid: Map<string, string>;
-  onChannelChange: (channelUuid: string) => void;
-  onOpenDetail: () => void;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onViewDetail: () => void;
 }) {
   const secondaryText = side === 'payable' ? row.summary || '—' : row.counterparty || '—';
   const overageMessage = disabled && overage > 0 ? `超出剩餘 ${fmtCurrency(overage)}` : null;
+  const chevronClass = cn('shrink-0 text-neutral-blue-gray transition-transform', expanded && 'rotate-180');
 
   return (
     <div className={cn(disabled ? 'opacity-50' : '')}>
-      {/* 行動版：卡片式版面，主體可點擊看明細；勾選與管道變更為獨立控件，點擊時不觸發明細 */}
+      {/* 行動版：卡片式版面，主體可點擊展開大約資訊；勾選為獨立控件，點擊時不觸發展開 */}
       <div className="flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-4 nav:hidden">
-        <button type="button" onClick={onOpenDetail} className="flex flex-col gap-1.5 text-left">
+        <button type="button" onClick={onToggleExpand} className="flex flex-col gap-1.5 text-left">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-xs text-neutral-mid">{row.date}</span>
             <div className="flex items-center gap-1">
               <span className="font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
-              <ChevronRight size={16} className="shrink-0 text-neutral-blue-gray" />
+              <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
           <span className="truncate text-sm text-neutral-dark">{secondaryText}</span>
           <span className="font-mono text-xs text-neutral-mid">憑證 {row.voucherNumber || '—'}</span>
+          <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>
         <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
           {selectable && <Checkbox checked={checked} disabled={disabled} onChange={onToggle} aria-label={`沖帳 ${row.orderCode}`} />}
-          <div className="min-w-0 flex-1">
-            <ChannelSelect
-              row={row}
-              widthClassName="w-full"
-              channelOptions={channelOptions}
-              channelNameByUuid={channelNameByUuid}
-              onChannelChange={onChannelChange}
-            />
-          </div>
         </div>
         {overageMessage && <p className="text-xs text-semantic-error">{overageMessage}</p>}
       </div>
@@ -122,38 +106,51 @@ function TxnRow({
       {/* 桌機：欄位化列 */}
       <div className="hidden items-center gap-3 rounded-md px-3 py-2 text-sm nav:flex hover:bg-surface-cream">
         {selectable ? <Checkbox checked={checked} disabled={disabled} onChange={onToggle} aria-label={`沖帳 ${row.orderCode}`} /> : <span className="w-5 shrink-0" />}
-        <button type="button" onClick={onOpenDetail} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date}</span>
           <span className="min-w-0 flex-1 truncate text-neutral-dark" title={secondaryText}>
             {secondaryText}
           </span>
           <span className="w-28 shrink-0 truncate font-mono text-neutral-mid">{row.voucherNumber || '—'}</span>
           <span className="w-24 shrink-0 text-right font-mono tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+          <span className="w-32 shrink-0 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
+            {channelLabel(row, channelNameByUuid)}
+          </span>
         </button>
-        <div onClick={e => e.stopPropagation()}>
-          <ChannelSelect
-            row={row}
-            widthClassName="w-32"
-            channelOptions={channelOptions}
-            channelNameByUuid={channelNameByUuid}
-            onChannelChange={onChannelChange}
-          />
-        </div>
-        <ChevronRight size={16} className="shrink-0 text-neutral-blue-gray" />
+        <ChevronDown size={16} className={chevronClass} />
       </div>
       {overageMessage && <p className="hidden px-3 text-xs text-semantic-error nav:block">{overageMessage}</p>}
+
+      {/* 展開面板：顯示大約資訊 + 查看詳細按鈕，桌機/行動版共用同一份 markup，靠 Tailwind 響應式 class 調整按鈕寬度 */}
+      {expanded && (
+        <div className="mt-1 flex flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
+          <div className="flex flex-col gap-1.5">
+            <InfoRow label="開立日期" value={row.date} />
+            <InfoRow label={side === 'payable' ? '項目摘要' : '買受人'} value={secondaryText} />
+            <InfoRow label="憑證號碼" value={row.voucherNumber || '—'} />
+            <InfoRow label="交易金額" value={fmtCurrency(row.amount)} />
+            <InfoRow label="銷售管道" value={channelLabel(row, channelNameByUuid)} />
+          </div>
+          <div className="flex nav:justify-end">
+            <Button variant="outline" size="sm" icon={FileSearch} onClick={onViewDetail} className="w-full nav:w-auto">
+              查看詳細
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /**
  * 選定群組下的交易清單：一般群組可逐筆勾選要沖帳的交易（selectable=true）；
- * 「全部管道」為唯讀總覽（selectable=false），僅供瀏覽、看明細、調整銷售管道。
+ * 「全部管道」為唯讀總覽（selectable=false），僅供瀏覽、看明細。
  * 未勾選且金額超過目前剩餘可沖銷金額（remaining）的交易會被停用；停用原因以 inline 提示標示在該筆交易下方，
  * 而非集中於清單底部的單一錯誤訊息（避免使用者第一眼就看到誤報的錯誤）。
  * 「其他」群組會拆成多個 section（依原始 groupUuid），每個 section 附標題。
- * 每一列固定顯示「銷售管道」下拉，可隨時變更歸類；點擊列主體開啟交易明細 dialog。
- * 行動版（<1000px）改為卡片式版面，避免欄位化列在窄螢幕擠成一行難以操作。
+ * 每一列固定顯示所屬「銷售管道」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
+ * 展開區的「查看詳細」按鈕導向獨立的交易明細頁（串接憑證 API，含照片），而非帳簿的交易編輯頁。
+ * 行動版（<1000px）改為卡片式版面，展開行為與桌機一致，避免欄位化列在窄螢幕擠成一行難以操作。
  */
 export default function ReconTxnList({
   side,
@@ -166,11 +163,11 @@ export default function ReconTxnList({
   emptyMessage,
   pool,
   remaining,
-  channelOptions,
   channelNameByUuid,
-  onChannelChange,
-  onRowClick,
+  expandedUuid,
+  onToggleExpand,
 }: ReconTxnListProps) {
+  const router = useRouter();
   const totalRows = sections.reduce((sum, s) => sum + s.rows.length, 0);
   if (totalRows === 0) {
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">{emptyMessage}</div>;
@@ -208,10 +205,10 @@ export default function ReconTxnList({
                 disabled={disabled}
                 overage={pool > 0 ? row.amount - remaining : 0}
                 onToggle={() => onToggle(row.uuid)}
-                channelOptions={channelOptions}
                 channelNameByUuid={channelNameByUuid}
-                onChannelChange={value => onChannelChange(row.uuid, value)}
-                onOpenDetail={() => onRowClick(row)}
+                expanded={expandedUuid === row.uuid}
+                onToggleExpand={() => onToggleExpand(row.uuid)}
+                onViewDetail={() => router.push(buildDetailHref(row, side))}
               />
             );
           })}

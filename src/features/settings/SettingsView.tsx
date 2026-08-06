@@ -65,7 +65,7 @@ export default function SettingsView() {
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6 flex flex-col gap-4 nav:flex-row nav:items-center nav:justify-between">
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">
             設定

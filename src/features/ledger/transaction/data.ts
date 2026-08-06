@@ -1,4 +1,6 @@
+import { listOfficialSubjects } from '@/api/subjects';
 import type { EntryInvoiceDetailDto } from '@/api/types';
+import type { SubjectOption } from '@/components/ui/SubjectSelect';
 import type { AllowanceRecord, Side } from '../types';
 import type { TransactionFormState } from './types';
 
@@ -7,7 +9,6 @@ export function parseSideParam(value: string | string[] | undefined): Side {
   return value === 'purchase' ? 'purchase' : 'sales';
 }
 
-export const TAX_RATE_LABEL = '應稅 5%';
 export const TAG_PLACEHOLDER = '新增一般標籤';
 export const PROJECT_PLACEHOLDER = '選擇專案';
 
@@ -39,6 +40,7 @@ export const PURCHASE_INVOICE_NUMBER_OPTIONS = ['VG-12345678'];
 
 export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   isAllowance: false,
+  declared: false,
   invoicePeriod: INVOICE_PERIOD_OPTIONS[0],
   voucherType: VOUCHER_TYPES[0],
   invoiceTrack: '',
@@ -47,7 +49,6 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   invoiceNumber: '',
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
   issueDate: undefined,
-  payDate: undefined,
   buyerTaxId: '',
   buyerName: '',
   sellerTaxId: '',
@@ -84,8 +85,8 @@ function formatDeclarePeriod(cmsYear: number, cmsPhase: number): string {
 
 /**
  * GET /ael/ledger/entries/detail 回應的 invoice 區塊 → 交易表單狀態。
- * entry／settlements 區塊本次未使用；invoice 沒有對應資料的欄位（標籤/專案/銷售管道/是否為折讓/
- * 費用類別/營業稅等）維持 EMPTY_TRANSACTION_FORM 預設值，畫面上以「尚未串接」標記提醒。
+ * entry／settlements 區塊本次未使用；invoice 沒有對應資料的欄位（標籤/專案/銷售管道等）維持
+ * EMPTY_TRANSACTION_FORM 預設值，畫面上以「尚未串接」標記提醒。
  * invoice 為 null（該筆交易尚未關聯發票）時整份表單維持 EMPTY_TRANSACTION_FORM，不視為錯誤。
  */
 export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDto | null): TransactionFormState {
@@ -102,8 +103,22 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
     taxAmount: invoice.businessTax,
     note: invoice.remark,
     voucherPreviewUrl: invoice.invoicePicUrl || null,
+    isAllowance: invoice.isDebit === 1,
+    declared: invoice.declared === 1,
   };
   return side === 'sales'
     ? { ...common, buyerTaxId: invoice.buyerTaxIdNumber }
     : { ...common, sellerTaxId: invoice.sellerTaxIdNumber, sellerName: invoice.companyName };
+}
+
+/**
+ * entry.officialAccountingSubjectId → SubjectOption，比照帳簿列表 mapPayableItemsToRows 向
+ * /ael/subject/official/list/latest 反查科目的方式；查無對應科目時退回以編號顯示。
+ */
+export async function resolveExpenseCategory(subjectId: number): Promise<SubjectOption> {
+  const subjectList = await listOfficialSubjects();
+  const subject = subjectList.find(s => s.id === subjectId);
+  return subject
+    ? { id: subject.id, subjectCode: subject.subjectCode, name: subject.name }
+    : { id: subjectId, subjectCode: '', name: `科目 #${subjectId}` };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { navLinks } from '@/data/navLinks';
-import { ArrowRight, ChevronDown, PanelLeftClose, SquarePlus } from 'lucide-react';
+import { ArrowRight, ChevronDown, PanelLeftClose, SquarePlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -41,12 +41,25 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:shadow-none ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 right-0 z-50 flex h-full w-64 flex-col border-l border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:left-0 nav:right-auto nav:border-l-0 nav:border-r nav:shadow-none ${
+          open ? 'translate-x-0' : 'translate-x-full nav:-translate-x-full'
         }`}
       >
-        {/* 頁首：logo + 收合鈕 */}
-        <div className='flex h-16 shrink-0 items-center justify-between border-b border-surface-cream px-4'>
+        {/* 手機版頁首：選單標題 + 關閉鈕（logo 已顯示於固定頂部列，此處不重複） */}
+        <div className='flex h-14 shrink-0 items-center justify-between border-b border-surface-cream px-4 nav:hidden'>
+          <span className='font-medium text-neutral-dark'>選單</span>
+          <button
+            type='button'
+            aria-label='關閉選單'
+            onClick={onToggle}
+            className='text-neutral-dark hover:text-brand-primary'
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* 桌機頁首：logo + 收合鈕 */}
+        <div className='hidden h-16 shrink-0 items-center justify-between border-b border-surface-cream px-4 nav:flex'>
           <picture>
             <img
               src='/logo.png'

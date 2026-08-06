@@ -167,6 +167,17 @@ Focus shadow: 0 0 0 3px rgba(0, 95, 162, 0.15)
 Error border: #DD6B5F（開創紅，semantic-error）
 ```
 
+**必填標示（Required Field Marker）**（表單欄位 label 右側標示必填）
+```
+符號: * （緊接 label 文字右側）
+Color: #DD6B5F（開創紅，semantic-error）
+Margin-left: 4px（ml-0.5）
+aria-hidden: true（不由螢幕報讀器唸出）
+```
+語意：僅用於「送出時會驗證、會擋下送出」的欄位；純選填欄位不加星號。
+對應元件：`src/components/ui/Label.tsx` 的 `required` prop；
+`src/features/ledger/transaction/components/Field.tsx` 的 `required` prop（transaction feature 專用欄位包裝）。
+
 **Error Message**（欄位下方驗證錯誤提示，如必填未填、密碼不一致）
 ```
 Color: #DD6B5F（開創紅，semantic-error）
@@ -202,21 +213,29 @@ Active / hover：文字 #005FA2（城信藍）+ 背景 #EAE5E3（surface-cream�
 項目：垂直排列，rounded-md（6px）、px-3 py-2
 
 結構（由上至下）：
-  1. Logo（頁首，含收合鈕）
+  1. 頁首（手機：「選單」文字 + X 關閉鈕／桌機：Logo + 收合鈕）
   2. 導覽項目（可捲動區）
   3. 登出（頁尾，固定）
 
 下拉子項目：向下展開於父項目下方，縮排 + 左側 1px #EAE5E3 分隔線
-開關鈕：關閉時浮動於畫面左上角（Menu 圖示）；開啟時側邊欄頁首內為收合鈕（PanelLeftClose / X）
 圖示：一律 lucide-react
+
+手機固定頂部列（< nav 1000px，取代桌機浮動開關鈕）：
+  高度 h-14（56px）、bg #FFFFFF、底部 1px #EAE5E3 邊框、z-40
+  左：Logo（100px 寬）；右：開啟選單鈕（Menu 圖示）
+  對應元件：src/components/AppShell.tsx 內的 <header>
+
+開關鈕：
+  手機（< nav 1000px）：固定頂部列右側 Menu 圖示開啟；側邊欄頁首內 X 圖示關閉
+  桌機（≥ nav 1000px）：收合時浮動於畫面左上角（Menu 圖示）；開啟時側邊欄頁首內為收合鈕（PanelLeftClose）
 
 深度：
   桌面（Push，側邊欄為版面一部分）→ 扁平，僅右側 1px 邊框，無陰影
   手機（Overlay，浮於內容上）→ shadow-level1（唯一陰影例外，同浮動選單規則）
 
 行為：
-  桌面（≥ nav 1000px）：Push — 展開時主內容向右推移 256px（ml-64），收合時佔滿全寬（ml-0）
-  手機（< nav 1000px）：Overlay — 側邊欄浮於內容上 + 半透明遮罩（bg-neutral-dark/40），主內容不位移
+  桌面（≥ nav 1000px）：Push — 側邊欄固定於左側，展開時主內容向右推移 256px（ml-64），收合時佔滿全寬（ml-0）
+  手機（< nav 1000px）：Overlay — 側邊欄自畫面右側滑出（fixed right-0）+ 半透明遮罩（bg-neutral-dark/40），主內容不位移，並保留 pt-14 淨空對應固定頂部列
 
 過渡：側邊欄 transition-transform；主內容 transition-[margin]
 ```

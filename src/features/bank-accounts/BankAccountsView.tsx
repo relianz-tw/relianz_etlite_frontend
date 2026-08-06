@@ -4,6 +4,7 @@ import { listBankAccounts } from '@/api/bankAccounts';
 import type { BankAccountDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
+import Pagination from '@/components/ui/Pagination';
 import { subMonths } from 'date-fns';
 import { Download, Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -13,12 +14,14 @@ import AccountSummaryCard from './components/AccountSummaryCard';
 import AddTransactionDialog from './components/AddTransactionDialog';
 import PeriodFilterBar from './components/PeriodFilterBar';
 import TransactionCards from './components/TransactionCards';
-import TransactionDetailModal from './components/TransactionDetailModal';
 import TransactionTable from './components/TransactionTable';
 import { createBankTransaction, listBankTransactions } from './data';
 import type { BankTransactionRow, NewBankTransactionInput } from './types';
-import { buildBankQueryString, parseBankFilters } from './urlState';
+import { buildBankQueryString, parseBankFilters, withReturnParam } from './urlState';
 import type { BankFilterState } from './urlState';
+
+/** 交易列表每頁筆數，比照帳簿頁面固定 10 筆 */
+const PAGE_LIMIT = 10;
 
 function toYmd(date: Date): string {
   const y = date.getFullYear();
@@ -52,7 +55,8 @@ export default function BankAccountsView() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [detailRow, setDetailRow] = useState<BankTransactionRow | null>(null);
+  // 目前 inline 展開中的交易 id；換頁／換帳戶／套用期間時歸零，避免展開狀態對應到已不在畫面上的列
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const updateFilters = (patch: Partial<BankFilterState>) => {
     const next: BankFilterState = { ...filters, ...patch };
@@ -132,8 +136,21 @@ export default function BankAccountsView() {
   const depositTotal = displayedRows.reduce((sum, r) => sum + (r.deposit ?? 0), 0);
   const expenseTotal = displayedRows.reduce((sum, r) => sum + (r.expense ?? 0), 0);
 
-  const handleApplyPeriod = (dateFrom: string, dateTo: string) => updateFilters({ dateFrom, dateTo });
-  const handleAccountChange = (uuid: string) => updateFilters({ account: uuid });
+  const totalPages = Math.max(1, Math.ceil(displayedRows.length / PAGE_LIMIT));
+  const pagedRows = displayedRows.slice((filters.page - 1) * PAGE_LIMIT, filters.page * PAGE_LIMIT);
+
+  const handlePageChange = (page: number) => {
+    setExpandedId(null);
+    updateFilters({ page });
+  };
+  const handleApplyPeriod = (dateFrom: string, dateTo: string) => {
+    setExpandedId(null);
+    updateFilters({ dateFrom, dateTo, page: 1 });
+  };
+  const handleAccountChange = (uuid: string) => {
+    setExpandedId(null);
+    updateFilters({ account: uuid, page: 1 });
+  };
 
   const handleCreate = async (input: NewBankTransactionInput) => {
     if (!selectedAccount) return;
@@ -143,7 +160,7 @@ export default function BankAccountsView() {
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6">
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">銀行帳戶總覽</h1>
           <p className="mt-1 text-sm text-neutral-mid">檢視銀行帳戶進出帳交易紀錄</p>
@@ -192,13 +209,24 @@ export default function BankAccountsView() {
               <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{txnError}</div>
             ) : (
               <>
-                <TransactionTable rows={displayedRows} onRowClick={setDetailRow} />
-                <TransactionCards rows={displayedRows} onRowClick={setDetailRow} />
+                <TransactionTable
+                  rows={pagedRows}
+                  totalCount={displayedRows.length}
+                  expandedId={expandedId}
+                  onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.uuid}`, searchParams)}
+                />
+                <TransactionCards
+                  rows={pagedRows}
+                  expandedId={expandedId}
+                  onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.uuid}`, searchParams)}
+                />
+                <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
               </>
             )}
 
             <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} bankAccountUuid={selectedAccount.uuid} onSubmit={handleCreate} />
-            <TransactionDetailModal open={detailRow !== null} row={detailRow} onClose={() => setDetailRow(null)} />
             {/*
               下載交易紀錄：本階段僅示意，沿用既有的 ExportRangeDialog（尚未接上實際產檔邏輯，見其原始 stub 說明）。
               TODO: 待確認匯出格式（CSV/Excel）與欄位順序後，接上依目前查詢帳戶/期間產出檔案的實際邏輯。

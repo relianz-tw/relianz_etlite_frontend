@@ -3,6 +3,7 @@
 import { createBankAccount, listBankAccounts, updateBankAccount } from '@/api/bankAccounts';
 import type { BankAccountDto, UpdateBankAccountBody } from '@/api/types';
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
@@ -229,7 +230,7 @@ export default function PaymentSettingsTab() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-3 nav:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">帳戶暱名</label>
+                    <Label required>帳戶暱名</Label>
                     <TextInput
                       placeholder="例：付款用國泰世華內科分行"
                       value={newAccount.nickname}
@@ -258,7 +259,7 @@ export default function PaymentSettingsTab() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行帳號</label>
+                    <Label required>銀行帳號</Label>
                     <TextInput
                       placeholder="請輸入完整帳號，不要輸入符號"
                       value={newAccount.accountNumber}

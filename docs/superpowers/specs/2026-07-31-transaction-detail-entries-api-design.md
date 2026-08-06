@@ -30,10 +30,14 @@
 | 憑證圖片 | `invoicePicUrl` | 直接串接（無檔名，`voucherFileName` 維持 `null`） |
 | 備註 | `remark` | 直接串接 |
 | 標籤／專案 | 無 | 「尚未串接」標記，維持空白 |
-| 是否為折讓 | `isDebit`（編碼未知） | 「尚未串接」標記，維持預設「否」 |
-| 營業稅（固定顯示「應稅 5%」的欄位） | `taxType`（編碼未知） | 「尚未串接」標記，維持原固定顯示 |
-| 費用類別／收入科目 | `costCategory`（只有代號無名稱） | 「尚未串接」標記，維持空白（`null`） |
-| 申報狀態 | `declared`（編碼未知） | 「尚未串接」標記，不顯示假資料 |
+| 是否為折讓 | `isDebit`（1 折讓、2 否） | 直接串接，移除「尚未串接」標記 |
+| 費用類別／收入科目 | entry 區塊 `officialAccountingSubjectId` | 直接串接，比照帳簿列表向 `/ael/subject/official/list/latest` 反查科目名稱，移除「尚未串接」標記 |
+| 申報狀態 | `declared`（1 已申報、2 未申報） | 直接串接，顯示已申報／未申報 badge |
+
+> 2026-08-04 更新：「營業稅」（原固定顯示「應稅 5%」的欄位）已從畫面上移除；`isDebit`／
+> `declared` 編碼已確認並完成串接；「付款日期」／「付款金額」兩列已從進項申報狀態卡片移除；
+> 費用類別／收入科目改為讀取 entry 區塊的 `officialAccountingSubjectId`（而非原規劃的 invoice
+> 區塊 `costCategory`），詳見下方型別與 `mapInvoiceDetailToForm`／`resolveExpenseCategory` 異動。
 
 **銷項限定**
 
@@ -41,7 +45,7 @@
 |---|---|---|
 | 買家統一編號 | `buyerTaxIdNumber` | 直接串接 |
 | 交易對象名稱（買家名稱） | 無 | 「尚未串接」標記，維持空白 |
-| 銷售管道 | 無 | 「尚未串接」標記，維持空白 |
+| 銷售管道 | entry 區塊 `paymentChannelUuid` | 直接串接（對應真實「銷售管道規則」清單的 uuid），移除「尚未串接」標記；並在下拉旁加上「新增」按鈕，沿用設定頁 `ChannelRuleDialog`／`createChannelRule` 直接新增管道 |
 | 入帳日期／入帳金額／手續費 | 無 | 「尚未串接」標記，不顯示假資料 |
 
 **進項限定**

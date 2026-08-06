@@ -15,7 +15,6 @@ interface ImportDropSectionProps {
 export default function ImportDropSection({ title, hint, accept = '.xlsx', onCancel }: ImportDropSectionProps) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [importing, setImporting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const acceptFile = (file: File | undefined) => {
@@ -42,15 +41,6 @@ export default function ImportDropSection({ title, hint, accept = '.xlsx', onCan
     e.preventDefault();
     setDragActive(false);
     acceptFile(e.dataTransfer.files?.[0]);
-  };
-
-  const handleImport = () => {
-    // 純前端模擬匯入流程，不接後端
-    setImporting(true);
-    setTimeout(() => {
-      setImporting(false);
-      setFileName(null);
-    }, 600);
   };
 
   return (
@@ -81,13 +71,14 @@ export default function ImportDropSection({ title, hint, accept = '.xlsx', onCan
           </>
         )}
       </button>
+      <p className="mt-2 text-xs text-neutral-mid">匯入功能尚未串接後端 API，敬請期待。</p>
 
       <div className="mt-4 flex gap-4">
         <Button variant="ghost" onClick={onCancel}>
           取消
         </Button>
-        <Button variant="primary" className="flex-1" onClick={handleImport} disabled={importing || !fileName}>
-          {importing ? '匯入中…' : '確認匯入'}
+        <Button variant="primary" className="flex-1" disabled title="匯入功能尚未串接後端 API">
+          確認匯入
         </Button>
       </div>
     </div>

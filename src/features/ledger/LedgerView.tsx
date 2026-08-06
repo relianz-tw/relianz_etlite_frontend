@@ -1,5 +1,6 @@
 'use client';
 
+import { listChannelRules } from '@/api/channelRules';
 import { fetchPayables, fetchPayablesPaid, fetchReceivables, fetchReceivablesCollected } from '@/api/ledger';
 import type { PayablesFilterBody } from '@/api/types';
 import Button from '@/components/ui/Button';
@@ -18,7 +19,7 @@ import LedgerTable from './components/LedgerTable';
 import SummaryCards from './components/SummaryCards';
 import { mapPayableItemsToRows, mapReceivableItemsToRows } from './data';
 import { formatYmd } from './transaction/data';
-import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
+import type { AdvancedFilter, LedgerTotals, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
 import { buildLedgerQueryString, defaultSubTabForSide, DEFAULT_SORT, parseLedgerFilters } from './urlState';
 import type { LedgerFilterState } from './urlState';
 
@@ -84,10 +85,29 @@ export default function LedgerView() {
   // 應付/已付/應收/已收四個子分頁共用同一組載入狀態；四支 filter API 依 side + 子分頁擇一呼叫
   const [rows, setRows] = useState<(SalesRow | PurchaseRow)[]>([]);
   const [total, setTotal] = useState(0);
+  // 頂部 KPI 卡片數字：來自 filter API 回傳的彙總欄位（issuedVoucherAmount 等），非前端計算；
+  // 載入完成前維持 null，SummaryCards 顯示 0 佔位，避免顯示上一次查詢殘留的數字
+  const [totals, setTotals] = useState<LedgerTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   // 手動入帳成功後遞增此值以觸發重新查詢（沖帳不改變頁碼/篩選條件，需獨立的刷新旗標）
   const [reloadKey, setReloadKey] = useState(0);
+
+  // 銷售管道名稱反查表：帳簿列表「銷售管道」欄位唯讀顯示用，一次載入不隨 side/分頁重抓
+  const [channelNameByUuid, setChannelNameByUuid] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    listChannelRules()
+      .then(list => {
+        if (!cancelled) setChannelNameByUuid(new Map(list.map(c => [c.uuid, c.channelName])));
+      })
+      .catch(() => {
+        // 名稱反查失敗僅影響顯示（退回顯示「未知」），不影響帳簿主要功能，故不特別呈現錯誤訊息
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 以目前 filters 為基礎合併變更後寫回網址；side/subTab/搜尋/排序/分頁的所有異動皆經此函式
   const updateFilters = (patch: Partial<LedgerFilterState>) => {
@@ -107,10 +127,12 @@ export default function LedgerView() {
         ? (filters.subTab === 'payable' ? fetchPayables(body) : fetchPayablesPaid(body)).then(async result => ({
             rows: await mapPayableItemsToRows(result.items),
             total: result.total,
+            totals: { primary: result.receivedVoucherAmount, settled: result.paidAmount, outstanding: result.payableAmount },
           }))
         : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(result => ({
             rows: mapReceivableItemsToRows(result.items),
             total: result.total,
+            totals: { primary: result.issuedVoucherAmount, settled: result.collectedAmount, outstanding: result.receivableAmount },
           }));
 
     request
@@ -118,6 +140,7 @@ export default function LedgerView() {
         if (cancelled) return;
         setRows(result.rows);
         setTotal(result.total);
+        setTotals(result.totals);
       })
       .catch(err => {
         if (cancelled) return;
@@ -181,14 +204,14 @@ export default function LedgerView() {
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6">
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">帳簿</h1>
           <p className="mt-1 text-sm text-neutral-mid">有開立發票或收據的交易</p>
         </div>
 
         <div className="mb-5">
-          <SummaryCards side={filters.side} />
+          <SummaryCards side={filters.side} totals={totals} />
         </div>
 
         <div className="mb-5">
@@ -246,6 +269,7 @@ export default function LedgerView() {
               sort={filters.sort}
               onSortToggle={handleSortToggle}
               onReceivableSettled={handleSettled}
+              channelNameByUuid={channelNameByUuid}
             />
             <LedgerCards
               side="sales"
@@ -257,6 +281,7 @@ export default function LedgerView() {
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}
               onReceivableSettled={handleSettled}
+              channelNameByUuid={channelNameByUuid}
             />
           </Fragment>
         ) : (

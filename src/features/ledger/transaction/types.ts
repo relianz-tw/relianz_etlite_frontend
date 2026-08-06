@@ -5,6 +5,8 @@ export type TransactionMode = 'create' | 'edit';
 /** 新增/編輯交易表單的本地狀態，欄位涵蓋銷項與進項全部情境（依 side 顯示對應子集） */
 export interface TransactionFormState {
   isAllowance: boolean;
+  /** 申報狀態，對應 API declared（1 已申報、2 未申報） */
+  declared: boolean;
   invoicePeriod: string;
   voucherType: string;
   invoiceTrack: string;
@@ -12,7 +14,6 @@ export interface TransactionFormState {
   invoiceNumber: string;
   declarePeriod: string;
   issueDate: Date | undefined;
-  payDate: Date | undefined;
   buyerTaxId: string;
   /** 銷項交易對象名稱（買方名稱），API counterpartyName 必填 */
   buyerName: string;

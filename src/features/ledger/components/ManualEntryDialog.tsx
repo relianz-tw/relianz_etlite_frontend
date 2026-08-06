@@ -4,6 +4,7 @@ import { listBankAccounts } from '@/api/bankAccounts';
 import type { BankAccountDto, ReceivableAllocation } from '@/api/types';
 import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
+import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
@@ -122,12 +123,12 @@ function ManualEntryDialogContent({
     <Modal open onClose={onClose} title="交易手動入帳" widthClassName="max-w-[420px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">手動入帳日期</label>
+          <Label required>手動入帳日期</Label>
           <DatePicker value={entryDate} onChange={setEntryDate} />
         </div>
         {isSales && (
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">收款戶頭</label>
+            <Label required>收款戶頭</Label>
             {accountsLoading ? (
               <p className="text-xs text-neutral-mid">載入中…</p>
             ) : accountsError ? (
@@ -146,7 +147,12 @@ function ManualEntryDialogContent({
           </div>
         )}
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm font-semibold text-neutral-dark">交易金額</span>
+          <span className="text-sm font-semibold text-neutral-dark">
+            交易金額
+            <span aria-hidden="true" className="ml-0.5 text-semantic-error">
+              *
+            </span>
+          </span>
           <MoneyInput widthClassName="w-36" value={amount} onChange={setAmount} />
         </div>
         {isSales && (

@@ -10,9 +10,6 @@ export const OTHER_GROUP_LABEL = '其他';
 export const ALL_GROUP_KEY = '__ALL__';
 export const ALL_GROUP_LABEL = '全部管道';
 
-/** 手動歸類覆寫：key 為交易 uuid，value 為使用者指定的管道／廠商 uuid，優先於原始 paymentChannelUuid/counterpartyUuid */
-export type ReassignMap = Record<string, string>;
-
 /** 側邊欄可選群組（銷售管道或廠商），key 一律為 uuid */
 export interface ReconGroupOption {
   uuid: string;
@@ -48,9 +45,6 @@ interface ReconCandidate {
   summary?: string;
 }
 
-/** 帶入手動歸類覆寫後的候選交易，供分組/明細函式共用 */
-type CandidateWithEffective = ReconCandidate & { effective: string | null };
-
 function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
   return (parseRocDate(a.date)?.getTime() ?? 0) - (parseRocDate(b.date)?.getTime() ?? 0);
 }
@@ -84,11 +78,7 @@ export function payableRowsToCandidates(rows: PurchaseRow[]): ReconCandidate[] {
   }));
 }
 
-function effectiveGroupUuid(candidate: ReconCandidate, reassignMap: ReassignMap): string | null {
-  return reassignMap[candidate.uuid] ?? candidate.groupUuid;
-}
-
-function toTxnRef(candidate: CandidateWithEffective): ReconTxnRef {
+function toTxnRef(candidate: ReconCandidate): ReconTxnRef {
   return {
     uuid: candidate.uuid,
     orderCode: candidate.orderCode,
@@ -97,12 +87,8 @@ function toTxnRef(candidate: CandidateWithEffective): ReconTxnRef {
     date: candidate.date,
     counterparty: candidate.counterparty,
     summary: candidate.summary,
-    channelUuid: candidate.effective,
+    channelUuid: candidate.groupUuid,
   };
-}
-
-function withEffectiveGroup(candidates: ReconCandidate[], reassignMap: ReassignMap): CandidateWithEffective[] {
-  return candidates.map(c => ({ ...c, effective: effectiveGroupUuid(c, reassignMap) }));
 }
 
 /**
@@ -116,52 +102,48 @@ export function resolveCatchAllKey(groupOptions: ReconGroupOption[]): string {
 }
 
 /**
- * 側邊欄群組清單：依 uuid 比對候選交易的 groupUuid（或使用者手動歸類覆寫後的 uuid）是否等於某個
- * 啟用中管道／廠商的 uuid；找不到對應的一律歸入「其他」（合併規則見 resolveCatchAllKey）。
+ * 側邊欄群組清單：依 uuid 比對候選交易的 groupUuid 是否等於某個啟用中管道／廠商的 uuid；
+ * 找不到對應的一律歸入「其他」（合併規則見 resolveCatchAllKey）。
  * candidates 需先排除已沖帳的交易再傳入。
  */
-export function buildReconGroups(candidates: ReconCandidate[], groupOptions: ReconGroupOption[], reassignMap: ReassignMap): ReconGroup[] {
-  const withEffective = withEffectiveGroup(candidates, reassignMap);
+export function buildReconGroups(candidates: ReconCandidate[], groupOptions: ReconGroupOption[]): ReconGroup[] {
   const knownUuids = new Set(groupOptions.map(o => o.uuid));
   const catchAllKey = resolveCatchAllKey(groupOptions);
-  const isUnclassified = (effective: string | null) => !effective || !knownUuids.has(effective);
+  const isUnclassified = (groupUuid: string | null) => !groupUuid || !knownUuids.has(groupUuid);
 
   const groups = groupOptions.map(opt => {
-    const matchRows = withEffective.filter(c => c.effective === opt.uuid || (opt.uuid === catchAllKey && isUnclassified(c.effective)));
+    const matchRows = candidates.filter(c => c.groupUuid === opt.uuid || (opt.uuid === catchAllKey && isUnclassified(c.groupUuid)));
     return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + c.amount, 0) };
   });
 
   // 沒有使用者自建的「其他」管道時，才需要前端合成一個桶收納未分類交易
   if (catchAllKey === OTHER_GROUP_KEY) {
-    const otherRows = withEffective.filter(c => isUnclassified(c.effective));
+    const otherRows = candidates.filter(c => isUnclassified(c.groupUuid));
     groups.push({ key: OTHER_GROUP_KEY, label: OTHER_GROUP_LABEL, count: otherRows.length, amount: otherRows.reduce((sum, c) => sum + c.amount, 0) });
   }
   return groups;
 }
 
 /** 選定群組下尚未沖帳的候選交易，依日期由舊到新排序供清單顯示 */
-export function getGroupRows(candidates: ReconCandidate[], groupKey: string | null, groupOptions: ReconGroupOption[], reassignMap: ReassignMap): ReconTxnRef[] {
+export function getGroupRows(candidates: ReconCandidate[], groupKey: string | null, groupOptions: ReconGroupOption[]): ReconTxnRef[] {
   if (!groupKey) return [];
-  const withEffective = withEffectiveGroup(candidates, reassignMap);
   const knownUuids = new Set(groupOptions.map(o => o.uuid));
   const catchAllKey = resolveCatchAllKey(groupOptions);
-  const isUnclassified = (effective: string | null) => !effective || !knownUuids.has(effective);
+  const isUnclassified = (groupUuid: string | null) => !groupUuid || !knownUuids.has(groupUuid);
   const isCatchAllGroup = groupKey === OTHER_GROUP_KEY || groupKey === catchAllKey;
   const filtered = isCatchAllGroup
-    ? withEffective.filter(c => c.effective === groupKey || isUnclassified(c.effective))
-    : withEffective.filter(c => c.effective === groupKey);
+    ? candidates.filter(c => c.groupUuid === groupKey || isUnclassified(c.groupUuid))
+    : candidates.filter(c => c.groupUuid === groupKey);
   return filtered.map(toTxnRef).sort(byDate);
 }
 
 /** 「全部管道」唯讀總覽：該側全部候選交易（不分群組），依日期由舊到新排序 */
-export function getAllRows(candidates: ReconCandidate[], reassignMap: ReassignMap): ReconTxnRef[] {
-  return withEffectiveGroup(candidates, reassignMap)
-    .map(toTxnRef)
-    .sort(byDate);
+export function getAllRows(candidates: ReconCandidate[]): ReconTxnRef[] {
+  return candidates.map(toTxnRef).sort(byDate);
 }
 
 /**
- * 「其他」群組專用：依原始（未覆寫）groupUuid 再分組，讓使用者理解為何落在「其他」——
+ * 「其他」群組專用：依原始 groupUuid 再分組，讓使用者理解為何落在「其他」——
  * 未指定 uuid 的交易以 blankLabel 顯示（如「未設定管道」），已知但非啟用中的 uuid 以 nameByUuid 反查名稱，
  * 查無名稱（如已刪除的管道/廠商）則顯示「未知」。
  */
@@ -169,15 +151,13 @@ export function getOtherSubGroups(
   candidates: ReconCandidate[],
   groupOptions: ReconGroupOption[],
   nameByUuid: Map<string, string>,
-  reassignMap: ReassignMap,
   blankLabel: string,
 ): ReconSubGroup[] {
   const knownUuids = new Set(groupOptions.map(o => o.uuid));
-  const withEffective = withEffectiveGroup(candidates, reassignMap);
-  const otherRows = withEffective.filter(c => !c.effective || !knownUuids.has(c.effective));
+  const otherRows = candidates.filter(c => !c.groupUuid || !knownUuids.has(c.groupUuid));
   const byKey = new Map<string, typeof otherRows>();
   otherRows.forEach(c => {
-    const key = c.effective ?? '__BLANK__';
+    const key = c.groupUuid ?? '__BLANK__';
     byKey.set(key, [...(byKey.get(key) ?? []), c]);
   });
   return Array.from(byKey.entries()).map(([key, list]) => ({

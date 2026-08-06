@@ -18,7 +18,7 @@ import TransactionSettlementHistory from './components/TransactionSettlementHist
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import TransactionStatusSummary from './components/TransactionStatusSummary';
 import VoucherUpload from './components/VoucherUpload';
-import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
+import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, resolveExpenseCategory, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
 import type { TransactionFormState, TransactionMode } from './types';
 
 interface TransactionFormViewProps {
@@ -65,7 +65,6 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
     counterpartyType: form.sellerTaxId ? 0 : 1,
     datetime: formatYmd(form.issueDate)!,
     deductible: form.deductible,
-    entryDate: formatYmd(form.payDate),
     ifDebit: form.isAllowance,
     importTaxNumber: isImport ? form.importTaxNumber || undefined : undefined,
     invoiceDate: formatYmd(form.issueDate)!,
@@ -94,7 +93,6 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
     counterpartyTaxId: form.buyerTaxId || undefined,
     counterpartyType: form.buyerTaxId ? 0 : 1,
     datetime: formatYmd(form.issueDate)!,
-    entryDate: formatYmd(form.payDate),
     ifDebit: form.isAllowance,
     invoiceDate: formatYmd(form.issueDate)!,
     memo: form.note || undefined,
@@ -128,9 +126,17 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
     setDetailLoading(true);
     setDetailError('');
     fetchEntryDetail({ ledgerUuid: transactionId })
-      .then(result => {
+      .then(async result => {
         if (cancelled) return;
-        setForm(mapInvoiceDetailToForm(side, result.invoice));
+        // 費用類別／收入科目來自 entry.officialAccountingSubjectId，比照帳簿列表反查科目名稱的方式處理
+        const expenseCategory = await resolveExpenseCategory(result.entry.officialAccountingSubjectId);
+        if (cancelled) return;
+        setForm({
+          ...mapInvoiceDetailToForm(side, result.invoice),
+          expenseCategory,
+          // 銷售管道對應 entry.paymentChannelUuid，直接帶入即可對應 channelField 下拉選項的 uuid
+          channel: result.entry.paymentChannelUuid ?? '',
+        });
         setEntryDetail(result.entry);
         setSettlements(result.settlements);
       })
@@ -182,7 +188,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6 flex flex-col gap-4 nav:flex-row nav:items-start nav:justify-between">
           <div>
             <Link href={backHref} className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-blue">
@@ -217,7 +223,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
             </div>
 
             <div className="flex flex-col gap-5">
-              {mode === 'edit' && <TransactionStatusSummary side={side} declarePeriod={form.declarePeriod} />}
+              {mode === 'edit' && <TransactionStatusSummary side={side} declarePeriod={form.declarePeriod} declared={form.declared} />}
               {mode === 'edit' && entryDetail && <TransactionSettlementStatus entry={entryDetail} />}
               <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
               <TransactionAmountCard side={side} mode={mode} form={form} onChange={handleChange} />

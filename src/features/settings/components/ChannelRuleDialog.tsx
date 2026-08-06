@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
@@ -72,7 +73,7 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
     <Modal open onClose={onClose} title={initial ? '編輯銷售管道' : '新增銷售管道'} widthClassName="max-w-[480px]">
       <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">管道名稱</label>
+          <Label required>管道名稱</Label>
           <TextInput
             placeholder="例如：蝦皮、中國信託刷卡機"
             value={form.channelName}
@@ -134,7 +135,7 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">收款帳戶</label>
+          <Label required>收款帳戶</Label>
           {accounts.length === 0 ? (
             <p className="text-xs text-semantic-error">尚無啟用中的銀行帳戶，請先於上方新增銀行帳戶</p>
           ) : (

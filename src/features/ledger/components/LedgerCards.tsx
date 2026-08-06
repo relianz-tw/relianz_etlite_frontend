@@ -13,16 +13,10 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Do
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
-import AddChannelDialog from './AddChannelDialog';
-import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
-import VoidConfirmDialog from './VoidConfirmDialog';
-
-const ADD_CHANNEL_OPTION = '+ 新增管道';
 
 const SORT_KEY_LABELS: Record<SortKey, string> = {
   id: '交易編號',
@@ -39,9 +33,15 @@ type LedgerCardsProps = {
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
 } & (
-  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void }
+  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void; channelNameByUuid: Map<string, string> }
   | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[]; onPayableSettled?: () => void }
 );
+
+/** 銷售管道唯讀顯示：帳簿列表無單筆交易更新管道的 API，故僅反查真實 paymentChannelUuid 顯示名稱，不提供編輯 */
+function channelLabel(row: SalesRow, channelNameByUuid: Map<string, string>): string {
+  if (!row.paymentChannelUuid) return '未分類';
+  return channelNameByUuid.get(row.paymentChannelUuid) ?? '未知';
+}
 
 /** 手機排序入口：下拉選欄位（預設 asc）＋方向鈕（僅切換 asc/desc），與桌機表格共用同一份排序資料 */
 function MobileSortControl({
@@ -151,37 +151,27 @@ function SalesCard({
   subTab,
   expanded,
   onToggle,
-  channels,
-  channelValue,
-  onChannelSelect,
+  channelText,
   onManualEntry,
   onCardClick,
   selectionMode,
   isSelected,
   onSelectToggle,
   onLongPressStart,
-  isVoided,
-  onVoid,
   allowanceCount,
-  onAllowance,
 }: {
   row: SalesRow;
   subTab: SalesSubTab;
   expanded: boolean;
   onToggle: () => void;
-  channels: string[];
-  channelValue: string;
-  onChannelSelect: (value: string) => void;
+  channelText: string;
   onManualEntry: () => void;
   onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
   onSelectToggle: () => void;
   onLongPressStart: (id: string) => void;
-  isVoided: boolean;
-  onVoid: () => void;
   allowanceCount: number;
-  onAllowance: () => void;
 }) {
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
   return (
@@ -209,29 +199,20 @@ function SalesCard({
                 入帳
               </Button>
             )}
-            {isVoided ? (
+            {row.voided ? (
               <span className="rounded-md bg-surface-cream px-2.5 py-1 text-xs font-semibold text-neutral-mid">已作廢</span>
             ) : (
-              <Button size="sm" variant="ghost" icon={CircleX} onClick={onVoid}>
+              <Button size="sm" variant="ghost" icon={CircleX} disabled title="作廢功能尚未串接後端 API">
                 作廢
               </Button>
             )}
-            <Button size="sm" variant="ghost" icon={FileMinus} onClick={onAllowance}>
+            <Button size="sm" variant="ghost" icon={FileMinus} disabled title="折讓功能尚未串接後端 API">
               {allowanceCount > 0 ? `折讓 (${allowanceCount})` : '折讓'}
             </Button>
           </div>
         )}
       </div>
-      {!selectionMode && subTab === 'received' && (
-        <div onClick={e => e.stopPropagation()}>
-          <Select widthClassName="w-full" value={channelValue} onValueChange={onChannelSelect}>
-            {channels.map(c => (
-              <option key={c}>{c}</option>
-            ))}
-            <option>{ADD_CHANNEL_OPTION}</option>
-          </Select>
-        </div>
-      )}
+      {!selectionMode && subTab === 'received' && <div className="truncate text-xs text-neutral-mid">{channelText}</div>}
       {!selectionMode && expanded && <ChildrenList children={row.children} />}
     </CardShell>
   );
@@ -250,8 +231,6 @@ function PurchaseCard({
   onLongPressStart,
   categoryValue,
   onCategorySelect,
-  projectValue,
-  onProjectSelect,
 }: {
   row: PurchaseRow;
   subTab: PurchaseSubTab;
@@ -265,8 +244,6 @@ function PurchaseCard({
   onLongPressStart: (id: string) => void;
   categoryValue: string;
   onCategorySelect: (value: string) => void;
-  projectValue: string;
-  onProjectSelect: (value: string) => void;
 }) {
   const locked = row.source !== 'invoice';
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
@@ -299,9 +276,9 @@ function PurchaseCard({
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
           <SubjectNameSelect value={locked ? row.category : categoryValue} onChange={onCategorySelect} disabled={locked} />
-          <Select widthClassName="w-full" value={locked ? row.project || '未指定專案' : projectValue} onValueChange={onProjectSelect} disabled={locked}>
-            {locked ? <option>{row.project || '未指定專案'}</option> : PROJECT_NAMES.map(p => <option key={p || 'none'}>{p || '未指定專案'}</option>)}
-          </Select>
+          <span className="flex h-10 items-center truncate px-1 text-sm text-neutral-mid" title={row.project || '未指定專案'}>
+            {row.project || '未指定專案'}
+          </span>
         </div>
       )}
       {!selectionMode && expanded && <ChildrenList children={row.children} />}
@@ -314,39 +291,16 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const searchParams = useSearchParams();
   const goToTransaction = (id: string) => router.push(withReturnParam(`/ledger/${id}?side=${props.side}`, searchParams));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [channels, setChannels] = useState(SALES_CHANNELS);
-  const [channelOverrides, setChannelOverrides] = useState<Record<string, string>>({});
-  const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | PurchaseRow | null>(null);
-  const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
-  const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
-  const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportSelectedOpen, setExportSelectedOpen] = useState(false);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
-  const [projectOverrides, setProjectOverrides] = useState<Record<string, string>>({});
   const [batchCategory, setBatchCategory] = useState('');
-  const [batchProject, setBatchProject] = useState('');
 
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
-  const handleChannelSelect = (rowId: string, value: string) => {
-    if (value === ADD_CHANNEL_OPTION) {
-      setAddChannelRowId(rowId);
-      return;
-    }
-    setChannelOverrides(o => ({ ...o, [rowId]: value }));
-  };
-  const handleChannelCreated = (name: string) => {
-    setChannels(c => [...c, name]);
-    if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
-    setAddChannelRowId(null);
-  };
-  const handleVoidConfirm = (rowId: string) => {
-    setVoidedOverrides(o => ({ ...o, [rowId]: true }));
-  };
   // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
   // 成功後觸發父層重新查詢應收/應付帳款列表
   const handleManualSettle = async (allocation: ReceivableAllocation) => {
@@ -369,7 +323,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
     setSelectionMode(false);
     setSelected({});
     setBatchCategory('');
-    setBatchProject('');
   };
 
   const rowIds = props.rows.map(r => r.id);
@@ -378,19 +331,17 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const toggleSelectAll = () => setSelected(allSelected ? {} : Object.fromEntries(rowIds.map(id => [id, true])));
   const selectedAmount = fmtCurrency(props.rows.filter(r => selected[r.id]).reduce((sum, r) => sum + r.amount, 0));
 
-  // 批次套用費用類別／專案：僅作用於發票來源（可編輯）的已選列，勞報單／薪資列固定不受影響
+  // 批次套用費用類別：僅作用於發票來源（可編輯）的已選列，勞報單／薪資列固定不受影響；
+  // 專案欄位純前端無持久化，已停用編輯
   const editableSelectedIds =
     props.side === 'purchase' ? props.rows.filter(r => selected[r.id] && r.source === 'invoice').map(r => r.id) : [];
   const handleBatchApply = () => {
-    if (batchCategory) setCategoryOverrides(o => ({ ...o, ...Object.fromEntries(editableSelectedIds.map(id => [id, batchCategory])) }));
-    if (batchProject) setProjectOverrides(o => ({ ...o, ...Object.fromEntries(editableSelectedIds.map(id => [id, batchProject])) }));
+    setCategoryOverrides(o => ({ ...o, ...Object.fromEntries(editableSelectedIds.map(id => [id, batchCategory])) }));
     setBatchCategory('');
-    setBatchProject('');
   };
 
   return (
     <div className="flex flex-col gap-2.5 nav:hidden">
-      <AddChannelDialog open={addChannelRowId !== null} onClose={() => setAddChannelRowId(null)} onSubmit={handleChannelCreated} />
       <ManualEntryDialog
         open={manualEntryRow !== null}
         onClose={() => setManualEntryRow(null)}
@@ -406,16 +357,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
         selectedAmount={selectedAmount}
         onExport={() => setExportSelectedOpen(false)}
       />
-      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
-      {voidRow && (
-        <VoidConfirmDialog
-          open
-          onClose={() => setVoidRow(null)}
-          onConfirm={() => handleVoidConfirm(voidRow.id)}
-          transactionId={voidRow.id}
-          amount={voidRow.amount}
-        />
-      )}
 
       {/* 頂部摘要／選擇操作列：sticky 貼在 Navbar（h-16）下方 */}
       <div className="sticky top-16 z-40 flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
@@ -464,22 +405,12 @@ export default function LedgerCards(props: LedgerCardsProps) {
 
       {selectionMode && props.side === 'purchase' && (
         <div className="flex flex-col gap-2 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
-          <div className="grid grid-cols-2 gap-2">
-            <SubjectNameSelect value={batchCategory} onChange={setBatchCategory} placeholder="變更費用類別" />
-            <Select widthClassName="w-full" value={batchProject} onValueChange={setBatchProject}>
-              <option value="">變更專案</option>
-              {PROJECT_NAMES.filter(Boolean).map(p => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <SubjectNameSelect value={batchCategory} onChange={setBatchCategory} placeholder="變更費用類別" />
           <Button
             variant="primary"
             size="md"
             className="w-full"
-            disabled={editableSelectedIds.length === 0 || (!batchCategory && !batchProject)}
+            disabled={editableSelectedIds.length === 0 || !batchCategory}
             onClick={handleBatchApply}
           >
             變更
@@ -495,19 +426,14 @@ export default function LedgerCards(props: LedgerCardsProps) {
               subTab={props.subTab}
               expanded={!!expanded[row.id]}
               onToggle={() => toggleExpand(row.id)}
-              channels={channels}
-              channelValue={channelOverrides[row.id] ?? row.channel}
-              onChannelSelect={v => handleChannelSelect(row.id, v)}
+              channelText={channelLabel(row, props.channelNameByUuid)}
               onManualEntry={() => setManualEntryRow(row)}
               onCardClick={() => goToTransaction(row.uuid ?? row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
               onLongPressStart={enterSelectionMode}
-              isVoided={row.voided || !!voidedOverrides[row.id]}
-              onVoid={() => setVoidRow(row)}
               allowanceCount={row.allowances.length}
-              onAllowance={() => setAllowanceRow(row)}
             />
           ))
         : props.rows.map(row => (
@@ -525,8 +451,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
               onLongPressStart={enterSelectionMode}
               categoryValue={categoryOverrides[row.id] ?? row.category}
               onCategorySelect={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
-              projectValue={projectOverrides[row.id] ?? row.project}
-              onProjectSelect={v => setProjectOverrides(o => ({ ...o, [row.id]: v }))}
             />
           ))}
     </div>

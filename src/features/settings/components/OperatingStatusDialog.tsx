@@ -2,6 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
@@ -60,11 +61,11 @@ export default function OperatingStatusDialog({ open, onClose, onSubmit, initial
           </Select>
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">開始日期</label>
+          <Label required>開始日期</Label>
           <TextInput placeholder="YYYY-MM-DD" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">結束日期</label>
+          <Label required>結束日期</Label>
           <TextInput
             placeholder="YYYY-MM-DD"
             value={ongoing ? '' : form.endDate}

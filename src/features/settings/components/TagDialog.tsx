@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import TextInput from '@/components/ui/TextInput';
 import { useEffect, useState } from 'react';
@@ -38,7 +39,7 @@ export default function TagDialog({ open, onClose, onSubmit, initialName }: TagD
   return (
     <Modal open onClose={onClose} title={initialName ? '編輯標籤' : '新增標籤'} widthClassName="max-w-[360px]">
       <div>
-        <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">標籤名稱</label>
+        <Label required>標籤名稱</Label>
         <TextInput
           placeholder="例：鹿東國小-二校區"
           value={name}

@@ -1,5 +1,5 @@
 import Badge from '@/components/ui/Badge';
-import { Bell, Calendar, CircleDollarSign, Landmark, Wallet } from 'lucide-react';
+import { Bell, Calendar, CircleDollarSign, Landmark } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Side } from '../../types';
 
@@ -9,28 +9,47 @@ interface StatusRow {
   value: ReactNode;
 }
 
-/** 交易明細 API 目前只提供 invoice 區塊，entry 的申報狀態／入帳/付款金額等無對應資料，先標記尚未串接 */
+/** 交易明細 API 目前只提供 invoice 區塊，entry 的入帳/付款金額等無對應資料，先標記尚未串接 */
 const NOT_WIRED_BADGE = (
   <Badge tone="neutral" variant="muted">
     尚未串接
   </Badge>
 );
 
-export default function TransactionStatusSummary({ side, declarePeriod }: { side: Side; declarePeriod: string }) {
+/** 申報狀態對應 API declared（1 已申報、2 未申報），已於 mapInvoiceDetailToForm 解碼為 boolean */
+function declaredBadge(declared: boolean) {
+  return declared ? (
+    <Badge tone="success" variant="muted">
+      已申報
+    </Badge>
+  ) : (
+    <Badge tone="neutral" variant="muted">
+      未申報
+    </Badge>
+  );
+}
+
+export default function TransactionStatusSummary({
+  side,
+  declarePeriod,
+  declared,
+}: {
+  side: Side;
+  declarePeriod: string;
+  declared: boolean;
+}) {
   const rows: StatusRow[] =
     side === 'sales'
       ? [
-          { icon: Bell, label: '申報狀態', value: NOT_WIRED_BADGE },
+          { icon: Bell, label: '申報狀態', value: declaredBadge(declared) },
           { icon: Calendar, label: '申報期間', value: declarePeriod },
           { icon: Calendar, label: '入帳日期', value: NOT_WIRED_BADGE },
           { icon: CircleDollarSign, label: '入帳金額', value: NOT_WIRED_BADGE },
           { icon: Landmark, label: '手續費', value: NOT_WIRED_BADGE },
         ]
       : [
-          { icon: Bell, label: '申報狀態', value: NOT_WIRED_BADGE },
+          { icon: Bell, label: '申報狀態', value: declaredBadge(declared) },
           { icon: Calendar, label: '申報期間', value: declarePeriod },
-          { icon: Calendar, label: '付款日期', value: NOT_WIRED_BADGE },
-          { icon: Wallet, label: '付款金額', value: NOT_WIRED_BADGE },
         ];
 
   return (

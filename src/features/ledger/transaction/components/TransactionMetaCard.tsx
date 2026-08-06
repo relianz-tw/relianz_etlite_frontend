@@ -1,13 +1,18 @@
 'use client';
 
-import { listChannelRules } from '@/api/channelRules';
-import type { ChannelRuleDto } from '@/api/types';
+import { listBankAccounts } from '@/api/bankAccounts';
+import { createChannelRule, listChannelRules } from '@/api/channelRules';
+import type { BankAccountDto, ChannelRuleDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
+import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
+import type { BankAccountRecord, ChannelRuleRecord } from '@/features/settings/data';
+import { CirclePlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { PROJECT_NAMES } from '../../data';
@@ -36,6 +41,20 @@ const ALLOWANCE_OPTIONS = [
   { value: 'yes', label: '是' },
 ] as const;
 
+// 新增進項「發票號碼」欄位依憑證種類顯示不同 label／helper，格式提示統一放 helper（收據不顯示此欄位，故無對應項目）
+const INVOICE_NUMBER_LABELS: Record<string, string> = {
+  [VOUCHER_TYPES[1]]: '高鐵 / 台鐵 / 國內班機票號',
+  [VOUCHER_TYPES[2]]: '變動載具號碼',
+  [VOUCHER_TYPES[3]]: '海關代徵營業稅繳納證號碼',
+};
+
+const INVOICE_NUMBER_HELPERS: Record<string, string> = {
+  [VOUCHER_TYPES[0]]: '發票範本：電子發票、手開發票、收銀機發票',
+  [VOUCHER_TYPES[1]]: '末10碼',
+  [VOUCHER_TYPES[2]]: '中間粗體號碼共10碼',
+  [VOUCHER_TYPES[3]]: '前三碼英文',
+};
+
 /** 交易明細 API（invoice 區塊）尚未提供對應資料的欄位，統一標記提醒目前仍是假資料 */
 const NOT_WIRED_BADGE = (
   <Badge tone="neutral" variant="muted">
@@ -43,9 +62,30 @@ const NOT_WIRED_BADGE = (
   </Badge>
 );
 
+/** BankAccountDto → BankAccountRecord，比照 PaymentSettingsTab 既有的轉換方式，供 ChannelRuleDialog 使用 */
+function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
+  return {
+    id: dto.uuid,
+    nickname: dto.accountName ?? '',
+    bankCode: dto.bankCode ?? '',
+    bankName: dto.bankName ?? '',
+    bankBranch: dto.branchName ?? '',
+    accountNumber: dto.accountNo ?? '',
+    balance: dto.currentBalance,
+    lastBalanceUpdateDate: dto.lastBalanceUpdateDate ?? '',
+    remark: dto.remark ?? '',
+    isActive: dto.isActive,
+    isDefaultReceivingAccount: dto.isDefaultReceivingAccount,
+    isDefaultPaymentAccount: dto.isDefaultPaymentAccount,
+  };
+}
+
 export default function TransactionMetaCard({ side, mode, form, onChange }: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
+  const [newChannelOpen, setNewChannelOpen] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>([]);
+  const [bankAccountsLoaded, setBankAccountsLoaded] = useState(false);
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
   useEffect(() => {
@@ -55,20 +95,30 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
   }, [side]);
 
-  const issueDateField = (
-    <Field label="開立日期">
-      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} />
-    </Field>
-  );
+  // 開啟「新增管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
+  useEffect(() => {
+    if (!newChannelOpen || bankAccountsLoaded) return;
+    listBankAccounts()
+      .then(list => {
+        setBankAccounts(list.filter(a => a.isActive).map(toBankAccountRecord));
+        setBankAccountsLoaded(true);
+      })
+      .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
+  }, [newChannelOpen, bankAccountsLoaded]);
 
-  // 交易付款日/收款日對應 API entryDate：兩側皆選填，開放使用者輸入或留空由系統依設定自動入帳
-  const entryDateField = (
-    <Field
-      key="payDate"
-      label={side === 'sales' ? '收款日期' : '付款日期'}
-      helper={`系統會依照${side === 'sales' ? '收款' : '付款'}日期自動入帳，如希望後續手動入帳請留空`}
-    >
-      <DatePicker value={form.payDate} onChange={d => onChange({ payDate: d })} />
+  // 新增管道成功後直接加入清單並選取，沿用設定頁 ChannelRuleDialog／createChannelRule 的表單與驗證邏輯
+  const handleCreateChannel = async (rule: Omit<ChannelRuleRecord, 'id'>) => {
+    const created = await createChannelRule(rule);
+    setChannelRules(list => [...list, created]);
+    onChange({ channel: created.uuid });
+  };
+
+  // 送出前驗證（validateForm）僅在新增（create）模式生效，故必填星號只在新增模式顯示
+  const isCreate = mode === 'create';
+
+  const issueDateField = (
+    <Field label="開立日期" required={isCreate}>
+      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} />
     </Field>
   );
 
@@ -79,7 +129,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   );
 
   const sellerNameField = (
-    <Field label="賣家名稱">
+    <Field label="賣家名稱" required={isCreate}>
       <TextInput placeholder="請輸入賣家名稱" value={form.sellerName} onChange={e => onChange({ sellerName: e.target.value })} />
     </Field>
   );
@@ -91,25 +141,29 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   );
 
   const buyerNameField = (
-    <Field label="交易對象名稱">
+    <Field label="交易對象名稱" required={isCreate}>
       <TextInput placeholder="請輸入交易對象名稱" value={form.buyerName} onChange={e => onChange({ buyerName: e.target.value })} />
     </Field>
   );
 
-  // channelField/tagField/projectField 為新增與編輯共用欄位；「尚未串接」標記只在編輯（交易明細）畫面顯示，
-  // 因為只有編輯頁的資料來自 invoice（目前沒有對應欄位），新增頁這幾個欄位本來就是使用者自行輸入、非未串接狀態
-  const editBadge = mode === 'edit' ? NOT_WIRED_BADGE : undefined;
+  // tagField/projectField 為新增與編輯共用欄位；兩者皆為純前端本地 state，未串接任何後端欄位
+  // （新增送出時不會一併送出，交易明細亦無對應資料可回填），新增與編輯畫面皆停用並標示提示
 
   const channelField = (
-    <Field label="銷售管道" badge={editBadge} helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
-      <Select widthClassName="w-full" value={form.channel} onValueChange={v => onChange({ channel: v })}>
-        <option value="">不指定</option>
-        {channelRules.map(c => (
-          <option key={c.uuid} value={c.uuid}>
-            {c.channelName}
-          </option>
-        ))}
-      </Select>
+    <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
+      <div className="flex items-center gap-2">
+        <Select widthClassName="w-full" value={form.channel} onValueChange={v => onChange({ channel: v })}>
+          <option value="">不指定</option>
+          {channelRules.map(c => (
+            <option key={c.uuid} value={c.uuid}>
+              {c.channelName}
+            </option>
+          ))}
+        </Select>
+        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewChannelOpen(true)}>
+          新增
+        </Button>
+      </div>
       {channelError && <p className="mt-1 text-xs text-semantic-error">{channelError}</p>}
     </Field>
   );
@@ -152,16 +206,16 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   ];
 
   const tagField = (
-    <Field label="標籤" badge={editBadge}>
-      <Select widthClassName="w-full" value={form.tag} onValueChange={v => onChange({ tag: v })}>
+    <Field label="標籤" badge={NOT_WIRED_BADGE}>
+      <Select widthClassName="w-full" value={form.tag} onValueChange={v => onChange({ tag: v })} disabled>
         <option value={TAG_PLACEHOLDER}>{TAG_PLACEHOLDER}</option>
       </Select>
     </Field>
   );
 
   const projectField = (
-    <Field label="專案" badge={editBadge}>
-      <Select widthClassName="w-full" value={form.project} onValueChange={v => onChange({ project: v })}>
+    <Field label="專案" badge={NOT_WIRED_BADGE}>
+      <Select widthClassName="w-full" value={form.project} onValueChange={v => onChange({ project: v })} disabled>
         <option value={PROJECT_PLACEHOLDER}>{PROJECT_PLACEHOLDER}</option>
         {PROJECT_NAMES.filter(Boolean).map(v => (
           <option key={v} value={v}>
@@ -187,7 +241,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
             ))}
           </Select>
         </Field>,
-        <Field key="invoiceNumber" label="發票號碼">
+        <Field key="invoiceNumber" label="發票號碼" required={isCreate}>
           <div className="flex gap-2">
             <TextInput
               widthClassName="w-16"
@@ -224,30 +278,37 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
             ))}
           </Select>
         </Field>,
-        <Field key="invoiceNumber" label="發票號碼" helper="發票範本：電子發票、手開發票、收銀機發票">
-          {form.voucherType === VOUCHER_TYPES[0] ? (
-            <div className="flex gap-2">
-              <TextInput
-                widthClassName="w-16"
-                placeholder="字軌"
-                maxLength={2}
-                value={form.invoiceTrack}
-                onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
-              />
-              <TextInput
-                widthClassName="flex-1"
-                placeholder="流水號"
-                maxLength={8}
-                value={form.invoiceSerial}
-                onChange={e => onChange({ invoiceSerial: e.target.value })}
-              />
-            </div>
-          ) : (
-            <TextInput placeholder="憑證編號" value={form.invoiceNumber} onChange={e => onChange({ invoiceNumber: e.target.value })} />
-          )}
-        </Field>,
+        form.voucherType === VOUCHER_TYPES[4] ? undefined : (
+          <Field
+            key="invoiceNumber"
+            label={INVOICE_NUMBER_LABELS[form.voucherType] ?? '發票號碼'}
+            required={isCreate && form.voucherType !== VOUCHER_TYPES[3]}
+            helper={INVOICE_NUMBER_HELPERS[form.voucherType]}
+          >
+            {form.voucherType === VOUCHER_TYPES[0] ? (
+              <div className="flex gap-2">
+                <TextInput
+                  widthClassName="w-16"
+                  placeholder="字軌"
+                  maxLength={2}
+                  value={form.invoiceTrack}
+                  onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
+                />
+                <TextInput
+                  widthClassName="flex-1"
+                  placeholder="流水號"
+                  maxLength={8}
+                  value={form.invoiceSerial}
+                  onChange={e => onChange({ invoiceSerial: e.target.value })}
+                />
+              </div>
+            ) : (
+              <TextInput placeholder="憑證編號" value={form.invoiceNumber} onChange={e => onChange({ invoiceNumber: e.target.value })} />
+            )}
+          </Field>
+        ),
       ],
-      [issueDateField, entryDateField],
+      [issueDateField],
       [sellerTaxIdField, sellerNameField],
       [tagField, projectField],
       [deductibleField],
@@ -284,6 +345,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
+      <ChannelRuleDialog open={newChannelOpen} onClose={() => setNewChannelOpen(false)} onSubmit={handleCreateChannel} accounts={bankAccounts} />
       <h2 className="mb-5 text-base font-semibold text-neutral-dark">交易資訊</h2>
       <div className="flex flex-col gap-4">
         {mode === 'edit' && (
@@ -306,7 +368,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Field>
         )}
 
-        <Field label="是否為折讓？" badge={editBadge} helper="如要一部或全部退款/退貨請選是">
+        <Field label="是否為折讓？" helper="如要一部或全部退款/退貨請選是">
           <SegmentedControl
             options={[...ALLOWANCE_OPTIONS]}
             value={form.isAllowance ? 'yes' : 'no'}

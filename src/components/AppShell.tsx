@@ -27,24 +27,44 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <>
+      {/* 手機版固定頂部列：logo 與選單鈕同列呈現，取代桌機用的浮動開關鈕 */}
+      <header className='fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-surface-cream bg-white px-4 nav:hidden'>
+        <picture>
+          <img
+            src='/logo.png'
+            alt='logo'
+            className='w-[100px]'
+            fetchPriority='high'
+          />
+        </picture>
+        <button
+          type='button'
+          aria-label='開啟選單'
+          onClick={() => setOpen(true)}
+          className='text-neutral-dark hover:text-brand-primary'
+        >
+          <Menu size={22} />
+        </button>
+      </header>
+
       <Sidebar open={open} onToggle={() => setOpen(o => !o)} />
 
-      {/* 收合時顯示浮動開關鈕 */}
+      {/* 桌機收合時顯示浮動開關鈕（手機版由固定頂部列取代） */}
       {!open && (
         <button
           type='button'
           aria-label='開啟選單'
           onClick={() => setOpen(true)}
-          className='fixed left-4 top-4 z-40 rounded-md border border-surface-cream bg-white p-2 text-neutral-dark shadow-level1 transition-colors hover:text-brand-primary'
+          className='fixed left-4 top-4 z-40 hidden rounded-md border border-surface-cream bg-white p-2 text-neutral-dark shadow-level1 transition-colors hover:text-brand-primary nav:block'
         >
           <Menu size={20} />
         </button>
       )}
 
-      {/* 收合時保留頂部淨空，避免浮動開關鈕蓋住各頁面左上角標題 */}
+      {/* 手機版固定頂部列高度需保留淨空；桌機則依展開狀態推移版面 */}
       <div
-        className={`transition-[margin,padding] duration-200 ${
-          open ? 'nav:ml-64' : 'pt-16'
+        className={`pt-14 transition-[margin] duration-200 nav:pt-0 ${
+          open ? 'nav:ml-64' : 'nav:ml-0'
         }`}
       >
         {children}

@@ -13,23 +13,23 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
-import { PROJECT_NAMES, SALES_CHANNELS } from '../data';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
-import AddChannelDialog from './AddChannelDialog';
-import AllowanceDialog from './AllowanceDialog';
 import ManualEntryDialog from './ManualEntryDialog';
-import VoidConfirmDialog from './VoidConfirmDialog';
-
-const ADD_CHANNEL_OPTION = '+ 新增管道';
 
 type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
-  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void }
+  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void; channelNameByUuid: Map<string, string> }
   | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[]; onPayableSettled?: () => void }
 );
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
+
+/** 銷售管道唯讀顯示：帳簿列表無單筆交易更新管道的 API，故僅反查真實 paymentChannelUuid 顯示名稱，不提供編輯 */
+function channelLabel(row: SalesRow, channelNameByUuid: Map<string, string>): string {
+  if (!row.paymentChannelUuid) return '未分類';
+  return channelNameByUuid.get(row.paymentChannelUuid) ?? '未知';
+}
 
 /** 可排序表頭：三態循環 none → asc → desc → none；active 時文字與圖示轉城信藍（見 DESIGN.md「Sortable Table Header」） */
 function SortHeader({
@@ -106,15 +106,13 @@ function TableFooter({
   );
 }
 
-/** 批次更新列（僅進項表格使用）：套用費用類別／專案至目前選取（且可編輯）的列 */
+/** 批次更新列（僅進項表格使用）：套用費用類別至目前選取（且可編輯）的列；專案欄位純前端無持久化，已停用編輯 */
 function BatchUpdateRow({
   colSpan,
   selectedCount,
   selectedAmount,
   batchCategory,
   onBatchCategoryChange,
-  batchProject,
-  onBatchProjectChange,
   onApply,
 }: {
   colSpan: number;
@@ -122,8 +120,6 @@ function BatchUpdateRow({
   selectedAmount: string;
   batchCategory: string;
   onBatchCategoryChange: (value: string) => void;
-  batchProject: string;
-  onBatchProjectChange: (value: string) => void;
   onApply: () => void;
 }) {
   return (
@@ -138,20 +134,7 @@ function BatchUpdateRow({
             <div className="w-48">
               <SubjectNameSelect value={batchCategory} onChange={onBatchCategoryChange} placeholder="變更費用類別" />
             </div>
-            <Select widthClassName="w-40" value={batchProject} onValueChange={onBatchProjectChange}>
-              <option value="">變更專案</option>
-              {PROJECT_NAMES.filter(Boolean).map(p => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </Select>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={selectedCount === 0 || (!batchCategory && !batchProject)}
-              onClick={onApply}
-            >
+            <Button size="sm" variant="primary" disabled={selectedCount === 0 || !batchCategory} onClick={onApply}>
               變更
             </Button>
           </div>
@@ -201,17 +184,9 @@ export default function LedgerTable(props: LedgerTableProps) {
   const searchParams = useSearchParams();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [channels, setChannels] = useState(SALES_CHANNELS);
-  const [channelOverrides, setChannelOverrides] = useState<Record<string, string>>({});
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
-  const [projectOverrides, setProjectOverrides] = useState<Record<string, string>>({});
   const [batchCategory, setBatchCategory] = useState('');
-  const [batchProject, setBatchProject] = useState('');
-  const [addChannelRowId, setAddChannelRowId] = useState<string | null>(null);
   const [manualEntryRow, setManualEntryRow] = useState<SalesRow | PurchaseRow | null>(null);
-  const [allowanceRow, setAllowanceRow] = useState<SalesRow | null>(null);
-  const [voidRow, setVoidRow] = useState<SalesRow | null>(null);
-  const [voidedOverrides, setVoidedOverrides] = useState<Record<string, boolean>>({});
   const [exportOpen, setExportOpen] = useState(false);
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
   const toggleCheck = (id: string) => setChecked(c => ({ ...c, [id]: !c[id] }));
@@ -244,21 +219,6 @@ export default function LedgerTable(props: LedgerTableProps) {
     />
   );
 
-  const handleChannelSelect = (rowId: string, value: string) => {
-    if (value === ADD_CHANNEL_OPTION) {
-      setAddChannelRowId(rowId);
-      return;
-    }
-    setChannelOverrides(o => ({ ...o, [rowId]: value }));
-  };
-  const handleChannelCreated = (name: string) => {
-    setChannels(c => [...c, name]);
-    if (addChannelRowId) setChannelOverrides(o => ({ ...o, [addChannelRowId]: name }));
-    setAddChannelRowId(null);
-  };
-  const handleVoidConfirm = (rowId: string) => {
-    setVoidedOverrides(o => ({ ...o, [rowId]: true }));
-  };
   // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
   // 成功後觸發父層重新查詢應收/應付帳款列表
   const handleManualSettle = async (allocation: ReceivableAllocation) => {
@@ -272,30 +232,17 @@ export default function LedgerTable(props: LedgerTableProps) {
   };
 
   const dialogs = (
-    <>
-      <AddChannelDialog open={addChannelRowId !== null} onClose={() => setAddChannelRowId(null)} onSubmit={handleChannelCreated} />
-      <ManualEntryDialog
-        open={manualEntryRow !== null}
-        onClose={() => setManualEntryRow(null)}
-        side={props.side}
-        row={manualEntryRow}
-        onSubmit={handleManualSettle}
-      />
-      <AllowanceDialog open={allowanceRow !== null} onClose={() => setAllowanceRow(null)} row={allowanceRow} />
-      {voidRow && (
-        <VoidConfirmDialog
-          open
-          onClose={() => setVoidRow(null)}
-          onConfirm={() => handleVoidConfirm(voidRow.id)}
-          transactionId={voidRow.id}
-          amount={voidRow.amount}
-        />
-      )}
-    </>
+    <ManualEntryDialog
+      open={manualEntryRow !== null}
+      onClose={() => setManualEntryRow(null)}
+      side={props.side}
+      row={manualEntryRow}
+      onSubmit={handleManualSettle}
+    />
   );
 
   if (props.side === 'sales') {
-    const { subTab, rows, totalCount, totalAmount, sort, onSortToggle } = props;
+    const { subTab, rows, totalCount, totalAmount, sort, onSortToggle, channelNameByUuid } = props;
     const showChannel = subTab === 'received';
     return (
       <>
@@ -363,17 +310,8 @@ export default function LedgerTable(props: LedgerTableProps) {
                   <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
                   <td className={`${tdClass} truncate`} title={row.counterparty}>{row.counterparty}</td>
                   {showChannel && (
-                    <td className={tdClass}>
-                      <Select
-                        widthClassName="w-32"
-                        value={channelOverrides[row.id] ?? row.channel}
-                        onValueChange={v => handleChannelSelect(row.id, v)}
-                      >
-                        {channels.map(c => (
-                          <option key={c}>{c}</option>
-                        ))}
-                        <option>{ADD_CHANNEL_OPTION}</option>
-                      </Select>
+                    <td className={`${tdClass} truncate text-neutral-mid`} title={channelLabel(row, channelNameByUuid)}>
+                      {channelLabel(row, channelNameByUuid)}
                     </td>
                   )}
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
@@ -384,16 +322,30 @@ export default function LedgerTable(props: LedgerTableProps) {
                           手動入帳
                         </Button>
                       )}
-                      {row.voided || voidedOverrides[row.id] ? (
+                      {row.voided ? (
                         <Button size="sm" variant="ghost" disabled icon={CircleX} className="w-[84px]">
                           已作廢
                         </Button>
                       ) : (
-                        <Button size="sm" variant="ghost" icon={CircleX} className="w-[84px]" onClick={() => setVoidRow(row)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={CircleX}
+                          className="w-[84px]"
+                          disabled
+                          title="作廢功能尚未串接後端 API"
+                        >
                           作廢
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" icon={FileMinus} className="w-[104px]" onClick={() => setAllowanceRow(row)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={FileMinus}
+                        className="w-[104px]"
+                        disabled
+                        title="折讓功能尚未串接後端 API"
+                      >
                         {row.allowances.length > 0 ? `折讓 (${row.allowances.length})` : '折讓'}
                       </Button>
                     </div>
@@ -436,10 +388,8 @@ export default function LedgerTable(props: LedgerTableProps) {
   const batchSelectedAmount = fmtCurrency(editableSelected.reduce((sum, r) => sum + r.amount, 0));
   const handleBatchApply = () => {
     const ids = editableSelected.map(r => r.id);
-    if (batchCategory) setCategoryOverrides(o => ({ ...o, ...Object.fromEntries(ids.map(id => [id, batchCategory])) }));
-    if (batchProject) setProjectOverrides(o => ({ ...o, ...Object.fromEntries(ids.map(id => [id, batchProject])) }));
+    setCategoryOverrides(o => ({ ...o, ...Object.fromEntries(ids.map(id => [id, batchCategory])) }));
     setBatchCategory('');
-    setBatchProject('');
   };
   return (
     <>
@@ -524,17 +474,8 @@ export default function LedgerTable(props: LedgerTableProps) {
                       />
                     </div>
                   </td>
-                  <td className={tdClass}>
-                    <Select
-                      widthClassName="w-32"
-                      value={locked ? row.project || '—' : projectOverrides[row.id] ?? row.project}
-                      onValueChange={v => setProjectOverrides(o => ({ ...o, [row.id]: v }))}
-                      disabled={locked}
-                    >
-                      {locked
-                        ? <option>{row.project || '—'}</option>
-                        : PROJECT_NAMES.map(p => <option key={p || 'none'}>{p}</option>)}
-                    </Select>
+                  <td className={`${tdClass} truncate text-neutral-mid`} title={row.project || '—'}>
+                    {row.project || '—'}
                   </td>
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
                   {showAction && (
@@ -577,8 +518,6 @@ export default function LedgerTable(props: LedgerTableProps) {
               selectedAmount={batchSelectedAmount}
               batchCategory={batchCategory}
               onBatchCategoryChange={setBatchCategory}
-              batchProject={batchProject}
-              onBatchProjectChange={setBatchProject}
               onApply={handleBatchApply}
             />
           )}

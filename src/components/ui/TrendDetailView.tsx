@@ -109,7 +109,7 @@ export default function TrendDetailView({ title, subtitle, backHref, series, tab
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1200px] px-4 py-7 nav:px-7">
+      <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <Link href={backHref} className="mb-4 inline-flex items-center gap-1.5 text-sm text-neutral-mid hover:text-brand-blue">
           <ArrowLeft size={15} />
           返回{subtitle}

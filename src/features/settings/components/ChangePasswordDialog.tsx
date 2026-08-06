@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import TextInput from '@/components/ui/TextInput';
 import { useState } from 'react';
@@ -51,7 +52,7 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
     <Modal open onClose={handleClose} title="變更密碼" widthClassName="max-w-[400px]">
       <div className="flex flex-col gap-4">
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">目前密碼</label>
+          <Label required>目前密碼</Label>
           <TextInput
             type="password"
             value={current}
@@ -62,7 +63,7 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">新密碼</label>
+          <Label required>新密碼</Label>
           <TextInput
             type="password"
             value={next}
@@ -73,7 +74,7 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">確認新密碼</label>
+          <Label required>確認新密碼</Label>
           <TextInput
             type="password"
             value={confirm}
