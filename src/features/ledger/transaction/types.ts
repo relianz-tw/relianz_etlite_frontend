@@ -19,6 +19,8 @@ export interface TransactionFormState {
   buyerName: string;
   sellerTaxId: string;
   sellerName: string;
+  /** 選擇既有廠商時帶入其 uuid，供建立進項交易時設定 counterpartyUuid；手動編輯賣家統編/名稱時會清空 */
+  sellerVendorUuid: string;
   channel: string;
   tag: string;
   project: string;

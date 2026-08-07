@@ -13,7 +13,12 @@ import type {
   PayablesFilterResult,
   ReceivablesFilterBody,
   ReceivablesFilterResult,
+  ReverseSettleBody,
   SettlePayableBody,
+  SettlePayablePreviewBody,
+  SettlePayablePreviewResult,
+  SettlePayableSummaryBody,
+  SettlePayableSummaryResult,
   SettleReceivableBody,
   SettleReceivablePreviewBody,
   SettleReceivablePreviewResult,
@@ -85,7 +90,7 @@ export function previewSettleReceivable(body: Omit<SettleReceivablePreviewBody, 
   });
 }
 
-/** 匯總沖帳（銷項）真正執行沖帳：依勾選的原單 uuid 與存入銀行帳戶入帳，非預覽 */
+/** 匯總沖帳（銷項）真正執行沖帳：依預覽結果的原單 uuid 與存入銀行帳戶入帳，非預覽 */
 export function settleReceivableSummary(body: Omit<SettleReceivableSummaryBody, 'companyUuid'>): Promise<SettleReceivableSummaryResult> {
   return apiFetch<SettleReceivableSummaryResult>('/ael/ledger/reconciliation/receivables/settle/summary', {
     method: 'POST',
@@ -93,6 +98,38 @@ export function settleReceivableSummary(body: Omit<SettleReceivableSummaryBody, 
   });
 }
 
+/** 匯總沖帳（進項）預覽拆帳：依 settleAmount 由舊到新試算各原單分配結果，不實際入帳 */
+export function previewSettlePayable(body: Omit<SettlePayablePreviewBody, 'companyUuid'>): Promise<SettlePayablePreviewResult> {
+  return apiFetch<SettlePayablePreviewResult>('/ael/ledger/reconciliation/payables/settle/preview', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 匯總沖帳（進項）真正執行沖帳：依預覽結果的原單 uuid 與付款銀行帳戶入帳，非預覽 */
+export function settlePayableSummary(body: Omit<SettlePayableSummaryBody, 'companyUuid'>): Promise<SettlePayableSummaryResult> {
+  return apiFetch<SettlePayableSummaryResult>('/ael/ledger/reconciliation/payables/settle/summary', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
 export function fetchEntryDetail(params: { ledgerUuid: string }): Promise<EntryDetailResult> {
   return apiFetch<EntryDetailResult>(`/ael/ledger/entries/detail${buildQuery({ companyUuid: COMPANY_UUID, ledgerUuid: params.ledgerUuid })}`);
+}
+
+/** 撤銷手動沖帳紀錄 */
+export function reverseManualSettle(body: Omit<ReverseSettleBody, 'companyUuid'>): Promise<unknown> {
+  return apiFetch<unknown>('/ael/ledger/settle/reverse', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 撤銷匯總沖帳紀錄；後端會一併恢復當初同批沖帳的所有交易 */
+export function reverseSummarySettle(body: Omit<ReverseSettleBody, 'companyUuid'>): Promise<unknown> {
+  return apiFetch<unknown>('/ael/ledger/reconciliation/settle/reverse', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
 }

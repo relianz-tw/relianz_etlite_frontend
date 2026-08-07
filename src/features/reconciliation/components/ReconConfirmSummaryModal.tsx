@@ -3,45 +3,30 @@
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { fmtCurrency } from '@/lib/utils';
+import type { ReconSettleResult, ReconSide } from '../types';
 
 interface ReconConfirmSummaryModalProps {
   open: boolean;
   groupLabel: string;
-  side: 'receivable' | 'payable';
-  matchedCount: number;
-  matchedAmount: number;
-  pool: number;
-  remaining: number;
-  /** 銷項且選到真實管道時，確認送出會實際呼叫後端沖帳 API，需顯示送出中狀態與錯誤訊息 */
+  side: ReconSide;
+  /** 僅在預覽結果完全平衡（settleAmount === totalBeforeRemaining）時才會開啟此彈窗，見 ReconciliationView */
+  result: ReconSettleResult;
   submitting?: boolean;
   submitError?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-/** 確認沖帳前的摘要覆核：送出前讓使用者再次確認勾選內容與金額，避免手滑誤送 */
-export default function ReconConfirmSummaryModal({
-  open,
-  groupLabel,
-  side,
-  matchedCount,
-  matchedAmount,
-  pool,
-  remaining,
-  submitting,
-  submitError,
-  onCancel,
-  onConfirm,
-}: ReconConfirmSummaryModalProps) {
+/** 確認沖帳前的摘要覆核：送出前讓使用者再次確認預覽結果與金額，避免手滑誤送 */
+export default function ReconConfirmSummaryModal({ open, groupLabel, side, result, submitting, submitError, onCancel, onConfirm }: ReconConfirmSummaryModalProps) {
   if (!open) return null;
 
   const rows: { label: string; value: string }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel },
-    { label: '已勾選', value: `${matchedCount} 筆` },
-    { label: '沖銷金額', value: fmtCurrency(matchedAmount) },
-    { label: '可沖銷總額', value: fmtCurrency(pool) },
+    { label: '本次沖帳', value: `${result.affectedCount} 筆` },
+    { label: '沖銷金額', value: fmtCurrency(result.appliedSettleAmount) },
+    { label: '對帳單金額', value: fmtCurrency(result.settleAmount) },
   ];
-  if (remaining > 0) rows.push({ label: '差額', value: fmtCurrency(remaining) });
 
   return (
     <Modal open onClose={onCancel} title="確認沖帳內容" widthClassName="max-w-[420px]">

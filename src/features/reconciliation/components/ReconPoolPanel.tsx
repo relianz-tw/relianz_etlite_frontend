@@ -5,9 +5,11 @@ import AccountSelector from '@/features/bank-accounts/components/AccountSelector
 import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
 import MoneyInput from '@/components/ui/MoneyInput';
 import TextInput from '@/components/ui/TextInput';
+import DatePicker from '@/components/ui/DatePicker';
 import Button from '@/components/ui/Button';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { Plus, Trash2 } from 'lucide-react';
+import type { ReconSide } from '../types';
 
 /** 額外金額單列：對應預覽 API 的 otherDeductions 項目，subject 未選時視為尚未填完整 */
 export interface ReconOtherDeductionRow {
@@ -18,6 +20,7 @@ export interface ReconOtherDeductionRow {
 }
 
 interface ReconPoolPanelProps {
+  side: ReconSide;
   statementAmount: number;
   feeAmount: number;
   onStatementChange: (value: number) => void;
@@ -27,12 +30,15 @@ interface ReconPoolPanelProps {
   onAddOtherDeduction: () => void;
   onRemoveOtherDeduction: (id: string) => void;
   onChangeOtherDeduction: (id: string, patch: Partial<Omit<ReconOtherDeductionRow, 'id'>>) => void;
-  /** 是否顯示「預覽拆帳」動作與存入銀行帳戶選擇；目前僅銷項且選到有明確 paymentChannelUuid 的真實管道時開放 */
+  /** 付款／收款日：匯總沖帳執行 API 必填欄位 */
+  paymentDate: Date | undefined;
+  onPaymentDateChange: (date: Date | undefined) => void;
+  /** 是否顯示「預覽拆帳」動作與銀行帳戶選擇；選到有明確 paymentChannelUuid／counterpartyUuid 的真實管道/廠商時開放 */
   showPreview: boolean;
   previewLoading: boolean;
   previewError: string;
   onPreview: () => void;
-  /** 存入銀行帳戶：確認沖帳時實際執行入帳的目標帳戶（bankAccountUuid） */
+  /** 銀行帳戶：確認沖帳時實際執行入帳／出帳的目標帳戶（bankAccountUuid） */
   accounts: BankAccountDto[];
   accountsLoading: boolean;
   accountsError: string;
@@ -41,11 +47,12 @@ interface ReconPoolPanelProps {
 }
 
 /**
- * 對帳單金額為本次「總金額」；手續費與額外金額皆為從中扣除的減項，扣完後即為實際存入金額
- * （對應預覽 API 的 depositAmount）。銷項可在此直接呼叫「預覽拆帳」，結果會回填至下方逐筆勾選清單，
- * 故合併在同一卡片內，動作與其依據的金額輸入相鄰。
+ * 對帳單金額為本次「總金額」；手續費與額外金額皆為從中扣除的減項，扣完後即為實際存入/付出金額
+ * （對應預覽 API 的 depositAmount／paymentAmount）。銷項/進項皆可在此直接呼叫「預覽拆帳」，
+ * 結果會回填至下方交易清單顯示，故合併在同一卡片內，動作與其依據的金額輸入相鄰。
  */
 export default function ReconPoolPanel({
+  side,
   statementAmount,
   feeAmount,
   onStatementChange,
@@ -54,6 +61,8 @@ export default function ReconPoolPanel({
   onAddOtherDeduction,
   onRemoveOtherDeduction,
   onChangeOtherDeduction,
+  paymentDate,
+  onPaymentDateChange,
   showPreview,
   previewLoading,
   previewError,
@@ -67,6 +76,8 @@ export default function ReconPoolPanel({
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = statementAmount - feeAmount - otherDeductionsTotal;
   const isDepositNegative = depositAmount < 0;
+  const accountLabel = side === 'payable' ? '付款銀行帳戶' : '存入銀行帳戶';
+  const dateLabel = side === 'payable' ? '付款日' : '收款日';
 
   return (
     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
@@ -118,7 +129,7 @@ export default function ReconPoolPanel({
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">
-        <span className="font-semibold text-neutral-dark">實際存入金額</span>
+        <span className="font-semibold text-neutral-dark">{side === 'payable' ? '實際付出金額' : '實際存入金額'}</span>
         <span className={cn('font-mono text-base font-semibold tabular-nums', isDepositNegative ? 'text-semantic-error' : 'text-neutral-dark')}>
           {fmtCurrency(depositAmount)}
         </span>
@@ -126,9 +137,16 @@ export default function ReconPoolPanel({
       {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">手續費與額外金額總和不可超過對帳單金額</p>}
 
       {showPreview && (
-        <div className="mt-4 border-t border-neutral-blue-gray/20 pt-3">
+        <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-neutral-dark">存入銀行帳戶</span>
+            <span className="text-sm text-neutral-dark">{dateLabel}</span>
+            <div className="w-40">
+              <DatePicker value={paymentDate} onChange={onPaymentDateChange} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-neutral-dark">{accountLabel}</span>
             {accountsLoading ? (
               <p className="text-xs text-neutral-mid">載入中…</p>
             ) : accountsError ? (
@@ -136,13 +154,13 @@ export default function ReconPoolPanel({
             ) : accounts.length === 0 ? (
               <p className="text-xs text-semantic-error">尚無啟用中的銀行帳戶，請先於設定新增銀行帳戶</p>
             ) : (
-              <div className="w-56">
+              <div className="w-80">
                 <AccountSelector accounts={accounts} value={bankAccountUuid} onChange={onBankAccountChange} />
               </div>
             )}
           </div>
 
-          <div className="mt-4 flex flex-col items-end">
+          <div className="flex flex-col items-end">
             <Button variant="primary" onClick={onPreview} disabled={previewLoading || statementAmount <= 0}>
               {previewLoading ? '預覽拆帳中…' : '預覽拆帳'}
             </Button>

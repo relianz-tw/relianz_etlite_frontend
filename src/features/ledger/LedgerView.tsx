@@ -86,7 +86,7 @@ export default function LedgerView() {
   const [rows, setRows] = useState<(SalesRow | PurchaseRow)[]>([]);
   const [total, setTotal] = useState(0);
   // 頂部 KPI 卡片數字：來自 filter API 回傳的彙總欄位（issuedVoucherAmount 等），非前端計算；
-  // 載入完成前維持 null，SummaryCards 顯示 0 佔位，避免顯示上一次查詢殘留的數字
+  // 每次查詢（含重新查詢）進行中維持 null，SummaryCards 顯示 0 佔位，避免顯示上一次查詢殘留的數字
   const [totals, setTotals] = useState<LedgerTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -120,6 +120,9 @@ export default function LedgerView() {
     let cancelled = false;
     setLoading(true);
     setError('');
+    // 每次重新查詢（含手動沖帳後的 reloadKey）都清空舊的統計數字，避免卡片在新結果回來前
+    // 短暫顯示上一次查詢的殘留金額，誤導使用者以為沖帳沒有生效
+    setTotals(null);
     const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced);
 
     const request =

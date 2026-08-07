@@ -2,7 +2,8 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { createChannelRule, listChannelRules } from '@/api/channelRules';
-import type { BankAccountDto, ChannelRuleDto } from '@/api/types';
+import { createVendor, listVendors } from '@/api/vendors';
+import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
@@ -11,7 +12,8 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
-import type { BankAccountRecord, ChannelRuleRecord } from '@/features/settings/data';
+import VendorDialog from '@/features/settings/components/VendorDialog';
+import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
 import { CirclePlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -86,6 +88,9 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   const [newChannelOpen, setNewChannelOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>([]);
   const [bankAccountsLoaded, setBankAccountsLoaded] = useState(false);
+  const [vendors, setVendors] = useState<VendorDto[]>([]);
+  const [vendorError, setVendorError] = useState('');
+  const [newVendorOpen, setNewVendorOpen] = useState(false);
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
   useEffect(() => {
@@ -93,6 +98,14 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     listChannelRules()
       .then(list => setChannelRules(list.filter(c => c.isActive)))
       .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
+  }, [side]);
+
+  // 廠商改為串接真實廠商名單（與設定頁「廠商管理」同一份 API），取代純文字輸入；僅進項新增需要，只載入一次
+  useEffect(() => {
+    if (side !== 'purchase') return;
+    listVendors()
+      .then(list => setVendors(list.filter(v => v.isActive)))
+      .catch(err => setVendorError(err instanceof Error ? err.message : '操作失敗'));
   }, [side]);
 
   // 開啟「新增管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
@@ -113,6 +126,23 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     onChange({ channel: created.uuid });
   };
 
+  // 新增廠商成功後直接加入清單並選取，沿用設定頁 VendorDialog／createVendor 的表單與驗證邏輯
+  const handleCreateVendor = async (vendor: Omit<VendorRecord, 'id'>) => {
+    const created = await createVendor({
+      taxId: vendor.taxId,
+      name: vendor.name,
+      registeredAddress: vendor.address,
+      bankAccountName: vendor.bankAccountName,
+      bankCode: vendor.bankCode,
+      bankName: vendor.bankName,
+      branchName: vendor.bankBranch,
+      accountNo: vendor.bankAccountNumber,
+      remark: vendor.remark,
+    });
+    setVendors(list => [...list, created]);
+    onChange({ sellerVendorUuid: created.uuid, sellerName: created.name, sellerTaxId: created.taxId });
+  };
+
   // 送出前驗證（validateForm）僅在新增（create）模式生效，故必填星號只在新增模式顯示
   const isCreate = mode === 'create';
 
@@ -124,13 +154,51 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   const sellerTaxIdField = (
     <Field label="賣家統一編號">
-      <TextInput placeholder="請輸入賣家統一編號" value={form.sellerTaxId} onChange={e => onChange({ sellerTaxId: e.target.value })} />
+      {/* 手動編輯統編視為與下方「廠商」選擇的既有廠商脫鉤，清空 sellerVendorUuid 避免誤送舊廠商 uuid */}
+      <TextInput
+        placeholder="請輸入賣家統一編號"
+        value={form.sellerTaxId}
+        onChange={e => onChange({ sellerTaxId: e.target.value, sellerVendorUuid: '' })}
+      />
     </Field>
   );
 
   const sellerNameField = (
     <Field label="賣家名稱" required={isCreate}>
-      <TextInput placeholder="請輸入賣家名稱" value={form.sellerName} onChange={e => onChange({ sellerName: e.target.value })} />
+      <TextInput
+        placeholder="請輸入賣家名稱"
+        value={form.sellerName}
+        onChange={e => onChange({ sellerName: e.target.value, sellerVendorUuid: '' })}
+      />
+    </Field>
+  );
+
+  // 廠商選單串接真實廠商名單（與設定頁「廠商管理」同一份 API），選擇後自動帶入統編／名稱與 uuid，
+  // 供建立進項交易時設定 counterpartyUuid，讓帳簿「匯總沖帳」頁能依廠商正確分組；
+  // 找不到對應廠商時仍可維持「不指定」，直接於下方統編/名稱欄位手動輸入（視為個人賣家，不關聯廠商）
+  const sellerVendorField = (
+    <Field label="廠商" helper="選擇既有廠商可自動帶入統編與名稱；找不到對應廠商時可於下方欄位直接手動輸入">
+      <div className="flex items-center gap-2">
+        <Select
+          widthClassName="w-full"
+          value={form.sellerVendorUuid}
+          onValueChange={v => {
+            const vendor = vendors.find(x => x.uuid === v);
+            onChange({ sellerVendorUuid: v, ...(vendor ? { sellerName: vendor.name, sellerTaxId: vendor.taxId } : {}) });
+          }}
+        >
+          <option value="">不指定（手動輸入）</option>
+          {vendors.map(v => (
+            <option key={v.uuid} value={v.uuid}>
+              {v.name}
+            </option>
+          ))}
+        </Select>
+        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewVendorOpen(true)}>
+          新增
+        </Button>
+      </div>
+      {vendorError && <p className="mt-1 text-xs text-semantic-error">{vendorError}</p>}
     </Field>
   );
 
@@ -309,6 +377,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
         ),
       ],
       [issueDateField],
+      [sellerVendorField],
       [sellerTaxIdField, sellerNameField],
       [tagField, projectField],
       [deductibleField],
@@ -346,6 +415,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <ChannelRuleDialog open={newChannelOpen} onClose={() => setNewChannelOpen(false)} onSubmit={handleCreateChannel} accounts={bankAccounts} />
+      <VendorDialog open={newVendorOpen} onClose={() => setNewVendorOpen(false)} onSubmit={handleCreateVendor} />
       <h2 className="mb-5 text-base font-semibold text-neutral-dark">交易資訊</h2>
       <div className="flex flex-col gap-4">
         {mode === 'edit' && (

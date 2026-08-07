@@ -1,5 +1,7 @@
 'use client';
 
+import type { SettleLedgerAllocation } from '@/api/types';
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import { cn, fmtCurrency } from '@/lib/utils';
@@ -13,22 +15,26 @@ interface ReconTxnListProps {
   /** 一般群組僅一個 section（label 不顯示）；「其他」群組會拆成多個依原始 groupUuid 分組的 section */
   sections: ReconSubGroup[];
   showSectionHeaders: boolean;
-  /** 「全部管道」為唯讀總覽，不提供沖帳勾選 */
-  selectable: boolean;
-  checkedIds: Set<string>;
-  disabledIds: Set<string>;
-  onToggle: (uuid: string) => void;
+  /** 「全部管道」為唯讀總覽，不顯示沖帳狀態欄；一般群組（含「其他」）才顯示狀態圓圈 */
+  showStatusColumn: boolean;
   emptyMessage: string;
-  pool: number;
-  remaining: number;
   /** 含停用/未知管道的完整名稱反查表，供顯示該筆交易目前所屬管道／廠商名稱 */
   channelNameByUuid: Map<string, string>;
   /** 目前展開中的交易 uuid，一次僅展開一列；null 代表全部收合 */
   expandedUuid: string | null;
   onToggleExpand: (uuid: string) => void;
+  /** 已有預覽拆帳結果時，依 ledgerUuid 對應到該筆的拆帳狀態；純顯示用途，不可編輯 */
+  allocationByUuid: Map<string, SettleLedgerAllocation>;
 }
 
 const HEADER_CLASS = 'text-xs font-semibold text-neutral-mid';
+
+/** settlementStatus：0平衡 1超沖 2少沖 */
+const SETTLEMENT_STATUS_BADGE: Record<number, { label: string; tone: 'success' | 'error' | 'info' }> = {
+  0: { label: '平衡', tone: 'success' },
+  1: { label: '超沖', tone: 'error' },
+  2: { label: '少沖', tone: 'info' },
+};
 
 function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>): string {
   if (!row.channelUuid) return '未分類';
@@ -52,14 +58,16 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** 沖帳狀態圓圈：已結清為綠色實心勾（沿用 Checkbox 圓形樣式，唯讀不可點擊）；尚無預覽結果或未分配時為空心圓 */
+function StatusCircle({ allocation }: { allocation?: SettleLedgerAllocation }) {
+  return <Checkbox checked={!!allocation?.closed} disabled shape="circle" onChange={() => {}} aria-label="沖帳狀態（僅供檢視）" />;
+}
+
 function TxnRow({
   row,
   side,
-  selectable,
-  checked,
-  disabled,
-  overage,
-  onToggle,
+  showStatusColumn,
+  allocation,
   channelNameByUuid,
   expanded,
   onToggleExpand,
@@ -67,28 +75,31 @@ function TxnRow({
 }: {
   row: ReconTxnRef;
   side: ReconSide;
-  selectable: boolean;
-  checked: boolean;
-  disabled: boolean;
-  overage: number;
-  onToggle: () => void;
+  showStatusColumn: boolean;
+  allocation?: SettleLedgerAllocation;
   channelNameByUuid: Map<string, string>;
   expanded: boolean;
   onToggleExpand: () => void;
   onViewDetail: () => void;
 }) {
   const secondaryText = side === 'payable' ? row.summary || '—' : row.counterparty || '—';
-  const overageMessage = disabled && overage > 0 ? `超出剩餘 ${fmtCurrency(overage)}` : null;
+  // 已有預覽結果、該筆尚未結清（少沖／超沖仍有殘餘）時，於金額旁標示狀態徽章，讓使用者一眼看出差異落在哪一筆
+  const statusBadge = allocation && !allocation.closed ? (SETTLEMENT_STATUS_BADGE[allocation.settlementStatus] ?? null) : null;
   const chevronClass = cn('shrink-0 text-neutral-blue-gray transition-transform', expanded && 'rotate-180');
 
   return (
-    <div className={cn(disabled ? 'opacity-50' : '')}>
-      {/* 行動版：卡片式版面，主體可點擊展開大約資訊；勾選為獨立控件，點擊時不觸發展開 */}
+    <div>
+      {/* 行動版：卡片式版面，主體可點擊展開大約資訊；沖帳狀態圓圈為獨立唯讀控件 */}
       <div className="flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-4 nav:hidden">
         <button type="button" onClick={onToggleExpand} className="flex flex-col gap-1.5 text-left">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-xs text-neutral-mid">{row.date}</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {statusBadge && (
+                <Badge tone={statusBadge.tone} variant="muted">
+                  {statusBadge.label}
+                </Badge>
+              )}
               <span className="font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
               <ChevronDown size={16} className={chevronClass} />
             </div>
@@ -97,15 +108,17 @@ function TxnRow({
           <span className="font-mono text-xs text-neutral-mid">憑證 {row.voucherNumber || '—'}</span>
           <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>
-        <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-          {selectable && <Checkbox checked={checked} disabled={disabled} onChange={onToggle} aria-label={`沖帳 ${row.orderCode}`} />}
-        </div>
-        {overageMessage && <p className="text-xs text-semantic-error">{overageMessage}</p>}
+        {showStatusColumn && (
+          <div className="flex items-center gap-2">
+            <StatusCircle allocation={allocation} />
+            <span className="text-xs text-neutral-mid">{allocation ? (allocation.closed ? '本次已結清' : '本次沖帳後仍有餘額') : '尚未預覽'}</span>
+          </div>
+        )}
       </div>
 
       {/* 桌機：欄位化列 */}
       <div className="hidden items-center gap-3 rounded-md px-3 py-2 text-sm nav:flex hover:bg-surface-cream">
-        {selectable ? <Checkbox checked={checked} disabled={disabled} onChange={onToggle} aria-label={`沖帳 ${row.orderCode}`} /> : <span className="w-5 shrink-0" />}
+        {showStatusColumn ? <StatusCircle allocation={allocation} /> : <span className="w-5 shrink-0" />}
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date}</span>
           <span className="min-w-0 flex-1 truncate text-neutral-dark" title={secondaryText}>
@@ -116,10 +129,14 @@ function TxnRow({
           <span className="w-32 shrink-0 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
             {channelLabel(row, channelNameByUuid)}
           </span>
+          {statusBadge && (
+            <Badge tone={statusBadge.tone} variant="muted">
+              {statusBadge.label}
+            </Badge>
+          )}
         </button>
         <ChevronDown size={16} className={chevronClass} />
       </div>
-      {overageMessage && <p className="hidden px-3 text-xs text-semantic-error nav:block">{overageMessage}</p>}
 
       {/* 展開面板：顯示大約資訊 + 查看詳細按鈕，桌機/行動版共用同一份 markup，靠 Tailwind 響應式 class 調整按鈕寬度 */}
       {expanded && (
@@ -131,6 +148,12 @@ function TxnRow({
             <InfoRow label="憑證號碼" value={row.voucherNumber || '—'} />
             <InfoRow label="交易金額" value={fmtCurrency(row.amount)} />
             <InfoRow label="銷售管道" value={channelLabel(row, channelNameByUuid)} />
+            {allocation && (
+              <>
+                <InfoRow label="本次沖帳額" value={fmtCurrency(allocation.settleAmount)} />
+                <InfoRow label="沖後剩餘" value={fmtCurrency(allocation.afterRemaining)} />
+              </>
+            )}
           </div>
           <div className="flex nav:justify-end">
             <Button variant="outline" size="sm" icon={FileSearch} onClick={onViewDetail} className="w-full nav:w-auto">
@@ -144,29 +167,24 @@ function TxnRow({
 }
 
 /**
- * 選定群組下的交易清單：一般群組可逐筆勾選要沖帳的交易（selectable=true）；
- * 「全部管道」為唯讀總覽（selectable=false），僅供瀏覽、看明細。
- * 未勾選且金額超過目前剩餘可沖銷金額（remaining）的交易會被停用；停用原因以 inline 提示標示在該筆交易下方，
- * 而非集中於清單底部的單一錯誤訊息（避免使用者第一眼就看到誤報的錯誤）。
+ * 選定群組下的交易清單：純檢視用途，不提供勾選編輯——沖帳對象與拆帳結果一律由後端預覽 API
+ * （settle/preview）決定，前端僅將結果（allocationByUuid）疊加回本地清單顯示，不再由使用者手動勾選調整。
+ * 「全部管道」為唯讀總覽（showStatusColumn=false），不顯示沖帳狀態圓圈。
  * 「其他」群組會拆成多個 section（依原始 groupUuid），每個 section 附標題。
  * 每一列固定顯示所屬「銷售管道」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
- * 展開區的「查看詳細」按鈕導向獨立的交易明細頁（串接憑證 API，含照片），而非帳簿的交易編輯頁。
+ * 展開區另顯示已預覽的本次沖帳額／沖後剩餘，「查看詳細」按鈕導向獨立的交易明細頁（含憑證照片）。
  * 行動版（<1000px）改為卡片式版面，展開行為與桌機一致，避免欄位化列在窄螢幕擠成一行難以操作。
  */
 export default function ReconTxnList({
   side,
   sections,
   showSectionHeaders,
-  selectable,
-  checkedIds,
-  disabledIds,
-  onToggle,
+  showStatusColumn,
   emptyMessage,
-  pool,
-  remaining,
   channelNameByUuid,
   expandedUuid,
   onToggleExpand,
+  allocationByUuid,
 }: ReconTxnListProps) {
   const router = useRouter();
   const totalRows = sections.reduce((sum, s) => sum + s.rows.length, 0);
@@ -193,26 +211,19 @@ export default function ReconTxnList({
               {section.label}（{section.rows.length}）
             </p>
           )}
-          {section.rows.map(row => {
-            const checked = checkedIds.has(row.uuid);
-            const disabled = selectable && !checked && disabledIds.has(row.uuid);
-            return (
-              <TxnRow
-                key={row.uuid}
-                row={row}
-                side={side}
-                selectable={selectable}
-                checked={checked}
-                disabled={disabled}
-                overage={pool > 0 ? row.amount - remaining : 0}
-                onToggle={() => onToggle(row.uuid)}
-                channelNameByUuid={channelNameByUuid}
-                expanded={expandedUuid === row.uuid}
-                onToggleExpand={() => onToggleExpand(row.uuid)}
-                onViewDetail={() => router.push(buildDetailHref(row, side))}
-              />
-            );
-          })}
+          {section.rows.map(row => (
+            <TxnRow
+              key={row.uuid}
+              row={row}
+              side={side}
+              showStatusColumn={showStatusColumn}
+              allocation={allocationByUuid.get(row.uuid)}
+              channelNameByUuid={channelNameByUuid}
+              expanded={expandedUuid === row.uuid}
+              onToggleExpand={() => onToggleExpand(row.uuid)}
+              onViewDetail={() => router.push(buildDetailHref(row, side))}
+            />
+          ))}
         </div>
       ))}
     </div>

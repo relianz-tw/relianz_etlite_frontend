@@ -1,14 +1,16 @@
 'use client';
 
-import type { SettleReceivableSummaryResult } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { fmtCurrency } from '@/lib/utils';
+import type { ReconSettleResult, ReconSide } from '../types';
 
 interface ReconSettleResultModalProps {
   open: boolean;
-  result: SettleReceivableSummaryResult | null;
+  side: ReconSide;
+  groupLabel: string;
+  result: ReconSettleResult | null;
   onClose: () => void;
 }
 
@@ -24,17 +26,20 @@ const SETTLEMENT_STATUS_BADGE: Record<number, { label: string; tone: BadgeTone }
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
-/** 沖帳執行結果：呼叫 settle/summary 成功後，顯示本次實際入帳的摘要與各原單明細 */
-export default function ReconSettleResultModal({ open, result, onClose }: ReconSettleResultModalProps) {
+/** 沖帳執行結果：呼叫 settle/summary 成功後，顯示本次實際入帳的摘要（含沖前/沖後餘額）與各原單明細 */
+export default function ReconSettleResultModal({ open, side, groupLabel, result, onClose }: ReconSettleResultModalProps) {
   if (!open || !result) return null;
 
   const summaryRows: { label: string; value: string }[] = [
+    { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel },
     { label: '沖帳總額', value: fmtCurrency(result.settleAmount) },
     { label: '有沖帳筆數', value: `${result.affectedCount} 筆` },
-    { label: '沖前剩餘合計', value: fmtCurrency(result.totalBeforeRemaining) },
-    { label: '付款日', value: result.paymentDate },
-    { label: '結算單號', value: result.settlementOrderCode },
-  ];
+    { label: '沖前餘額', value: fmtCurrency(result.balanceBefore) },
+    { label: '沖後餘額', value: fmtCurrency(result.balanceAfter) },
+    { label: '差額處理方式', value: result.isBalance ? '記入餘額' : '沖入最後一筆' },
+    { label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '', value: result.paymentDate ?? '' },
+    { label: '結算單號', value: result.settlementOrderCode ?? '—' },
+  ].filter(row => row.label);
 
   return (
     <Modal open onClose={onClose} title="沖帳結果" widthClassName="max-w-[840px]">
@@ -47,7 +52,40 @@ export default function ReconSettleResultModal({ open, result, onClose }: ReconS
         ))}
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-md border border-neutral-blue-gray/30">
+      {/* 行動版：卡片式列表，避免窄螢幕橫向滑動表格導致狀態欄被切到看不見 */}
+      <div className="mt-4 flex flex-col gap-2 nav:hidden">
+        {result.allocations.map(a => {
+          const badge = SETTLEMENT_STATUS_BADGE[a.settlementStatus] ?? { label: '未知狀態', tone: 'neutral' as const };
+          return (
+            <div key={a.ledgerUuid} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-neutral-dark">{a.orderCode}</span>
+                <Badge tone={badge.tone} variant="muted">
+                  {badge.label}
+                </Badge>
+              </div>
+              <span className="font-mono text-xs text-neutral-mid">{a.transactionDate ?? '—'}</span>
+              <div className="mt-2 flex flex-col gap-1 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-neutral-mid">沖前剩餘</span>
+                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(a.beforeRemaining)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-neutral-mid">本次沖帳</span>
+                  <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(a.settleAmount)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-neutral-mid">沖後剩餘</span>
+                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(a.afterRemaining)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 桌機：欄位化表格 */}
+      <div className="mt-4 hidden overflow-x-auto rounded-md border border-neutral-blue-gray/30 nav:block">
         <table className="w-full min-w-[720px] border-collapse">
           <thead className="bg-surface-off-white">
             <tr className="border-b border-neutral-blue-gray/40">
@@ -57,7 +95,6 @@ export default function ReconSettleResultModal({ open, result, onClose }: ReconS
               <th className={`${thClass} text-right`}>本次沖帳</th>
               <th className={`${thClass} text-right`}>沖後剩餘</th>
               <th className={thClass}>狀態</th>
-              <th className={thClass}>結算單號</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +112,6 @@ export default function ReconSettleResultModal({ open, result, onClose }: ReconS
                       {badge.label}
                     </Badge>
                   </td>
-                  <td className={`${tdClass} font-mono`}>{a.settlementOrderCode ?? '—'}</td>
                 </tr>
               );
             })}

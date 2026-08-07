@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FocusEvent } from 'react';
 
 interface MoneyInputProps {
   value: number;
@@ -16,6 +16,12 @@ export default function MoneyInput({ value, onChange, widthClassName = 'w-full',
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, '');
     onChange?.(digits === '' ? 0 : Number(digits));
+  };
+
+  // 游標點入時全選現有數字（含預設值 0），避免點擊後直接輸入時遊標落在字元前方，
+  // 導致新輸入的數字插入在既有數字之前而非取代（例如顯示 0 時輸入 800 變成 8000）
+  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
+    e.target.select();
   };
 
   return (
@@ -36,6 +42,7 @@ export default function MoneyInput({ value, onChange, widthClassName = 'w-full',
         readOnly={readOnly}
         value={value.toLocaleString('en-US')}
         onChange={handleChange}
+        onFocus={handleFocus}
         className="w-full min-w-0 bg-transparent text-right text-sm text-neutral-dark outline-none disabled:text-neutral-mid"
       />
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { listBankAccounts } from '@/api/bankAccounts';
-import type { BankAccountDto, ReceivableAllocation } from '@/api/types';
+import type { BankAccountDto, ManualSettleAllocation } from '@/api/types';
 import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
 import Label from '@/components/ui/Label';
@@ -18,7 +18,7 @@ interface ManualEntryDialogProps {
   side: Side;
   row: SalesRow | PurchaseRow | null;
   /** 呼叫端負責實際送出 API；失敗時 throw Error，對話框會攔截並顯示錯誤訊息、不關閉 */
-  onSubmit: (allocation: ReceivableAllocation) => Promise<void>;
+  onSubmit: (allocation: ManualSettleAllocation) => Promise<void>;
 }
 
 /** 帳簿列的民國年日期字串（如 "115/03/26"）→ JS Date */
@@ -42,7 +42,7 @@ function ManualEntryDialogContent({
   side: Side;
   row: SalesRow | PurchaseRow;
   onClose: () => void;
-  onSubmit: (allocation: ReceivableAllocation) => Promise<void>;
+  onSubmit: (allocation: ManualSettleAllocation) => Promise<void>;
 }) {
   const isSales = side === 'sales';
   const scheduledDate = parseRowDate(row.date);
@@ -105,12 +105,12 @@ function ManualEntryDialogContent({
     setError('');
     try {
       await onSubmit({
+        ledgerUuid: row.uuid,
         amount,
         bankAccountUuid,
-        depositAmount,
+        actualAmount: depositAmount,
         feeAmount: isSales ? fee : 0,
         paymentDate,
-        receivableLedgerUuid: row.uuid,
       });
       onClose();
     } catch (err) {

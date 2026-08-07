@@ -18,6 +18,8 @@ export interface VendorDto {
   remark: string;
   createdAt: string;
   updatedAt: string;
+  /** 廠商當前餘額（進項匯總沖帳超沖/少沖記餘額時異動）；後端 GET 回應偶見字串格式，讀取時一律 Number() 正規化 */
+  balance: number;
 }
 
 export type CreateVendorBody = Pick<
@@ -39,6 +41,7 @@ export type UpdateVendorBody = Pick<
   | 'accountNo'
   | 'remark'
   | 'isActive'
+  | 'balance'
 >;
 
 export interface VendorExistsResult {
@@ -190,6 +193,8 @@ export interface ChannelRuleDto {
   remark: string;
   createdAt: string;
   updatedAt: string;
+  /** 銷售管道當前餘額（銷項匯總沖帳超沖/少沖記餘額時異動）；後端回應偶見字串格式，讀取時一律 Number() 正規化 */
+  balance: number;
 }
 
 export type CreateChannelRuleBody = Pick<
@@ -197,7 +202,7 @@ export type CreateChannelRuleBody = Pick<
   'companyUuid' | 'channelName' | 'settlementStyle' | 'settlementAmount' | 'receivingAccountUuid' | 'isActive' | 'remark'
 >;
 
-export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'uuid'>;
+export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'uuid' | 'balance'>;
 
 /**
  * 建立進項應付交易紀錄（POST /ael/ledger/payables）body。
@@ -436,54 +441,81 @@ export interface ReceivablesFilterResult {
   receivableAmount: number;
 }
 
-/** 應收帳款手動入帳沖帳物件 */
-export interface ReceivableAllocation {
-  /** 金額 */
+/**
+ * 單筆手動入帳表單值：呼叫端（LedgerTable／LedgerCards）依 side 組成
+ * SettleReceivableBody／SettlePayableBody 送出，兩者欄位命名不同（見下方）。
+ */
+export interface ManualSettleAllocation {
+  /** 應收/應付帳款 uuid */
+  ledgerUuid: string;
+  /** 沖帳金額 */
   amount: number;
   /** 銀行帳戶 uuid */
   bankAccountUuid: string;
-  /** 實際存入金額 */
-  depositAmount: number;
+  /** 銷項為實際存入金額；進項為實際付款金額 */
+  actualAmount: number;
   /** 手續費 */
   feeAmount: number;
   /** YYYYMMDD */
   paymentDate: string;
-  /** 應收帳款 uuid */
-  receivableLedgerUuid: string;
-}
-
-/** 應收帳款手動入帳（POST /ael/ledger/receivables/settle）body */
-export interface SettleReceivableBody {
-  /** 沖帳物件 */
-  allocations: ReceivableAllocation[];
-  companyUuid: string;
-  /** 備註 */
-  memo: string;
 }
 
 /**
- * 應付帳款手動入帳（POST /ael/ledger/payables/settle）body。
- * 後端沖帳物件與應收帳款共用同一 Allocation 結構（含欄位名稱 receivableLedgerUuid），
- * 呼叫端傳入應付帳款 uuid 即可，非命名錯誤。
+ * 應收帳款手動入帳（POST /ael/ledger/receivables/settle）body。
+ * ledgerUuid／allocations 實測與 api.md 文件不符：uuid 欄位實際固定叫 ledgerUuid
+ * （非 receivableLedgerUuid／payableLedgerUuid），allocations 實際須為陣列（非單一物件）。
  */
-export interface SettlePayableBody {
-  /** 沖帳物件 */
-  allocations: ReceivableAllocation[];
+export interface SettleReceivableBody {
   companyUuid: string;
+  /** 應收帳款 uuid */
+  ledgerUuid: string;
+  /** 交易收款日，YYYYMMDD */
+  paymentDate: string;
+  /** 銀行帳戶 uuid */
+  bankAccountUuid: string;
+  /** 沖帳金額 */
+  settleAmount: number;
+  /** 實際存入 */
+  depositAmount: number;
   /** 備註 */
   memo: string;
+  /** 沖帳手續費物件 */
+  allocations: SettleSummaryFee[];
+  /** 沖帳其他減項物件 */
+  otherDeductions?: SettleSummaryOtherDeduction[];
 }
 
-/** 匯總沖帳預覽請求中的手續費物件（單一物件，非陣列） */
-export interface SettleReceivablePreviewFee {
+/** 應付帳款手動入帳（POST /ael/ledger/payables/settle）body。同上，ledgerUuid／allocations 見備註。 */
+export interface SettlePayableBody {
+  companyUuid: string;
+  /** 應付帳款 uuid */
+  ledgerUuid: string;
+  /** 交易付款日，YYYYMMDD */
+  paymentDate: string;
+  /** 銀行帳戶 uuid */
+  bankAccountUuid: string;
+  /** 沖帳金額 */
+  settleAmount: number;
+  /** 實際付款 */
+  paymentAmount: number;
+  /** 備註 */
+  memo: string;
+  /** 沖帳手續費物件 */
+  allocations: SettleSummaryFee[];
+  /** 沖帳其他減項物件 */
+  otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/** 匯總沖帳手續費物件（單一物件，非陣列），銷項／進項共用同一結構 */
+export interface SettleSummaryFee {
   /** 沖帳項目名稱，目前固定帶入「手續費」 */
   name: string;
   /** 手續費 */
   feeAmount: number;
 }
 
-/** 匯總沖帳預覽的額外扣款項（可無限新增） */
-export interface SettleReceivableOtherDeduction {
+/** 匯總沖帳的額外扣款項（可無限新增），銷項／進項共用同一結構 */
+export interface SettleSummaryOtherDeduction {
   /** 沖帳項目名稱 */
   name: string;
   /** 沖帳金額 */
@@ -492,23 +524,8 @@ export interface SettleReceivableOtherDeduction {
   officialAccountingSubjectId: number;
 }
 
-/** POST /ael/ledger/reconciliation/receivables/settle/preview body */
-export interface SettleReceivablePreviewBody {
-  /** 沖帳手續費物件 */
-  allocations: SettleReceivablePreviewFee;
-  companyUuid: string;
-  /** 銷項實際存入 */
-  depositAmount: number;
-  /** 使用者未新增任何額外金額時不傳此參數 */
-  otherDeductions?: SettleReceivableOtherDeduction[];
-  /** 銷售管道 uuid */
-  paymentChannelUuid: string;
-  /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
-  settleAmount: number;
-}
-
 /** 匯總沖帳預覽回應中，請求手續費物件的回填（後端附加欄位，實測皆為空字串，用途未知） */
-export interface SettleReceivablePreviewFeeEcho {
+export interface SettlePreviewFeeEcho {
   feeAmount: number;
   name: string;
   settlementLedgerUuid: string;
@@ -516,8 +533,11 @@ export interface SettleReceivablePreviewFeeEcho {
   relationUuid: string;
 }
 
-/** 匯總沖帳預覽回應中，單張原單的拆帳結果 */
-export interface SettleReceivablePreviewLedgerAllocation {
+/**
+ * 匯總沖帳預覽／執行回應中，單張原單的拆帳結果，銷項／進項共用同一結構。
+ * settlementLedgerUuid／settlementOrderCode／relationUuid 僅執行結果（summary，alloc>0 時）才有。
+ */
+export interface SettleLedgerAllocation {
   /** 原單 uuid */
   ledgerUuid: string;
   /** 原單交易編號 */
@@ -528,99 +548,189 @@ export interface SettleReceivablePreviewLedgerAllocation {
   beforeRemaining: number;
   /** 本次分配沖帳額（元） */
   settleAmount: number;
-  paymentAmount: number;
-  feeAmount: number;
-  deductionAmount: number;
+  paymentAmount?: number;
+  feeAmount?: number;
+  deductionAmount?: number;
   /** 沖後剩餘（元，可負＝超沖） */
   afterRemaining: number;
   /** 沖後狀態：0平衡 1超沖 2少沖 */
   settlementStatus: number;
-  /** 本次沖後是否結清（after<=0 且有沖） */
+  /** 本次沖後是否結清（after<=0 且有沖）；isBalance=false 時超沖少沖差額會強制沖入最後一筆並標記結清 */
   closed: boolean;
-}
-
-/**
- * POST /ael/ledger/reconciliation/receivables/settle/preview 回應。
- * 實測回應中 allocations 並非陣列，而是請求手續費物件的回填；各原單拆帳結果在 ledgerAllocations。
- */
-export interface SettleReceivablePreviewResult {
-  /** 實際有分配金額（alloc>0）的原單筆數 */
-  affectedCount: number;
-  allocations: SettleReceivablePreviewFeeEcho;
-  /** 各原單拆帳結果 */
-  ledgerAllocations: SettleReceivablePreviewLedgerAllocation[];
-  /** 請求 otherDeductions 的回填；目前前端未消費此欄位，結構未知，故不進一步型別化 */
-  otherDeductions: unknown[];
-  /** 應收匯總才有；應付 preview 通常不出現 */
-  paymentChannelUuid?: string;
-  /** 應付匯總：廠商 uuid；銷項不會出現 */
-  counterpartyUuid?: string;
-  /** 本次匯總沖帳總額（元） */
-  settleAmount: number;
-  /** 銷項實際存入 */
-  depositAmount: number;
-  /** 拆帳前各原單 remaining 合計 */
-  totalBeforeRemaining: number;
-}
-
-/**
- * POST /ael/ledger/reconciliation/receivables/settle/summary body：真正執行沖帳（非預覽）。
- * 目前僅確認 ledgerUuids／bankAccountUuid 兩個欄位；回應中另有 paymentDate／paymentChannelUuid／settleAmount，
- * 但無法確認這些是否也是請求所需欄位（也可能是後端依 ledgerUuids 反查／自動計算後才回填），需再與後端確認。
- */
-export interface SettleReceivableSummaryBody {
-  /** 本次勾選要沖帳的原單 uuid 清單 */
-  ledgerUuids: string[];
-  /** 存入銀行帳戶 uuid */
-  bankAccountUuid: string;
-  companyUuid: string;
-}
-
-/** 匯總沖帳執行結果中，單張原單的沖帳結果 */
-export interface SettleReceivableSummaryAllocation {
-  /** 原單 uuid */
-  ledgerUuid: string;
-  /** 原單交易編號 */
-  orderCode: string;
-  transactionDate?: string | null;
-  /** 沖前剩餘 */
-  beforeRemaining: number;
-  /** 本次分配沖帳額 */
-  settleAmount: number;
-  /** 沖後剩餘（可負＝超沖） */
-  afterRemaining: number;
-  /** 0平衡 1超沖 2少沖 */
-  settlementStatus: number;
   /** 結算傳票 uuid（alloc>0 才有） */
   settlementLedgerUuid?: string;
   /** 結算傳票編號 */
   settlementOrderCode?: string;
   /** 沖帳關聯 uuid */
   relationUuid?: string;
-  closed: boolean;
 }
 
-/** POST /ael/ledger/reconciliation/receivables/settle/summary 回應 */
-export interface SettleReceivableSummaryResult {
-  /** 有沖帳的原單筆數 */
-  affectedCount: number;
-  allocations: SettleReceivableSummaryAllocation[];
-  /** 付款戶頭 */
-  bankAccountUuid: string;
-  /** 廠商 uuid；銷項不會出現 */
-  counterpartyUuid?: string;
+/** POST /ael/ledger/reconciliation/receivables/settle/preview body */
+export interface SettleReceivablePreviewBody {
+  companyUuid: string;
   /** 銷售管道 uuid */
   paymentChannelUuid: string;
+  /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
+  settleAmount: number;
+  /** 銷項實際存入 */
+  depositAmount: number;
+  /** 是否將超沖少沖的金額記進餘額 */
+  isBalance: boolean;
+  /** 沖帳手續費物件 */
+  allocations: SettleSummaryFee;
+  /** 使用者未新增任何額外金額時不傳此參數 */
+  otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/** POST /ael/ledger/reconciliation/payables/settle/preview body */
+export interface SettlePayablePreviewBody {
+  companyUuid: string;
+  /** 廠商 uuid */
+  counterpartyUuid: string;
+  /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
+  settleAmount: number;
+  /** 進項實際付出 */
+  paymentAmount: number;
+  /** 是否將超沖少沖的金額記進餘額 */
+  isBalance: boolean;
+  /** 沖帳手續費物件 */
+  allocations: SettleSummaryFee;
+  /** 使用者未新增任何額外金額時不傳此參數 */
+  otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/**
+ * 匯總沖帳預覽回應共用欄位（銷項／進項共用）。
+ * 實測回應中 allocations 並非陣列，而是請求手續費物件的回填；各原單拆帳結果在 ledgerAllocations。
+ */
+interface SettlePreviewResultBase {
+  /** 實際有分配金額（alloc>0）的原單筆數 */
+  affectedCount: number;
+  allocations: SettlePreviewFeeEcho;
+  /** 各原單拆帳結果 */
+  ledgerAllocations: SettleLedgerAllocation[];
+  /** 請求 otherDeductions 的回填；目前前端未消費此欄位，結構未知，故不進一步型別化 */
+  otherDeductions: unknown[];
+  /** 本次匯總沖帳總額（元） */
+  settleAmount: number;
+  /** 實際沖到原單合計金額 */
+  appliedSettleAmount: number;
+  /** 沖前餘額（廠商／銷售管道） */
+  balanceBefore: number;
+  /** 沖後餘額（廠商／銷售管道） */
+  balanceAfter: number;
+  /** 是否將超沖少沖的金額記進餘額 */
+  isBalance: boolean;
+  /** 拆帳前各原單 remaining 合計 */
+  totalBeforeRemaining: number;
+}
+
+/** POST /ael/ledger/reconciliation/receivables/settle/preview 回應 */
+export interface SettleReceivablePreviewResult extends SettlePreviewResultBase {
+  paymentChannelUuid?: string;
+  /** 銷項實際存入 */
+  depositAmount: number;
+  /** 實際異動銀行金額 */
+  actualDepositAmount: number;
+}
+
+/** POST /ael/ledger/reconciliation/payables/settle/preview 回應 */
+export interface SettlePayablePreviewResult extends SettlePreviewResultBase {
+  counterpartyUuid?: string;
+  /** 進項實際付出 */
+  paymentAmount: number;
+  /** 實際異動銀行金額 */
+  actualPaymentAmount: number;
+}
+
+/**
+ * POST /ael/ledger/reconciliation/receivables/settle/summary body：真正執行沖帳（非預覽）。
+ * isBalance=true 時，depositAmount 須帶「實際沖完整的那幾筆金額總和」（即預覽回應 ledgerAllocations 中
+ * closed=true 各筆 settleAmount 加總），而非使用者原始輸入的存入金額；isBalance=false 時沿用原始輸入值，
+ * 差額直接沖入最後一筆交易。ledgerUuids 取自預覽回應的 ledgerAllocations（依所選 isBalance 重新預覽後的結果）。
+ */
+export interface SettleReceivableSummaryBody {
+  companyUuid: string;
+  /** 要匯總沖帳的原單 uuid 列表（不可重複；須同銷售管道） */
+  ledgerUuids: string[];
+  /** 本次匯總沖帳總額（元） */
+  settleAmount: number;
+  /** 銷項實際存入 */
+  depositAmount: number;
+  /** 收款日 YYYYMMDD */
+  paymentDate: string;
+  /** 存入銀行帳戶 uuid */
+  bankAccountUuid: string;
+  /** 備註（選填） */
+  memo?: string;
+  /** 是否將超沖少沖的金額記進餘額 */
+  isBalance: boolean;
+  /** 沖帳手續費物件 */
+  allocations: SettleSummaryFee;
+  otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/** POST /ael/ledger/reconciliation/payables/settle/summary body，欄位語意同 SettleReceivableSummaryBody（進項版） */
+export interface SettlePayableSummaryBody {
+  companyUuid: string;
+  ledgerUuids: string[];
+  settleAmount: number;
+  /** 進項實際付出 */
+  paymentAmount: number;
   /** 付款日 YYYYMMDD */
+  paymentDate: string;
+  /** 付款銀行帳戶 uuid */
+  bankAccountUuid: string;
+  memo?: string;
+  isBalance: boolean;
+  allocations: SettleSummaryFee;
+  otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/** 匯總沖帳執行結果共用欄位（銷項／進項共用） */
+interface SettleSummaryResultBase {
+  /** 有沖帳的原單筆數 */
+  affectedCount: number;
+  /** 各原單沖帳結果；實測欄位名稱與 preview 一致為 ledgerAllocations，非 api.md 範例所示的 allocations */
+  ledgerAllocations: SettleLedgerAllocation[];
+  /** 付款／收款戶頭 */
+  bankAccountUuid: string;
+  /** 付款／收款日 YYYYMMDD */
   paymentDate: string;
   /** 匯總沖帳總額 */
   settleAmount: number;
+  /** 實際沖到原單的合計 */
+  appliedSettleAmount: number;
+  /** 沖前餘額（廠商／銷售管道） */
+  balanceBefore: number;
+  /** 沖後餘額（廠商／銷售管道） */
+  balanceAfter: number;
+  /** 是否將超沖少沖的金額記進餘額 */
+  isBalance: boolean;
+  /** 沖前剩餘合計 */
+  totalBeforeRemaining: number;
   /** 唯一匯總結算帳 uuid */
   settlementLedgerUuid: string;
   /** 交易編號 */
   settlementOrderCode: string;
-  /** 沖前剩餘合計 */
-  totalBeforeRemaining: number;
+}
+
+/** POST /ael/ledger/reconciliation/receivables/settle/summary 回應 */
+export interface SettleReceivableSummaryResult extends SettleSummaryResultBase {
+  counterpartyUuid?: string;
+  paymentChannelUuid: string;
+  /** 實際銀行存入 */
+  depositAmount: number;
+  actualDepositAmount: number;
+}
+
+/** POST /ael/ledger/reconciliation/payables/settle/summary 回應 */
+export interface SettlePayableSummaryResult extends SettleSummaryResultBase {
+  counterpartyUuid: string;
+  paymentChannelUuid?: string;
+  /** 實際銀行付出 */
+  paymentAmount: number;
+  actualPaymentAmount: number;
 }
 
 /** GET /ael/ledger/entries/detail 回應的 invoice 區塊；僅型別化本次會使用的欄位 */
@@ -685,6 +795,31 @@ export interface EntryDetailSettlementDto {
   settlement: { entryDate: string | null } | null;
 }
 
+/** GET /ael/ledger/entries/detail 回應的單筆沖帳事件；供「沖帳紀錄」卡片的恢復／編輯操作使用 */
+export interface EntryDetailSettleEventDto {
+  /** settle_events.uuid，恢復沖帳時需傳入 */
+  settleEventUuid: string;
+  /** 0 手動沖帳／2 匯總沖帳 */
+  reconMethod: number;
+  /** 0 銷項／1 進項 */
+  side: number;
+  /** 付款／收款日，YYYYMMDD */
+  paymentDate: string;
+  /** 帳面沖帳金額 */
+  settleAmount: number;
+  /** 實際收付（銷項為存入、進項為付款） */
+  cashAmount: number;
+  /** 沖前廠商／銷售管道餘額 */
+  balanceBefore: number;
+  /** 沖後廠商／銷售管道餘額 */
+  balanceAfter: number;
+  /** 是否已撤銷 */
+  isReverse: boolean;
+  /** 目前是否可撤銷（未撤銷且無更新的未撤銷事件） */
+  canReverse: boolean;
+  createdAt: string;
+}
+
 /** GET /ael/ledger/entries/detail 回應；僅型別化 invoice 區塊與沖帳相關子集
  *  （entry／settlements 其餘欄位如 direction／entryType／status 等本次不使用）。
  *  invoice 沒有關聯發票的交易（如未開立發票的應收帳款）會是 null */
@@ -692,4 +827,13 @@ export interface EntryDetailResult {
   entry: EntryDetailEntryDto;
   invoice: EntryInvoiceDetailDto | null;
   settlements: EntryDetailSettlementDto[];
+  /** 此原單相關沖帳事件（供撤銷）；無則空陣列 */
+  settleEvents: EntryDetailSettleEventDto[];
+}
+
+/** POST /ael/ledger/settle/reverse 與 /ael/ledger/reconciliation/settle/reverse 共用 body */
+export interface ReverseSettleBody {
+  companyUuid: string;
+  /** settle_events.uuid */
+  settleEventUuid: string;
 }

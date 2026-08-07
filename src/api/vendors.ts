@@ -6,8 +6,10 @@ import { buildQuery, apiFetch } from './client';
 import { COMPANY_UUID } from './config';
 import type { CreateVendorBody, UpdateVendorBody, VendorDto, VendorExistsResult } from './types';
 
-export function listVendors(): Promise<VendorDto[]> {
-  return apiFetch<VendorDto[]>(`/ael/vendors${buildQuery({ companyUuid: COMPANY_UUID })}`);
+/** balance 欄位後端偶見以字串回傳（見 api.md GET /ael/vendors 回應示例），統一正規化為 number 供畫面直接運算 */
+export async function listVendors(): Promise<VendorDto[]> {
+  const list = await apiFetch<VendorDto[]>(`/ael/vendors${buildQuery({ companyUuid: COMPANY_UUID })}`);
+  return list.map(v => ({ ...v, balance: Number(v.balance) || 0 }));
 }
 
 export function createVendor(body: Omit<CreateVendorBody, 'companyUuid'>): Promise<VendorDto> {

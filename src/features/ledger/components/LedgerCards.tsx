@@ -1,7 +1,7 @@
 'use client';
 
 import { settlePayable, settleReceivable } from '@/api/ledger';
-import type { ReceivableAllocation } from '@/api/types';
+import type { ManualSettleAllocation, SettleSummaryFee } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
@@ -303,12 +303,29 @@ export default function LedgerCards(props: LedgerCardsProps) {
 
   // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
   // 成功後觸發父層重新查詢應收/應付帳款列表
-  const handleManualSettle = async (allocation: ReceivableAllocation) => {
+  const handleManualSettle = async (allocation: ManualSettleAllocation) => {
+    const allocations: SettleSummaryFee[] = allocation.feeAmount > 0 ? [{ name: '手續費', feeAmount: allocation.feeAmount }] : [];
     if (props.side === 'sales') {
-      await settleReceivable({ allocations: [allocation], memo: '' });
+      await settleReceivable({
+        ledgerUuid: allocation.ledgerUuid,
+        paymentDate: allocation.paymentDate,
+        bankAccountUuid: allocation.bankAccountUuid,
+        settleAmount: allocation.amount,
+        depositAmount: allocation.actualAmount,
+        memo: '',
+        allocations,
+      });
       props.onReceivableSettled?.();
     } else {
-      await settlePayable({ allocations: [allocation], memo: '' });
+      await settlePayable({
+        ledgerUuid: allocation.ledgerUuid,
+        paymentDate: allocation.paymentDate,
+        bankAccountUuid: allocation.bankAccountUuid,
+        settleAmount: allocation.amount,
+        paymentAmount: allocation.actualAmount,
+        memo: '',
+        allocations,
+      });
       props.onPayableSettled?.();
     }
   };

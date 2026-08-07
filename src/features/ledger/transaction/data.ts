@@ -53,6 +53,7 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   buyerName: '',
   sellerTaxId: '',
   sellerName: '',
+  sellerVendorUuid: '',
   // 銷售管道改為串接真實銷售管道 API 後才有可選值，預設空字串代表「不指定」
   channel: '',
   tag: TAG_PLACEHOLDER,

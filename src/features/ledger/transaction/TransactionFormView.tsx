@@ -1,16 +1,18 @@
 'use client';
 
-import { createPayable, createReceivable, fetchEntryDetail } from '@/api/ledger';
-import type { CreatePayableBody, CreateReceivableBody, EntryDetailEntryDto, EntryDetailSettlementDto } from '@/api/types';
+import { createPayable, createReceivable, fetchEntryDetail, reverseManualSettle, reverseSummarySettle } from '@/api/ledger';
+import type { CreatePayableBody, CreateReceivableBody, EntryDetailEntryDto, EntryDetailSettleEventDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import VoidConfirmDialog from '../components/VoidConfirmDialog';
 import type { Side } from '../types';
 import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
+import SettlementEditDialog from './components/SettlementEditDialog';
+import SettlementReverseConfirmModal from './components/SettlementReverseConfirmModal';
 import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionAmountCard from './components/TransactionAmountCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
@@ -63,6 +65,8 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
     counterpartyTaxId: form.sellerTaxId || undefined,
     // 有填統編視為廠商(0)，否則視為個人(1)
     counterpartyType: form.sellerTaxId ? 0 : 1,
+    // 選自既有廠商清單時帶入 uuid，供帳簿「匯總沖帳」頁依廠商分組；手動輸入未對應廠商時為 undefined
+    counterpartyUuid: form.sellerVendorUuid || undefined,
     datetime: formatYmd(form.issueDate)!,
     deductible: form.deductible,
     ifDebit: form.isAllowance,
@@ -118,10 +122,18 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   const [detailLoading, setDetailLoading] = useState(mode === 'edit');
   const [detailError, setDetailError] = useState('');
   const [entryDetail, setEntryDetail] = useState<EntryDetailEntryDto | null>(null);
-  const [settlements, setSettlements] = useState<EntryDetailSettlementDto[]>([]);
+  const [settleEvents, setSettleEvents] = useState<EntryDetailSettleEventDto[]>([]);
+  // 恢復／編輯沖帳成功後遞增，觸發下方 useEffect 重新載入交易明細
+  const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    if (mode !== 'edit' || !transactionId) return;
+  // 沖帳紀錄操作：恢復確認、編輯金額（僅手動沖帳）共用同一組送出中／錯誤狀態
+  const [reverseTarget, setReverseTarget] = useState<EntryDetailSettleEventDto | null>(null);
+  const [editTarget, setEditTarget] = useState<EntryDetailSettleEventDto | null>(null);
+  const [reverseSubmitting, setReverseSubmitting] = useState(false);
+  const [reverseError, setReverseError] = useState('');
+
+  const loadDetail = useCallback(() => {
+    if (mode !== 'edit' || !transactionId) return () => {};
     let cancelled = false;
     setDetailLoading(true);
     setDetailError('');
@@ -138,7 +150,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           channel: result.entry.paymentChannelUuid ?? '',
         });
         setEntryDetail(result.entry);
-        setSettlements(result.settlements);
+        setSettleEvents(result.settleEvents);
       })
       .catch(err => {
         if (cancelled) return;
@@ -151,6 +163,38 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       cancelled = true;
     };
   }, [mode, side, transactionId]);
+
+  useEffect(() => loadDetail(), [loadDetail, reloadKey]);
+
+  const reloadDetail = () => setReloadKey(k => k + 1);
+
+  // 沖帳金額編輯（僅手動沖帳）：由 TransactionSettlementHistory 觸發，開啟 SettlementEditDialog
+  const handleEditSettlement = (event: EntryDetailSettleEventDto) => setEditTarget(event);
+
+  // 恢復沖帳紀錄：先跳確認彈窗，匯總沖帳會於彈窗內提示會一併恢復同批所有交易
+  const handleReverseSettlement = (event: EntryDetailSettleEventDto) => {
+    setReverseError('');
+    setReverseTarget(event);
+  };
+
+  const handleConfirmReverse = async () => {
+    if (!reverseTarget) return;
+    setReverseSubmitting(true);
+    setReverseError('');
+    try {
+      if (reverseTarget.reconMethod === 2) {
+        await reverseSummarySettle({ settleEventUuid: reverseTarget.settleEventUuid });
+      } else {
+        await reverseManualSettle({ settleEventUuid: reverseTarget.settleEventUuid });
+      }
+      setReverseTarget(null);
+      reloadDetail();
+    } catch (err) {
+      setReverseError(err instanceof Error ? err.message : '操作失敗');
+    } finally {
+      setReverseSubmitting(false);
+    }
+  };
 
   const handleChange = (patch: Partial<TransactionFormState>) => setForm(f => ({ ...f, ...patch }));
   const handleFileChange = (fileName: string, previewUrl: string) =>
@@ -228,7 +272,9 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
               <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
               <TransactionAmountCard side={side} mode={mode} form={form} onChange={handleChange} />
               {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
-              {mode === 'edit' && <TransactionSettlementHistory settlements={settlements} />}
+              {mode === 'edit' && (
+                <TransactionSettlementHistory side={side} settleEvents={settleEvents} onEdit={handleEditSettlement} onReverse={handleReverseSettlement} />
+              )}
 
               {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
 
@@ -266,6 +312,27 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           transactionId={form.invoiceNumber}
           amount={totalAmount}
         />
+      )}
+
+      {mode === 'edit' && transactionId && (
+        <>
+          <SettlementReverseConfirmModal
+            open={reverseTarget !== null}
+            event={reverseTarget}
+            submitting={reverseSubmitting}
+            submitError={reverseError}
+            onClose={() => setReverseTarget(null)}
+            onConfirm={handleConfirmReverse}
+          />
+          <SettlementEditDialog
+            open={editTarget !== null}
+            event={editTarget}
+            side={side}
+            ledgerUuid={transactionId}
+            onClose={() => setEditTarget(null)}
+            onSaved={reloadDetail}
+          />
+        </>
       )}
     </div>
   );

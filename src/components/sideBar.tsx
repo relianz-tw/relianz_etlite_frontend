@@ -1,7 +1,8 @@
 'use client';
 
+import { getBasicSetting } from '@/api/basicSettings';
 import { navLinks } from '@/data/navLinks';
-import { ArrowRight, ChevronDown, PanelLeftClose, SquarePlus, X } from 'lucide-react';
+import { ArrowRight, Building2, ChevronDown, SquarePlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -25,10 +26,24 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
   const pathname = usePathname();
   // 以項目名稱作為 key，讓多個下拉選單能各自獨立開合
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     setOpenDropdown(null);
   }, [pathname]);
+
+  // 登出按鈕上方顯示目前公司名稱；查詢失敗時不影響選單其餘功能，靜默忽略即可
+  useEffect(() => {
+    let cancelled = false;
+    getBasicSetting()
+      .then(result => {
+        if (!cancelled) setCompanyName(result.companyName);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -41,8 +56,8 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-50 flex h-full w-64 flex-col border-l border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:left-0 nav:right-auto nav:border-l-0 nav:border-r nav:shadow-none ${
-          open ? 'translate-x-0' : 'translate-x-full nav:-translate-x-full'
+        className={`fixed inset-y-0 right-0 z-50 flex h-full w-64 flex-col border-l border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:left-0 nav:right-auto nav:translate-x-0 nav:border-l-0 nav:border-r nav:shadow-none ${
+          open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* 手機版頁首：選單標題 + 關閉鈕（logo 已顯示於固定頂部列，此處不重複） */}
@@ -58,8 +73,8 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
           </button>
         </div>
 
-        {/* 桌機頁首：logo + 收合鈕 */}
-        <div className='hidden h-16 shrink-0 items-center justify-between border-b border-surface-cream px-4 nav:flex'>
+        {/* 桌機頁首：固定顯示 logo，側邊欄不提供收合功能 */}
+        <div className='hidden h-16 shrink-0 items-center border-b border-surface-cream px-4 nav:flex'>
           <picture>
             <img
               src='/logo.png'
@@ -68,14 +83,6 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
               fetchPriority='high'
             />
           </picture>
-          <button
-            type='button'
-            aria-label='收合選單'
-            onClick={onToggle}
-            className='text-neutral-dark hover:text-brand-primary'
-          >
-            <PanelLeftClose size={20} />
-          </button>
         </div>
 
         {/* 導覽項目 */}
@@ -131,13 +138,19 @@ const Sidebar = ({ open, onToggle }: SidebarProps) => {
           })}
         </ul>
 
-        {/* 頁尾：登出 */}
+        {/* 頁尾：目前公司名稱 + 登出 */}
         <div className='shrink-0 border-t border-surface-cream p-3'>
+          {companyName && (
+            <div className='mb-2 flex items-center gap-1.5 px-3 text-xs text-neutral-mid'>
+              <Building2 size={14} className='shrink-0' />
+              <span className='truncate'>{companyName}</span>
+            </div>
+          )}
           <button
             type='button'
-            className='flex w-full items-center gap-1 rounded-md border border-surface-cream px-3 py-2 text-neutral-dark transition-colors hover:bg-surface-cream hover:text-brand-primary'
+            className='flex w-full items-center gap-1.5 rounded-md border border-surface-cream px-3 py-1.5 text-[13px] text-neutral-dark transition-colors hover:bg-surface-cream hover:text-brand-primary'
           >
-            <ArrowRight size={14} />
+            <ArrowRight size={13} />
             登出
           </button>
         </div>

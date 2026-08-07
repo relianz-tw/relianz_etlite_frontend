@@ -27,6 +27,7 @@ function toVendorRecord(dto: VendorDto): VendorRecord {
     bankAccountNumber: dto.accountNo ?? '',
     remark: dto.remark ?? '',
     isActive: dto.isActive,
+    balance: dto.balance ?? 0,
   };
 }
 
@@ -44,6 +45,7 @@ function toUpdateVendorBody(record: VendorRecord): Omit<UpdateVendorBody, 'compa
     accountNo: record.bankAccountNumber,
     remark: record.remark,
     isActive: record.isActive,
+    balance: record.balance,
   };
 }
 

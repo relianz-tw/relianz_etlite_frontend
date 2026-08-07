@@ -26,6 +26,7 @@ function toChannelRuleRecord(dto: ChannelRuleDto): ChannelRuleRecord {
     receivingAccountUuid: dto.receivingAccountUuid ?? '',
     remark: dto.remark ?? '',
     isActive: dto.isActive,
+    balance: dto.balance ?? 0,
   };
 }
 
