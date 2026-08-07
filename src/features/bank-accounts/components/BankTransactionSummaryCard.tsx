@@ -1,6 +1,6 @@
 'use client';
 
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import type { BankTransactionRow } from '../types';
 
 function DetailField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
@@ -25,8 +25,8 @@ export default function BankTransactionSummaryCard({ row }: { row: BankTransacti
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <h2 className="mb-5 text-base font-semibold text-neutral-dark">交易資訊</h2>
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm nav:grid-cols-4">
-        <DetailField label="交易時間" value={formatYyyymmdd(row.transactionDate)} mono />
-        <DetailField label="帳務時間" value={formatYyyymmdd(row.accountingDate)} mono />
+        <DetailField label="交易時間" value={formatYyyymmddRoc(row.transactionDate)} mono />
+        <DetailField label="帳務時間" value={formatYyyymmddRoc(row.accountingDate)} mono />
         <DetailField label={amountLabel} value={amountValue} mono />
         <DetailField label="餘額" value={fmtCurrency(row.balance)} mono />
         <DetailField label="交易管道" value={row.channel} />

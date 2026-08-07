@@ -2,22 +2,15 @@
 
 import type { BankAccountDto } from '@/api/types';
 import AccountSelector from '@/features/bank-accounts/components/AccountSelector';
-import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
-import MoneyInput from '@/components/ui/MoneyInput';
-import TextInput from '@/components/ui/TextInput';
-import DatePicker from '@/components/ui/DatePicker';
 import Button from '@/components/ui/Button';
+import MoneyInput from '@/components/ui/MoneyInput';
+import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
+import DatePicker from '@/components/ui/DatePicker';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { Plus, Trash2 } from 'lucide-react';
 import type { ReconSide } from '../types';
 
-/** 額外金額單列：對應預覽 API 的 otherDeductions 項目，subject 未選時視為尚未填完整 */
-export interface ReconOtherDeductionRow {
-  id: string;
-  subject: SubjectOption | null;
-  name: string;
-  amount: number;
-}
+/** 額外金額單列：對應預覽 API 的 otherDeductions 項目，沿用共用元件的型別 */
+export type ReconOtherDeductionRow = OtherDeductionRow;
 
 interface ReconPoolPanelProps {
   side: ReconSide;
@@ -95,37 +88,7 @@ export default function ReconPoolPanel({
           </div>
         </div>
 
-        {otherDeductions.map(row => (
-          <div key={row.id} className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className="min-w-0 flex-1 nav:w-56 nav:flex-none">
-                <SubjectSelect value={row.subject} onChange={s => onChangeOtherDeduction(row.id, { subject: s })} placeholder="請選擇科目" />
-              </div>
-              <TextInput
-                widthClassName="w-28"
-                value={row.name}
-                onChange={e => onChangeOtherDeduction(row.id, { name: e.target.value })}
-                placeholder="項目名稱"
-              />
-              <button
-                type="button"
-                onClick={() => onRemoveOtherDeduction(row.id)}
-                aria-label="移除此項"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-mid transition-colors hover:bg-surface-cream hover:text-semantic-error"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="text-lg text-neutral-mid">−</span>
-              <MoneyInput widthClassName="w-32" value={row.amount} onChange={value => onChangeOtherDeduction(row.id, { amount: value })} />
-            </div>
-          </div>
-        ))}
-
-        <Button variant="outline" size="sm" icon={Plus} onClick={onAddOtherDeduction} className="self-end">
-          新增額外金額
-        </Button>
+        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">

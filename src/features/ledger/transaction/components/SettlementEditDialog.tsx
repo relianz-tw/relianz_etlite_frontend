@@ -8,8 +8,10 @@ import DatePicker from '@/components/ui/DatePicker';
 import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
+import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import Select from '@/components/ui/Select';
-import { useEffect, useState } from 'react';
+import { getFriendlyErrorMessage } from '@/lib/errors';
+import { useEffect, useRef, useState } from 'react';
 import type { Side } from '../../types';
 import { formatYmd } from '../data';
 
@@ -61,11 +63,23 @@ function SettlementEditDialogContent({
   const isSales = side === 'sales';
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(parseYyyymmdd(event.paymentDate));
   const [amount, setAmount] = useState(event.settleAmount);
-  const [fee, setFee] = useState(isSales ? Math.max(event.settleAmount - event.cashAmount, 0) : 0);
+  // 原沖帳事件僅回傳帳面金額與實際收付金額的合計差額（手續費＋額外金額合計），無法拆分回各項目，
+  // 故初始帶入單一手續費欄位，額外金額列表預設為空，使用者可視需要重新拆分
+  const [fee, setFee] = useState(Math.max(event.settleAmount - event.cashAmount, 0));
+  const [otherDeductions, setOtherDeductions] = useState<OtherDeductionRow[]>([]);
+  const otherDeductionIdRef = useRef(0);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // 恢復步驟已成功但重新沖帳失敗：資料已變動，僅能關閉並重新整理，不可重試（避免重複恢復）
   const [reverted, setReverted] = useState(false);
+
+  const handleAddOtherDeduction = () => {
+    otherDeductionIdRef.current += 1;
+    setOtherDeductions(prev => [...prev, { id: `OD-${otherDeductionIdRef.current}`, subject: null, name: '', amount: 0 }]);
+  };
+  const handleRemoveOtherDeduction = (id: string) => setOtherDeductions(prev => prev.filter(r => r.id !== id));
+  const handleChangeOtherDeduction = (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) =>
+    setOtherDeductions(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
 
   // 收/付款戶頭：同 ManualEntryDialog，銷項預設收款帳戶、進項預設付款帳戶
   const [accounts, setAccounts] = useState<BankAccountDto[]>([]);
@@ -78,13 +92,14 @@ function SettlementEditDialogContent({
     listBankAccounts()
       .then(list => {
         if (cancelled) return;
-        setAccounts(list);
-        const defaultAccount = list.find(account => (isSales ? account.isDefaultReceivingAccount : account.isDefaultPaymentAccount)) ?? list[0];
+        const activeList = list.filter(account => account.isActive);
+        setAccounts(activeList);
+        const defaultAccount = activeList.find(account => (isSales ? account.isDefaultReceivingAccount : account.isDefaultPaymentAccount)) ?? activeList[0];
         if (defaultAccount) setBankAccountUuid(defaultAccount.uuid);
       })
       .catch(err => {
         if (cancelled) return;
-        setAccountsError(err instanceof Error ? err.message : '操作失敗');
+        setAccountsError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -94,8 +109,8 @@ function SettlementEditDialogContent({
     };
   }, [isSales]);
 
-  // 進項不顯示手續費欄位：手續費固定 0、存入（付款）金額即沖帳金額
-  const depositAmount = isSales ? amount - fee : amount;
+  const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
+  const depositAmount = amount - fee - otherDeductionsTotal;
 
   const handleClose = () => {
     // 已恢復但重新沖帳失敗時，關閉前一併通知父層重新載入，讓畫面反映已恢復的最新狀態
@@ -112,6 +127,14 @@ function SettlementEditDialogContent({
       setError(isSales ? '請選擇收款戶頭' : '找不到可用的付款戶頭，請確認銀行帳戶設定');
       return;
     }
+    if (depositAmount < 0) {
+      setError('手續費與額外金額總和不可超過沖帳金額');
+      return;
+    }
+    if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount <= 0)) {
+      setError('請完整填寫額外金額的科目、名稱與金額');
+      return;
+    }
     const formattedDate = formatYmd(paymentDate);
     if (!formattedDate) {
       setError('請選擇沖帳日期');
@@ -124,21 +147,41 @@ function SettlementEditDialogContent({
     } catch (err) {
       // 步驟一失敗：原沖帳紀錄未變動，維持表單讓使用者可重試
       setSubmitting(false);
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       return;
     }
     const allocations: SettleSummaryFee[] = fee > 0 ? [{ name: '手續費', feeAmount: fee }] : [];
+    const otherDeductionsBody =
+      otherDeductions.length > 0 ? otherDeductions.map(r => ({ name: r.name, amount: r.amount, officialAccountingSubjectId: r.subject!.id! })) : undefined;
     try {
       if (isSales) {
-        await settleReceivable({ ledgerUuid, paymentDate: formattedDate, bankAccountUuid, settleAmount: amount, depositAmount, memo: '', allocations });
+        await settleReceivable({
+          ledgerUuid,
+          paymentDate: formattedDate,
+          bankAccountUuid,
+          settleAmount: amount,
+          depositAmount,
+          memo: '',
+          allocations,
+          otherDeductions: otherDeductionsBody,
+        });
       } else {
-        await settlePayable({ ledgerUuid, paymentDate: formattedDate, bankAccountUuid, settleAmount: amount, paymentAmount: depositAmount, memo: '', allocations });
+        await settlePayable({
+          ledgerUuid,
+          paymentDate: formattedDate,
+          bankAccountUuid,
+          settleAmount: amount,
+          paymentAmount: depositAmount,
+          memo: '',
+          allocations,
+          otherDeductions: otherDeductionsBody,
+        });
       }
     } catch (err) {
       // 步驟二失敗：原紀錄已恢復，不可重試，改為提示使用者關閉後重新沖帳
       setSubmitting(false);
       setReverted(true);
-      setError(`原沖帳紀錄已恢復，但新沖帳建立失敗，請重新沖帳。${err instanceof Error ? err.message : ''}`);
+      setError(`原沖帳紀錄已恢復，但新沖帳建立失敗，請重新沖帳。${getFriendlyErrorMessage(err, '')}`);
       return;
     }
     setSubmitting(false);
@@ -182,18 +225,26 @@ function SettlementEditDialogContent({
           </span>
           <MoneyInput widthClassName="w-36" value={amount} onChange={setAmount} disabled={reverted} />
         </div>
-        {isSales && (
-          <>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-neutral-dark">各項手續費</span>
-              <MoneyInput widthClassName="w-36" value={fee} onChange={setFee} disabled={reverted} />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-neutral-dark">存入金額</span>
-              <MoneyInput widthClassName="w-36" value={depositAmount} disabled readOnly />
-            </div>
-          </>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm font-semibold text-neutral-dark">各項手續費</span>
+          <MoneyInput widthClassName="w-36" value={fee} onChange={setFee} disabled={reverted} />
+        </div>
+
+        {!reverted && (
+          <OtherDeductionsEditor
+            rows={otherDeductions}
+            onAdd={handleAddOtherDeduction}
+            onRemove={handleRemoveOtherDeduction}
+            onChange={handleChangeOtherDeduction}
+          />
         )}
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm font-semibold text-neutral-dark">{isSales ? '存入金額' : '實際付款金額'}</span>
+          <MoneyInput widthClassName="w-36" value={depositAmount} disabled readOnly />
+        </div>
+        {depositAmount < 0 && <p className="text-xs text-semantic-error">手續費與額外金額總和不可超過沖帳金額</p>}
 
         {error && <p className="text-xs text-semantic-error">{error}</p>}
       </div>

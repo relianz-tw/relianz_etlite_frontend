@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type BadgeTone = 'success' | 'error' | 'info' | 'neutral';
+export type BadgeTone = 'success' | 'error' | 'info' | 'neutral';
 type BadgeVariant = 'solid' | 'muted';
 
 interface BadgeProps {

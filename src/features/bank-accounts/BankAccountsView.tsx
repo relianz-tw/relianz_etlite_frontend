@@ -5,6 +5,7 @@ import type { BankAccountDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { subMonths } from 'date-fns';
 import { Download, Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -76,7 +77,7 @@ export default function BankAccountsView() {
       })
       .catch(err => {
         if (cancelled) return;
-        setAccountsError(err instanceof Error ? err.message : '操作失敗');
+        setAccountsError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -109,7 +110,7 @@ export default function BankAccountsView() {
       })
       .catch(err => {
         if (cancelled) return;
-        setTxnError(err instanceof Error ? err.message : '操作失敗');
+        setTxnError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setTxnLoading(false);

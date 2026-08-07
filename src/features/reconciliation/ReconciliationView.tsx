@@ -5,8 +5,10 @@ import { listChannelRules } from '@/api/channelRules';
 import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
 import { listVendors } from '@/api/vendors';
 import Button from '@/components/ui/Button';
+import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { mapPayableItemsToRows, mapReceivableItemsToRows } from '@/features/ledger/data';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReconBalanceEditModal from './components/ReconBalanceEditModal';
@@ -117,7 +119,7 @@ export default function ReconciliationView() {
         setAccounts(list.filter(a => a.isActive));
       })
       .catch(err => {
-        if (!cancelled) setAccountsError(err instanceof Error ? err.message : '操作失敗');
+        if (!cancelled) setAccountsError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -163,7 +165,7 @@ export default function ReconciliationView() {
           });
     task
       .catch(err => {
-        if (!cancelled) setDataError(err instanceof Error ? err.message : '操作失敗');
+        if (!cancelled) setDataError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setDataLoading(false);
@@ -317,7 +319,7 @@ export default function ReconciliationView() {
       // 差額判斷邏輯同 hasDiff（見上方註解），須以逐筆拆帳狀態為準，不能只比較 settleAmount 與 totalBeforeRemaining
       if (result.allocations.some(a => a.settlementStatus !== 0)) setSurplusOpen(true);
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : '操作失敗');
+      setPreviewError(getFriendlyErrorMessage(err));
     } finally {
       setPreviewLoading(false);
     }
@@ -371,7 +373,7 @@ export default function ReconciliationView() {
       });
       finalizeSettle(result);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '操作失敗');
+      setSubmitError(getFriendlyErrorMessage(err));
     } finally {
       setSubmitLoading(false);
     }
@@ -414,7 +416,7 @@ export default function ReconciliationView() {
       });
       finalizeSettle(result);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '操作失敗');
+      setSubmitError(getFriendlyErrorMessage(err));
     } finally {
       setSubmitLoading(false);
     }
@@ -439,7 +441,7 @@ export default function ReconciliationView() {
       });
       finalizeSettle(result);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '操作失敗');
+      setSubmitError(getFriendlyErrorMessage(err));
     } finally {
       setSubmitLoading(false);
     }
@@ -478,75 +480,76 @@ export default function ReconciliationView() {
         ) : dataError ? (
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{dataError}</div>
         ) : (
-          <div className="flex flex-col gap-4 nav:flex-row nav:items-start nav:gap-6">
-            <ReconGroupSidebar groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} onEditBalance={setBalanceEditKey} />
-
-            <div className="min-w-0 flex-1 nav:max-w-[760px]">
-              {!selectedGroupKey ? (
-                <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
-                  請從左側選擇{side === 'receivable' ? '銷售管道' : '廠商'}
-                </div>
-              ) : (
-                <div className={cn('flex flex-col gap-4', isAllGroup ? 'pb-4' : 'pb-20')}>
-                  {submittedInfo && !isAllGroup && (
-                    <div className="rounded-md border border-semantic-success/30 bg-semantic-success-muted p-3 text-sm text-semantic-success-dark">
-                      已沖銷 {submittedInfo.matchedCount} 筆交易，共 {fmtCurrency(submittedInfo.matchedAmount)}。
-                    </div>
-                  )}
-
-                  {!isAllGroup && !canSettle && (
-                    <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
-                      此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援預覽拆帳，請於左側切換至實際{side === 'receivable' ? '管道' : '廠商'}
-                    </div>
-                  )}
-
-                  {!isAllGroup && (
-                    <ReconPoolPanel
-                      side={side}
-                      statementAmount={statementAmount}
-                      feeAmount={feeAmount}
-                      onStatementChange={handleStatementChange}
-                      onFeeChange={handleFeeChange}
-                      otherDeductions={otherDeductions}
-                      onAddOtherDeduction={handleAddOtherDeduction}
-                      onRemoveOtherDeduction={handleRemoveOtherDeduction}
-                      onChangeOtherDeduction={handleChangeOtherDeduction}
-                      paymentDate={paymentDate}
-                      onPaymentDateChange={date => {
-                        setPaymentDate(date);
-                        setPreviewResult(null);
-                      }}
-                      showPreview={canSettle}
-                      previewLoading={previewLoading}
-                      previewError={previewError}
-                      onPreview={handlePreview}
-                      accounts={accounts}
-                      accountsLoading={accountsLoading}
-                      accountsError={accountsError}
-                      bankAccountUuid={bankAccountUuid}
-                      onBankAccountChange={setBankAccountUuid}
-                    />
-                  )}
-
-                  <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-                    <p className="mb-3 text-sm font-semibold text-neutral-dark">{isAllGroup ? '全部交易' : '待沖帳款'}</p>
-                    {!isAllGroup && <ReconPoolSummary statementAmount={statementAmount} previewResult={previewResult} />}
-                    <ReconTxnList
-                      side={side}
-                      sections={sections}
-                      showSectionHeaders={isOtherGroup}
-                      showStatusColumn={!isAllGroup}
-                      emptyMessage={isAllGroup ? '目前沒有交易' : '此群組沒有待沖帳的交易'}
-                      channelNameByUuid={sideData?.nameByUuid ?? new Map()}
-                      expandedUuid={expandedUuid}
-                      onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
-                      allocationByUuid={allocationByUuid}
-                    />
+          <ResizableSplitPane
+            defaultLeftWidth={224}
+            minLeftWidth={180}
+            maxLeftWidth={420}
+            left={<ReconGroupSidebar groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} onEditBalance={setBalanceEditKey} />}
+          >
+            {!selectedGroupKey ? (
+              <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
+                請從左側選擇{side === 'receivable' ? '銷售管道' : '廠商'}
+              </div>
+            ) : (
+              <div className={cn('flex flex-col gap-4', isAllGroup ? 'pb-4' : 'pb-20')}>
+                {submittedInfo && !isAllGroup && (
+                  <div className="rounded-md border border-semantic-success/30 bg-semantic-success-muted p-3 text-sm text-semantic-success-dark">
+                    已沖銷 {submittedInfo.matchedCount} 筆交易，共 {fmtCurrency(submittedInfo.matchedAmount)}。
                   </div>
+                )}
+
+                {!isAllGroup && !canSettle && (
+                  <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
+                    此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援預覽拆帳，請於左側切換至實際{side === 'receivable' ? '管道' : '廠商'}
+                  </div>
+                )}
+
+                {!isAllGroup && (
+                  <ReconPoolPanel
+                    side={side}
+                    statementAmount={statementAmount}
+                    feeAmount={feeAmount}
+                    onStatementChange={handleStatementChange}
+                    onFeeChange={handleFeeChange}
+                    otherDeductions={otherDeductions}
+                    onAddOtherDeduction={handleAddOtherDeduction}
+                    onRemoveOtherDeduction={handleRemoveOtherDeduction}
+                    onChangeOtherDeduction={handleChangeOtherDeduction}
+                    paymentDate={paymentDate}
+                    onPaymentDateChange={date => {
+                      setPaymentDate(date);
+                      setPreviewResult(null);
+                    }}
+                    showPreview={canSettle}
+                    previewLoading={previewLoading}
+                    previewError={previewError}
+                    onPreview={handlePreview}
+                    accounts={accounts}
+                    accountsLoading={accountsLoading}
+                    accountsError={accountsError}
+                    bankAccountUuid={bankAccountUuid}
+                    onBankAccountChange={setBankAccountUuid}
+                  />
+                )}
+
+                <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-neutral-dark">{isAllGroup ? '全部交易' : '待沖帳款'}</p>
+                  {!isAllGroup && <ReconPoolSummary statementAmount={statementAmount} previewResult={previewResult} />}
+                  <ReconTxnList
+                    side={side}
+                    sections={sections}
+                    showSectionHeaders={isOtherGroup}
+                    showStatusColumn={!isAllGroup}
+                    emptyMessage={isAllGroup ? '目前沒有交易' : '此群組沒有待沖帳的交易'}
+                    channelNameByUuid={sideData?.nameByUuid ?? new Map()}
+                    expandedUuid={expandedUuid}
+                    onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
+                    allocationByUuid={allocationByUuid}
+                  />
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </ResizableSplitPane>
         )}
       </div>
 

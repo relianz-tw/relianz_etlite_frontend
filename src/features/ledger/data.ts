@@ -51,6 +51,9 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
     source: 'invoice',
     counterpartyUuid: item.counterpartyUuid,
     voucherNumber: voucherNumberFromInvoice(item.invoice),
+    settledAmount: item.settledAmount,
+    remainingAmount: item.remainingAmount,
+    settlementStatus: item.settlementStatus,
   }));
 }
 
@@ -72,6 +75,9 @@ export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesR
       voucherNumber: voucherNumberFromInvoice(item.invoice),
       voided: false,
       allowances: [],
+      settledAmount: item.settledAmount,
+      remainingAmount: item.remainingAmount,
+      settlementStatus: item.settlementStatus,
     };
   });
 }

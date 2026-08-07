@@ -14,6 +14,7 @@ import TextInput from '@/components/ui/TextInput';
 import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { CirclePlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -97,7 +98,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     if (side !== 'sales') return;
     listChannelRules()
       .then(list => setChannelRules(list.filter(c => c.isActive)))
-      .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
+      .catch(err => setChannelError(getFriendlyErrorMessage(err)));
   }, [side]);
 
   // 廠商改為串接真實廠商名單（與設定頁「廠商管理」同一份 API），取代純文字輸入；僅進項新增需要，只載入一次
@@ -105,7 +106,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     if (side !== 'purchase') return;
     listVendors()
       .then(list => setVendors(list.filter(v => v.isActive)))
-      .catch(err => setVendorError(err instanceof Error ? err.message : '操作失敗'));
+      .catch(err => setVendorError(getFriendlyErrorMessage(err)));
   }, [side]);
 
   // 開啟「新增管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
@@ -116,7 +117,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
         setBankAccounts(list.filter(a => a.isActive).map(toBankAccountRecord));
         setBankAccountsLoaded(true);
       })
-      .catch(err => setChannelError(err instanceof Error ? err.message : '操作失敗'));
+      .catch(err => setChannelError(getFriendlyErrorMessage(err)));
   }, [newChannelOpen, bankAccountsLoaded]);
 
   // 新增管道成功後直接加入清單並選取，沿用設定頁 ChannelRuleDialog／createChannelRule 的表單與驗證邏輯

@@ -4,6 +4,7 @@ import { createChannelRule, listChannelRules, updateChannelRule } from '@/api/ch
 import type { ChannelRuleDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
@@ -46,7 +47,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     setLoadError('');
     listChannelRules()
       .then(list => setRules(list.map(toChannelRuleRecord)))
-      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -81,7 +82,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
       await updateChannelRule({ ...body, uuid: id, isActive: false });
       loadRules();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSavingId(null);
     }
@@ -95,7 +96,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
       await updateChannelRule({ ...body, uuid: id, isActive: true });
       loadRules();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSavingId(null);
     }

@@ -3,7 +3,7 @@
 import type { EntryDetailSettleEventDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
 
 interface SettlementReverseConfirmModalProps {
@@ -29,7 +29,7 @@ export default function SettlementReverseConfirmModal({ open, event, submitting,
       <div className="flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-neutral-mid">沖帳日期</span>
-          <span className="font-mono font-semibold tabular-nums text-neutral-dark">{formatYyyymmdd(event.paymentDate)}</span>
+          <span className="font-mono font-semibold tabular-nums text-neutral-dark">{formatYyyymmddRoc(event.paymentDate)}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-neutral-mid">沖帳金額</span>

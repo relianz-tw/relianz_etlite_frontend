@@ -1,6 +1,6 @@
 'use client';
 
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import type { LinkedLedgerTxn } from '../types';
 
 /** 欄寬比照帳簿表格（交易編號/交易金額/交易敘述/費用類別/專案名稱/開立日期），純文字呈現、無互動元件 */
@@ -42,7 +42,7 @@ export default function InlineLinkedTransactions({ items }: { items: LinkedLedge
             </span>
             <span className="truncate text-neutral-mid">{item.category || '—'}</span>
             <span className="truncate text-neutral-mid">{item.project || '—'}</span>
-            <span className="font-mono text-neutral-mid">{formatYyyymmdd(item.date)}</span>
+            <span className="font-mono text-neutral-mid">{formatYyyymmddRoc(item.date)}</span>
           </div>
         ))}
       </div>
@@ -58,7 +58,7 @@ export default function InlineLinkedTransactions({ items }: { items: LinkedLedge
             <div className="flex flex-wrap gap-x-3 text-neutral-mid">
               <span>{item.category || '—'}</span>
               <span>{item.project || '—'}</span>
-              <span className="font-mono">{formatYyyymmdd(item.date)}</span>
+              <span className="font-mono">{formatYyyymmddRoc(item.date)}</span>
             </div>
           </div>
         ))}

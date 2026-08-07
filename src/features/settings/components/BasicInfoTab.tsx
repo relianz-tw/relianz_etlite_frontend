@@ -3,6 +3,7 @@
 import { getBasicSetting, updateBasicSetting } from '@/api/basicSettings';
 import type { BasicSettingDto } from '@/api/types';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Check, KeyRound, Pencil, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BASIC_INFO_LABOR_RISK } from '../data';
@@ -71,7 +72,7 @@ export default function BasicInfoTab() {
         setReadonlyFields(toReadonlyFields(dto));
         setEditableFields(toEditableFields(dto));
       })
-      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -95,7 +96,7 @@ export default function BasicInfoTab() {
       await updateBasicSetting(editableFields);
       setEditing(false);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '操作失敗');
+      setSaveError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }

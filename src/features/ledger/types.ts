@@ -71,6 +71,12 @@ export interface SalesRow {
   voided: boolean;
   allowances: AllowanceRecord[];
   children?: SubRow[];
+  /** 已沖帳金額（累計）；僅應收帳款/應付帳款分頁顯示，已收款/已付款分頁不需要 */
+  settledAmount?: number;
+  /** 未沖帳金額；可為負，代表超沖 */
+  remainingAmount?: number;
+  /** 0平衡 1超沖 2少沖 */
+  settlementStatus?: number;
 }
 
 export interface PurchaseRow {
@@ -88,4 +94,10 @@ export interface PurchaseRow {
   /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
   voucherNumber?: string;
   children?: SubRow[];
+  /** 已沖帳金額（累計）；僅應收帳款/應付帳款分頁顯示，已收款/已付款分頁不需要 */
+  settledAmount?: number;
+  /** 未沖帳金額；可為負，代表超沖 */
+  remainingAmount?: number;
+  /** 0平衡 1超沖 2少沖 */
+  settlementStatus?: number;
 }

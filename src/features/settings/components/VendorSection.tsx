@@ -4,6 +4,7 @@ import { createVendor, listVendors, updateVendor } from '@/api/vendors';
 import type { UpdateVendorBody, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { VendorRecord } from '../data';
@@ -65,7 +66,7 @@ export default function VendorSection() {
     setLoadError('');
     listVendors()
       .then(list => setVendors(list.map(toVendorRecord)))
-      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -107,7 +108,7 @@ export default function VendorSection() {
       await updateVendor(toUpdateVendorBody({ ...vendor, isActive: false }));
       loadVendors();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSavingId(null);
     }
@@ -120,7 +121,7 @@ export default function VendorSection() {
       await updateVendor(toUpdateVendorBody({ ...vendor, isActive: true }));
       loadVendors();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSavingId(null);
     }
@@ -175,9 +176,7 @@ export default function VendorSection() {
                     className={`border-b border-neutral-blue-gray/20 last:border-0 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
                   >
                     <td className="whitespace-nowrap px-4 py-3.5 font-mono text-neutral-dark">{vendor.taxId || '—'}</td>
-                    <td className="truncate px-4 py-3.5 text-neutral-dark" title={vendor.name}>
-                      {vendor.name || '—'}
-                    </td>
+                    <td className="whitespace-normal break-words px-4 py-3.5 text-neutral-dark">{vendor.name || '—'}</td>
                     <td className="truncate px-4 py-3.5 text-neutral-mid" title={vendor.address}>
                       {vendor.address || '—'}
                     </td>
@@ -222,7 +221,9 @@ export default function VendorSection() {
               <div key={vendor.id} className="flex flex-col gap-1.5 rounded-lg border border-neutral-blue-gray/30 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="truncate font-semibold text-neutral-dark">{vendor.name || vendor.taxId}</span>
+                    <span className="truncate font-semibold text-neutral-dark" title={vendor.name || vendor.taxId}>
+                      {vendor.name || vendor.taxId}
+                    </span>
                     {vendor.isActive ? (
                       <Badge tone="success" variant="muted">
                         啟用中

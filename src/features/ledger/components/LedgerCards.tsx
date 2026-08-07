@@ -17,6 +17,7 @@ import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortS
 import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
 import ManualEntryDialog from './ManualEntryDialog';
+import SettlementStatusCell from './SettlementStatusCell';
 
 const SORT_KEY_LABELS: Record<SortKey, string> = {
   id: '交易編號',
@@ -191,7 +192,12 @@ function SalesCard({
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.counterparty}>{row.counterparty}</div>
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+          {subTab === 'receivable' && (
+            <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
+          )}
+        </div>
         {!selectionMode && (
           <div className="flex flex-wrap justify-end gap-1.5" onClick={e => e.stopPropagation()}>
             {subTab === 'receivable' && (
@@ -264,7 +270,12 @@ function PurchaseCard({
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.party}>{row.party}</div>
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+          {subTab === 'payable' && (
+            <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
+          )}
+        </div>
         {!selectionMode && subTab === 'payable' && (
           <div onClick={e => e.stopPropagation()}>
             <Button size="sm" variant="outline" icon={DollarSign} onClick={onManualEntry}>
@@ -314,6 +325,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
         depositAmount: allocation.actualAmount,
         memo: '',
         allocations,
+        otherDeductions: allocation.otherDeductions,
       });
       props.onReceivableSettled?.();
     } else {
@@ -325,6 +337,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
         paymentAmount: allocation.actualAmount,
         memo: '',
         allocations,
+        otherDeductions: allocation.otherDeductions,
       });
       props.onPayableSettled?.();
     }

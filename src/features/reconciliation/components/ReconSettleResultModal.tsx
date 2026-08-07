@@ -3,7 +3,8 @@
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { fmtCurrency } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { getSettlementStatusBadge } from '@/lib/settlementStatus';
 import type { ReconSettleResult, ReconSide } from '../types';
 
 interface ReconSettleResultModalProps {
@@ -13,15 +14,6 @@ interface ReconSettleResultModalProps {
   result: ReconSettleResult | null;
   onClose: () => void;
 }
-
-type BadgeTone = 'success' | 'error' | 'info' | 'neutral';
-
-/** settlementStatus：0平衡 1超沖 2少沖；比照既有沖帳狀態徽章配色慣例 */
-const SETTLEMENT_STATUS_BADGE: Record<number, { label: string; tone: BadgeTone }> = {
-  0: { label: '平衡', tone: 'success' },
-  1: { label: '超沖', tone: 'error' },
-  2: { label: '少沖', tone: 'info' },
-};
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
@@ -37,7 +29,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
     { label: '沖前餘額', value: fmtCurrency(result.balanceBefore) },
     { label: '沖後餘額', value: fmtCurrency(result.balanceAfter) },
     { label: '差額處理方式', value: result.isBalance ? '記入餘額' : '沖入最後一筆' },
-    { label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '', value: result.paymentDate ?? '' },
+    { label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '', value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '' },
     { label: '結算單號', value: result.settlementOrderCode ?? '—' },
   ].filter(row => row.label);
 
@@ -55,7 +47,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
       {/* 行動版：卡片式列表，避免窄螢幕橫向滑動表格導致狀態欄被切到看不見 */}
       <div className="mt-4 flex flex-col gap-2 nav:hidden">
         {result.allocations.map(a => {
-          const badge = SETTLEMENT_STATUS_BADGE[a.settlementStatus] ?? { label: '未知狀態', tone: 'neutral' as const };
+          const badge = getSettlementStatusBadge(a.settlementStatus);
           return (
             <div key={a.ledgerUuid} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
               <div className="flex items-center justify-between gap-2">
@@ -64,7 +56,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
                   {badge.label}
                 </Badge>
               </div>
-              <span className="font-mono text-xs text-neutral-mid">{a.transactionDate ?? '—'}</span>
+              <span className="font-mono text-xs text-neutral-mid">{a.transactionDate ? formatYyyymmddRoc(a.transactionDate) : '—'}</span>
               <div className="mt-2 flex flex-col gap-1 text-sm">
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-neutral-mid">沖前剩餘</span>
@@ -99,11 +91,11 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
           </thead>
           <tbody>
             {result.allocations.map((a, i) => {
-              const badge = SETTLEMENT_STATUS_BADGE[a.settlementStatus] ?? { label: '未知狀態', tone: 'neutral' as const };
+              const badge = getSettlementStatusBadge(a.settlementStatus);
               return (
                 <tr key={a.ledgerUuid} className={`border-b border-neutral-blue-gray/20 last:border-0 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}>
                   <td className={tdClass}>{a.orderCode}</td>
-                  <td className={`${tdClass} font-mono`}>{a.transactionDate ?? '—'}</td>
+                  <td className={`${tdClass} font-mono`}>{a.transactionDate ? formatYyyymmddRoc(a.transactionDate) : '—'}</td>
                   <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(a.beforeRemaining)}</td>
                   <td className={`${tdClass} text-right font-mono tabular-nums font-semibold`}>{fmtCurrency(a.settleAmount)}</td>
                   <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(a.afterRemaining)}</td>

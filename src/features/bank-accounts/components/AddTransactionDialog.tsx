@@ -8,6 +8,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import TextInput from '@/components/ui/TextInput';
 import Textarea from '@/components/ui/Textarea';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
 import type { NewBankTransactionInput } from '../types';
 
@@ -105,7 +106,7 @@ export default function AddTransactionDialog({ open, onClose, bankAccountUuid, o
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       setSubmitting(false);
     }
   };

@@ -6,6 +6,7 @@ import type { ChannelRuleDto, VendorDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
 import type { ReconSide } from '../types';
 
@@ -77,7 +78,7 @@ export default function ReconBalanceEditModal({ open, side, channelRule, vendor,
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       setSubmitting(false);
     }
   };

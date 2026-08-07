@@ -1,7 +1,7 @@
 import type { EntryDetailSettleEventDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import type { Side } from '../../types';
 
 interface TransactionSettlementHistoryProps {
@@ -34,7 +34,7 @@ export default function TransactionSettlementHistory({ side, settleEvents, onEdi
               <div key={event.settleEventUuid} className={`flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0 ${event.isReverse ? 'text-neutral-mid' : ''}`}>
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex items-center gap-2 font-medium text-neutral-dark">
-                    {formatYyyymmdd(event.paymentDate)}
+                    {formatYyyymmddRoc(event.paymentDate)}
                     {methodLabel && (
                       <Badge tone={event.reconMethod === 0 ? 'neutral' : 'info'} variant="muted">
                         {methodLabel}

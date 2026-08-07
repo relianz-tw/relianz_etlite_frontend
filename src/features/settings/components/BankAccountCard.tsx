@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
-import { formatYyyymmdd } from '@/lib/utils';
+import { formatYyyymmddRoc } from '@/lib/utils';
 import { Check, HandCoins, Pencil, Power, PowerOff, Wallet, X } from 'lucide-react';
 import type { BankAccountRecord } from '../data';
 
@@ -77,7 +77,7 @@ export default function BankAccountCard({
               onChange={v => onChange({ balance: v })}
             />
             <p className="mt-1 text-xs text-neutral-mid">
-              更新日期：{account.lastBalanceUpdateDate ? formatYyyymmdd(account.lastBalanceUpdateDate) : '尚無紀錄'}
+              更新日期：{account.lastBalanceUpdateDate ? formatYyyymmddRoc(account.lastBalanceUpdateDate) : '尚無紀錄'}
             </p>
           </div>
         </div>

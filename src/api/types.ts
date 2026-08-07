@@ -458,6 +458,8 @@ export interface ManualSettleAllocation {
   feeAmount: number;
   /** YYYYMMDD */
   paymentDate: string;
+  /** 額外扣款項（可無限新增），使用者未新增任何額外金額時不傳此欄位 */
+  otherDeductions?: SettleSummaryOtherDeduction[];
 }
 
 /**

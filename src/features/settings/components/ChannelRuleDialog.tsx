@@ -7,6 +7,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
 import { SETTLEMENT_MONTH_DAYS, SETTLEMENT_STYLE, SETTLEMENT_WEEKDAYS } from '../data';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
@@ -66,7 +67,7 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
       await onSubmit(form);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       setSubmitting(false);
     }
   };

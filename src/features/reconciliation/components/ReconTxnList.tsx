@@ -104,7 +104,9 @@ function TxnRow({
               <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
-          <span className="truncate text-sm text-neutral-dark">{secondaryText}</span>
+          <span className="truncate text-sm text-neutral-dark" title={secondaryText}>
+            {secondaryText}
+          </span>
           <span className="font-mono text-xs text-neutral-mid">憑證 {row.voucherNumber || '—'}</span>
           <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>

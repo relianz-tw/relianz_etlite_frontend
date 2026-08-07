@@ -2,7 +2,7 @@
 
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { LinkedLedgerTxn } from '../types';
@@ -34,7 +34,7 @@ export default function LinkedTransactionList({ items }: { items: LinkedLedgerTx
                   {item.itemSummary}・發票號碼 <span className="font-mono">{item.invoiceNo}</span>
                 </p>
                 <div className="flex items-center gap-3 text-xs text-neutral-mid">
-                  <span className="font-mono">{formatYyyymmdd(item.date)}</span>
+                  <span className="font-mono">{formatYyyymmddRoc(item.date)}</span>
                   <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(item.amount)}</span>
                 </div>
               </div>

@@ -7,8 +7,10 @@ import DatePicker from '@/components/ui/DatePicker';
 import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Modal from '@/components/ui/Modal';
+import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import Select from '@/components/ui/Select';
-import { useEffect, useState } from 'react';
+import { getFriendlyErrorMessage } from '@/lib/errors';
+import { useEffect, useRef, useState } from 'react';
 import { formatYmd } from '../transaction/data';
 import type { PurchaseRow, SalesRow, Side } from '../types';
 
@@ -49,8 +51,19 @@ function ManualEntryDialogContent({
   const [entryDate, setEntryDate] = useState<Date | undefined>(scheduledDate);
   const [amount, setAmount] = useState(row.amount);
   const [fee, setFee] = useState(0);
+  // 額外金額（otherDeductions）：id 以遞增計數器產生，避免使用 Date.now()/Math.random()
+  const [otherDeductions, setOtherDeductions] = useState<OtherDeductionRow[]>([]);
+  const otherDeductionIdRef = useRef(0);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleAddOtherDeduction = () => {
+    otherDeductionIdRef.current += 1;
+    setOtherDeductions(prev => [...prev, { id: `OD-${otherDeductionIdRef.current}`, subject: null, name: '', amount: 0 }]);
+  };
+  const handleRemoveOtherDeduction = (id: string) => setOtherDeductions(prev => prev.filter(r => r.id !== id));
+  const handleChangeOtherDeduction = (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) =>
+    setOtherDeductions(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
 
   // 收/付款戶頭：抓取啟用中銀行帳戶清單，銷項預設收款帳戶（isDefaultReceivingAccount）、
   // 進項預設付款帳戶（isDefaultPaymentAccount）；進項不顯示選擇 UI，僅內部帶入 API 所需欄位
@@ -64,13 +77,14 @@ function ManualEntryDialogContent({
     listBankAccounts()
       .then(list => {
         if (cancelled) return;
-        setAccounts(list);
-        const defaultAccount = list.find(account => (isSales ? account.isDefaultReceivingAccount : account.isDefaultPaymentAccount)) ?? list[0];
+        const activeList = list.filter(account => account.isActive);
+        setAccounts(activeList);
+        const defaultAccount = activeList.find(account => (isSales ? account.isDefaultReceivingAccount : account.isDefaultPaymentAccount)) ?? activeList[0];
         if (defaultAccount) setBankAccountUuid(defaultAccount.uuid);
       })
       .catch(err => {
         if (cancelled) return;
-        setAccountsError(err instanceof Error ? err.message : '操作失敗');
+        setAccountsError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -80,12 +94,12 @@ function ManualEntryDialogContent({
     };
   }, [isSales]);
 
-  // 進項不顯示手續費／實際存入金額欄位：手續費固定 0、存入金額即交易金額
-  const depositAmount = isSales ? amount - fee : amount;
+  const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
+  const depositAmount = amount - fee - otherDeductionsTotal;
 
   const handleSubmit = async () => {
     if (!row.uuid) {
-      setError(`查無${isSales ? '應收' : '應付'}帳款 uuid，請重新整理列表後再試`);
+      setError(`查無${isSales ? '應收' : '應付'}帳款紀錄，請重新整理列表後再試`);
       return;
     }
     if (amount <= 0) {
@@ -94,6 +108,14 @@ function ManualEntryDialogContent({
     }
     if (!bankAccountUuid) {
       setError(isSales ? '請選擇收款戶頭' : '找不到可用的付款戶頭，請確認銀行帳戶設定');
+      return;
+    }
+    if (depositAmount < 0) {
+      setError('手續費與額外金額總和不可超過交易金額');
+      return;
+    }
+    if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount <= 0)) {
+      setError('請完整填寫額外金額的科目、名稱與金額');
       return;
     }
     const paymentDate = formatYmd(entryDate);
@@ -109,12 +131,16 @@ function ManualEntryDialogContent({
         amount,
         bankAccountUuid,
         actualAmount: depositAmount,
-        feeAmount: isSales ? fee : 0,
+        feeAmount: fee,
         paymentDate,
+        otherDeductions:
+          otherDeductions.length > 0
+            ? otherDeductions.map(r => ({ name: r.name, amount: r.amount, officialAccountingSubjectId: r.subject!.id! }))
+            : undefined,
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       setSubmitting(false);
     }
   };
@@ -155,18 +181,24 @@ function ManualEntryDialogContent({
           </span>
           <MoneyInput widthClassName="w-36" value={amount} onChange={setAmount} />
         </div>
-        {isSales && (
-          <>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-neutral-dark">各項手續費</span>
-              <MoneyInput widthClassName="w-36" value={fee} onChange={setFee} />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-neutral-dark">存入金額</span>
-              <MoneyInput widthClassName="w-36" value={depositAmount} disabled readOnly />
-            </div>
-          </>
-        )}
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm font-semibold text-neutral-dark">各項手續費</span>
+          <MoneyInput widthClassName="w-36" value={fee} onChange={setFee} />
+        </div>
+
+        <OtherDeductionsEditor
+          rows={otherDeductions}
+          onAdd={handleAddOtherDeduction}
+          onRemove={handleRemoveOtherDeduction}
+          onChange={handleChangeOtherDeduction}
+        />
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm font-semibold text-neutral-dark">{isSales ? '存入金額' : '實際付款金額'}</span>
+          <MoneyInput widthClassName="w-36" value={depositAmount} disabled readOnly />
+        </div>
+        {depositAmount < 0 && <p className="text-xs text-semantic-error">手續費與額外金額總和不可超過交易金額</p>}
 
         {error && <p className="text-xs text-semantic-error">{error}</p>}
       </div>

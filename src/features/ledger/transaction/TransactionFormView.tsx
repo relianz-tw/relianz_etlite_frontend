@@ -4,6 +4,7 @@ import { createPayable, createReceivable, fetchEntryDetail, reverseManualSettle,
 import type { CreatePayableBody, CreateReceivableBody, EntryDetailEntryDto, EntryDetailSettleEventDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -154,7 +155,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       })
       .catch(err => {
         if (cancelled) return;
-        setDetailError(err instanceof Error ? err.message : '操作失敗');
+        setDetailError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setDetailLoading(false);
@@ -190,7 +191,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       setReverseTarget(null);
       reloadDetail();
     } catch (err) {
-      setReverseError(err instanceof Error ? err.message : '操作失敗');
+      setReverseError(getFriendlyErrorMessage(err));
     } finally {
       setReverseSubmitting(false);
     }
@@ -222,7 +223,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       }
       router.push(backHref);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '操作失敗');
+      setSubmitError(getFriendlyErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

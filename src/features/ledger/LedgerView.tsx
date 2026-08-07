@@ -9,6 +9,7 @@ import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import TabBar from '@/components/ui/TabBar';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, sortRows } from '@/lib/utils';
 import { Download } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -147,7 +148,7 @@ export default function LedgerView() {
       })
       .catch(err => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : '操作失敗');
+        setError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

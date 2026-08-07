@@ -7,6 +7,7 @@ import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { numberToChineseNumeral, todayYyyymmdd } from '@/lib/utils';
 import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -80,7 +81,7 @@ export default function PaymentSettingsTab() {
     setLoadError('');
     listBankAccounts()
       .then(list => setAccounts(list.map(toBankAccountRecord)))
-      .catch(err => setLoadError(err instanceof Error ? err.message : '操作失敗'))
+      .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -115,20 +116,22 @@ export default function PaymentSettingsTab() {
       setDraft(null);
       loadAccounts();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }
   };
 
+  // 停用時若該帳戶正是目前的預設收/付款戶頭，一併清除預設標記，避免停用中的帳戶仍被標示為預設，
+  // 造成畫面上「預設戶頭已停用」的矛盾狀態
   const deactivateAccount = async (account: BankAccountRecord) => {
     setSaving(true);
     setActionError('');
     try {
-      await updateBankAccount(toUpdateBody({ ...account, isActive: false }));
+      await updateBankAccount(toUpdateBody({ ...account, isActive: false, isDefaultPaymentAccount: false, isDefaultReceivingAccount: false }));
       loadAccounts();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -141,7 +144,7 @@ export default function PaymentSettingsTab() {
       await updateBankAccount(toUpdateBody({ ...account, isActive: true }));
       loadAccounts();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -160,7 +163,7 @@ export default function PaymentSettingsTab() {
       await updateBankAccount(toUpdateBody({ ...target, [field]: true }));
       loadAccounts();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -187,7 +190,7 @@ export default function PaymentSettingsTab() {
       setAdding(false);
       loadAccounts();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失敗');
+      setActionError(getFriendlyErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -323,7 +326,16 @@ export default function PaymentSettingsTab() {
           if (pendingDeactivate) deactivateAccount(pendingDeactivate);
         }}
         title="停用銀行帳戶"
-        message={`確定要停用「${pendingDeactivate?.nickname}」嗎？停用後可於帳戶清單重新啟用。`}
+        message={
+          pendingDeactivate?.isDefaultPaymentAccount || pendingDeactivate?.isDefaultReceivingAccount
+            ? `「${pendingDeactivate?.nickname}」目前是預設${[
+                pendingDeactivate?.isDefaultReceivingAccount ? '收款' : null,
+                pendingDeactivate?.isDefaultPaymentAccount ? '付款' : null,
+              ]
+                .filter(Boolean)
+                .join('／')}戶頭，停用後將自動取消預設標記，請記得於帳戶清單重新指定其他預設戶頭。確定要停用嗎？`
+            : `確定要停用「${pendingDeactivate?.nickname}」嗎？停用後可於帳戶清單重新啟用。`
+        }
         confirmLabel="確定停用"
       />
     </div>

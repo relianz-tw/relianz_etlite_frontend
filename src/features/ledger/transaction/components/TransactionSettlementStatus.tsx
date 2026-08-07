@@ -1,6 +1,7 @@
 import type { EntryDetailEntryDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import { fmtCurrency } from '@/lib/utils';
+import { getSettlementStatusBadge } from '@/lib/settlementStatus';
 import { CircleDollarSign, Scale, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -10,17 +11,8 @@ interface StatusRow {
   value: ReactNode;
 }
 
-type BadgeTone = 'success' | 'error' | 'info' | 'neutral';
-
-/** entry.settlementStatus：0平衡 1超沖 2少沖；未知值一律顯示中性樣式，避免畫面出錯 */
-const SETTLEMENT_STATUS_BADGE: Record<number, { label: string; tone: BadgeTone }> = {
-  0: { label: '平衡', tone: 'success' },
-  1: { label: '超沖', tone: 'error' },
-  2: { label: '少沖', tone: 'info' },
-};
-
 export default function TransactionSettlementStatus({ entry }: { entry: EntryDetailEntryDto }) {
-  const statusBadge = SETTLEMENT_STATUS_BADGE[entry.settlementStatus] ?? { label: '未知狀態', tone: 'neutral' as const };
+  const statusBadge = getSettlementStatusBadge(entry.settlementStatus);
 
   const rows: StatusRow[] = [
     { icon: CircleDollarSign, label: '已沖金額', value: fmtCurrency(entry.settledAmount) },

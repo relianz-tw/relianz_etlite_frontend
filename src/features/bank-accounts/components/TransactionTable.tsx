@@ -1,7 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Fragment } from 'react';
@@ -36,7 +36,7 @@ function ExpandedDetail({ row, detailHref }: { row: BankTransactionRow; detailHr
         <div />
         <div className="px-4">
           <p className="text-xs text-neutral-mid">帳務時間</p>
-          <p className="mt-0.5 font-mono font-medium text-neutral-dark">{formatYyyymmdd(row.accountingDate)}</p>
+          <p className="mt-0.5 font-mono font-medium text-neutral-dark">{formatYyyymmddRoc(row.accountingDate)}</p>
         </div>
         <div className="min-w-0 px-4">
           <p className="text-xs text-neutral-mid">摘要</p>
@@ -114,8 +114,8 @@ export default function TransactionTable({ rows, totalCount, expandedId, onToggl
                       expanded ? 'bg-brand-blue/5' : i % 2 === 1 ? 'bg-surface-warm/30' : ''
                     }`}
                   >
-                    <td className={`${tdClass} font-mono`}>{formatYyyymmdd(row.transactionDate)}</td>
-                    <td className={`${tdClass} font-mono text-neutral-mid`}>{formatYyyymmdd(row.accountingDate)}</td>
+                    <td className={`${tdClass} font-mono`}>{formatYyyymmddRoc(row.transactionDate)}</td>
+                    <td className={`${tdClass} font-mono text-neutral-mid`}>{formatYyyymmddRoc(row.accountingDate)}</td>
                     <td className={`${tdClass} truncate`} title={row.summary}>
                       <span className="inline-flex items-center gap-1.5">
                         <ChevronDown size={14} className={`shrink-0 text-neutral-mid transition-transform ${expanded ? 'rotate-180' : ''}`} />

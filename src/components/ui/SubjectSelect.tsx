@@ -2,6 +2,7 @@
 
 import { listOfficialSubjects, listSubjectUsage } from '@/api/subjects';
 import type { OfficialSubjectDto } from '@/api/types';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Check, ChevronDown, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -41,7 +42,7 @@ export default function SubjectSelect({ value, onChange, disabled, placeholder =
         setFrequentNames(usageList.map(u => u.subjectName));
         setLoaded(true);
       })
-      .catch(err => setError(err instanceof Error ? err.message : '操作失敗'))
+      .catch(err => setError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [open, loaded]);
 

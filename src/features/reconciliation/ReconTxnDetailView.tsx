@@ -3,6 +3,7 @@
 import { fetchEntryDetail } from '@/api/ledger';
 import type { EntryInvoiceDetailDto } from '@/api/types';
 import VoucherPreviewCard from '@/components/ui/VoucherPreviewCard';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -54,7 +55,7 @@ export default function ReconTxnDetailView({ transactionId, side, counterparty }
       })
       .catch(err => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : '操作失敗');
+        setError(getFriendlyErrorMessage(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

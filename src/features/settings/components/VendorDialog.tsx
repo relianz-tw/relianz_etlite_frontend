@@ -6,6 +6,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { vendorExists } from '@/api/vendors';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
 import type { VendorRecord } from '../data';
 
@@ -71,7 +72,7 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
       await onSubmit(form);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失敗');
+      setError(getFriendlyErrorMessage(err));
       setSubmitting(false);
     }
   };

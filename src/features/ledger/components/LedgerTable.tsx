@@ -8,7 +8,7 @@ import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import Select from '@/components/ui/Select';
 import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, DollarSign, Download, FileMinus } from 'lucide-react';
-import { fmtCurrency } from '@/lib/utils';
+import { cn, fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Fragment, useState } from 'react';
@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import ManualEntryDialog from './ManualEntryDialog';
+import SettlementStatusCell from './SettlementStatusCell';
 
 type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
   | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void; channelNameByUuid: Map<string, string> }
@@ -232,6 +233,7 @@ export default function LedgerTable(props: LedgerTableProps) {
         depositAmount: allocation.actualAmount,
         memo: '',
         allocations,
+        otherDeductions: allocation.otherDeductions,
       });
       props.onReceivableSettled?.();
     } else {
@@ -243,6 +245,7 @@ export default function LedgerTable(props: LedgerTableProps) {
         paymentAmount: allocation.actualAmount,
         memo: '',
         allocations,
+        otherDeductions: allocation.otherDeductions,
       });
       props.onPayableSettled?.();
     }
@@ -261,6 +264,9 @@ export default function LedgerTable(props: LedgerTableProps) {
   if (props.side === 'sales') {
     const { subTab, rows, totalCount, totalAmount, sort, onSortToggle, channelNameByUuid } = props;
     const showChannel = subTab === 'received';
+    // 沖帳狀態（已沖/剩餘/超沖）僅應收帳款分頁顯示，已收款分頁已結清、參考價值低故不顯示；
+    // 併入交易金額欄位內顯示（而非另闢欄位），避免再擠壓買受人欄位可用寬度
+    const showSettlement = subTab === 'receivable';
     return (
       <>
       {dialogs}
@@ -271,7 +277,7 @@ export default function LedgerTable(props: LedgerTableProps) {
           <colgroup>
             <col className="w-10" />
             <col className="w-[160px]" />
-            <col className="w-[150px]" />
+            <col className={showSettlement ? 'w-[170px]' : 'w-[150px]'} />
             <col />
             {showChannel && <col className="w-[150px]" />}
             <col className="w-[120px]" />
@@ -324,8 +330,15 @@ export default function LedgerTable(props: LedgerTableProps) {
                       </Link>
                     </div>
                   </td>
-                  <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
-                  <td className={`${tdClass} truncate`} title={row.counterparty}>{row.counterparty}</td>
+                  <td className={`${tdClass} whitespace-normal text-right`}>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="font-mono font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
+                      {showSettlement && (
+                        <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
+                      )}
+                    </div>
+                  </td>
+                  <td className={cn(tdClass, 'whitespace-normal break-words')}>{row.counterparty}</td>
                   {showChannel && (
                     <td className={`${tdClass} truncate text-neutral-mid`} title={channelLabel(row, channelNameByUuid)}>
                       {channelLabel(row, channelNameByUuid)}
@@ -418,7 +431,7 @@ export default function LedgerTable(props: LedgerTableProps) {
         <colgroup>
           <col className="w-10" />
           <col className="w-[160px]" />
-          <col className="w-[150px]" />
+          <col className={showAction ? 'w-[170px]' : 'w-[150px]'} />
           <col />
           <col className="w-[190px]" />
           <col className="w-[150px]" />
@@ -480,8 +493,15 @@ export default function LedgerTable(props: LedgerTableProps) {
                       </Link>
                     </div>
                   </td>
-                  <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.amount)}</td>
-                  <td className={`${tdClass} truncate`} title={row.party}>{row.party}</td>
+                  <td className={`${tdClass} whitespace-normal text-right`}>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="font-mono font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
+                      {showAction && (
+                        <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
+                      )}
+                    </div>
+                  </td>
+                  <td className={cn(tdClass, 'whitespace-normal break-words')}>{row.party}</td>
                   <td className={tdClass}>
                     <div className="w-44">
                       <SubjectNameSelect

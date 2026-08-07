@@ -1,7 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
-import { fmtCurrency, formatYyyymmdd } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import InlineLinkedTransactions from './InlineLinkedTransactions';
@@ -34,7 +34,7 @@ export default function TransactionCards({ rows, expandedId, onToggle, detailHre
           <div key={row.id} className="rounded-lg border border-neutral-blue-gray/30 bg-white">
             <button type="button" onClick={() => onToggle(row.id)} className="flex w-full flex-col gap-1.5 p-4 text-left">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs text-neutral-mid">{formatYyyymmdd(row.transactionDate)}</span>
+                <span className="font-mono text-xs text-neutral-mid">{formatYyyymmddRoc(row.transactionDate)}</span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-neutral-dark">餘額 {fmtCurrency(row.balance)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
@@ -56,7 +56,7 @@ export default function TransactionCards({ rows, expandedId, onToggle, detailHre
                 </div>
                 <div>
                   <p className="text-xs text-neutral-mid">帳務時間</p>
-                  <p className="mt-0.5 font-mono font-medium text-neutral-dark">{formatYyyymmdd(row.accountingDate)}</p>
+                  <p className="mt-0.5 font-mono font-medium text-neutral-dark">{formatYyyymmddRoc(row.accountingDate)}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-neutral-mid">備註</p>

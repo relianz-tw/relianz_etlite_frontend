@@ -20,10 +20,11 @@ interface ReconGroupSidebarProps {
  * 「全部管道」與前端合成的「其他」無對應實體，group.balance 為 undefined，不顯示餘額列與編輯按鈕。
  * 桌機為卡片化直向清單（與全站主導覽的側邊欄樣式區隔，避免雙左欄視覺混淆）；
  * 手機收合為頂部水平 chips 橫向捲動。「全部管道」與其後管道間加一條分隔線，區隔總覽與個別管道。
+ * 寬度由外層 ResizableSplitPane 控制（可拖曳調整），此處桌機恆為 w-full 填滿外層容器。
  */
 export default function ReconGroupSidebar({ groups, selectedKey, onSelect, onEditBalance }: ReconGroupSidebarProps) {
   return (
-    <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-2 nav:w-56 nav:shrink-0 nav:p-3">
+    <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-2 nav:w-full nav:p-3">
       <div className="flex gap-2 overflow-x-auto nav:flex-col nav:gap-1 nav:overflow-visible">
         {groups.map((group, index) => {
           const active = group.key === selectedKey;

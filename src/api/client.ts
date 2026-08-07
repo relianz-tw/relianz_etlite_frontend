@@ -1,8 +1,9 @@
 /**
  * 帳簿區後端 API 共用 fetch 封裝。
  * 所有回應皆包在固定信封 { success, data, errorCode, message } 中（見 docs/api/ledger-api.md 0.2 節），
- * 這裡統一拆封：成功回傳 data，失敗一律 throw Error(message)，由呼叫端 catch 依專案慣例
- * （error instanceof Error ? error.message : '操作失敗'）呈現錯誤訊息。
+ * 這裡統一拆封：成功回傳 data，失敗一律 throw Error(message)，由呼叫端 catch 統一呼叫
+ * getFriendlyErrorMessage(err)（見 @/lib/errors）轉為使用者可讀訊息後呈現，避免後端訊息中
+ * 可能夾帶的技術字眼（欄位名稱、旗標等）直接外洩到畫面。
  */
 
 interface ApiEnvelope<T> {

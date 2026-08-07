@@ -2,6 +2,7 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import VoucherPreviewCard from '@/components/ui/VoucherPreviewCard';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -53,7 +54,7 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
         }
         setRow(result);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : '操作失敗');
+        if (!cancelled) setError(getFriendlyErrorMessage(err));
       } finally {
         if (!cancelled) setLoading(false);
       }
