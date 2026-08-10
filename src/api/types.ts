@@ -479,6 +479,8 @@ export interface SettleReceivableBody {
   settleAmount: number;
   /** 實際存入 */
   depositAmount: number;
+  /** 使用餘額 */
+  balanceUsed: number;
   /** 備註 */
   memo: string;
   /** 沖帳手續費物件 */
@@ -500,6 +502,8 @@ export interface SettlePayableBody {
   settleAmount: number;
   /** 實際付款 */
   paymentAmount: number;
+  /** 使用餘額 */
+  balanceUsed: number;
   /** 備註 */
   memo: string;
   /** 沖帳手續費物件 */
@@ -572,10 +576,16 @@ export interface SettleReceivablePreviewBody {
   companyUuid: string;
   /** 銷售管道 uuid */
   paymentChannelUuid: string;
+  /** 使用預設預覽嗎：true 由後端依 transaction_date 由舊到新自動拆帳（匯總沖帳）；false 僅預覽 ledgerUuids 指定的原單（多筆沖帳） */
+  isDefault: boolean;
+  /** 要預覽匯總沖帳的自選 uuid 列表；isDefault=true 時傳空陣列 */
+  ledgerUuids: string[];
   /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
   settleAmount: number;
   /** 銷項實際存入 */
   depositAmount: number;
+  /** 使用餘額 */
+  balanceUsed: number;
   /** 是否將超沖少沖的金額記進餘額 */
   isBalance: boolean;
   /** 沖帳手續費物件 */
@@ -589,10 +599,16 @@ export interface SettlePayablePreviewBody {
   companyUuid: string;
   /** 廠商 uuid */
   counterpartyUuid: string;
+  /** 使用預設預覽嗎：true 由後端依 transaction_date 由舊到新自動拆帳（匯總沖帳）；false 僅預覽 ledgerUuids 指定的原單（多筆沖帳） */
+  isDefault: boolean;
+  /** 要預覽匯總沖帳的自選 uuid 列表；isDefault=true 時傳空陣列 */
+  ledgerUuids: string[];
   /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
   settleAmount: number;
   /** 進項實際付出 */
   paymentAmount: number;
+  /** 使用餘額 */
+  balanceUsed: number;
   /** 是否將超沖少沖的金額記進餘額 */
   isBalance: boolean;
   /** 沖帳手續費物件 */
@@ -665,6 +681,8 @@ export interface SettleReceivableSummaryBody {
   bankAccountUuid: string;
   /** 備註（選填） */
   memo?: string;
+  /** 使用餘額 */
+  balanceUsed: number;
   /** 是否將超沖少沖的金額記進餘額 */
   isBalance: boolean;
   /** 沖帳手續費物件 */
@@ -684,6 +702,8 @@ export interface SettlePayableSummaryBody {
   /** 付款銀行帳戶 uuid */
   bankAccountUuid: string;
   memo?: string;
+  /** 使用餘額 */
+  balanceUsed: number;
   isBalance: boolean;
   allocations: SettleSummaryFee;
   otherDeductions?: SettleSummaryOtherDeduction[];
@@ -737,6 +757,8 @@ export interface SettlePayableSummaryResult extends SettleSummaryResultBase {
 
 /** GET /ael/ledger/entries/detail 回應的 invoice 區塊；僅型別化本次會使用的欄位 */
 export interface EntryInvoiceDetailDto {
+  /** 1 銷項／2 進項 */
+  buyOrSell: number;
   invoiceTrack: string;
   invoiceNumber: string;
   /** 民國年 */
