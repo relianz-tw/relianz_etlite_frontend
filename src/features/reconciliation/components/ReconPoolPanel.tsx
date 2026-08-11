@@ -37,15 +37,15 @@ interface ReconPoolPanelProps {
   selectedCount?: number;
   onClearSelection: () => void;
 
-  /** 該群組名稱與當前餘額；「全部管道」或前端合成的「其他」無對應實體時 balance 為 undefined，整塊不顯示 */
+  /** 該群組名稱與當前餘額；「全部管道」或前端合成的「其他」無對應實體時 balance 為 undefined，「使用餘額」整塊不顯示 */
   balanceLabel: string;
   balance?: number;
   /**
-   * 本次沖帳使用的餘額（元），會一併帶入預覽/執行 API 的 balanceUsed 參數。
-   * 有傳入 onBalanceUsedChange 時此欄位可編輯，由使用者決定要用多少餘額；
+   * 本次沖帳使用的餘額（元），為對帳單/沖帳金額下方的固定減項，會一併帶入預覽/執行 API 的 balanceUsed 參數，
+   * 並從實際存入/付出金額中扣除。有傳入 onBalanceUsedChange 時此欄位可編輯，由使用者決定要用多少餘額；
    * 省略 onBalanceUsedChange 時維持唯讀顯示，供尚未串接的呼叫端相容。
    */
-  offsetAmount: number;
+  balanceUsed: number;
   onBalanceUsedChange?: (value: number) => void;
 
   /** 金額欄位標題：匯總沖帳為「對帳單金額」，單筆沖帳為「沖帳金額」 */
@@ -81,8 +81,8 @@ interface ReconPoolPanelProps {
 /**
  * 沖帳作業卡片：頂部以 TabBar 切換單筆／多筆／匯總三種操作模式，模式差異僅反映在上半部（已選交易、
  * 主要動作文案），下半部的金額輸入與計算邏輯三種模式共用同一份 UI。
- * 金額欄位一律為「總金額」；手續費與每筆額外金額皆可正可負（預設負值，即減項），
- * 加總後即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
+ * 金額欄位一律為「總金額」；手續費與每筆額外金額皆可正可負（預設負值，即減項）、使用餘額為固定減項（僅正值，
+ * 下方小字顯示目前餘額），加總後即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
  */
 export default function ReconPoolPanel({
   mode,
@@ -93,7 +93,7 @@ export default function ReconPoolPanel({
   onClearSelection,
   balanceLabel,
   balance,
-  offsetAmount,
+  balanceUsed,
   onBalanceUsedChange,
   amountLabel,
   statementAmount,
@@ -118,7 +118,7 @@ export default function ReconPoolPanel({
   onBankAccountChange,
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal;
+  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal - balanceUsed;
   const isDepositNegative = depositAmount < 0;
   const accountLabel = side === 'payable' ? '付款銀行帳戶' : '存入銀行帳戶';
   const dateLabel = side === 'payable' ? '付款日' : '收款日';
@@ -173,23 +173,9 @@ export default function ReconPoolPanel({
         </div>
       )}
 
-      {balance !== undefined && (
-        <div className="mt-3 flex flex-col gap-2 border-t border-neutral-blue-gray/20 pt-3">
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <span className="text-neutral-dark">
-              目前 {balanceLabel} 餘額剩餘 <span className="font-mono font-semibold tabular-nums">{fmtCurrency(balance)}</span>
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-neutral-dark">本次抵銷</span>
-            <MoneyInput widthClassName="w-36" value={offsetAmount} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
-          </div>
-        </div>
-      )}
-
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-blue-gray/20 pt-3">
         <label className="text-sm font-semibold text-neutral-dark">{amountLabel}</label>
-        <MoneyInput widthClassName="w-36" value={statementAmount} onChange={onStatementChange} />
+        <MoneyInput widthClassName="w-40" value={statementAmount} onChange={onStatementChange} />
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
@@ -197,6 +183,23 @@ export default function ReconPoolPanel({
           <span className="text-sm text-neutral-dark">手續費</span>
           <MoneyInput widthClassName="w-40" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
         </div>
+
+        {balance !== undefined && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-neutral-dark">使用餘額</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-neutral-mid" aria-hidden="true">
+                  －
+                </span>
+                <MoneyInput widthClassName="w-40" value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
+              </div>
+            </div>
+            <p className="text-right text-xs text-neutral-mid">
+              目前 {balanceLabel} 餘額 {fmtCurrency(balance)}
+            </p>
+          </div>
+        )}
 
         <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} allowSign />
       </div>
@@ -207,7 +210,7 @@ export default function ReconPoolPanel({
           {fmtCurrency(depositAmount)}
         </span>
       </div>
-      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額</p>}
+      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費、使用餘額與額外金額</p>}
 
       {showActionArea && (
         <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">

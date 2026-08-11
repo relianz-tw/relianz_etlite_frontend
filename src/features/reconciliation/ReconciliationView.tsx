@@ -251,7 +251,8 @@ export default function ReconciliationView() {
     return sections.flatMap(s => s.rows).find(r => r.uuid === selectedUuid) ?? null;
   }, [sections, selectedUuid]);
 
-  const depositAmount = statementAmount + feeAmount + otherDeductions.reduce((sum, r) => sum + r.amount, 0);
+  // 使用餘額為對帳單/沖帳金額下方的固定減項（見 ReconPoolPanel），從實際存入/付出金額中扣除
+  const depositAmount = statementAmount + feeAmount + otherDeductions.reduce((sum, r) => sum + r.amount, 0) - balanceUsed;
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過），此時仍須讓使用者透過 A/B/C 選擇處理方式
@@ -373,7 +374,7 @@ export default function ReconciliationView() {
   // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、使用餘額不可超過目前餘額、需選收/付款日
   const validateAmountInputs = (): string => {
     if (statementAmount <= 0) return `請先輸入${mode === 'single' ? '沖帳' : '對帳單'}金額`;
-    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額`;
+    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費、使用餘額與額外金額`;
     if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
     if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
@@ -672,7 +673,7 @@ export default function ReconciliationView() {
                   onClearSelection={mode === 'multi' ? clearMultiSelection : clearSingleSelection}
                   balanceLabel={selectedGroupLabel}
                   balance={selectedGroup?.balance}
-                  offsetAmount={balanceUsed}
+                  balanceUsed={balanceUsed}
                   onBalanceUsedChange={handleBalanceUsedChange}
                   amountLabel={mode === 'single' ? '沖帳金額' : '對帳單金額'}
                   statementAmount={statementAmount}

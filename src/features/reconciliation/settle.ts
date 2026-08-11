@@ -107,7 +107,12 @@ interface SummaryParams {
   otherDeductions: ReconOtherDeductionRow[];
 }
 
-/** 匯總／多筆沖帳真正執行：依 side 呼叫對應 API，回應正規化為 ReconSettleResult */
+/**
+ * 匯總／多筆沖帳真正執行：依 side 呼叫對應 API，回應正規化為 ReconSettleResult。
+ * settleAmount 帶對帳單/沖帳總額（本次匯總沖帳分配到各原單的總額，不因使用餘額而縮減）；
+ * depositAmount／paymentAmount 帶實際存入/付出金額，即 settleAmount − balanceUsed − 手續費 − 額外金額
+ * （params.actualAmount 已依此公式算好，見 ReconciliationView 的 depositAmount 計算）。
+ */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
   const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
