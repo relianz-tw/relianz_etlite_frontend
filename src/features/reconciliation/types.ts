@@ -3,6 +3,17 @@ import type { SettleLedgerAllocation } from '@/api/types';
 export type ReconSide = 'receivable' | 'payable';
 
 /**
+ * 沖帳操作模式：
+ * - single：單筆沖帳，走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0），
+ *   事後可在交易明細頁用 SettlementEditDialog 編輯金額；不限定管道／廠商，「全部管道」「其他」亦可操作。
+ * - multi：多筆沖帳，使用者勾選多筆交易後試算並沖帳；與 summary 共用 settle/preview + settle/summary API，
+ *   差別僅在於帶入使用者勾選的 ledgerUuids 與 isDefault=false（summary 固定 isDefault=true、ledgerUuids=[]，
+ *   由後端自動拆帳），需先於左側選擇明確銷售管道／廠商。
+ * - summary：匯總沖帳，沿用既有 settle/preview + settle/summary 流程（reconMethod=2），僅能整批恢復。
+ */
+export type ReconMode = 'single' | 'multi' | 'summary';
+
+/**
  * 匯總沖帳預覽／執行結果，正規化銷項（depositAmount／paymentChannelUuid）與進項
  * （paymentAmount／counterpartyUuid）的欄位差異為同一組欄位，供 ReconciliationView 與下游元件
  * 不需要再依 side 分別處理型別。actualAmount 對應銷項 actualDepositAmount／進項 actualPaymentAmount。
@@ -47,4 +58,6 @@ export interface ReconTxnRef {
   summary?: string;
   /** 該筆交易的銷售管道／廠商 uuid；未指定為 null */
   channelUuid?: string | null;
+  /** 未沖帳金額；可為負代表超沖。單筆沖帳模式用於顯示「待沖 $X」與預估沖後剩餘 */
+  remainingAmount?: number;
 }

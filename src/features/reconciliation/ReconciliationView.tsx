@@ -2,7 +2,7 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { listChannelRules } from '@/api/channelRules';
-import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
+import type { BankAccountDto } from '@/api/types';
 import { listVendors } from '@/api/vendors';
 import Button from '@/components/ui/Button';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
@@ -11,12 +11,12 @@ import { mapPayableItemsToRows, mapReceivableItemsToRows } from '@/features/ledg
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import ReconBalanceEditModal from './components/ReconBalanceEditModal';
 import ReconConfirmSummaryModal from './components/ReconConfirmSummaryModal';
 import ReconGroupSidebar from './components/ReconGroupSidebar';
 import ReconPoolPanel, { type ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import ReconPoolSummary from './components/ReconPoolSummary';
 import ReconSettleResultModal from './components/ReconSettleResultModal';
+import ReconSingleConfirmModal from './components/ReconSingleConfirmModal';
 import ReconSurplusModal from './components/ReconSurplusModal';
 import ReconTxnList from './components/ReconTxnList';
 import {
@@ -31,23 +31,20 @@ import {
   receivableRowsToCandidates,
   resolveCatchAllKey,
 } from './data';
-import type { ReconGroupOption } from './data';
+import type { ReconGroup, ReconGroupOption } from './data';
 import { fetchAllPayables, fetchAllReceivables } from './fetchAll';
-import { previewSettle, submitSettle } from './settle';
-import type { ReconSettleResult, ReconSide } from './types';
+import { previewSettle, submitSettle, submitSingleSettle } from './settle';
+import type { ReconMode, ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 
 const SIDE_OPTIONS: { value: ReconSide; label: string }[] = [
-  { value: 'receivable', label: '銷項' },
-  { value: 'payable', label: '進項' },
+  { value: 'receivable', label: '應收' },
+  { value: 'payable', label: '應付' },
 ];
 
 interface SideData {
   candidates: ReturnType<typeof receivableRowsToCandidates>;
   groupOptions: ReconGroupOption[];
   nameByUuid: Map<string, string>;
-  /** 完整 DTO 清單，供餘額編輯彈窗帶出既有欄位（PATCH 為整批覆寫，非 partial patch）；銷項用 channelRules，進項用 vendors */
-  channelRules: ChannelRuleDto[];
-  vendors: VendorDto[];
 }
 
 /** Date → API 需要的西元 YYYYMMDD 字串（比照 features/ledger/transaction/data.ts 的 formatYmd） */
@@ -60,29 +57,47 @@ function toYyyymmdd(date: Date | undefined): string {
 }
 
 /**
- * 匯總沖帳頁：選擇銷售管道／廠商後，輸入對帳單金額並預覽拆帳，確認沖帳對象與結果。
- * 銷售管道與廠商清單取自真實 API（/ael/payment/channelRules、/ael/vendors，含當前餘額 balance），
- * 候選交易亦取自真實 API（/ael/ledger/receivables/filter、/ael/ledger/payables/filter），
+ * 沖帳中心：同一頁承載單筆／多筆／匯總三種沖帳操作（見 ReconPoolPanel 頂部 TabBar），選擇銷售管道／廠商後
+ * 輸入金額完成沖帳。銷售管道與廠商清單取自真實 API（/ael/payment/channelRules、/ael/vendors，含當前餘額
+ * balance），候選交易亦取自真實 API（/ael/ledger/receivables/filter、/ael/ledger/payables/filter），
  * 分組比對一律依 uuid（paymentChannelUuid／counterpartyUuid）而非名稱字串，避免同名不同管道/廠商誤判。
  *
- * 沖帳對象與拆帳結果一律由後端 settle/preview API 決定（依 transaction_date 由舊到新分配），前端不再由
- * 使用者手動勾選調整；下方交易清單改為純檢視，將預覽結果疊加顯示為圓形狀態（見 ReconTxnList）。
+ * 三種模式：
+ * - single（單筆沖帳）：使用者從清單勾選一筆交易，走手動沖帳 API（reconMethod=0），允許超沖少沖，
+ *   事後可在交易明細頁編輯金額。不限定必須是明確管道／廠商，「全部管道」「其他」亦可操作。
+ * - multi（多筆沖帳）：使用者從清單勾選多筆交易，走與 summary 相同的 settle/preview + settle/summary
+ *   流程，差別僅在於預覽時明確帶入使用者勾選的 ledgerUuids 與 isDefault=false（summary 固定
+ *   isDefault=true、ledgerUuids=[]，由後端自動拆帳）。需先於左側選擇明確銷售管道／廠商，
+ *   下方交易清單的選取圓圈改為可複選勾選（見 ReconTxnList）。
+ * - summary（匯總沖帳）：沿用既有流程，沖帳對象與拆帳結果一律由後端 settle/preview API 決定
+ *   （依 transaction_date 由舊到新分配），前端不由使用者手動勾選調整；下方交易清單改為純檢視，
+ *   將預覽結果疊加顯示為圓形狀態（見 ReconTxnList）。僅有明確 uuid 的真實管道／廠商可使用。
  *
- * 預覽（isBalance 固定帶 false，僅作試算）成功後：
- * - 若對帳單金額與待沖總額完全相符（無超沖／少沖），開放「確認沖帳」直接送出（isBalance 送 false，無影響）。
- * - 若有差額，立即彈出三選一提示（見 ReconSurplusModal）：
- *   A 回去檢查：不呼叫任何 API，停留原畫面讓使用者確認金額／交易資料。
- *   B 留在餘額上，帶下次沖帳使用：以 isBalance=true 重新預覽一次取得正確的 closed 分佈，
- *     實際存入/付出金額（depositAmount／paymentAmount）改帶「實際沖完整那幾筆金額總和」
- *     （closed=true 各筆 settleAmount 加總，見 api.md 對 settle/summary 的說明），再呼叫執行 API。
- *   C 將金額沖入最後一筆交易：以 isBalance=false（沿用原本的預覽結果）呼叫執行 API，
- *     實際存入/付出金額沿用使用者原始輸入值。
- * 執行成功後，清空已快取的候選清單並重新向後端拉取（含最新餘額），讓已沖帳交易與餘額變動自然反映。
+ *   預覽（isBalance 固定帶 false，僅作試算）成功後：
+ *   - 若對帳單金額與待沖總額完全相符（無超沖／少沖），開放「確認沖帳」直接送出（isBalance 送 false，無影響）。
+ *   - 若有差額，立即彈出三選一提示（見 ReconSurplusModal）：
+ *     A 回去檢查：不呼叫任何 API，停留原畫面讓使用者確認金額／交易資料。
+ *     B 留在餘額上，帶下次沖帳使用：以 isBalance=true 重新預覽一次取得正確的 closed 分佈，
+ *       實際存入/付出金額（depositAmount／paymentAmount）改帶「實際沖完整那幾筆金額總和」
+ *       （closed=true 各筆 settleAmount 加總，見 api.md 對 settle/summary 的說明），再呼叫執行 API。
+ *     C 將金額沖入最後一筆交易：以 isBalance=false（沿用原本的預覽結果）呼叫執行 API，
+ *       實際存入/付出金額沿用使用者原始輸入值。
+ *   執行成功後，清空已快取的候選清單並重新向後端拉取（含最新餘額），讓已沖帳交易與餘額變動自然反映。
+ *
+ * 使用餘額（balanceUsed）：ReconPoolPanel「本次抵銷」欄位，單筆／多筆／匯總沖帳共用同一個輸入框，
+ * 使用者輸入後會一併帶入預覽／執行 API 的 balanceUsed 參數，決定該次沖帳要使用多少目前餘額。
  */
 export default function ReconciliationView() {
   const [side, setSide] = useState<ReconSide>('receivable');
+  const [mode, setMode] = useState<ReconMode>('summary');
   // 預設顯示「全部管道」唯讀總覽，讓使用者一進頁面就能看到完整交易清單，不需先手動點選
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(ALL_GROUP_KEY);
+  // 單筆沖帳模式勾選的交易 uuid；僅會有 0～1 筆（單選）
+  const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  // 多筆沖帳模式勾選的交易 uuid 集合（複選）
+  const [selectedMultiUuids, setSelectedMultiUuids] = useState<Set<string>>(new Set());
+  // 本次沖帳使用的餘額（元），對應 ReconPoolPanel「本次抵銷」欄位，單筆／多筆／匯總沖帳共用同一個輸入狀態
+  const [balanceUsed, setBalanceUsed] = useState(0);
   const [statementAmount, setStatementAmount] = useState(0);
   const [feeAmount, setFeeAmount] = useState(0);
   // 額外金額（otherDeductions）：id 以遞增計數器產生（不可用 Date.now()/Math.random()）
@@ -94,11 +109,12 @@ export default function ReconciliationView() {
   const [previewError, setPreviewError] = useState('');
   const [confirmSummaryOpen, setConfirmSummaryOpen] = useState(false);
   const [surplusOpen, setSurplusOpen] = useState(false);
+  // 單筆沖帳模式：點擊「確認沖帳」前的輸入驗證錯誤，與確認彈窗開關
+  const [singleActionError, setSingleActionError] = useState('');
+  const [singleConfirmOpen, setSingleConfirmOpen] = useState(false);
   const [submittedInfo, setSubmittedInfo] = useState<{ matchedCount: number; matchedAmount: number } | null>(null);
   // 目前展開中的交易 uuid（就地展開看大約資訊，一次僅展開一列）
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null);
-  // 編輯餘額彈窗：帶入目前選定要編輯的群組 uuid（null 代表關閉）
-  const [balanceEditKey, setBalanceEditKey] = useState<string | null>(null);
 
   // 銀行帳戶：確認沖帳時實際入帳／出帳的目標帳戶
   const [accounts, setAccounts] = useState<BankAccountDto[]>([]);
@@ -107,7 +123,7 @@ export default function ReconciliationView() {
   const [bankAccountUuid, setBankAccountUuid] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  // 沖帳執行結果（settle/summary 回應正規化後）：成功後開結果 modal 顯示摘要、沖前/沖後餘額與各原單明細
+  // 沖帳執行結果（settle/summary 回應正規化後，僅匯總沖帳使用）：成功後開結果 modal 顯示摘要、沖前/沖後餘額與各原單明細
   const [settleResult, setSettleResult] = useState<ReconSettleResult | null>(null);
   const [settleResultOpen, setSettleResultOpen] = useState(false);
 
@@ -129,7 +145,7 @@ export default function ReconciliationView() {
     };
   }, []);
 
-  // 銷項預設收款帳戶、進項預設付款帳戶；side 切換時重新套用（呼應 handleSideChange 重置其餘輸入的行為）
+  // 應收預設收款帳戶、應付預設付款帳戶；side 切換時重新套用（呼應 handleSideChange 重置其餘輸入的行為）
   useEffect(() => {
     if (accounts.length === 0) return;
     const defaultAccount = side === 'payable' ? accounts.find(a => a.isDefaultPaymentAccount) : accounts.find(a => a.isDefaultReceivingAccount);
@@ -154,14 +170,14 @@ export default function ReconciliationView() {
             const groupOptions = activeChannels.map(c => ({ uuid: c.uuid, name: c.channelName, balance: c.balance }));
             const nameByUuid = new Map(channelList.map(c => [c.uuid, c.channelName]));
             const candidates = receivableRowsToCandidates(mapReceivableItemsToRows(items));
-            if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid, channelRules: channelList, vendors: [] });
+            if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })
         : Promise.all([listVendors(), fetchAllPayables()]).then(async ([vendorList, items]) => {
             const activeVendors = vendorList.filter(v => v.isActive);
             const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name, balance: v.balance }));
             const nameByUuid = new Map(vendorList.map(v => [v.uuid, v.name]));
             const candidates = payableRowsToCandidates(await mapPayableItemsToRows(items));
-            if (!cancelled) setPayableData({ candidates, groupOptions, nameByUuid, channelRules: [], vendors: vendorList });
+            if (!cancelled) setPayableData({ candidates, groupOptions, nameByUuid });
           });
     task
       .catch(err => {
@@ -182,7 +198,7 @@ export default function ReconciliationView() {
 
   // 「全部管道」為唯讀總覽項，永遠列在最前面，不參與 buildReconGroups 的管道比對邏輯
   const groups = useMemo(() => {
-    const allGroup = {
+    const allGroup: ReconGroup = {
       key: ALL_GROUP_KEY,
       label: ALL_GROUP_LABEL,
       count: availableCandidates.length,
@@ -211,19 +227,31 @@ export default function ReconciliationView() {
     return [{ key: selectedGroupKey, label: '', rows: groupRows }];
   }, [selectedGroupKey, isAllGroup, isOtherGroup, allRows, side, availableCandidates, groupOptions, sideData, groupRows]);
 
-  const selectedGroupLabel = groups.find(g => g.key === selectedGroupKey)?.label ?? '';
+  const selectedGroup = groups.find(g => g.key === selectedGroupKey);
+  const selectedGroupLabel = selectedGroup?.label ?? '';
 
-  // 預覽結果依 ledgerUuid 疊加回交易清單顯示狀態圓圈，純檢視用途
+  // 預覽結果依 ledgerUuid 疊加回交易清單顯示狀態圓圈，純檢視用途（僅匯總沖帳模式使用）
   const allocationByUuid = useMemo(() => {
     const map = new Map(previewResult?.allocations.map(a => [a.ledgerUuid, a]) ?? []);
     return map;
   }, [previewResult]);
 
-  // 目前選定群組是否對應一個真實銷售管道／廠商 uuid（含使用者自建同名「其他」的情況），預覽拆帳與確認沖帳皆需要明確的 uuid
+  // 目前選定群組是否對應一個真實銷售管道／廠商 uuid（含使用者自建同名「其他」的情況）；匯總沖帳的預覽拆帳與確認沖帳皆需要明確的 uuid
   const isKnownChannel = groupOptions.some(o => o.uuid === selectedGroupKey);
   const canSettle = isKnownChannel;
 
-  const depositAmount = statementAmount - feeAmount - otherDeductions.reduce((sum, r) => sum + r.amount, 0);
+  // 單筆沖帳模式：目前選取欄要顯示在「全部管道」與「其他」也能操作，這是三模式改版新增的沖帳路徑（之前完全沒有）
+  const showStatusColumn = mode === 'single' ? true : !isAllGroup;
+  const selectedUuids = useMemo(() => {
+    if (mode === 'multi') return selectedMultiUuids;
+    return new Set(selectedUuid ? [selectedUuid] : []);
+  }, [mode, selectedMultiUuids, selectedUuid]);
+  const selectedRow: ReconTxnRef | null = useMemo(() => {
+    if (!selectedUuid) return null;
+    return sections.flatMap(s => s.rows).find(r => r.uuid === selectedUuid) ?? null;
+  }, [sections, selectedUuid]);
+
+  const depositAmount = statementAmount + feeAmount + otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過），此時仍須讓使用者透過 A/B/C 選擇處理方式
@@ -234,14 +262,19 @@ export default function ReconciliationView() {
     setStatementAmount(0);
     setFeeAmount(0);
     setOtherDeductions([]);
+    setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
     setSubmitError('');
     setConfirmSummaryOpen(false);
     setSurplusOpen(false);
+    setSingleActionError('');
+    setSingleConfirmOpen(false);
     setSubmittedInfo(null);
     setExpandedUuid(null);
     setSettleResultOpen(false);
+    setSelectedUuid(null);
+    setSelectedMultiUuids(new Set());
   };
 
   const handleSideChange = (next: ReconSide) => {
@@ -250,57 +283,111 @@ export default function ReconciliationView() {
     resetInputs();
   };
 
+  const handleModeChange = (next: ReconMode) => {
+    setMode(next);
+    resetInputs();
+  };
+
   const handleSelectGroup = (key: string) => {
     setSelectedGroupKey(key);
     resetInputs();
   };
 
-  const handleStatementChange = (value: number) => {
-    setStatementAmount(value);
+  // 清空已算出的結果與錯誤提示，供任何金額輸入變動時呼叫
+  const clearComputedState = () => {
     setPreviewResult(null);
     setPreviewError('');
+    setSingleActionError('');
     setSubmittedInfo(null);
+  };
+
+  const handleStatementChange = (value: number) => {
+    setStatementAmount(value);
+    clearComputedState();
   };
   const handleFeeChange = (value: number) => {
     setFeeAmount(value);
-    setPreviewResult(null);
-    setPreviewError('');
+    clearComputedState();
   };
 
   const handleAddOtherDeduction = () => {
     otherDeductionIdRef.current += 1;
     setOtherDeductions(prev => [...prev, { id: `OD-${otherDeductionIdRef.current}`, subject: null, name: '', amount: 0 }]);
-    setPreviewResult(null);
-    setPreviewError('');
+    clearComputedState();
   };
   const handleRemoveOtherDeduction = (id: string) => {
     setOtherDeductions(prev => prev.filter(r => r.id !== id));
-    setPreviewResult(null);
-    setPreviewError('');
+    clearComputedState();
   };
   const handleChangeOtherDeduction = (id: string, patch: Partial<Omit<ReconOtherDeductionRow, 'id'>>) => {
     setOtherDeductions(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
-    setPreviewResult(null);
-    setPreviewError('');
+    clearComputedState();
   };
 
-  // 預覽拆帳（isBalance 固定帶 false，僅作試算用途）：成功後若有差額立即彈出三選一提示，無差額則等待使用者按「確認沖帳」
+  // 單筆沖帳模式：換一筆交易（或清除選取）時金額歸零，避免延用上一筆的金額（含使用餘額，因該筆交易換了，先前輸入的使用餘額不應延用）
+  const clearSingleSelection = () => {
+    setSelectedUuid(null);
+    setStatementAmount(0);
+    setFeeAmount(0);
+    setOtherDeductions([]);
+    setBalanceUsed(0);
+    setSingleActionError('');
+    setSubmitError('');
+  };
+  // 多筆沖帳模式：清除全部已勾選交易與試算結果；金額與使用餘額是使用者對整批交易的輸入，維持不歸零
+  const clearMultiSelection = () => {
+    setSelectedMultiUuids(new Set());
+    clearComputedState();
+  };
+  // 切換勾選：single 為單選（再點一次已勾選的列即取消，並重置金額與使用餘額）；multi 為複選（累加/移除 uuid，
+  // 保留使用者已輸入的金額與使用餘額，僅清除試算結果，因為使用者通常會先勾好多筆再統一輸入對帳單金額）
+  const handleToggleSelect = (uuid: string) => {
+    if (mode === 'multi') {
+      setSelectedMultiUuids(prev => {
+        const next = new Set(prev);
+        if (next.has(uuid)) next.delete(uuid);
+        else next.add(uuid);
+        return next;
+      });
+      clearComputedState();
+      return;
+    }
+    if (selectedUuid === uuid) {
+      clearSingleSelection();
+      return;
+    }
+    setSelectedUuid(uuid);
+    setStatementAmount(0);
+    setFeeAmount(0);
+    setOtherDeductions([]);
+    setBalanceUsed(0);
+    setSingleActionError('');
+    setSubmitError('');
+  };
+  // 使用餘額（本次抵銷）欄位變更：與手續費／額外金額同樣視為影響試算結果的輸入，變更後清除舊試算結果
+  const handleBalanceUsedChange = (value: number) => {
+    setBalanceUsed(value);
+    clearComputedState();
+  };
+
+  // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、使用餘額不可超過目前餘額、需選收/付款日
+  const validateAmountInputs = (): string => {
+    if (statementAmount <= 0) return `請先輸入${mode === 'single' ? '沖帳' : '對帳單'}金額`;
+    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額`;
+    if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
+    if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
+    if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
+    return '';
+  };
+
+  // 匯總／多筆沖帳：預覽拆帳（isBalance 固定帶 false，僅作試算用途）：成功後若有差額立即彈出三選一提示，無差額則等待使用者按「確認沖帳」
+  // 匯總沖帳不帶 ledgerUuids／isDefault（等同 isDefault=true，由後端自動拆帳）；多筆沖帳明確帶入使用者勾選的 ledgerUuids 與 isDefault=false
   const handlePreview = async () => {
     if (!selectedGroupKey || !isKnownChannel) return;
-    if (statementAmount <= 0) {
-      setPreviewError('請先輸入對帳單金額');
-      return;
-    }
-    if (depositAmount < 0) {
-      setPreviewError('手續費與額外金額總和不可超過對帳單金額');
-      return;
-    }
-    if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount <= 0)) {
-      setPreviewError('請完整填寫額外金額的科目、名稱與金額');
-      return;
-    }
-    if (!paymentDate) {
-      setPreviewError(side === 'payable' ? '請先選擇付款日' : '請先選擇收款日');
+    if (mode === 'multi' && selectedMultiUuids.size === 0) return;
+    const err = validateAmountInputs();
+    if (err) {
+      setPreviewError(err);
       return;
     }
     setPreviewLoading(true);
@@ -309,8 +396,11 @@ export default function ReconciliationView() {
       const result = await previewSettle({
         side,
         groupUuid: selectedGroupKey,
+        ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : [],
+        isDefault: mode !== 'multi',
         settleAmount: statementAmount,
         actualAmount: depositAmount,
+        balanceUsed,
         isBalance: false,
         feeAmount,
         otherDeductions,
@@ -325,17 +415,19 @@ export default function ReconciliationView() {
     }
   };
 
-  // 執行沖帳成功後的共用收尾：清空快取候選清單觸發重新拉取（含最新餘額），並開啟結果彈窗
+  // 執行沖帳成功後的共用收尾：清空快取候選清單觸發重新拉取（含最新餘額），並開啟結果彈窗（匯總／多筆沖帳共用）
   const finalizeSettle = (result: ReconSettleResult) => {
     if (side === 'receivable') setReceivableData(null);
     else setPayableData(null);
     setStatementAmount(0);
     setFeeAmount(0);
     setOtherDeductions([]);
+    setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
     setConfirmSummaryOpen(false);
     setSurplusOpen(false);
+    setSelectedMultiUuids(new Set());
     setSubmittedInfo({ matchedCount: result.affectedCount, matchedAmount: result.appliedSettleAmount });
     setSettleResult(result);
     setSettleResultOpen(true);
@@ -365,6 +457,7 @@ export default function ReconciliationView() {
         ledgerUuids: previewResult.allocations.map(a => a.ledgerUuid),
         settleAmount: statementAmount,
         actualAmount: depositAmount,
+        balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         bankAccountUuid,
         isBalance: false,
@@ -385,7 +478,8 @@ export default function ReconciliationView() {
   };
 
   // B：留在餘額上，帶下次沖帳使用——isBalance=true 下「已結清」的原單分佈與 isBalance=false 不同（見檔案頂端說明），
-  // 故重新預覽一次取得正確結果，depositAmount／paymentAmount 改帶「實際沖完整那幾筆金額總和」
+  // 故重新預覽一次取得正確結果，depositAmount／paymentAmount 改帶「實際沖完整那幾筆金額總和」；
+  // 多筆沖帳須沿用原本勾選的 ledgerUuids／isDefault=false，避免重新預覽時擴大到整個管道／廠商的待沖交易
   const handleChooseKeepOnBalance = async () => {
     if (!requireSubmitReady() || !selectedGroupKey) return;
     setSubmitLoading(true);
@@ -394,8 +488,11 @@ export default function ReconciliationView() {
       const rePreview = await previewSettle({
         side,
         groupUuid: selectedGroupKey,
+        ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : [],
+        isDefault: mode !== 'multi',
         settleAmount: statementAmount,
         actualAmount: depositAmount,
+        balanceUsed,
         isBalance: true,
         feeAmount,
         otherDeductions,
@@ -408,6 +505,7 @@ export default function ReconciliationView() {
         ledgerUuids: rePreview.allocations.map(a => a.ledgerUuid),
         settleAmount: rePreview.appliedSettleAmount,
         actualAmount: rePreview.actualAmount,
+        balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         bankAccountUuid,
         isBalance: true,
@@ -433,6 +531,7 @@ export default function ReconciliationView() {
         ledgerUuids: previewResult.allocations.map(a => a.ledgerUuid),
         settleAmount: statementAmount,
         actualAmount: depositAmount,
+        balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         bankAccountUuid,
         isBalance: false,
@@ -453,20 +552,74 @@ export default function ReconciliationView() {
     setConfirmSummaryOpen(true);
   };
 
-  // 側邊欄「編輯餘額」：帶出完整 DTO（PATCH 為整批覆寫），成功後清空快取觸發重新拉取最新餘額
-  const editingChannelRule = sideData?.channelRules.find(c => c.uuid === balanceEditKey);
-  const editingVendor = sideData?.vendors.find(v => v.uuid === balanceEditKey);
-  const handleBalanceSaved = () => {
-    if (side === 'receivable') setReceivableData(null);
-    else setPayableData(null);
+  // 單筆沖帳：點擊「確認沖帳」先驗證輸入，通過才開確認彈窗；實際送出在 handleConfirmSingleSettle
+  const handleOpenSingleConfirm = () => {
+    if (!selectedRow) return;
+    const err = validateAmountInputs();
+    if (err) {
+      setSingleActionError(err);
+      return;
+    }
+    if (!bankAccountUuid) {
+      setSingleActionError('請先選擇銀行帳戶');
+      return;
+    }
+    setSingleActionError('');
+    setSubmitError('');
+    setSingleConfirmOpen(true);
   };
+
+  // 單筆沖帳：走手動沖帳 API（reconMethod=0），允許超沖少沖；成功後清空快取觸發重新拉取，並以橫幅顯示結果
+  // （不開結果 modal——手動沖帳 API 回應與 ReconSettleResult 形狀不同，橫幅已足夠）
+  const handleConfirmSingleSettle = async () => {
+    if (!selectedRow) return;
+    setSubmitLoading(true);
+    setSubmitError('');
+    try {
+      await submitSingleSettle({
+        side,
+        ledgerUuid: selectedRow.uuid,
+        settleAmount: statementAmount,
+        actualAmount: depositAmount,
+        balanceUsed,
+        paymentDate: toYyyymmdd(paymentDate),
+        bankAccountUuid,
+        feeAmount,
+        otherDeductions,
+      });
+      if (side === 'receivable') setReceivableData(null);
+      else setPayableData(null);
+      setSubmittedInfo({ matchedCount: 1, matchedAmount: statementAmount });
+      setStatementAmount(0);
+      setFeeAmount(0);
+      setOtherDeductions([]);
+      setBalanceUsed(0);
+      setSelectedUuid(null);
+      setSingleConfirmOpen(false);
+    } catch (err) {
+      setSubmitError(getFriendlyErrorMessage(err));
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const actionLabel =
+    mode === 'single' ? (submitLoading ? '沖帳中…' : '確認沖帳') : previewLoading ? '預覽拆帳中…' : '預覽拆帳';
+  const actionDisabled =
+    mode === 'single'
+      ? submitLoading || !selectedRow || statementAmount <= 0
+      : mode === 'multi'
+        ? previewLoading || statementAmount <= 0 || selectedMultiUuids.size === 0
+        : previewLoading || statementAmount <= 0;
+  const actionError = mode === 'single' ? singleActionError : previewError;
+  const showActionArea = mode === 'single' ? !!selectedRow : mode === 'multi' ? canSettle && selectedMultiUuids.size > 0 : canSettle;
 
   return (
     <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6">
-          <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">匯總沖帳</h1>
-          <p className="mt-1 text-sm text-neutral-mid">依銷售管道或廠商，將對帳單金額與待沖帳款預覽拆帳後沖銷</p>
+          <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">沖帳中心</h1>
+          <p className="mt-1 text-sm text-neutral-mid">單筆、多筆或依銷售管道／廠商匯總，完成應收應付沖帳</p>
         </div>
 
         <div className="mb-5 w-full nav:w-56">
@@ -484,67 +637,85 @@ export default function ReconciliationView() {
             defaultLeftWidth={224}
             minLeftWidth={180}
             maxLeftWidth={420}
-            left={<ReconGroupSidebar groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} onEditBalance={setBalanceEditKey} />}
+            left={<ReconGroupSidebar groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} />}
           >
             {!selectedGroupKey ? (
               <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
                 請從左側選擇{side === 'receivable' ? '銷售管道' : '廠商'}
               </div>
             ) : (
-              <div className={cn('flex flex-col gap-4', isAllGroup ? 'pb-4' : 'pb-20')}>
-                {submittedInfo && !isAllGroup && (
+              <div className={cn('flex flex-col gap-4', mode === 'summary' && !isAllGroup ? 'pb-20' : 'pb-4')}>
+                {submittedInfo && (
                   <div className="rounded-md border border-semantic-success/30 bg-semantic-success-muted p-3 text-sm text-semantic-success-dark">
                     已沖銷 {submittedInfo.matchedCount} 筆交易，共 {fmtCurrency(submittedInfo.matchedAmount)}。
                   </div>
                 )}
 
-                {!isAllGroup && !canSettle && (
+                {mode !== 'single' && isAllGroup && (
                   <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
-                    此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援預覽拆帳，請於左側切換至實際{side === 'receivable' ? '管道' : '廠商'}
+                    「全部管道」為唯讀總覽，{mode === 'multi' ? '多筆' : '匯總'}沖帳需先於左側選擇單一銷售管道／廠商；若要沖銷單一交易，可改用上方「單筆沖帳」
                   </div>
                 )}
 
-                {!isAllGroup && (
-                  <ReconPoolPanel
-                    side={side}
-                    statementAmount={statementAmount}
-                    feeAmount={feeAmount}
-                    onStatementChange={handleStatementChange}
-                    onFeeChange={handleFeeChange}
-                    otherDeductions={otherDeductions}
-                    onAddOtherDeduction={handleAddOtherDeduction}
-                    onRemoveOtherDeduction={handleRemoveOtherDeduction}
-                    onChangeOtherDeduction={handleChangeOtherDeduction}
-                    paymentDate={paymentDate}
-                    onPaymentDateChange={date => {
-                      setPaymentDate(date);
-                      setPreviewResult(null);
-                    }}
-                    showPreview={canSettle}
-                    previewLoading={previewLoading}
-                    previewError={previewError}
-                    onPreview={handlePreview}
-                    accounts={accounts}
-                    accountsLoading={accountsLoading}
-                    accountsError={accountsError}
-                    bankAccountUuid={bankAccountUuid}
-                    onBankAccountChange={setBankAccountUuid}
-                  />
+                {mode !== 'single' && !isAllGroup && !canSettle && (
+                  <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
+                    此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援{mode === 'multi' ? '多筆' : '匯總'}沖帳，可改用單筆沖帳，或於左側切換至實際{side === 'receivable' ? '管道' : '廠商'}
+                  </div>
                 )}
+
+                <ReconPoolPanel
+                  mode={mode}
+                  onModeChange={handleModeChange}
+                  side={side}
+                  selectedRow={mode === 'single' ? selectedRow : null}
+                  selectedCount={selectedMultiUuids.size}
+                  onClearSelection={mode === 'multi' ? clearMultiSelection : clearSingleSelection}
+                  balanceLabel={selectedGroupLabel}
+                  balance={selectedGroup?.balance}
+                  offsetAmount={balanceUsed}
+                  onBalanceUsedChange={handleBalanceUsedChange}
+                  amountLabel={mode === 'single' ? '沖帳金額' : '對帳單金額'}
+                  statementAmount={statementAmount}
+                  feeAmount={feeAmount}
+                  onStatementChange={handleStatementChange}
+                  onFeeChange={handleFeeChange}
+                  otherDeductions={otherDeductions}
+                  onAddOtherDeduction={handleAddOtherDeduction}
+                  onRemoveOtherDeduction={handleRemoveOtherDeduction}
+                  onChangeOtherDeduction={handleChangeOtherDeduction}
+                  paymentDate={paymentDate}
+                  onPaymentDateChange={date => {
+                    setPaymentDate(date);
+                    clearComputedState();
+                  }}
+                  showActionArea={showActionArea}
+                  actionLabel={actionLabel}
+                  actionDisabled={actionDisabled}
+                  actionError={actionError}
+                  onAction={mode === 'single' ? handleOpenSingleConfirm : handlePreview}
+                  accounts={accounts}
+                  accountsLoading={accountsLoading}
+                  accountsError={accountsError}
+                  bankAccountUuid={bankAccountUuid}
+                  onBankAccountChange={setBankAccountUuid}
+                />
 
                 <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
                   <p className="mb-3 text-sm font-semibold text-neutral-dark">{isAllGroup ? '全部交易' : '待沖帳款'}</p>
-                  {!isAllGroup && <ReconPoolSummary statementAmount={statementAmount} previewResult={previewResult} />}
+                  {mode !== 'single' && !isAllGroup && <ReconPoolSummary statementAmount={statementAmount} previewResult={previewResult} />}
                   <ReconTxnList
                     side={side}
                     sections={sections}
                     showSectionHeaders={isOtherGroup}
-                    showStatusColumn={!isAllGroup}
+                    showStatusColumn={showStatusColumn}
+                    mode={mode}
                     emptyMessage={isAllGroup ? '目前沒有交易' : '此群組沒有待沖帳的交易'}
                     channelNameByUuid={sideData?.nameByUuid ?? new Map()}
                     expandedUuid={expandedUuid}
                     onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
                     allocationByUuid={allocationByUuid}
+                    selectedUuids={selectedUuids}
+                    onToggleSelect={handleToggleSelect}
                   />
                 </div>
               </div>
@@ -553,7 +724,7 @@ export default function ReconciliationView() {
         )}
       </div>
 
-      {selectedGroupKey && !isAllGroup && previewResult && (
+      {mode !== 'single' && selectedGroupKey && !isAllGroup && previewResult && (
         <div className="sticky bottom-0 z-10 border-t border-neutral-blue-gray/30 bg-white px-4 py-3 nav:px-7">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-1 nav:flex-row nav:items-center nav:justify-between">
             <div className="flex flex-col gap-0.5">
@@ -582,7 +753,7 @@ export default function ReconciliationView() {
         </div>
       )}
 
-      {previewResult && !hasDiff && (
+      {mode !== 'single' && previewResult && !hasDiff && (
         <ReconConfirmSummaryModal
           open={confirmSummaryOpen}
           groupLabel={selectedGroupLabel}
@@ -595,7 +766,7 @@ export default function ReconciliationView() {
         />
       )}
 
-      {previewResult && (
+      {mode !== 'single' && previewResult && (
         <ReconSurplusModal
           open={surplusOpen}
           groupLabel={selectedGroupLabel}
@@ -610,16 +781,23 @@ export default function ReconciliationView() {
         />
       )}
 
-      <ReconSettleResultModal open={settleResultOpen} side={side} groupLabel={selectedGroupLabel} result={settleResult} onClose={() => setSettleResultOpen(false)} />
+      {mode !== 'single' && (
+        <ReconSettleResultModal open={settleResultOpen} side={side} groupLabel={selectedGroupLabel} result={settleResult} onClose={() => setSettleResultOpen(false)} />
+      )}
 
-      <ReconBalanceEditModal
-        open={!!balanceEditKey}
-        side={side}
-        channelRule={editingChannelRule}
-        vendor={editingVendor}
-        onClose={() => setBalanceEditKey(null)}
-        onSaved={handleBalanceSaved}
-      />
+      {mode === 'single' && selectedRow && (
+        <ReconSingleConfirmModal
+          open={singleConfirmOpen}
+          side={side}
+          row={selectedRow}
+          settleAmount={statementAmount}
+          actualAmount={depositAmount}
+          submitting={submitLoading}
+          submitError={submitError}
+          onCancel={() => setSingleConfirmOpen(false)}
+          onConfirm={handleConfirmSingleSettle}
+        />
+      )}
     </div>
   );
 }
