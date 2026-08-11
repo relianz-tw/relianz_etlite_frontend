@@ -861,3 +861,41 @@ export interface ReverseSettleBody {
   /** settle_events.uuid */
   settleEventUuid: string;
 }
+
+/** GET /ael/ledger/entries/dailyDetail 單筆分錄 */
+export interface DailyDetailLineDto {
+  rocYear: string;
+  /** 傳票號 */
+  voucherNo: string;
+  seq: string;
+  /** 傳票類型：1=現金收入、2=現金支出、3=轉帳 */
+  voucherType: string;
+  /** 民國日期 YYYMMDD，例 '1150807' */
+  rocDate: string;
+  /** 會計科目名稱 */
+  subjectName: string;
+  /** 對方科目/對象代碼（目前多為空） */
+  counterpartyCode: string;
+  summary: string;
+  /** 借貸別：'1'=借、'2'=貸 */
+  debitCredit: '1' | '2';
+  amount: number;
+  voucherCategory: string;
+  printFlag: string;
+  taxAmount: string;
+  ledgerUuid: string;
+  lineUuid: string;
+  settleEventUuid?: string;
+  isReverse: boolean;
+  /** 分錄建立日 YYYYMMDD */
+  createdDate: string;
+  /** 同傳票內列排序 */
+  sortOrder: number;
+}
+
+/** GET /ael/ledger/entries/dailyDetail 回應 data */
+export interface DailyDetailResult {
+  ledgerUuid: string;
+  settleEventUuids: string[];
+  lines: DailyDetailLineDto[];
+}

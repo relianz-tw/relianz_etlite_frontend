@@ -1,7 +1,7 @@
 'use client';
 
-import { createPayable, createReceivable, fetchEntryDetail, reverseManualSettle, reverseSummarySettle } from '@/api/ledger';
-import type { CreatePayableBody, CreateReceivableBody, EntryDetailEntryDto, EntryDetailSettleEventDto } from '@/api/types';
+import { createPayable, createReceivable, fetchDailyDetail, fetchEntryDetail, reverseSummarySettle } from '@/api/ledger';
+import type { CreatePayableBody, CreateReceivableBody, DailyDetailLineDto, EntryDetailEntryDto, EntryDetailSettleEventDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
@@ -15,9 +15,8 @@ import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
 import SettlementEditDialog from './components/SettlementEditDialog';
 import SettlementReverseConfirmModal from './components/SettlementReverseConfirmModal';
 import TransactionAllowanceCard from './components/TransactionAllowanceCard';
-import TransactionAmountCard from './components/TransactionAmountCard';
+import TransactionJournalCard from './components/TransactionJournalCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
-import TransactionSettlementHistory from './components/TransactionSettlementHistory';
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import TransactionStatusSummary from './components/TransactionStatusSummary';
 import VoucherUpload from './components/VoucherUpload';
@@ -124,8 +123,12 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   const [detailError, setDetailError] = useState('');
   const [entryDetail, setEntryDetail] = useState<EntryDetailEntryDto | null>(null);
   const [settleEvents, setSettleEvents] = useState<EntryDetailSettleEventDto[]>([]);
+  // 1 銷項／2 進項，決定沖帳狀態卡的名詞（已收/已付、待收/待付）；invoice 為 null 時以 side 作為 fallback
+  const [buyOrSell, setBuyOrSell] = useState<number>(side === 'sales' ? 1 : 2);
   // 恢復／編輯沖帳成功後遞增，觸發下方 useEffect 重新載入交易明細
   const [reloadKey, setReloadKey] = useState(0);
+  // 日記帳分錄；與主流程並行載入，失敗不阻擋主流程
+  const [dailyLines, setDailyLines] = useState<DailyDetailLineDto[]>([]);
 
   // 沖帳紀錄操作：恢復確認、編輯金額（僅手動沖帳）共用同一組送出中／錯誤狀態
   const [reverseTarget, setReverseTarget] = useState<EntryDetailSettleEventDto | null>(null);
@@ -138,8 +141,11 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
     let cancelled = false;
     setDetailLoading(true);
     setDetailError('');
-    fetchEntryDetail({ ledgerUuid: transactionId })
-      .then(async result => {
+    Promise.all([
+      fetchEntryDetail({ ledgerUuid: transactionId }),
+      fetchDailyDetail({ ledgerUuid: transactionId }),
+    ])
+      .then(async ([result, daily]) => {
         if (cancelled) return;
         // 費用類別／收入科目來自 entry.officialAccountingSubjectId，比照帳簿列表反查科目名稱的方式處理
         const expenseCategory = await resolveExpenseCategory(result.entry.officialAccountingSubjectId);
@@ -152,6 +158,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         });
         setEntryDetail(result.entry);
         setSettleEvents(result.settleEvents);
+        setBuyOrSell(result.invoice?.buyOrSell ?? (side === 'sales' ? 1 : 2));
+        setDailyLines(daily.lines);
       })
       .catch(err => {
         if (cancelled) return;
@@ -172,7 +180,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   // 沖帳金額編輯（僅手動沖帳）：由 TransactionSettlementHistory 觸發，開啟 SettlementEditDialog
   const handleEditSettlement = (event: EntryDetailSettleEventDto) => setEditTarget(event);
 
-  // 恢復沖帳紀錄：先跳確認彈窗，匯總沖帳會於彈窗內提示會一併恢復同批所有交易
+  // 恢復沖帳紀錄：僅多筆沖帳（reconMethod=2）提供此操作，先跳確認彈窗提示會一併恢復同批所有交易；
+  // 單筆沖帳改由「編輯金額」填 0 達成同等效果
   const handleReverseSettlement = (event: EntryDetailSettleEventDto) => {
     setReverseError('');
     setReverseTarget(event);
@@ -183,11 +192,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
     setReverseSubmitting(true);
     setReverseError('');
     try {
-      if (reverseTarget.reconMethod === 2) {
-        await reverseSummarySettle({ settleEventUuid: reverseTarget.settleEventUuid });
-      } else {
-        await reverseManualSettle({ settleEventUuid: reverseTarget.settleEventUuid });
-      }
+      await reverseSummarySettle({ settleEventUuid: reverseTarget.settleEventUuid });
       setReverseTarget(null);
       reloadDetail();
     } catch (err) {
@@ -269,13 +274,20 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
 
             <div className="flex flex-col gap-5">
               {mode === 'edit' && <TransactionStatusSummary side={side} declarePeriod={form.declarePeriod} declared={form.declared} />}
-              {mode === 'edit' && entryDetail && <TransactionSettlementStatus entry={entryDetail} />}
-              <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
-              <TransactionAmountCard side={side} mode={mode} form={form} onChange={handleChange} />
-              {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
-              {mode === 'edit' && (
-                <TransactionSettlementHistory side={side} settleEvents={settleEvents} onEdit={handleEditSettlement} onReverse={handleReverseSettlement} />
+              {mode === 'edit' && entryDetail && (
+                <TransactionSettlementStatus
+                  entry={entryDetail}
+                  buyOrSell={buyOrSell}
+                  settleEvents={settleEvents}
+                  onEdit={handleEditSettlement}
+                  onReverse={handleReverseSettlement}
+                />
               )}
+              {mode === 'edit' && entryDetail && (
+                <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
+              )}
+              <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
+              {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
 
               {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
 

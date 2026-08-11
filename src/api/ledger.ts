@@ -8,6 +8,7 @@ import { COMPANY_UUID } from './config';
 import type {
   CreatePayableBody,
   CreateReceivableBody,
+  DailyDetailResult,
   EntryDetailResult,
   PayablesFilterBody,
   PayablesFilterResult,
@@ -116,6 +117,11 @@ export function settlePayableSummary(body: Omit<SettlePayableSummaryBody, 'compa
 
 export function fetchEntryDetail(params: { ledgerUuid: string }): Promise<EntryDetailResult> {
   return apiFetch<EntryDetailResult>(`/ael/ledger/entries/detail${buildQuery({ companyUuid: COMPANY_UUID, ledgerUuid: params.ledgerUuid })}`);
+}
+
+/** 取得單筆交易相關的日記帳分錄（GET /ael/ledger/entries/dailyDetail） */
+export function fetchDailyDetail(params: { ledgerUuid: string }): Promise<DailyDetailResult> {
+  return apiFetch<DailyDetailResult>(`/ael/ledger/entries/dailyDetail${buildQuery({ companyUuid: COMPANY_UUID, ledgerUuid: params.ledgerUuid })}`);
 }
 
 /** 撤銷手動沖帳紀錄 */
