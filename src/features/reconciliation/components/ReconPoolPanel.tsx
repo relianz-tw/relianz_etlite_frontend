@@ -8,7 +8,7 @@ import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/O
 import DatePicker from '@/components/ui/DatePicker';
 import TabBar from '@/components/ui/TabBar';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { Minus, X } from 'lucide-react';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
 /** 額外金額單列：對應預覽 API 的 otherDeductions 項目，沿用共用元件的型別 */
@@ -189,9 +189,12 @@ export default function ReconPoolPanel({
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-neutral-dark">使用餘額</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-neutral-mid" aria-hidden="true">
-                  －
-                </span>
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-cream text-neutral-mid"
+                  aria-hidden="true"
+                >
+                  <Minus size={14} />
+                </div>
                 <MoneyInput widthClassName="w-40" value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
               </div>
             </div>
