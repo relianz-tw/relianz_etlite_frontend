@@ -635,7 +635,7 @@ export default function ReconciliationView() {
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{dataError}</div>
         ) : (
           <ResizableSplitPane
-            defaultLeftWidth={224}
+            defaultLeftWidth={192}
             minLeftWidth={180}
             maxLeftWidth={420}
             left={<ReconGroupSidebar groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} />}
