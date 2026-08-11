@@ -6,31 +6,70 @@ import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
 import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import DatePicker from '@/components/ui/DatePicker';
+import TabBar from '@/components/ui/TabBar';
 import { cn, fmtCurrency } from '@/lib/utils';
-import type { ReconSide } from '../types';
+import { X } from 'lucide-react';
+import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
 /** 額外金額單列：對應預覽 API 的 otherDeductions 項目，沿用共用元件的型別 */
 export type ReconOtherDeductionRow = OtherDeductionRow;
 
+const MODE_OPTIONS: { value: ReconMode; label: string; disabled?: boolean; hint?: string }[] = [
+  { value: 'single', label: '單筆沖帳' },
+  { value: 'multi', label: '多筆沖帳' },
+  { value: 'summary', label: '匯總沖帳' },
+];
+
+const MODE_DESCRIPTION: Record<ReconMode, string> = {
+  single: '從下方清單勾選一筆交易，輸入金額後沖帳；沖帳後可於交易明細頁編輯金額。',
+  multi: '勾選多筆交易後輸入金額，僅針對勾選的交易試算並沖帳。',
+  summary: '輸入對帳單金額，交由系統依日期由舊到新自動拆帳。',
+};
+
 interface ReconPoolPanelProps {
+  mode: ReconMode;
+  onModeChange: (mode: ReconMode) => void;
   side: ReconSide;
+
+  /** 單筆沖帳模式下目前勾選的交易；未勾選為 null */
+  selectedRow: ReconTxnRef | null;
+  /** 多筆沖帳模式下目前已勾選的交易筆數；未使用多筆沖帳的呼叫端可省略，預設 0 */
+  selectedCount?: number;
+  onClearSelection: () => void;
+
+  /** 該群組名稱與當前餘額；「全部管道」或前端合成的「其他」無對應實體時 balance 為 undefined，整塊不顯示 */
+  balanceLabel: string;
+  balance?: number;
+  /**
+   * 本次沖帳使用的餘額（元），會一併帶入預覽/執行 API 的 balanceUsed 參數。
+   * 有傳入 onBalanceUsedChange 時此欄位可編輯，由使用者決定要用多少餘額；
+   * 省略 onBalanceUsedChange 時維持唯讀顯示，供尚未串接的呼叫端相容。
+   */
+  offsetAmount: number;
+  onBalanceUsedChange?: (value: number) => void;
+
+  /** 金額欄位標題：匯總沖帳為「對帳單金額」，單筆沖帳為「沖帳金額」 */
+  amountLabel: string;
   statementAmount: number;
   feeAmount: number;
   onStatementChange: (value: number) => void;
   onFeeChange: (value: number) => void;
-  /** 額外金額（otherDeductions）：可無限新增，與手續費同為從對帳單金額中扣除的減項 */
+  /** 額外金額（otherDeductions）：可無限新增，與手續費同樣可正可負，從對帳單/沖帳金額中加總計入 */
   otherDeductions: ReconOtherDeductionRow[];
   onAddOtherDeduction: () => void;
   onRemoveOtherDeduction: (id: string) => void;
   onChangeOtherDeduction: (id: string, patch: Partial<Omit<ReconOtherDeductionRow, 'id'>>) => void;
-  /** 付款／收款日：匯總沖帳執行 API 必填欄位 */
+  /** 付款／收款日：沖帳執行 API 必填欄位 */
   paymentDate: Date | undefined;
   onPaymentDateChange: (date: Date | undefined) => void;
-  /** 是否顯示「預覽拆帳」動作與銀行帳戶選擇；選到有明確 paymentChannelUuid／counterpartyUuid 的真實管道/廠商時開放 */
-  showPreview: boolean;
-  previewLoading: boolean;
-  previewError: string;
-  onPreview: () => void;
+
+  /** 是否顯示收款日／銀行帳戶／主要動作按鈕：匯總沖帳需選到明確管道/廠商；單筆沖帳需先勾選一筆交易 */
+  showActionArea: boolean;
+  actionLabel: string;
+  actionDisabled: boolean;
+  actionError: string;
+  onAction: () => void;
+
   /** 銀行帳戶：確認沖帳時實際執行入帳／出帳的目標帳戶（bankAccountUuid） */
   accounts: BankAccountDto[];
   accountsLoading: boolean;
@@ -40,12 +79,23 @@ interface ReconPoolPanelProps {
 }
 
 /**
- * 對帳單金額為本次「總金額」；手續費與額外金額皆為從中扣除的減項，扣完後即為實際存入/付出金額
- * （對應預覽 API 的 depositAmount／paymentAmount）。銷項/進項皆可在此直接呼叫「預覽拆帳」，
- * 結果會回填至下方交易清單顯示，故合併在同一卡片內，動作與其依據的金額輸入相鄰。
+ * 沖帳作業卡片：頂部以 TabBar 切換單筆／多筆／匯總三種操作模式，模式差異僅反映在上半部（已選交易、
+ * 主要動作文案），下半部的金額輸入與計算邏輯三種模式共用同一份 UI。
+ * 金額欄位一律為「總金額」；手續費與每筆額外金額皆可正可負（預設負值，即減項），
+ * 加總後即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
  */
 export default function ReconPoolPanel({
+  mode,
+  onModeChange,
   side,
+  selectedRow,
+  selectedCount = 0,
+  onClearSelection,
+  balanceLabel,
+  balance,
+  offsetAmount,
+  onBalanceUsedChange,
+  amountLabel,
   statementAmount,
   feeAmount,
   onStatementChange,
@@ -56,10 +106,11 @@ export default function ReconPoolPanel({
   onChangeOtherDeduction,
   paymentDate,
   onPaymentDateChange,
-  showPreview,
-  previewLoading,
-  previewError,
-  onPreview,
+  showActionArea,
+  actionLabel,
+  actionDisabled,
+  actionError,
+  onAction,
   accounts,
   accountsLoading,
   accountsError,
@@ -67,28 +118,87 @@ export default function ReconPoolPanel({
   onBankAccountChange,
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  const depositAmount = statementAmount - feeAmount - otherDeductionsTotal;
+  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal;
   const isDepositNegative = depositAmount < 0;
   const accountLabel = side === 'payable' ? '付款銀行帳戶' : '存入銀行帳戶';
   const dateLabel = side === 'payable' ? '付款日' : '收款日';
 
   return (
     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-      <div className="flex items-center justify-between gap-2">
-        <label className="text-sm font-semibold text-neutral-dark">對帳單金額</label>
+      <TabBar options={MODE_OPTIONS} value={mode} onChange={onModeChange} />
+      <p className="mt-2 text-xs text-neutral-mid">{MODE_DESCRIPTION[mode]}</p>
+
+      {mode === 'single' && (
+        <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
+          {selectedRow ? (
+            <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-neutral-dark">
+                  {selectedRow.date} · {side === 'payable' ? selectedRow.summary || '—' : selectedRow.counterparty || '—'}
+                </p>
+                <p className="text-xs text-neutral-mid">待沖 {fmtCurrency(selectedRow.remainingAmount ?? selectedRow.amount)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={onClearSelection}
+                aria-label="清除已選交易"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-white hover:text-semantic-error"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-mid">請從下方清單勾選一筆交易</p>
+          )}
+        </div>
+      )}
+
+      {mode === 'multi' && (
+        <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
+          {selectedCount > 0 ? (
+            <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
+              <span className="font-medium text-neutral-dark">已選取 {selectedCount} 筆交易</span>
+              <button
+                type="button"
+                onClick={onClearSelection}
+                aria-label="清除所有已選交易"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-white hover:text-semantic-error"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-mid">請從下方清單勾選要沖帳的交易（可複選）</p>
+          )}
+        </div>
+      )}
+
+      {balance !== undefined && (
+        <div className="mt-3 flex flex-col gap-2 border-t border-neutral-blue-gray/20 pt-3">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-neutral-dark">
+              目前 {balanceLabel} 餘額剩餘 <span className="font-mono font-semibold tabular-nums">{fmtCurrency(balance)}</span>
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-neutral-dark">本次抵銷</span>
+            <MoneyInput widthClassName="w-36" value={offsetAmount} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-blue-gray/20 pt-3">
+        <label className="text-sm font-semibold text-neutral-dark">{amountLabel}</label>
         <MoneyInput widthClassName="w-36" value={statementAmount} onChange={onStatementChange} />
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-neutral-dark">手續費</span>
-          <div className="flex items-center gap-2">
-            <span className="text-lg text-neutral-mid">−</span>
-            <MoneyInput widthClassName="w-36" value={feeAmount} onChange={onFeeChange} />
-          </div>
+          <MoneyInput widthClassName="w-40" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
         </div>
 
-        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} />
+        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} allowSign />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">
@@ -97,9 +207,9 @@ export default function ReconPoolPanel({
           {fmtCurrency(depositAmount)}
         </span>
       </div>
-      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">手續費與額外金額總和不可超過對帳單金額</p>}
+      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額</p>}
 
-      {showPreview && (
+      {showActionArea && (
         <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-neutral-dark">{dateLabel}</span>
@@ -124,10 +234,10 @@ export default function ReconPoolPanel({
           </div>
 
           <div className="flex flex-col items-end">
-            <Button variant="primary" onClick={onPreview} disabled={previewLoading || statementAmount <= 0}>
-              {previewLoading ? '預覽拆帳中…' : '預覽拆帳'}
+            <Button variant="primary" onClick={onAction} disabled={actionDisabled}>
+              {actionLabel}
             </Button>
-            {previewError && <p className="mt-2 text-sm text-semantic-error">{previewError}</p>}
+            {actionError && <p className="mt-2 text-sm text-semantic-error">{actionError}</p>}
           </div>
         </div>
       )}
