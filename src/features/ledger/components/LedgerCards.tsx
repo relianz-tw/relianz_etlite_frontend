@@ -1,7 +1,5 @@
 'use client';
 
-import { settlePayable, settleReceivable } from '@/api/ledger';
-import type { ManualSettleAllocation, SettleSummaryFee } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
@@ -9,15 +7,13 @@ import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, DollarSign, Download, FileMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Download, FileMinus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
-import ManualEntryDialog from './ManualEntryDialog';
-import SettlementStatusCell from './SettlementStatusCell';
 
 const SORT_KEY_LABELS: Record<SortKey, string> = {
   id: '交易編號',
@@ -34,8 +30,8 @@ type LedgerCardsProps = {
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
 } & (
-  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; onReceivableSettled?: () => void; channelNameByUuid: Map<string, string> }
-  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[]; onPayableSettled?: () => void }
+  | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; channelNameByUuid: Map<string, string> }
+  | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
 );
 
 /** 銷售管道唯讀顯示：帳簿列表無單筆交易更新管道的 API，故僅反查真實 paymentChannelUuid 顯示名稱，不提供編輯 */
@@ -153,7 +149,6 @@ function SalesCard({
   expanded,
   onToggle,
   channelText,
-  onManualEntry,
   onCardClick,
   selectionMode,
   isSelected,
@@ -166,7 +161,6 @@ function SalesCard({
   expanded: boolean;
   onToggle: () => void;
   channelText: string;
-  onManualEntry: () => void;
   onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
@@ -192,19 +186,9 @@ function SalesCard({
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.counterparty}>{row.counterparty}</div>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
-          {subTab === 'receivable' && (
-            <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
-          )}
-        </div>
+        <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
         {!selectionMode && (
           <div className="flex flex-wrap justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-            {subTab === 'receivable' && (
-              <Button size="sm" variant="outline" icon={DollarSign} onClick={onManualEntry}>
-                入帳
-              </Button>
-            )}
             {row.voided ? (
               <span className="rounded-md bg-surface-cream px-2.5 py-1 text-xs font-semibold text-neutral-mid">已作廢</span>
             ) : (
@@ -226,10 +210,8 @@ function SalesCard({
 
 function PurchaseCard({
   row,
-  subTab,
   expanded,
   onToggle,
-  onManualEntry,
   onCardClick,
   selectionMode,
   isSelected,
@@ -242,7 +224,6 @@ function PurchaseCard({
   subTab: PurchaseSubTab;
   expanded: boolean;
   onToggle: () => void;
-  onManualEntry: () => void;
   onCardClick: () => void;
   selectionMode: boolean;
   isSelected: boolean;
@@ -269,21 +250,7 @@ function PurchaseCard({
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.party}>{row.party}</div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
-          {subTab === 'payable' && (
-            <SettlementStatusCell settledAmount={row.settledAmount} remainingAmount={row.remainingAmount} settlementStatus={row.settlementStatus} />
-          )}
-        </div>
-        {!selectionMode && subTab === 'payable' && (
-          <div onClick={e => e.stopPropagation()}>
-            <Button size="sm" variant="outline" icon={DollarSign} onClick={onManualEntry}>
-              入帳
-            </Button>
-          </div>
-        )}
-      </div>
+      <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
           <SubjectNameSelect value={locked ? row.category : categoryValue} onChange={onCategorySelect} disabled={locked} />
@@ -302,7 +269,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const searchParams = useSearchParams();
   const goToTransaction = (id: string) => router.push(withReturnParam(`/ledger/${id}?side=${props.side}`, searchParams));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [manualEntryRow, setManualEntryRow] = useState<SalesRow | PurchaseRow | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -311,37 +277,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
   const [batchCategory, setBatchCategory] = useState('');
 
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
-
-  // 依銷項/進項呼叫 /ael/ledger/receivables/settle 或 /ael/ledger/payables/settle 送出手動入帳；
-  // 成功後觸發父層重新查詢應收/應付帳款列表
-  const handleManualSettle = async (allocation: ManualSettleAllocation) => {
-    const allocations: SettleSummaryFee[] = allocation.feeAmount > 0 ? [{ name: '手續費', feeAmount: allocation.feeAmount }] : [];
-    if (props.side === 'sales') {
-      await settleReceivable({
-        ledgerUuid: allocation.ledgerUuid,
-        paymentDate: allocation.paymentDate,
-        bankAccountUuid: allocation.bankAccountUuid,
-        settleAmount: allocation.amount,
-        depositAmount: allocation.actualAmount,
-        memo: '',
-        allocations,
-        otherDeductions: allocation.otherDeductions,
-      });
-      props.onReceivableSettled?.();
-    } else {
-      await settlePayable({
-        ledgerUuid: allocation.ledgerUuid,
-        paymentDate: allocation.paymentDate,
-        bankAccountUuid: allocation.bankAccountUuid,
-        settleAmount: allocation.amount,
-        paymentAmount: allocation.actualAmount,
-        memo: '',
-        allocations,
-        otherDeductions: allocation.otherDeductions,
-      });
-      props.onPayableSettled?.();
-    }
-  };
 
   // 長按任一卡片進入選擇模式並選取該卡；再次長按或點擊其他卡片皆為切換選取
   const enterSelectionMode = (id: string) => {
@@ -372,13 +307,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
 
   return (
     <div className="flex flex-col gap-2.5 nav:hidden">
-      <ManualEntryDialog
-        open={manualEntryRow !== null}
-        onClose={() => setManualEntryRow(null)}
-        side={props.side}
-        row={manualEntryRow}
-        onSubmit={handleManualSettle}
-      />
       <ExportRangeDialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)} onExport={() => setExportDialogOpen(false)} />
       <ExportSelectedDialog
         open={exportSelectedOpen}
@@ -457,7 +385,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
               expanded={!!expanded[row.id]}
               onToggle={() => toggleExpand(row.id)}
               channelText={channelLabel(row, props.channelNameByUuid)}
-              onManualEntry={() => setManualEntryRow(row)}
               onCardClick={() => goToTransaction(row.uuid ?? row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}
@@ -473,7 +400,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
               subTab={props.subTab}
               expanded={!!expanded[row.id]}
               onToggle={() => toggleExpand(row.id)}
-              onManualEntry={() => setManualEntryRow(row)}
               onCardClick={() => goToTransaction(row.uuid ?? row.id)}
               selectionMode={selectionMode}
               isSelected={!!selected[row.id]}

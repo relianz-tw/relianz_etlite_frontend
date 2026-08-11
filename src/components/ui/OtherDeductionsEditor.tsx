@@ -19,15 +19,17 @@ interface OtherDeductionsEditorProps {
   onAdd: () => void;
   onRemove: (id: string) => void;
   onChange: (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) => void;
+  /** 開啟後每列金額改用 MoneyInput 的正負切換鈕，取代原本寫死的 − 字元；預設 false 維持原行為 */
+  allowSign?: boolean;
 }
 
 /**
  * 額外金額列表：科目 + 項目名稱 + 金額，可無限新增／移除，從對帳單金額（或交易金額）中扣除。
- * 供手動沖帳（ManualEntryDialog／SettlementEditDialog，容器較窄）與匯總沖帳（ReconPoolPanel，容器較寬）共用，
+ * 供手動沖帳（SettlementEditDialog，容器較窄）與匯總沖帳（ReconPoolPanel，容器較寬）共用，
  * 故每列固定採二行版面（科目獨立一行、項目名稱＋金額＋刪除一行）並以卡片分隔，不隨容器寬度改變排列方式，
  * 避免窄容器下欄位擠壓換行、行與行之間欄位錯位而顯得凌亂。
  */
-export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange }: OtherDeductionsEditorProps) {
+export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, allowSign = false }: OtherDeductionsEditorProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(row => (
@@ -53,8 +55,14 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange 
               placeholder="項目名稱"
             />
             <div className="flex shrink-0 items-center gap-1.5">
-              <span className="text-lg text-neutral-mid">−</span>
-              <MoneyInput widthClassName="w-28" value={row.amount} onChange={value => onChange(row.id, { amount: value })} />
+              {!allowSign && <span className="text-lg text-neutral-mid">−</span>}
+              <MoneyInput
+                widthClassName={allowSign ? 'w-36' : 'w-28'}
+                value={row.amount}
+                onChange={value => onChange(row.id, { amount: value })}
+                allowSign={allowSign}
+                negativeByDefault
+              />
             </div>
           </div>
         </div>

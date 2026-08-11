@@ -149,7 +149,7 @@ export default function ReconciliationView() {
   useEffect(() => {
     if (accounts.length === 0) return;
     const defaultAccount = side === 'payable' ? accounts.find(a => a.isDefaultPaymentAccount) : accounts.find(a => a.isDefaultReceivingAccount);
-    setBankAccountUuid((defaultAccount ?? accounts[0]).uuid);
+    setBankAccountUuid((defaultAccount ?? accounts[0]).bankAccountUuid);
   }, [side, accounts]);
 
   const [receivableData, setReceivableData] = useState<SideData | null>(null);
@@ -167,8 +167,8 @@ export default function ReconciliationView() {
       side === 'receivable'
         ? Promise.all([listChannelRules(), fetchAllReceivables()]).then(([channelList, items]) => {
             const activeChannels = channelList.filter(c => c.isActive);
-            const groupOptions = activeChannels.map(c => ({ uuid: c.uuid, name: c.channelName, balance: c.balance }));
-            const nameByUuid = new Map(channelList.map(c => [c.uuid, c.channelName]));
+            const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance }));
+            const nameByUuid = new Map(channelList.map(c => [c.channelUuid, c.channelName]));
             const candidates = receivableRowsToCandidates(mapReceivableItemsToRows(items));
             if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })

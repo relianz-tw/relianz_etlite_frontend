@@ -76,7 +76,7 @@ export default function ReconTxnDetailView({ transactionId, side, counterparty }
         <div className="mb-6">
           <Link href="/ledger/reconciliation" className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-blue">
             <ChevronLeft size={16} />
-            返回匯總沖帳
+            返回沖帳中心
           </Link>
           <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">交易明細</h1>
         </div>

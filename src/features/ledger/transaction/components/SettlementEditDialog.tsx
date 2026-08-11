@@ -96,7 +96,7 @@ function SettlementEditDialogContent({
         const activeList = list.filter(account => account.isActive);
         setAccounts(activeList);
         const defaultAccount = activeList.find(account => (isSales ? account.isDefaultReceivingAccount : account.isDefaultPaymentAccount)) ?? activeList[0];
-        if (defaultAccount) setBankAccountUuid(defaultAccount.uuid);
+        if (defaultAccount) setBankAccountUuid(defaultAccount.bankAccountUuid);
       })
       .catch(err => {
         if (cancelled) return;
@@ -223,7 +223,7 @@ function SettlementEditDialogContent({
             ) : (
               <Select widthClassName="w-full" value={bankAccountUuid} onValueChange={setBankAccountUuid} disabled={reverted}>
                 {accounts.map(account => (
-                  <option key={account.uuid} value={account.uuid}>
+                  <option key={account.bankAccountUuid} value={account.bankAccountUuid}>
                     {account.accountName}（{account.bankName} {account.accountNo}）
                   </option>
                 ))}

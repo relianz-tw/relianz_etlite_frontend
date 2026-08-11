@@ -13,7 +13,7 @@ export default function AccountSelector({ accounts, value, onChange }: AccountSe
   return (
     <Select value={value} onValueChange={onChange}>
       {accounts.map(account => (
-        <option key={account.uuid} value={account.uuid}>
+        <option key={account.bankAccountUuid} value={account.bankAccountUuid}>
           {account.accountName || account.bankName}（{account.accountNo}）
         </option>
       ))}

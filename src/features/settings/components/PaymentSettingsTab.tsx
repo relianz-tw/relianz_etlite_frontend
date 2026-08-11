@@ -49,7 +49,7 @@ function toUpdateBody(record: BankAccountRecord): Omit<UpdateBankAccountBody, 'c
 /** 後端 BankAccountDto 轉為畫面用的 BankAccountRecord */
 function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
   return {
-    id: dto.uuid,
+    id: dto.bankAccountUuid,
     nickname: dto.accountName ?? '',
     bankCode: dto.bankCode ?? '',
     bankName: dto.bankName ?? '',

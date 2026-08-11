@@ -47,6 +47,8 @@ interface ReconCandidate {
   /** 銷項為 paymentChannelUuid、進項為 counterpartyUuid；未指定時為 null */
   groupUuid: string | null;
   summary?: string;
+  /** 未沖帳金額；可為負代表超沖 */
+  remainingAmount?: number;
 }
 
 function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
@@ -65,6 +67,7 @@ export function receivableRowsToCandidates(rows: SalesRow[]): ReconCandidate[] {
       date: r.date,
       counterparty: r.counterparty,
       groupUuid: r.paymentChannelUuid ?? null,
+      remainingAmount: r.remainingAmount,
     }));
 }
 
@@ -79,6 +82,7 @@ export function payableRowsToCandidates(rows: PurchaseRow[]): ReconCandidate[] {
     counterparty: r.party,
     groupUuid: r.counterpartyUuid ?? null,
     summary: [r.category, r.project].filter(Boolean).join(' · '),
+    remainingAmount: r.remainingAmount,
   }));
 }
 
@@ -92,6 +96,7 @@ function toTxnRef(candidate: ReconCandidate): ReconTxnRef {
     counterparty: candidate.counterparty,
     summary: candidate.summary,
     channelUuid: candidate.groupUuid,
+    remainingAmount: candidate.remainingAmount,
   };
 }
 

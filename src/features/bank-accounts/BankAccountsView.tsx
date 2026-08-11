@@ -87,15 +87,15 @@ export default function BankAccountsView() {
     };
   }, []);
 
-  const selectedAccount = accounts.find(a => a.uuid === filters.account) ?? accounts[0] ?? null;
+  const selectedAccount = accounts.find(a => a.bankAccountUuid === filters.account) ?? accounts[0] ?? null;
 
   // 網址上的 account 參數缺少或指向不存在／已停用的帳戶時，補上目前選定帳戶，維持網址可分享、可重新整理
   useEffect(() => {
-    if (!accountsLoading && selectedAccount && filters.account !== selectedAccount.uuid) {
-      updateFilters({ account: selectedAccount.uuid });
+    if (!accountsLoading && selectedAccount && filters.account !== selectedAccount.bankAccountUuid) {
+      updateFilters({ account: selectedAccount.bankAccountUuid });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountsLoading, selectedAccount?.uuid]);
+  }, [accountsLoading, selectedAccount?.bankAccountUuid]);
 
   // 切換帳戶時重新載入該帳戶的交易紀錄（全期資料，期間篩選於下方以 useMemo 對全期資料做篩選）
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function BankAccountsView() {
     let cancelled = false;
     setTxnLoading(true);
     setTxnError('');
-    listBankTransactions(selectedAccount.uuid, selectedAccount.currentBalance)
+    listBankTransactions(selectedAccount.bankAccountUuid, selectedAccount.currentBalance)
       .then(rows => {
         if (cancelled) return;
         setTransactions(rows);
@@ -118,7 +118,7 @@ export default function BankAccountsView() {
     return () => {
       cancelled = true;
     };
-  }, [selectedAccount?.uuid]);
+  }, [selectedAccount?.bankAccountUuid]);
 
   const { from: defaultFrom, to: defaultTo } = defaultRange();
   const effectiveDateFrom = filters.dateFrom || defaultFrom;
@@ -155,7 +155,7 @@ export default function BankAccountsView() {
 
   const handleCreate = async (input: NewBankTransactionInput) => {
     if (!selectedAccount) return;
-    const rows = await createBankTransaction(selectedAccount.uuid, selectedAccount.currentBalance, input);
+    const rows = await createBankTransaction(selectedAccount.bankAccountUuid, selectedAccount.currentBalance, input);
     setTransactions(rows);
   };
 
@@ -178,7 +178,7 @@ export default function BankAccountsView() {
             <div className="mb-5 flex flex-col gap-3 nav:flex-row nav:items-end nav:justify-between">
               <div className="w-full nav:w-72">
                 <label className="mb-1.5 block text-xs font-semibold text-neutral-mid">選擇帳戶</label>
-                <AccountSelector accounts={accounts} value={selectedAccount.uuid} onChange={handleAccountChange} />
+                <AccountSelector accounts={accounts} value={selectedAccount.bankAccountUuid} onChange={handleAccountChange} />
               </div>
               <div className="flex gap-2.5">
                 <Button variant="outline" icon={Download} onClick={() => setExportOpen(true)}>
@@ -215,19 +215,19 @@ export default function BankAccountsView() {
                   totalCount={displayedRows.length}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
-                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.uuid}`, searchParams)}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
                 />
                 <TransactionCards
                   rows={pagedRows}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
-                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.uuid}`, searchParams)}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
                 />
                 <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
               </>
             )}
 
-            <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} bankAccountUuid={selectedAccount.uuid} onSubmit={handleCreate} />
+            <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} bankAccountUuid={selectedAccount.bankAccountUuid} onSubmit={handleCreate} />
             {/*
               下載交易紀錄：本階段僅示意，沿用既有的 ExportRangeDialog（尚未接上實際產檔邏輯，見其原始 stub 說明）。
               TODO: 待確認匯出格式（CSV/Excel）與欄位順序後，接上依目前查詢帳戶/期間產出檔案的實際邏輯。

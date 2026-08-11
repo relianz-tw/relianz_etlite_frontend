@@ -199,13 +199,26 @@ Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
 ```
 對應元件：`src/components/ui/Textarea.tsx`。
 
+**金額輸入正負切換（Signed Money Input）**（金額欄位需要讓使用者選擇正值或負值，如沖帳中心的手續費、額外金額）
+```
+切換鈕：24×24px（h-7 w-7）、rounded-md（6px）
+  背景: #EAE5E3（surface-cream）
+  Hover 背景: #F0EBE5（surface-warm）
+  圖示: lucide Plus（正）/ Minus（負），14px，色彩隨文字 #797C80（neutral-mid）→ hover #3A3830
+  Disabled：opacity 50%、cursor-not-allowed，維持背景不變（不 hover）
+排列：切換鈕 + 金額輸入框，中間 gap 6px（gap-1.5），切換鈕在左
+輸入框本身沿用上方 Form Inputs 規格，顯示絕對值（不顯示負號字元），正負完全由切換鈕圖示表達
+```
+對應元件：`src/components/ui/MoneyInput.tsx` 的 `allowSign` prop（選用，預設關閉時為一般金額輸入，行為不變）。
+
 ### Navigation — Sidebar（側邊欄導覽）
 
 全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +
 `src/components/AppShell.tsx`。
 
 ```
-寬度：展開 256px（w-64，8px 系統倍數）
+寬度：預設 256px（w-64，8px 系統倍數），桌機（≥ nav 1000px）可拖曳調整，範圍 200–400px，
+      僅本次瀏覽有效（不持久化）；手機（< nav 1000px）固定 256px，不可拖曳
 背景：#FFFFFF
 邊框：右側 1px #EAE5E3（surface-cream），取代原頂部列的 bottom border
 文字：Noto Sans TC 14px，#3A3830（權威灰）
@@ -219,6 +232,16 @@ Active / hover：文字 #005FA2（城信藍）+ 背景 #EAE5E3（surface-cream�
 
 下拉子項目：向下展開於父項目下方，縮排 + 左側 1px #EAE5E3 分隔線
 圖示：一律 lucide-react
+
+含子項目的父項目：
+  點擊文字直接導覽至父項目 path（通常等同該群組總覽頁），並自動展開子項目
+  子項目路徑為目前頁面時，父項目自動維持展開；點擊右側 chevron 圖示可手動覆蓋展開/收合狀態
+  路由切換時清除手動覆蓋，回到「依目前路徑自動展開」的預設狀態
+
+拖曳分隔線（僅桌機）：
+  位置：側邊欄右邊界，寬度 4px（w-1）、cursor-col-resize
+  預設透明，hover / 拖曳中顯示 brand-primary 半透明提示色（無陰影，符合扁平原則）
+  拖曳時同步更新側邊欄寬度與主內容 margin-left（透過 CSS variable 保持一致）
 
 手機固定頂部列（< nav 1000px，取代桌機浮動開關鈕）：
   高度 h-14（56px）、bg #FFFFFF、底部 1px #EAE5E3 邊框、z-40
@@ -234,7 +257,7 @@ Active / hover：文字 #005FA2（城信藍）+ 背景 #EAE5E3（surface-cream�
   手機（Overlay，浮於內容上）→ shadow-level1（唯一陰影例外，同浮動選單規則）
 
 行為：
-  桌面（≥ nav 1000px）：Push — 側邊欄固定於左側，展開時主內容向右推移 256px（ml-64），收合時佔滿全寬（ml-0）
+  桌面（≥ nav 1000px）：Push — 側邊欄固定於左側，主內容向右推移側邊欄目前寬度（預設 256px，可拖曳 200–400px）
   手機（< nav 1000px）：Overlay — 側邊欄自畫面右側滑出（fixed right-0）+ 半透明遮罩（bg-neutral-dark/40），主內容不位移，並保留 pt-14 淨空對應固定頂部列
 
 過渡：側邊欄 transition-transform；主內容 transition-[margin]
@@ -301,7 +324,14 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 間距：每個分頁 px 12px、py 12px；分頁間 gap 4px
 ```
 
-對應元件：`src/components/ui/TabBar.tsx`。
+**停用狀態（Disabled）**（功能尚未開放的分頁，如沖帳中心「多筆沖帳」等待後端 API）
+```
+文字：#9AA7B9（neutral-blue-gray），底線透明（不隨選取狀態改變）
+不可點擊：cursor-not-allowed，無 hover 效果
+說明：以原生 title 屬性顯示滑鼠停留提示，說明尚未開放原因
+```
+
+對應元件：`src/components/ui/TabBar.tsx`（`TabBarOption.disabled` / `hint`）。
 
 ---
 

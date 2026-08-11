@@ -7217,7 +7217,7 @@ HTTP Status Code **200**
 |»»» createdAt|string(date-time)|false|none||none|
 |» settleEvents|[object]|true|none||此原單相關沖帳事件（供撤銷）；無則空陣列|
 |»» settleEventUuid|string|true|none||settle_events.uuid|
-|»» reconMethod|integer|true|none||0手動沖帳／2匯總沖帳|
+|»» reconMethod|integer|true|none||0手動沖帳／1開立上傳發票即沖帳／2匯總沖帳|
 |»» side|integer|true|none||0銷項／1進項|
 |»» paymentDate|string|true|none||付款／收款日 YYYYMMDD|
 |»» settleAmount|integer|true|none||帳面沖帳金額|
@@ -7316,6 +7316,7 @@ POST /ael/ledger/payables/settle
 |» bankAccountUuid|body|string| yes |銀行帳戶uuid|
 |» settleAmount|body|integer| yes |沖帳金額|
 |» paymentAmount|body|integer| yes |實際付款|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» memo|body|string| yes |備註|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |none|
@@ -7435,6 +7436,7 @@ POST /ael/ledger/receivables/settle
 |» bankAccountUuid|body|string| yes |銀行帳戶uuid|
 |» settleAmount|body|integer| yes |沖帳金額|
 |» depositAmount|body|integer| yes |實際存入|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» memo|body|string| yes |備註|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |none|
@@ -7519,8 +7521,11 @@ POST /ael/ledger/reconciliation/payables/settle/preview
 |body|body|object| yes |none|
 |» companyUuid|body|string| yes |公司 UUID|
 |» counterpartyUuid|body|string| yes |廠商uuid|
+|» isDefault|body|boolean| yes |使用預設預覽嗎|
+|» ledgerUuids|body|[string]| yes |要預覽匯總沖帳的自選 uuid 列表|
 |» settleAmount|body|integer| yes |本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆|
 |» paymentAmount|body|integer| yes |進項實際付出|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
@@ -7703,6 +7708,7 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
 |» paymentDate|body|string| yes |付款／收款日 YYYYMMDD,必填|
 |» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
 |» memo|body|string| no |備註（選填）|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
@@ -7896,8 +7902,11 @@ POST /ael/ledger/reconciliation/receivables/settle/preview
 |body|body|object| yes |none|
 |» companyUuid|body|string| yes |公司 UUID|
 |» paymentChannelUuid|body|string| yes |銷售管道uuid|
+|» isDefault|body|boolean| yes |使用預設預覽嗎|
+|» ledgerUuids|body|[string]| yes |要預覽匯總沖帳的自選 uuid 列表|
 |» settleAmount|body|integer| yes |本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆|
 |» depositAmount|body|integer| yes |銷項實際存入|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
@@ -8101,6 +8110,7 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
 |» paymentDate|body|string| yes |付款／收款日 YYYYMMDD,必填|
 |» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
 |» memo|body|string| no |備註（選填）|
+|» balanceUsed|body|integer| yes |使用餘額|
 |» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
@@ -8236,6 +8246,45 @@ POST /ael/ledger/settle/reverse
 
 ### Responses Data Schema
 
+## POST 恢復發票即沖的沖帳紀錄
+
+POST /ael/ledger/invoiceSettle/reverse
+
+恢復發票即沖的沖帳紀錄
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "settleEventUuid": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |none|
+|» settleEventUuid|body|string| yes |none|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
 ## POST 恢復匯總沖帳紀錄
 
 POST /ael/ledger/reconciliation/settle/reverse
@@ -8291,6 +8340,8 @@ GET /ael/ledger/reconciliation/payables
 |year|query|string| no |西元年|
 |dateFrom|query|string| no |日期起，	YYYYMMDD|
 |dateTo|query|string| no |日期迄，	YYYYMMDD|
+|counterpartyUuid|query|string| no |廠商uuid|
+|settled|query|string| no |true=已結清、false=未結清、省略=全部|
 
 > Response Examples
 
@@ -8305,7 +8356,7 @@ GET /ael/ledger/reconciliation/payables
             "counterpartyUuid": "301b53f8-1b59-4ecc-8836-ba6673e6baa7",
             "counterpartyName": "和興商店",
             "vendor": {
-                "uuid": "301b53f8-1b59-4ecc-8836-ba6673e6baa7",
+                "bankAccountUuid": "301b53f8-1b59-4ecc-8836-ba6673e6baa7",
                 "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
                 "taxId": "61194605",
                 "name": "和興商店",
@@ -8325,7 +8376,7 @@ GET /ael/ledger/reconciliation/payables
             "settlementStatus": 2,
             "items": [
                 {
-                    "uuid": "9b435670-0281-4a26-b23d-743845b56323",
+                    "ledgerUuid": "9b435670-0281-4a26-b23d-743845b56323",
                     "orderCode": "TX-115072900003",
                     "entryDate": null,
                     "entryKind": 0,
@@ -8369,7 +8420,7 @@ HTTP Status Code **200**
 |»» counterpartyUuid|string|false|none||none|
 |»» counterpartyName|string|false|none||none|
 |»» vendor|object|false|none||none|
-|»»» uuid|string|true|none||none|
+|»»» bankAccountUuid|string|true|none||none|
 |»»» companyUuid|string|true|none||none|
 |»»» taxId|string|true|none||none|
 |»»» name|string|true|none||none|
@@ -8389,7 +8440,7 @@ HTTP Status Code **200**
 |»» totalRemainingAmount|integer|false|none||none|
 |»» settlementStatus|integer|false|none||none|
 |»» items|[object]|false|none||none|
-|»»» uuid|string|false|none||none|
+|»»» ledgerUuid|string|false|none||none|
 |»»» orderCode|string|false|none||none|
 |»»» entryDate|null|false|none||none|
 |»»» direction|integer|false|none||none|
@@ -8422,6 +8473,543 @@ GET /ael/ledger/reconciliation/receivables
 |year|query|string| no |西元年|
 |dateFrom|query|string| no |日期起，	YYYYMMDD|
 |dateTo|query|string| no |日期迄，	YYYYMMDD|
+|paymentChannelUuid|query|string| no |銷售管道uuid|
+|settled|query|string| no |true=已結清、false=未結清、省略=全部|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": [
+        {
+            "groupKey": "channel:5900d3b6-d6b3-4075-92ad-890aee377301",
+            "hasChannel": true,
+            "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+            "channelName": "蝦皮",
+            "channel": {
+                "channelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+                "channelName": "蝦皮",
+                "receivingAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+                "settlementStyle": 0,
+                "settlementAmount": 7,
+                "feeRateBps": 200,
+                "feeFixedAmount": 3,
+                "balance": 0,
+                "isActive": true,
+                "remark": "2.00%+3元",
+                "createdAt": "2026-07-30T08:41:19Z",
+                "updatedAt": "2026-08-11T03:17:34Z"
+            },
+            "receivingAccount": {
+                "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+                "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+                "accountName": "測試帳戶改",
+                "bankCode": "822",
+                "bankName": "中國信託",
+                "branchName": "港墘分行",
+                "accountNo": "1234567890123456",
+                "currentBalance": 132605,
+                "lastBalanceUpdateDate": "20260811",
+                "isDefaultReceivingAccount": false,
+                "isDefaultPaymentAccount": true,
+                "isActive": true,
+                "remark": "前端自動化測試備註",
+                "createdAt": "2026-07-30T04:17:46Z",
+                "updatedAt": "2026-08-11T04:36:40Z"
+            },
+            "balance": 0,
+            "totalSettledAmount": 2000,
+            "totalRemainingAmount": 980599,
+            "settlementStatus": 2,
+            "items": [
+                {
+                    "ledgerUuid": "f2ab9a2e-8cf0-43b7-89c4-29c2d4fc38a7",
+                    "orderCode": "TX-115073100008",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "潤智教育有限公司",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 30000,
+                    "netAmount": 30000,
+                    "taxAmount": 0,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 30000,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-07-31T08:45:29Z"
+                },
+                {
+                    "ledgerUuid": "b2d3e3c7-0c62-414e-a0ad-9a04a30d865b",
+                    "orderCode": "TX-115080700039",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 46490,
+                    "netAmount": 43000,
+                    "taxAmount": 3490,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 46490,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T07:59:08Z"
+                },
+                {
+                    "ledgerUuid": "44026f3e-4eba-4376-8f44-ecc125e82876",
+                    "orderCode": "TX-115073100005",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "潤智教育有限公司",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 5040,
+                    "netAmount": 4000,
+                    "taxAmount": 40,
+                    "taxFreeAmount": 1000,
+                    "settledAmount": 0,
+                    "remainingAmount": 5040,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-07-31T07:06:51Z"
+                },
+                {
+                    "ledgerUuid": "6d0f26aa-94cf-4c23-8d3a-a53d7dcbb47a",
+                    "orderCode": "TX-115073100006",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "潤智教育有限公司",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 34000,
+                    "netAmount": 34000,
+                    "taxAmount": 0,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 34000,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 11,
+                    "createdAt": "2026-07-31T08:43:46Z"
+                },
+                {
+                    "ledgerUuid": "c6ef0f9f-7b49-4196-907e-16ea21dd9723",
+                    "orderCode": "TX-115080700036",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "923848234",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 34000,
+                    "netAmount": 34000,
+                    "taxAmount": 0,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 34000,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T07:57:29Z"
+                },
+                {
+                    "ledgerUuid": "0190bf3a-3716-4a74-9694-2bec305d7b48",
+                    "orderCode": "TX-115080300010",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "原味商行",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 1050,
+                    "netAmount": 1000,
+                    "taxAmount": 50,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 1000,
+                    "remainingAmount": 50,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 41,
+                    "createdAt": "2026-08-03T08:58:28Z"
+                },
+                {
+                    "ledgerUuid": "1ed3867e-4c56-4b21-9597-fd3a9a0d82fc",
+                    "orderCode": "TX-115080700040",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 34349,
+                    "netAmount": 34000,
+                    "taxAmount": 349,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 34349,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 11,
+                    "createdAt": "2026-08-07T07:59:36Z"
+                },
+                {
+                    "ledgerUuid": "f26bc332-2d45-405e-b993-8f31fa1d0290",
+                    "orderCode": "TX-115080700042",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 312240,
+                    "netAmount": 309200,
+                    "taxAmount": 3040,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 312240,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T08:00:57Z"
+                },
+                {
+                    "ledgerUuid": "1b7c3bac-262c-434e-8a0d-115c15a193d5",
+                    "orderCode": "TX-115080700043",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 23737,
+                    "netAmount": 23434,
+                    "taxAmount": 303,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 23737,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T08:01:33Z"
+                },
+                {
+                    "ledgerUuid": "d4d9f931-776b-4bb5-9120-61177490941b",
+                    "orderCode": "TX-115080700044",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 34340,
+                    "netAmount": 34000,
+                    "taxAmount": 340,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 34340,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T08:01:59Z"
+                },
+                {
+                    "ledgerUuid": "183d22a1-2859-42db-9efc-1fa9d15755b9",
+                    "orderCode": "TX-115080700046",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 4044,
+                    "netAmount": 4000,
+                    "taxAmount": 44,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 4044,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 11,
+                    "createdAt": "2026-08-07T08:03:12Z"
+                },
+                {
+                    "ledgerUuid": "5603d33c-d301-4b10-9c45-f664bec4a11e",
+                    "orderCode": "TX-115080700047",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 3454,
+                    "netAmount": 3424,
+                    "taxAmount": 30,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 3454,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-07T08:03:35Z"
+                },
+                {
+                    "ledgerUuid": "f2cb960e-6aac-4b85-8ae6-3133ae86b9f4",
+                    "orderCode": "TX-115080300003",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "原味商行",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 1050,
+                    "netAmount": 1000,
+                    "taxAmount": 50,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 1000,
+                    "remainingAmount": 50,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 41,
+                    "createdAt": "2026-08-03T07:03:52Z"
+                },
+                {
+                    "ledgerUuid": "da6c16f7-e7d1-47a5-b4b0-d776c2cfd928",
+                    "orderCode": "TX-115080700041",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 3434,
+                    "netAmount": 3400,
+                    "taxAmount": 34,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 3434,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T08:00:28Z"
+                },
+                {
+                    "ledgerUuid": "3b89af58-f323-4f76-84eb-6ef24ac80ef0",
+                    "orderCode": "TX-115080700035",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試公司一",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 300000,
+                    "netAmount": 300000,
+                    "taxAmount": 0,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 300000,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T07:56:33Z"
+                },
+                {
+                    "ledgerUuid": "c9cf71a4-aafc-498c-bbd3-081c6b2785b1",
+                    "orderCode": "TX-115080700045",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試測試",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 53429,
+                    "netAmount": 49999,
+                    "taxAmount": 3430,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 53429,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 10,
+                    "createdAt": "2026-08-07T08:02:34Z"
+                },
+                {
+                    "ledgerUuid": "a10f2060-01d8-48b1-b26a-cbce12caaece",
+                    "orderCode": "TX-115080600009",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試買家C",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 0,
+                    "netAmount": 100,
+                    "taxAmount": 0,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 0,
+                    "settlementStatus": 0,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-06T09:16:47Z"
+                },
+                {
+                    "ledgerUuid": "a781b07d-4127-4055-b5cc-680f55daf985",
+                    "orderCode": "TX-115080700037",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試二二二",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 43730,
+                    "netAmount": 40300,
+                    "taxAmount": 3430,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 43730,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-07T07:58:21Z"
+                },
+                {
+                    "ledgerUuid": "ac93b74f-9861-404b-a417-df2e021e9c24",
+                    "orderCode": "TX-115080700017",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試買家二",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 2100,
+                    "netAmount": 2000,
+                    "taxAmount": 100,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 2100,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-07T04:21:58Z"
+                },
+                {
+                    "ledgerUuid": "986cedb4-1f69-40fc-94a4-e2f71d140503",
+                    "orderCode": "TX-115080700018",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試買家三",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 3150,
+                    "netAmount": 3000,
+                    "taxAmount": 150,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 3150,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-07T04:23:02Z"
+                },
+                {
+                    "ledgerUuid": "0b33c141-c694-40e1-b899-97bb42218dbd",
+                    "orderCode": "TX-115080700038",
+                    "entryDate": null,
+                    "entryKind": 0,
+                    "direction": 2,
+                    "counterpartyName": "測試客戶一",
+                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                    "totalAmount": 12962,
+                    "netAmount": 12345,
+                    "taxAmount": 617,
+                    "taxFreeAmount": 0,
+                    "settledAmount": 0,
+                    "remainingAmount": 12962,
+                    "settlementStatus": 2,
+                    "officialAccountingSubjectId": 1,
+                    "createdAt": "2026-08-07T07:59:04Z"
+                }
+            ]
+        }
+    ],
+    "errorCode": "0000",
+    "message": "操作成功",
+    "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|[object]|true|none||none|
+|»» groupKey|string|false|none||none|
+|»» hasChannel|boolean|false|none||none|
+|»» paymentChannelUuid|string|false|none||none|
+|»» channelName|string|false|none||none|
+|»» channel|object|false|none||none|
+|»»» channelUuid|string|true|none||none|
+|»»» companyUuid|string|true|none||none|
+|»»» channelName|string|true|none||none|
+|»»» receivingAccountUuid|string|true|none||none|
+|»»» settlementStyle|integer|true|none||none|
+|»»» settlementAmount|integer|true|none||none|
+|»»» feeRateBps|integer|true|none||none|
+|»»» feeFixedAmount|integer|true|none||none|
+|»»» balance|integer|true|none||none|
+|»»» isActive|boolean|true|none||none|
+|»»» remark|string|true|none||none|
+|»»» createdAt|string|true|none||none|
+|»»» updatedAt|string|true|none||none|
+|»» receivingAccount|object|false|none||none|
+|»»» bankAccountUuid|string|true|none||none|
+|»»» companyUuid|string|true|none||none|
+|»»» accountName|string|true|none||none|
+|»»» bankCode|string|true|none||none|
+|»»» bankName|string|true|none||none|
+|»»» branchName|string|true|none||none|
+|»»» accountNo|string|true|none||none|
+|»»» currentBalance|integer|true|none||none|
+|»»» lastBalanceUpdateDate|string|true|none||none|
+|»»» isDefaultReceivingAccount|boolean|true|none||none|
+|»»» isDefaultPaymentAccount|boolean|true|none||none|
+|»»» isActive|boolean|true|none||none|
+|»»» remark|string|true|none||none|
+|»»» createdAt|string|true|none||none|
+|»»» updatedAt|string|true|none||none|
+|»» balance|integer|false|none||none|
+|»» totalSettledAmount|integer|false|none||none|
+|»» totalRemainingAmount|integer|false|none||none|
+|»» settlementStatus|integer|false|none||none|
+|»» items|[object]|false|none||none|
+|»»» ledgerUuid|string|true|none||none|
+|»»» orderCode|string|true|none||none|
+|»»» entryDate|null|true|none||none|
+|»»» entryKind|integer|true|none||none|
+|»»» direction|integer|true|none||none|
+|»»» counterpartyName|string|true|none||none|
+|»»» paymentChannelUuid|string|true|none||none|
+|»»» totalAmount|integer|true|none||none|
+|»»» netAmount|integer|true|none||none|
+|»»» taxAmount|integer|true|none||none|
+|»»» taxFreeAmount|integer|true|none||none|
+|»»» settledAmount|integer|true|none||none|
+|»»» remainingAmount|integer|true|none||none|
+|»»» settlementStatus|integer|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||none|
+|»»» createdAt|string|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
+
+# 日記帳
+
+## POST 產生日記帳
+
+POST /ael/ledger/daily/excel
+
+產生日記帳
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "dateFrom": "20260101",
+    "dateTo": "20260808"
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» dateFrom|body|string| yes |日期起，YYYYMMDD|
+|» dateTo|body|string| yes |日期迄，YYYYMMDD|
 
 > Response Examples
 
@@ -8438,6 +9026,267 @@ GET /ael/ledger/reconciliation/receivables
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+## GET 拿該筆交易相關的日記帳
+
+GET /ael/ledger/entries/dailyDetail
+
+拿該筆交易相關的日記帳
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|ledgerUuid|query|string| no |交易uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": {
+        "ledgerUuid": "ebc326e5-bbc2-4e68-ad2e-b26ed4ca590b",
+        "settleEventUuids": [
+            "dbb6b55d-f4da-4e8d-be73-4c40dd389025"
+        ],
+        "lines": [
+            {
+                "rocYear": "115",
+                "voucherNo": "08070019",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "文具用品",
+                "counterpartyCode": "",
+                "summary": "CD20000001-進貨/費用",
+                "debitCredit": "1",
+                "amount": 1500,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "e198fdaf-fa95-4448-ac8a-03c6056b600c",
+                "lineUuid": "339eaf9e-a764-42e0-a33b-ccd7d7b0659e",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 1
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070019",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "進項稅款",
+                "counterpartyCode": "",
+                "summary": "CD20000001-進項稅額",
+                "debitCredit": "1",
+                "amount": 75,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "e198fdaf-fa95-4448-ac8a-03c6056b600c",
+                "lineUuid": "6b381394-d639-46e2-bafd-9d31aecddc1a",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 2
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070019",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "應付帳款",
+                "counterpartyCode": "",
+                "summary": "CD20000001-應付帳款",
+                "debitCredit": "2",
+                "amount": 1575,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "e198fdaf-fa95-4448-ac8a-03c6056b600c",
+                "lineUuid": "f6808f39-f420-41fe-95e1-9fa1a05a6d47",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 3
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070020",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "文具用品",
+                "counterpartyCode": "",
+                "summary": "CD20000002-進貨/費用",
+                "debitCredit": "1",
+                "amount": 2500,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "09517c1c-8a37-4605-9c3a-8789ad08eaf4",
+                "lineUuid": "352e8119-03b0-499b-b2a8-93c40efd5c54",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 1
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070020",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "進項稅款",
+                "counterpartyCode": "",
+                "summary": "CD20000002-進項稅額",
+                "debitCredit": "1",
+                "amount": 125,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "09517c1c-8a37-4605-9c3a-8789ad08eaf4",
+                "lineUuid": "b514f91f-7dc5-4e0d-b9c5-c9d8efdafe9d",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 2
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070020",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "應付帳款",
+                "counterpartyCode": "",
+                "summary": "CD20000002-應付帳款",
+                "debitCredit": "2",
+                "amount": 2625,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "09517c1c-8a37-4605-9c3a-8789ad08eaf4",
+                "lineUuid": "7a100f7c-63e5-444e-bd3d-c538fd261dad",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 3
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070041",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "應付帳款",
+                "counterpartyCode": "",
+                "summary": "沖銷應付帳款",
+                "debitCredit": "1",
+                "amount": 1575,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "ebc326e5-bbc2-4e68-ad2e-b26ed4ca590b",
+                "lineUuid": "72b7494b-8e26-4a0b-9884-16adcd5dd88a",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 1
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070041",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "應付帳款",
+                "counterpartyCode": "",
+                "summary": "沖銷應付帳款",
+                "debitCredit": "1",
+                "amount": 2625,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "ebc326e5-bbc2-4e68-ad2e-b26ed4ca590b",
+                "lineUuid": "04c007a8-b3f8-436f-9ea3-367eaa13927d",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 2
+            },
+            {
+                "rocYear": "115",
+                "voucherNo": "08070041",
+                "seq": "",
+                "voucherType": "3",
+                "rocDate": "1150807",
+                "subjectName": "銀行存款",
+                "counterpartyCode": "",
+                "summary": "付款",
+                "debitCredit": "2",
+                "amount": 4200,
+                "voucherCategory": "",
+                "printFlag": "N",
+                "taxAmount": "",
+                "ledgerUuid": "ebc326e5-bbc2-4e68-ad2e-b26ed4ca590b",
+                "lineUuid": "75e66018-cb77-4bfc-96bd-29b56a75cc0f",
+                "settleEventUuid": "dbb6b55d-f4da-4e8d-be73-4c40dd389025",
+                "isReverse": false,
+                "createdDate": "20260807",
+                "sortOrder": 3
+            }
+        ]
+    },
+    "errorCode": "0000",
+    "message": "操作成功",
+    "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» ledgerUuid|string|true|none||交易uuid|
+|»» settleEventUuids|[string]|true|none||沖帳事件uuids|
+|»» lines|[object]|true|none||日記帳|
+|»»» rocYear|string|true|none||民國年|
+|»»» voucherNo|string|true|none||傳票號|
+|»»» seq|string|true|none||序號（目前固定空字串）|
+|»»» voucherType|string|true|none||傳票類型|
+|»»» rocDate|string|true|none||民國日期 YYYMMDD|
+|»»» subjectName|string|true|none||會計科目名稱|
+|»»» counterpartyCode|string|true|none||對方科目／對象代碼（目前多為空|
+|»»» summary|string|true|none||摘要|
+|»»» debitCredit|string|true|none||借貸別：1=借、2=貸|
+|»»» amount|integer|true|none||金額|
+|»»» voucherCategory|string|true|none||傳票類別（目前固定空字串)|
+|»»» printFlag|string|true|none||none|
+|»»» taxAmount|string|true|none||none|
+|»»» ledgerUuid|string|true|none||ledger_entries.uuid|
+|»»» lineUuid|string|true|none||ledger_entry_lines.uuid|
+|»»» settleEventUuid|string|false|none||沖帳事件uuid|
+|»»» isReverse|boolean|true|none||是否為恢復分錄|
+|»»» createdDate|string|true|none||分錄建立日 YYYYMMDD|
+|»»» sortOrder|integer|true|none||同傳票內列排序|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
 
 # 廠商名單
 
@@ -8833,7 +9682,7 @@ GET /ael/bankAccounts
 {
     "data": [
         {
-            "uuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+            "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
             "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
             "accountName": "測試帳戶",
             "bankCode": "822",
@@ -8863,6 +9712,30 @@ GET /ael/bankAccounts
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|[object]|true|none||none|
+|»» bankAccountUuid|string|false|none||none|
+|»» companyUuid|string|false|none||none|
+|»» accountName|string|false|none||none|
+|»» bankCode|string|false|none||none|
+|»» bankName|string|false|none||none|
+|»» branchName|string|false|none||none|
+|»» accountNo|string|false|none||none|
+|»» currentBalance|integer|false|none||none|
+|»» lastBalanceUpdateDate|null|false|none||none|
+|»» isDefaultReceivingAccount|boolean|false|none||none|
+|»» isDefaultPaymentAccount|boolean|false|none||none|
+|»» isActive|boolean|false|none||none|
+|»» remark|string|false|none||none|
+|»» createdAt|string|false|none||none|
+|»» updatedAt|string|false|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
 
 ## POST 新增銀行帳戶
 
@@ -8912,7 +9785,7 @@ POST /ael/bankAccounts
 ```json
 {
     "data": {
-        "uuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
         "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
         "accountName": "測試帳戶",
         "bankCode": "822",
@@ -8994,7 +9867,7 @@ PATCH /ael/bankAccounts
 ```json
 {
     "data": {
-        "uuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
         "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
         "accountName": "測試帳戶改",
         "bankCode": "822",
@@ -9220,7 +10093,7 @@ ps. feeRateBps 以及 feeFixedAmount 在自動入帳前都先掛 0
 ```json
 {
     "data": {
-        "uuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+        "channelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
         "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
         "channelName": "蝦皮",
         "receivingAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
@@ -9247,6 +10120,27 @@ ps. feeRateBps 以及 feeFixedAmount 在自動入帳前都先掛 0
 
 ### Responses Data Schema
 
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» channelUuid|string|true|none||none|
+|»» companyUuid|string|true|none||none|
+|»» channelName|string|true|none||none|
+|»» receivingAccountUuid|string|true|none||none|
+|»» settlementStyle|integer|true|none||none|
+|»» settlementAmount|integer|true|none||none|
+|»» feeRateBps|integer|true|none||none|
+|»» feeFixedAmount|integer|true|none||none|
+|»» isActive|boolean|true|none||none|
+|»» remark|string|true|none||none|
+|»» createdAt|string|true|none||none|
+|»» updatedAt|string|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
+
 ## GET 撈取公司所有銷售管道規則
 
 GET /ael/payment/channelRules
@@ -9268,7 +10162,7 @@ GET /ael/payment/channelRules
 {
     "data": [
         {
-            "uuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+            "channelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
             "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
             "channelName": "蝦皮",
             "receivingAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
@@ -9295,6 +10189,27 @@ GET /ael/payment/channelRules
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|[object]|true|none||none|
+|»» channelUuid|string|false|none||none|
+|»» companyUuid|string|false|none||none|
+|»» channelName|string|false|none||none|
+|»» receivingAccountUuid|string|false|none||none|
+|»» settlementStyle|integer|false|none||none|
+|»» settlementAmount|integer|false|none||none|
+|»» feeRateBps|integer|false|none||none|
+|»» feeFixedAmount|integer|false|none||none|
+|»» isActive|boolean|false|none||none|
+|»» remark|string|false|none||none|
+|»» createdAt|string|false|none||none|
+|»» updatedAt|string|false|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
 
 ## PATCH 更新銷售管道規則
 
@@ -9338,7 +10253,7 @@ PATCH /ael/payment/channelRules
 ```json
 {
     "data": {
-        "uuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+        "channelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
         "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
         "channelName": "蝦皮",
         "receivingAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",

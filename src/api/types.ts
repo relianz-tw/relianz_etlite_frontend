@@ -54,7 +54,7 @@ export interface VendorExistsResult {
  * lastBalanceUpdateDate 格式為 YYYYMMDD 字串，新建帳戶尚未有紀錄時為 null。
  */
 export interface BankAccountDto {
-  uuid: string;
+  bankAccountUuid: string;
   companyUuid: string;
   accountName: string;
   bankCode: string;
@@ -86,9 +86,9 @@ export type CreateBankAccountBody = Pick<
   | 'remark'
 >;
 
+/** PATCH /ael/bankAccounts body 的 uuid 為銀行帳戶 uuid，與回應 DTO 的 bankAccountUuid 為同一值但欄位名不同（api.md 第 9828、9849 行） */
 export type UpdateBankAccountBody = Pick<
   BankAccountDto,
-  | 'uuid'
   | 'companyUuid'
   | 'accountName'
   | 'bankCode'
@@ -101,6 +101,7 @@ export type UpdateBankAccountBody = Pick<
   | 'isActive'
   | 'remark'
 > & {
+  uuid: string;
   /** YYYYMMDD；後端要求必填，本次介面未提供異動餘額功能，故一律回填原值 */
   lastBalanceUpdateDate: string;
 };
@@ -176,7 +177,7 @@ export interface SubjectUsageDto {
  * feeRateBps／feeFixedAmount（手續費）本次介面暫不編輯，建立/更新時一律不帶這兩個欄位，留待日後補上。
  */
 export interface ChannelRuleDto {
-  uuid: string;
+  channelUuid: string;
   companyUuid: string;
   channelName: string;
   /** 入帳規則類型，0:固定延遲天數，1:每週固定星期，2:每月固定日期 */
@@ -202,7 +203,8 @@ export type CreateChannelRuleBody = Pick<
   'companyUuid' | 'channelName' | 'settlementStyle' | 'settlementAmount' | 'receivingAccountUuid' | 'isActive' | 'remark'
 >;
 
-export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'uuid' | 'balance'>;
+/** PATCH /ael/payment/channelRules body 的 uuid 為渠道 uuid，與回應 DTO 的 channelUuid 為同一值但欄位名不同（api.md 第 10224、10237 行） */
+export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'balance'> & { uuid: string };
 
 /**
  * 建立進項應付交易紀錄（POST /ael/ledger/payables）body。

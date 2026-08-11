@@ -41,12 +41,12 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
     const load = async () => {
       try {
         const accounts = await listBankAccounts();
-        const account = accounts.find(a => a.uuid === accountUuid);
+        const account = accounts.find(a => a.bankAccountUuid === accountUuid);
         if (!account) {
           if (!cancelled) setError('找不到此銀行帳戶');
           return;
         }
-        const result = await getBankTransaction(account.uuid, account.currentBalance, transactionId);
+        const result = await getBankTransaction(account.bankAccountUuid, account.currentBalance, transactionId);
         if (cancelled) return;
         if (!result) {
           setError('找不到此筆交易');

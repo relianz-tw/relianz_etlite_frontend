@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, CirclePlus } from 'lucide-react';
 import { Children, isValidElement, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
@@ -13,6 +13,10 @@ interface SelectProps {
   disabled?: boolean;
   onValueChange?: (value: string) => void;
   children: ReactNode;
+  /** 下拉選單最下方「新增」列的文字，預設「新增」；需與 onAddNew 搭配才會顯示 */
+  addNewLabel?: string;
+  /** 提供時，下拉選單最下方會多一列「新增」，點擊後關閉選單並觸發此callback（不影響已選值） */
+  onAddNew?: () => void;
 }
 
 interface SelectOption {
@@ -49,6 +53,8 @@ export default function Select({
   disabled,
   onValueChange,
   children,
+  addNewLabel,
+  onAddNew,
 }: SelectProps) {
   const options = parseOptions(children);
   const [open, setOpen] = useState(false);
@@ -62,7 +68,7 @@ export default function Select({
   useEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const estimatedPanelHeight = Math.min(options.length * 36 + 8, 256);
+    const estimatedPanelHeight = Math.min(options.length * 36 + 8 + (onAddNew ? 37 : 0), 256);
     const openUp = window.innerHeight - rect.bottom < estimatedPanelHeight && rect.top > estimatedPanelHeight;
     setPosition({
       top: (openUp ? rect.top - 4 : rect.bottom + 4) + window.scrollY,
@@ -145,6 +151,22 @@ export default function Select({
                 {option.value === value && <Check size={14} className="shrink-0" />}
               </button>
             ))}
+            {onAddNew && (
+              <>
+                <div className="my-1 border-t border-neutral-blue-gray/20" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onAddNew();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-brand-blue transition-colors hover:bg-brand-blue/5"
+                >
+                  <CirclePlus size={15} className="shrink-0" />
+                  {addNewLabel ?? '新增'}
+                </button>
+              </>
+            )}
           </div>,
           document.body,
         )}

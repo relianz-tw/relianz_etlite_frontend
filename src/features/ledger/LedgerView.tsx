@@ -91,8 +91,6 @@ export default function LedgerView() {
   const [totals, setTotals] = useState<LedgerTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // 手動入帳成功後遞增此值以觸發重新查詢（沖帳不改變頁碼/篩選條件，需獨立的刷新旗標）
-  const [reloadKey, setReloadKey] = useState(0);
 
   // 銷售管道名稱反查表：帳簿列表「銷售管道」欄位唯讀顯示用，一次載入不隨 side/分頁重抓
   const [channelNameByUuid, setChannelNameByUuid] = useState<Map<string, string>>(new Map());
@@ -100,7 +98,7 @@ export default function LedgerView() {
     let cancelled = false;
     listChannelRules()
       .then(list => {
-        if (!cancelled) setChannelNameByUuid(new Map(list.map(c => [c.uuid, c.channelName])));
+        if (!cancelled) setChannelNameByUuid(new Map(list.map(c => [c.channelUuid, c.channelName])));
       })
       .catch(() => {
         // 名稱反查失敗僅影響顯示（退回顯示「未知」），不影響帳簿主要功能，故不特別呈現錯誤訊息
@@ -121,8 +119,7 @@ export default function LedgerView() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    // 每次重新查詢（含手動沖帳後的 reloadKey）都清空舊的統計數字，避免卡片在新結果回來前
-    // 短暫顯示上一次查詢的殘留金額，誤導使用者以為沖帳沒有生效
+    // 每次重新查詢都清空舊的統計數字，避免卡片在新結果回來前短暫顯示上一次查詢的殘留金額
     setTotals(null);
     const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced);
 
@@ -157,7 +154,7 @@ export default function LedgerView() {
     return () => {
       cancelled = true;
     };
-  }, [filters, reloadKey]);
+  }, [filters]);
 
   // 桌機表頭三態循環：none → asc → desc → none；切換到不同欄位時重新從 asc 開始
   const handleSortToggle = (key: SortKey) => {
@@ -202,9 +199,6 @@ export default function LedgerView() {
   const sortedRows = sortKeyFn ? sortRows(rows, sortKeyFn, filters.sort.dir) : rows;
   const totalAmount = fmtCurrency(sortedRows.reduce((sum, r) => sum + r.amount, 0));
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
-
-  // 應收／應付帳款手動入帳成功後皆呼叫此函式重新查詢目前列表
-  const handleSettled = () => setReloadKey(k => k + 1);
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -272,7 +266,6 @@ export default function LedgerView() {
               totalAmount={totalAmount}
               sort={filters.sort}
               onSortToggle={handleSortToggle}
-              onReceivableSettled={handleSettled}
               channelNameByUuid={channelNameByUuid}
             />
             <LedgerCards
@@ -284,7 +277,6 @@ export default function LedgerView() {
               sort={filters.sort}
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}
-              onReceivableSettled={handleSettled}
               channelNameByUuid={channelNameByUuid}
             />
           </Fragment>
@@ -298,7 +290,6 @@ export default function LedgerView() {
               totalAmount={totalAmount}
               sort={filters.sort}
               onSortToggle={handleSortToggle}
-              onPayableSettled={handleSettled}
             />
             <LedgerCards
               side="purchase"
@@ -309,7 +300,6 @@ export default function LedgerView() {
               sort={filters.sort}
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}
-              onPayableSettled={handleSettled}
             />
           </Fragment>
         )}

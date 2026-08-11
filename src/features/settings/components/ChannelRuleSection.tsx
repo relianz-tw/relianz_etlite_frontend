@@ -20,7 +20,7 @@ interface ChannelRuleSectionProps {
 /** 後端 ChannelRuleDto 轉為畫面用的 ChannelRuleRecord */
 function toChannelRuleRecord(dto: ChannelRuleDto): ChannelRuleRecord {
   return {
-    id: dto.uuid,
+    id: dto.channelUuid,
     channelName: dto.channelName ?? '',
     settlementStyle: dto.settlementStyle,
     settlementAmount: dto.settlementAmount,

@@ -10,7 +10,9 @@ import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
+import SubjectSelect from '@/components/ui/SubjectSelect';
 import TextInput from '@/components/ui/TextInput';
+import Textarea from '@/components/ui/Textarea';
 import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
@@ -68,7 +70,7 @@ const NOT_WIRED_BADGE = (
 /** BankAccountDto → BankAccountRecord，比照 PaymentSettingsTab 既有的轉換方式，供 ChannelRuleDialog 使用 */
 function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
   return {
-    id: dto.uuid,
+    id: dto.bankAccountUuid,
     nickname: dto.accountName ?? '',
     bankCode: dto.bankCode ?? '',
     bankName: dto.bankName ?? '',
@@ -124,7 +126,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   const handleCreateChannel = async (rule: Omit<ChannelRuleRecord, 'id'>) => {
     const created = await createChannelRule(rule);
     setChannelRules(list => [...list, created]);
-    onChange({ channel: created.uuid });
+    onChange({ channel: created.channelUuid });
   };
 
   // 新增廠商成功後直接加入清單並選取，沿用設定頁 VendorDialog／createVendor 的表單與驗證邏輯
@@ -210,7 +212,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
   );
 
   const buyerNameField = (
-    <Field label="交易對象名稱" required={isCreate}>
+    <Field label="買家名稱" required={isCreate}>
       <TextInput placeholder="請輸入交易對象名稱" value={form.buyerName} onChange={e => onChange({ buyerName: e.target.value })} />
     </Field>
   );
@@ -220,19 +222,19 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   const channelField = (
     <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
-      <div className="flex items-center gap-2">
-        <Select widthClassName="w-full" value={form.channel} onValueChange={v => onChange({ channel: v })}>
-          <option value="">不指定</option>
-          {channelRules.map(c => (
-            <option key={c.uuid} value={c.uuid}>
-              {c.channelName}
-            </option>
-          ))}
-        </Select>
-        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewChannelOpen(true)}>
-          新增
-        </Button>
-      </div>
+      <Select
+        widthClassName="w-full"
+        value={form.channel}
+        onValueChange={v => onChange({ channel: v })}
+        onAddNew={() => setNewChannelOpen(true)}
+      >
+        <option value="">不指定</option>
+        {channelRules.map(c => (
+          <option key={c.channelUuid} value={c.channelUuid}>
+            {c.channelName}
+          </option>
+        ))}
+      </Select>
       {channelError && <p className="mt-1 text-xs text-semantic-error">{channelError}</p>}
     </Field>
   );
@@ -295,6 +297,8 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     </Field>
   );
 
+  const totalAmount = form.salesAmount + form.exemptSalesAmount + form.taxAmount;
+
   // 依 side/mode 排出成對列（每列各自獨立成一個 2 欄 grid），避免不同列的說明文字行數互相影響高度
   let rows: [ReactNode, ReactNode?][] = [];
 
@@ -329,7 +333,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </div>
         </Field>,
       ],
-      [buyerNameField, buyerTaxIdField],
+      [buyerTaxIdField, buyerNameField],
       // 收款日期欄位暫時隱藏（需求方要求），僅保留開立日期
       [issueDateField],
       [channelField, tagField],
@@ -453,6 +457,32 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
             {row[1]}
           </div>
         ))}
+
+        <div className="flex flex-col gap-4 border-t border-neutral-blue-gray/20 pt-4">
+          <Field label={side === 'purchase' ? '費用類別' : '收入科目'} required={mode === 'create'}>
+            <SubjectSelect value={form.expenseCategory} onChange={s => onChange({ expenseCategory: s })} />
+          </Field>
+
+          <Field label="銷售額">
+            <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} />
+          </Field>
+
+          <Field label="免稅銷售額">
+            <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} />
+          </Field>
+
+          <Field label="稅額">
+            <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} />
+          </Field>
+
+          <Field label="總金額">
+            <MoneyInput value={totalAmount} disabled readOnly />
+          </Field>
+
+          <Field label="備註">
+            <Textarea value={form.note} onChange={e => onChange({ note: e.target.value })} placeholder="備註（選填）" />
+          </Field>
+        </div>
       </div>
     </div>
   );
