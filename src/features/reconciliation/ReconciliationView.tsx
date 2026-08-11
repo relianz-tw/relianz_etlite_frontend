@@ -479,7 +479,7 @@ export default function ReconciliationView() {
   };
 
   // B：留在餘額上，帶下次沖帳使用——isBalance=true 下「已結清」的原單分佈與 isBalance=false 不同（見檔案頂端說明），
-  // 故重新預覽一次取得正確結果，depositAmount／paymentAmount 改帶「實際沖完整那幾筆金額總和」；
+  // 故重新預覽一次，僅為取得正確的 ledgerUuids 子集合（isBalance=true 時未結清的最後一筆會被排除）；
   // 多筆沖帳須沿用原本勾選的 ledgerUuids／isDefault=false，避免重新預覽時擴大到整個管道／廠商的待沖交易
   const handleChooseKeepOnBalance = async () => {
     if (!requireSubmitReady() || !selectedGroupKey) return;
@@ -499,13 +499,15 @@ export default function ReconciliationView() {
         otherDeductions,
       });
       // isBalance=true 時，後端只會沖能「完整結清」的原單——沖不滿的最後一筆會直接排除在 ledgerAllocations 外
-      // （不勾選、不異動），差額改記入餘額。故 settleAmount／實際存入(付出)金額都必須改用重新預覽後、
-      // 已排除該筆的 appliedSettleAmount／actualAmount，不能沿用使用者原始輸入的對帳單金額。
+      // （不勾選、不異動），差額改記入餘額；rePreview 僅用於取得正確的 ledgerUuids 子集合。
+      // settleAmount／實際存入(付出)金額一律沿用使用者原始輸入的對帳單金額與 depositAmount
+      // （＝settleAmount − balanceUsed − 手續費 − 額外金額），不可用 rePreview 的
+      // appliedSettleAmount／actualAmount 取代（實測驗證過會被後端拒絕）。
       const result = await submitSettle({
         side,
         ledgerUuids: rePreview.allocations.map(a => a.ledgerUuid),
-        settleAmount: rePreview.appliedSettleAmount,
-        actualAmount: rePreview.actualAmount,
+        settleAmount: statementAmount,
+        actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         bankAccountUuid,
