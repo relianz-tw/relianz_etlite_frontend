@@ -6,8 +6,8 @@ import type { AllowanceLineItem, PurchaseRow, SalesRow } from './types';
 
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
 
-/** /ael/ledger/payables/filter 回傳的 YYYYMMDD 或 ISO 日期字串 → Date */
-function parseApiDate(value: string): Date | undefined {
+/** /ael/ledger/payables/filter 回傳的 YYYYMMDD 或 ISO 日期字串 → Date（沖帳中心 data.ts 亦重用此函式解析對帳中心 API 的日期） */
+export function parseApiDate(value: string): Date | undefined {
   if (/^\d{8}$/.test(value)) {
     const year = parseInt(value.slice(0, 4), 10);
     const month = parseInt(value.slice(4, 6), 10) - 1;

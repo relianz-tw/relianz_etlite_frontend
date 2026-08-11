@@ -2,14 +2,16 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { listChannelRules } from '@/api/channelRules';
+import { fetchReconciliationPayables, fetchReconciliationReceivables } from '@/api/ledger';
 import type { BankAccountDto } from '@/api/types';
 import { listVendors } from '@/api/vendors';
 import Button from '@/components/ui/Button';
+import PeriodFilterBar from '@/components/ui/PeriodFilterBar';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import { mapPayableItemsToRows, mapReceivableItemsToRows } from '@/features/ledger/data';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
+import { subMonths } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReconConfirmSummaryModal from './components/ReconConfirmSummaryModal';
 import ReconGroupSidebar from './components/ReconGroupSidebar';
@@ -27,12 +29,11 @@ import {
   getGroupRows,
   getOtherSubGroups,
   OTHER_GROUP_KEY,
-  payableRowsToCandidates,
-  receivableRowsToCandidates,
+  payableGroupsToCandidates,
+  receivableGroupsToCandidates,
   resolveCatchAllKey,
 } from './data';
 import type { ReconGroup, ReconGroupOption } from './data';
-import { fetchAllPayables, fetchAllReceivables } from './fetchAll';
 import { previewSettle, submitSettle, submitSingleSettle } from './settle';
 import type { ReconMode, ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 
@@ -42,7 +43,7 @@ const SIDE_OPTIONS: { value: ReconSide; label: string }[] = [
 ];
 
 interface SideData {
-  candidates: ReturnType<typeof receivableRowsToCandidates>;
+  candidates: ReturnType<typeof receivableGroupsToCandidates>;
   groupOptions: ReconGroupOption[];
   nameByUuid: Map<string, string>;
 }
@@ -56,11 +57,19 @@ function toYyyymmdd(date: Date | undefined): string {
   return `${year}${month}${day}`;
 }
 
+/** 「近一個月」預設查詢區間：今天往前推一個月為起始日，今天為結束日（比照 bank-accounts 的 defaultRange） */
+function defaultDateRange(): { dateFrom: string; dateTo: string } {
+  const today = new Date();
+  return { dateFrom: toYyyymmdd(subMonths(today, 1)), dateTo: toYyyymmdd(today) };
+}
+
 /**
  * 沖帳中心：同一頁承載單筆／多筆／匯總三種沖帳操作（見 ReconPoolPanel 頂部 TabBar），選擇銷售管道／廠商後
  * 輸入金額完成沖帳。銷售管道與廠商清單取自真實 API（/ael/payment/channelRules、/ael/vendors，含當前餘額
- * balance），候選交易亦取自真實 API（/ael/ledger/receivables/filter、/ael/ledger/payables/filter），
- * 分組比對一律依 uuid（paymentChannelUuid／counterpartyUuid）而非名稱字串，避免同名不同管道/廠商誤判。
+ * balance），候選交易取自對帳中心專屬 API（/ael/ledger/reconciliation/receivables、
+ * /ael/ledger/reconciliation/payables，依 dateRange 篩選、settled 固定帶 false 僅顯示未結清，
+ * 一律不帶 paymentChannelUuid／counterpartyUuid 一次抓全部分組），分組比對一律依 uuid 而非名稱字串，
+ * 避免同名不同管道/廠商誤判。
  *
  * 三種模式：
  * - single（單筆沖帳）：使用者從清單勾選一筆交易，走手動沖帳 API（reconMethod=0），允許超沖少沖，
@@ -89,7 +98,7 @@ function toYyyymmdd(date: Date | undefined): string {
  */
 export default function ReconciliationView() {
   const [side, setSide] = useState<ReconSide>('receivable');
-  const [mode, setMode] = useState<ReconMode>('summary');
+  const [mode, setMode] = useState<ReconMode>('single');
   // 預設顯示「全部管道」唯讀總覽，讓使用者一進頁面就能看到完整交易清單，不需先手動點選
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(ALL_GROUP_KEY);
   // 單筆沖帳模式勾選的交易 uuid；僅會有 0～1 筆（單選）
@@ -156,8 +165,11 @@ export default function ReconciliationView() {
   const [payableData, setPayableData] = useState<SideData | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState('');
+  // 對帳中心資料查詢區間，預設近一個月；套用新區間時會清空兩側快取觸發重新拉取（見 handleApplyDateRange）
+  const [dateRange, setDateRange] = useState(defaultDateRange);
 
-  // 依 side 惰性載入並快取：切換回已載入過的一側不重新打 API；執行沖帳成功後會清空快取觸發重新拉取
+  // 依 side 惰性載入並快取：切換回已載入過的一側不重新打 API；執行沖帳成功或套用新日期區間後會清空快取觸發重新拉取。
+  // 一律不帶 paymentChannelUuid／counterpartyUuid（抓全部分組），settled 固定帶 false（僅顯示未結清）
   useEffect(() => {
     if (side === 'receivable' ? receivableData !== null : payableData !== null) return;
     let cancelled = false;
@@ -165,18 +177,18 @@ export default function ReconciliationView() {
     setDataError('');
     const task =
       side === 'receivable'
-        ? Promise.all([listChannelRules(), fetchAllReceivables()]).then(([channelList, items]) => {
+        ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateRange, settled: 'false' })]).then(([channelList, groups]) => {
             const activeChannels = channelList.filter(c => c.isActive);
             const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance }));
             const nameByUuid = new Map(channelList.map(c => [c.channelUuid, c.channelName]));
-            const candidates = receivableRowsToCandidates(mapReceivableItemsToRows(items));
+            const candidates = receivableGroupsToCandidates(groups);
             if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })
-        : Promise.all([listVendors(), fetchAllPayables()]).then(async ([vendorList, items]) => {
+        : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateRange, settled: 'false' })]).then(([vendorList, groups]) => {
             const activeVendors = vendorList.filter(v => v.isActive);
             const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name, balance: v.balance }));
             const nameByUuid = new Map(vendorList.map(v => [v.uuid, v.name]));
-            const candidates = payableRowsToCandidates(await mapPayableItemsToRows(items));
+            const candidates = payableGroupsToCandidates(groups);
             if (!cancelled) setPayableData({ candidates, groupOptions, nameByUuid });
           });
     task
@@ -189,7 +201,16 @@ export default function ReconciliationView() {
     return () => {
       cancelled = true;
     };
-  }, [side, receivableData, payableData]);
+  }, [side, receivableData, payableData, dateRange]);
+
+  // 套用新查詢區間：兩側快取都失效，重置選取的群組與輸入，避免殘留舊區間的沖帳輸入誤送
+  const handleApplyDateRange = (dateFrom: string, dateTo: string) => {
+    setDateRange({ dateFrom, dateTo });
+    setReceivableData(null);
+    setPayableData(null);
+    setSelectedGroupKey(ALL_GROUP_KEY);
+    resetInputs();
+  };
 
   const sideData = side === 'receivable' ? receivableData : payableData;
   const availableCandidates = sideData?.candidates ?? [];
@@ -627,6 +648,16 @@ export default function ReconciliationView() {
 
         <div className="mb-5 w-full nav:w-56">
           <SegmentedControl options={SIDE_OPTIONS} value={side} onChange={handleSideChange} size="md" />
+        </div>
+
+        <div className="mb-5">
+          <PeriodFilterBar
+            dateFrom={dateRange.dateFrom}
+            dateTo={dateRange.dateTo}
+            defaultDateFrom={defaultDateRange().dateFrom}
+            defaultDateTo={defaultDateRange().dateTo}
+            onApply={handleApplyDateRange}
+          />
         </div>
 
         {dataLoading ? (

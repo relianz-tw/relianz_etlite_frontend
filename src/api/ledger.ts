@@ -14,6 +14,9 @@ import type {
   PayablesFilterResult,
   ReceivablesFilterBody,
   ReceivablesFilterResult,
+  ReconciliationQuery,
+  ReconPayableGroupDto,
+  ReconReceivableGroupDto,
   ReverseSettleBody,
   SettlePayableBody,
   SettlePayablePreviewBody,
@@ -67,6 +70,16 @@ export function fetchReceivablesCollected(filter: Omit<ReceivablesFilterBody, 'c
     method: 'POST',
     body: JSON.stringify({ ...filter, companyUuid: COMPANY_UUID }),
   });
+}
+
+/** 對帳中心：依廠商分組的進項應付；不帶 counterpartyUuid 代表全部廠商 */
+export function fetchReconciliationPayables(params: ReconciliationQuery): Promise<ReconPayableGroupDto[]> {
+  return apiFetch<ReconPayableGroupDto[]>(`/ael/ledger/reconciliation/payables${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`);
+}
+
+/** 對帳中心：依銷售管道分組的銷項應收；不帶 paymentChannelUuid 代表全部管道 */
+export function fetchReconciliationReceivables(params: ReconciliationQuery): Promise<ReconReceivableGroupDto[]> {
+  return apiFetch<ReconReceivableGroupDto[]>(`/ael/ledger/reconciliation/receivables${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`);
 }
 
 export function settleReceivable(body: Omit<SettleReceivableBody, 'companyUuid'>): Promise<unknown> {

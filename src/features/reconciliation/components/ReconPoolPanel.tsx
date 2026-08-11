@@ -134,7 +134,7 @@ export default function ReconPoolPanel({
             <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-medium text-neutral-dark">
-                  {selectedRow.date} · {side === 'payable' ? selectedRow.summary || '—' : selectedRow.counterparty || '—'}
+                  {selectedRow.date} · {selectedRow.orderCode}
                 </p>
                 <p className="text-xs text-neutral-mid">待沖 {fmtCurrency(selectedRow.remainingAmount ?? selectedRow.amount)}</p>
               </div>

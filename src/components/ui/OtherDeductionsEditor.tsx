@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
 import TextInput from '@/components/ui/TextInput';
@@ -34,8 +35,9 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
     <div className="flex flex-col gap-2">
       {rows.map(row => (
         <div key={row.id} className="flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-surface-cream/50 p-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1">
+              <Label required>科目</Label>
               <SubjectSelect value={row.subject} onChange={s => onChange(row.id, { subject: s })} placeholder="請選擇科目" />
             </div>
             <button
@@ -47,22 +49,28 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
               <Trash2 size={16} />
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <TextInput
-              widthClassName="w-full"
-              value={row.name}
-              onChange={e => onChange(row.id, { name: e.target.value })}
-              placeholder="項目名稱"
-            />
-            <div className="flex shrink-0 items-center gap-1.5">
-              {!allowSign && <span className="text-lg text-neutral-mid">−</span>}
-              <MoneyInput
-                widthClassName={allowSign ? 'w-36' : 'w-28'}
-                value={row.amount}
-                onChange={value => onChange(row.id, { amount: value })}
-                allowSign={allowSign}
-                negativeByDefault
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <Label required>項目名稱</Label>
+              <TextInput
+                widthClassName="w-full"
+                value={row.name}
+                onChange={e => onChange(row.id, { name: e.target.value })}
+                placeholder="項目名稱"
               />
+            </div>
+            <div className="shrink-0">
+              <Label required>金額</Label>
+              <div className="flex items-center gap-1.5">
+                {!allowSign && <span className="text-lg text-neutral-mid">−</span>}
+                <MoneyInput
+                  widthClassName={allowSign ? 'w-36' : 'w-28'}
+                  value={row.amount}
+                  onChange={value => onChange(row.id, { amount: value })}
+                  allowSign={allowSign}
+                  negativeByDefault
+                />
+              </div>
             </div>
           </div>
         </div>

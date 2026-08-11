@@ -17,8 +17,8 @@ interface ReconTxnDetailViewProps {
   counterparty?: string;
 }
 
-/** 憑證明細民國年 year/month/day 欄位補零組成 YYY/MM/DD */
-function formatInvoiceDate(invoice: EntryInvoiceDetailDto): string {
+/** 憑證明細民國年 year/month/day 欄位補零組成 YYY/MM/DD（ReconTxnList 的展開面板懶載入亦重用此函式） */
+export function formatInvoiceDate(invoice: EntryInvoiceDetailDto): string {
   const month = String(invoice.month).padStart(2, '0');
   const day = String(invoice.day).padStart(2, '0');
   return `${invoice.year}/${month}/${day}`;

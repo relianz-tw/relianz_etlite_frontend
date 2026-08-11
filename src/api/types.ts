@@ -443,6 +443,83 @@ export interface ReceivablesFilterResult {
   receivableAmount: number;
 }
 
+/** GET /ael/ledger/reconciliation/{payables,receivables} 共用 query 參數 */
+export interface ReconciliationQuery {
+  /** 日期起，YYYYMMDD */
+  dateFrom?: string;
+  /** 日期迄，YYYYMMDD */
+  dateTo?: string;
+  /** 'true'=已結清、'false'=未結清、省略=全部 */
+  settled?: string;
+}
+
+/** 對帳中心進項應付單筆項目；與 PayableListItemDto 不同，無 invoice／memo／entryType／status／counterpartyType 欄位 */
+export interface ReconPayableItemDto {
+  ledgerUuid: string;
+  orderCode: string;
+  /** 交易付款日 YYYYMMDD；未入帳時為 null */
+  entryDate: string | null;
+  entryKind: number;
+  direction: number;
+  counterpartyName: string;
+  counterpartyUuid: string | null;
+  totalAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  taxFreeAmount: number;
+  settledAmount: number;
+  remainingAmount: number;
+  settlementStatus: number;
+  officialAccountingSubjectId: number;
+  createdAt: string;
+}
+
+/** 對帳中心進項應付分組（依廠商） */
+export interface ReconPayableGroupDto {
+  groupKey: string;
+  isVendor: boolean;
+  counterpartyUuid: string | null;
+  counterpartyName: string;
+  totalSettledAmount: number;
+  totalRemainingAmount: number;
+  settlementStatus: number;
+  items: ReconPayableItemDto[];
+}
+
+/** 對帳中心銷項應收單筆項目；與 ReceivableListItemDto 不同，無 invoice／memo／entryType／status／counterpartyType 欄位 */
+export interface ReconReceivableItemDto {
+  ledgerUuid: string;
+  orderCode: string;
+  /** 交易收款日 YYYYMMDD；未入帳時為 null */
+  entryDate: string | null;
+  entryKind: number;
+  direction: number;
+  counterpartyName: string;
+  /** 銷售管道 uuid；未指定時為 null */
+  paymentChannelUuid: string | null;
+  totalAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  taxFreeAmount: number;
+  settledAmount: number;
+  remainingAmount: number;
+  settlementStatus: number;
+  officialAccountingSubjectId: number;
+  createdAt: string;
+}
+
+/** 對帳中心銷項應收分組（依銷售管道） */
+export interface ReconReceivableGroupDto {
+  groupKey: string;
+  hasChannel: boolean;
+  paymentChannelUuid: string | null;
+  channelName: string;
+  totalSettledAmount: number;
+  totalRemainingAmount: number;
+  settlementStatus: number;
+  items: ReconReceivableItemDto[];
+}
+
 /**
  * 單筆手動入帳表單值：呼叫端（LedgerTable／LedgerCards）依 side 組成
  * SettleReceivableBody／SettlePayableBody 送出，兩者欄位命名不同（見下方）。

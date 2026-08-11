@@ -1,12 +1,16 @@
 'use client';
 
-import type { SettleLedgerAllocation } from '@/api/types';
+import { fetchEntryDetail } from '@/api/ledger';
+import type { EntryDetailResult, SettleLedgerAllocation } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { formatInvoiceDate } from '../ReconTxnDetailView';
 import type { ReconSubGroup } from '../data';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
@@ -47,6 +51,16 @@ function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>):
   return channelNameByUuid.get(row.channelUuid) ?? '未知';
 }
 
+/** 桌機交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排 */
+function AmountCell({ amount }: { amount: number }) {
+  return (
+    <span className="flex w-28 shrink-0 items-center justify-between font-mono tabular-nums text-neutral-dark">
+      <span className="text-neutral-mid">$</span>
+      <span>{amount.toLocaleString('en-US')}</span>
+    </span>
+  );
+}
+
 /** 交易明細頁網址：帶 side 供頁面判斷欄位標籤／稅籍方向，帶 name 沿用清單既有買受人/賣方名稱（發票明細 API 對銷項不含買受人名稱） */
 function buildDetailHref(row: ReconTxnRef, side: ReconSide): string {
   const params = new URLSearchParams({ side, name: row.counterparty ?? '' });
@@ -74,6 +88,42 @@ function SelectCircle({ checked, onToggle }: { checked: boolean; onToggle: () =>
   return <Checkbox checked={checked} shape="circle" onChange={onToggle} aria-label="選取此筆進行沖帳" />;
 }
 
+/**
+ * 展開面板懶載入的憑證明細：對帳中心清單 API 不含憑證資料，僅在使用者實際展開該列時才呼叫
+ * GET /ael/ledger/entries/detail 補齊憑證號碼／統一編號／開立日期，避免整頁一次打上百支請求。
+ * 已抓過的結果留在 state 內，收合再展開不重複請求。
+ */
+function useLazyEntryDetail(ledgerUuid: string, expanded: boolean) {
+  const [detail, setDetail] = useState<EntryDetailResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [fetched, setFetched] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || fetched) return;
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    fetchEntryDetail({ ledgerUuid })
+      .then(result => {
+        if (cancelled) return;
+        setDetail(result);
+        setFetched(true);
+      })
+      .catch(err => {
+        if (!cancelled) setError(getFriendlyErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, fetched, ledgerUuid]);
+
+  return { detail, loading, error };
+}
+
 function TxnRow({
   row,
   side,
@@ -99,12 +149,15 @@ function TxnRow({
   onToggleExpand: () => void;
   onViewDetail: () => void;
 }) {
-  const secondaryText = side === 'payable' ? row.summary || '—' : row.counterparty || '—';
   // 已有預覽結果、該筆尚未結清（少沖／超沖仍有殘餘）時，於金額旁標示狀態徽章，讓使用者一眼看出差異落在哪一筆
   const statusBadge = allocation && !allocation.closed ? (SETTLEMENT_STATUS_BADGE[allocation.settlementStatus] ?? null) : null;
   const chevronClass = cn('shrink-0 text-neutral-blue-gray transition-transform', expanded && 'rotate-180');
   // 單筆／多筆沖帳皆可勾選（單筆為單選、多筆為複選，由呼叫端 onToggleSelect 決定行為）；匯總沖帳僅唯讀顯示拆帳狀態
   const isSelectable = mode === 'single' || mode === 'multi';
+  const { detail, loading: detailLoading, error: detailError } = useLazyEntryDetail(row.uuid, expanded);
+  const invoice = detail?.invoice;
+  const voucherNumber = invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : '—';
+  const taxId = invoice ? (side === 'receivable' ? invoice.buyerTaxIdNumber : invoice.sellerTaxIdNumber) : '';
 
   return (
     <div>
@@ -123,10 +176,9 @@ function TxnRow({
               <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
-          <span className="truncate text-sm text-neutral-dark" title={secondaryText}>
-            {secondaryText}
+          <span className="truncate font-mono text-sm text-neutral-dark" title={row.orderCode}>
+            {row.orderCode}
           </span>
-          <span className="font-mono text-xs text-neutral-mid">憑證 {row.voucherNumber || '—'}</span>
           <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>
         {showStatusColumn && (
@@ -169,12 +221,11 @@ function TxnRow({
         )}
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date}</span>
-          <span className="min-w-0 flex-1 truncate text-neutral-dark" title={secondaryText}>
-            {secondaryText}
+          <span className="w-44 shrink-0 truncate font-mono text-neutral-dark" title={row.orderCode}>
+            {row.orderCode}
           </span>
-          <span className="w-28 shrink-0 truncate font-mono text-neutral-mid">{row.voucherNumber || '—'}</span>
-          <span className="w-24 shrink-0 text-right font-mono tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
-          <span className="w-32 shrink-0 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
+          <AmountCell amount={row.amount} />
+          <span className="ml-3 min-w-0 flex-1 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
             {channelLabel(row, channelNameByUuid)}
           </span>
           {statusBadge && (
@@ -186,16 +237,29 @@ function TxnRow({
         <ChevronDown size={16} className={chevronClass} />
       </div>
 
-      {/* 展開面板：顯示大約資訊 + 查看詳細按鈕，桌機/行動版共用同一份 markup，靠 Tailwind 響應式 class 調整按鈕寬度 */}
+      {/* 展開面板：交易編號／日期／買受人／金額／管道為清單既有資料即時顯示；憑證號碼／統一編號／開立日期
+          懶載入自 GET /ael/ledger/entries/detail，桌機/行動版共用同一份 markup */}
       {expanded && (
         <div className="mt-1 flex flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
           <div className="flex flex-col gap-1.5">
-            <InfoRow label="交易號碼" value={row.orderCode || '—'} />
+            <InfoRow label="交易編號" value={row.orderCode || '—'} />
             <InfoRow label="開立日期" value={row.date} />
-            <InfoRow label={side === 'payable' ? '項目摘要' : '買受人'} value={secondaryText} />
-            <InfoRow label="憑證號碼" value={row.voucherNumber || '—'} />
+            <InfoRow label={side === 'payable' ? '賣方' : '買受人'} value={row.counterparty || '—'} />
             <InfoRow label="交易金額" value={fmtCurrency(row.amount)} />
             <InfoRow label="銷售管道" value={channelLabel(row, channelNameByUuid)} />
+            {detailLoading ? (
+              <p className="text-xs text-neutral-mid">憑證資料載入中…</p>
+            ) : detailError ? (
+              <p className="text-xs text-semantic-error">{detailError}</p>
+            ) : detail && !invoice ? (
+              <p className="text-xs text-neutral-mid">此交易尚無對應憑證</p>
+            ) : invoice ? (
+              <>
+                <InfoRow label="憑證號碼" value={voucherNumber} />
+                <InfoRow label="統一編號" value={taxId || '—'} />
+                <InfoRow label="憑證開立日期" value={formatInvoiceDate(invoice)} />
+              </>
+            ) : null}
             {allocation && (
               <>
                 <InfoRow label="本次沖帳額" value={fmtCurrency(allocation.settleAmount)} />
@@ -252,10 +316,9 @@ export default function ReconTxnList({
       <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
         <span className={cn(HEADER_CLASS, 'w-5 shrink-0')}>{showStatusColumn && (mode === 'single' || mode === 'multi') ? '選取' : ''}</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
-        <span className={cn(HEADER_CLASS, 'min-w-0 flex-1')}>{side === 'payable' ? '項目摘要' : '買受人'}</span>
-        <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>憑證號碼</span>
-        <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>交易金額</span>
-        <span className={cn(HEADER_CLASS, 'w-32 shrink-0')}>銷售管道</span>
+        <span className={cn(HEADER_CLASS, 'w-44 shrink-0')}>交易編號</span>
+        <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>交易金額</span>
+        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>銷售管道</span>
         <span className="w-4 shrink-0" />
       </div>
 

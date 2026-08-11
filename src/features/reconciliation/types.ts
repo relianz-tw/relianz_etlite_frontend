@@ -46,16 +46,12 @@ export interface ReconSettleResult {
 export interface ReconTxnRef {
   /** 應收/應付帳款真實 uuid，用於沖帳識別、去重比對與呼叫沖帳 API */
   uuid: string;
-  /** 顯示用交易編號 */
+  /** 顯示用交易編號；對帳中心 API 未回傳憑證資料，改以此欄位取代憑證號碼欄，憑證資訊改由展開面板懶載入 entries/detail */
   orderCode: string;
-  /** 憑證號碼：invoiceTrack + invoiceNumber；無對應憑證時為 undefined */
-  voucherNumber?: string;
   amount: number;
   date: string; // 民國年 YYY/MM/DD
-  /** 交易對方名稱：應收為買受人／應付為賣方或交易敘述，供清單顯示用 */
+  /** 交易對方名稱：應收為買受人／應付為賣方，供展開面板顯示與交易明細頁帶入用 */
   counterparty: string;
-  /** 應付專用的項目摘要（科目＋專案），已選定廠商時清單改顯示此欄取代重複的廠商名稱 */
-  summary?: string;
   /** 該筆交易的銷售管道／廠商 uuid；未指定為 null */
   channelUuid?: string | null;
   /** 未沖帳金額；可為負代表超沖。單筆沖帳模式用於顯示「待沖 $X」與預估沖後剩餘 */

@@ -11,7 +11,7 @@ export interface LedgerFilterState {
   page: number;
 }
 
-const DEFAULT_SIDE: Side = 'purchase';
+const DEFAULT_SIDE: Side = 'sales';
 const DEFAULT_SALES_SUB_TAB: SalesSubTab = 'receivable';
 const DEFAULT_PURCHASE_SUB_TAB: PurchaseSubTab = 'payable';
 const DEFAULT_QUICK_FIELD: QuickSearchField = 'id';
@@ -32,7 +32,8 @@ export function defaultSubTabForSide(side: Side): SalesSubTab | PurchaseSubTab {
  * （例如手動改網址帶入無效值）一律回退預設值，不拋錯。
  */
 export function parseLedgerFilters(searchParams: ReadonlyURLSearchParams): LedgerFilterState {
-  const side: Side = searchParams.get('side') === 'sales' ? 'sales' : DEFAULT_SIDE;
+  const sideParam = searchParams.get('side');
+  const side: Side = sideParam === 'sales' || sideParam === 'purchase' ? sideParam : DEFAULT_SIDE;
 
   const subTabParam = searchParams.get('subTab');
   const validSubTabs: string[] = side === 'sales' ? SALES_SUB_TABS : PURCHASE_SUB_TABS;

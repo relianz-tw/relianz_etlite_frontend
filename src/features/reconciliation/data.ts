@@ -1,5 +1,6 @@
-import { parseRocDate } from '@/components/ui/DatePicker';
-import type { PurchaseRow, SalesRow } from '@/features/ledger/types';
+import type { ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
+import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
+import { parseApiDate } from '@/features/ledger/data';
 import type { ReconTxnRef } from './types';
 
 /** 側邊欄「其他」群組：找不到對應啟用中管道/廠商 uuid 的交易（含未指定與已停用/未知 uuid） */
@@ -40,13 +41,11 @@ export interface ReconSubGroup {
 interface ReconCandidate {
   uuid: string;
   orderCode: string;
-  voucherNumber?: string;
   amount: number;
   date: string;
   counterparty: string;
   /** 銷項為 paymentChannelUuid、進項為 counterpartyUuid；未指定時為 null */
   groupUuid: string | null;
-  summary?: string;
   /** 未沖帳金額；可為負代表超沖 */
   remainingAmount?: number;
 }
@@ -55,46 +54,48 @@ function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
   return (parseRocDate(a.date)?.getTime() ?? 0) - (parseRocDate(b.date)?.getTime() ?? 0);
 }
 
-/** 應收帳款列（已排除作廢）→ 統一候選交易形狀，分組鍵為 paymentChannelUuid */
-export function receivableRowsToCandidates(rows: SalesRow[]): ReconCandidate[] {
-  return rows
-    .filter(r => !r.voided)
-    .map(r => ({
-      uuid: r.uuid ?? r.id,
-      orderCode: r.id,
-      voucherNumber: r.voucherNumber,
-      amount: r.amount,
-      date: r.date,
-      counterparty: r.counterparty,
-      groupUuid: r.paymentChannelUuid ?? null,
-      remainingAmount: r.remainingAmount,
-    }));
+/** 對帳中心 items 的 entryDate（YYYYMMDD，未入帳時為 null）→ 民國年 YYY/MM/DD；缺值時退回 createdAt（ISO 字串） */
+function toRocDate(entryDate: string | null, createdAt: string): string {
+  return formatRocDate(parseApiDate(entryDate ?? createdAt));
 }
 
-/** 應付帳款列 → 統一候選交易形狀，分組鍵為 counterpartyUuid（廠商），summary 顯示科目摘要取代重複的廠商欄 */
-export function payableRowsToCandidates(rows: PurchaseRow[]): ReconCandidate[] {
-  return rows.map(r => ({
-    uuid: r.uuid ?? r.id,
-    orderCode: r.id,
-    voucherNumber: r.voucherNumber,
-    amount: r.amount,
-    date: r.date,
-    counterparty: r.party,
-    groupUuid: r.counterpartyUuid ?? null,
-    summary: [r.category, r.project].filter(Boolean).join(' · '),
-    remainingAmount: r.remainingAmount,
-  }));
+/** 對帳中心銷項應收分組回應 → 攤平為統一候選交易形狀，分組鍵為 paymentChannelUuid */
+export function receivableGroupsToCandidates(groups: ReconReceivableGroupDto[]): ReconCandidate[] {
+  return groups.flatMap(group =>
+    group.items.map(item => ({
+      uuid: item.ledgerUuid,
+      orderCode: item.orderCode,
+      amount: item.totalAmount,
+      date: toRocDate(item.entryDate, item.createdAt),
+      counterparty: item.counterpartyName,
+      groupUuid: item.paymentChannelUuid,
+      remainingAmount: item.remainingAmount,
+    })),
+  );
+}
+
+/** 對帳中心進項應付分組回應 → 攤平為統一候選交易形狀，分組鍵為 counterpartyUuid（廠商） */
+export function payableGroupsToCandidates(groups: ReconPayableGroupDto[]): ReconCandidate[] {
+  return groups.flatMap(group =>
+    group.items.map(item => ({
+      uuid: item.ledgerUuid,
+      orderCode: item.orderCode,
+      amount: item.totalAmount,
+      date: toRocDate(item.entryDate, item.createdAt),
+      counterparty: item.counterpartyName,
+      groupUuid: item.counterpartyUuid,
+      remainingAmount: item.remainingAmount,
+    })),
+  );
 }
 
 function toTxnRef(candidate: ReconCandidate): ReconTxnRef {
   return {
     uuid: candidate.uuid,
     orderCode: candidate.orderCode,
-    voucherNumber: candidate.voucherNumber,
     amount: candidate.amount,
     date: candidate.date,
     counterparty: candidate.counterparty,
-    summary: candidate.summary,
     channelUuid: candidate.groupUuid,
     remainingAmount: candidate.remainingAmount,
   };

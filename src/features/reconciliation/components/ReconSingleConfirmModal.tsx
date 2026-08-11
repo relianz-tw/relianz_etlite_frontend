@@ -30,8 +30,7 @@ export default function ReconSingleConfirmModal({ open, side, row, settleAmount,
 
   const rows: { label: string; value: string }[] = [
     { label: '開立日期', value: row.date },
-    { label: side === 'payable' ? '項目摘要' : '買受人', value: (side === 'payable' ? row.summary : row.counterparty) || '—' },
-    { label: '憑證號碼', value: row.voucherNumber || '—' },
+    { label: '交易編號', value: row.orderCode || '—' },
     { label: '待沖金額', value: fmtCurrency(remaining) },
     { label: '沖帳金額', value: fmtCurrency(settleAmount) },
     { label: side === 'payable' ? '實際付出金額' : '實際存入金額', value: fmtCurrency(actualAmount) },
