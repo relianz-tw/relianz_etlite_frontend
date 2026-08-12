@@ -17,6 +17,7 @@ export const navLinks: NavLink[] = [
     path: '/ledger',
     children: [
       { name: '帳簿總覽', path: '/ledger' },
+      { name: '新增交易', path: '/ledger/new' },
       { name: '沖帳中心', path: '/ledger/reconciliation' },
     ],
   },

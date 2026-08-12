@@ -18,7 +18,6 @@ import TransactionAllowanceCard from './components/TransactionAllowanceCard';
 import TransactionJournalCard from './components/TransactionJournalCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
-import TransactionStatusSummary from './components/TransactionStatusSummary';
 import VoucherUpload from './components/VoucherUpload';
 import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, resolveExpenseCategory, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
 import type { TransactionFormState, TransactionMode } from './types';
@@ -113,6 +112,10 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
 export default function TransactionFormView({ mode, side, transactionId, returnQuery }: TransactionFormViewProps) {
   const router = useRouter();
   const [form, setForm] = useState<TransactionFormState>(EMPTY_TRANSACTION_FORM);
+  // 編輯畫面載入完成後的表單快照，供「修改交易資訊」後按「取消」還原用
+  const [savedForm, setSavedForm] = useState<TransactionFormState>(EMPTY_TRANSACTION_FORM);
+  // 編輯畫面預設唯讀，需按「修改交易資訊」才開放欄位編輯
+  const [editing, setEditing] = useState(false);
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -150,12 +153,15 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         // 費用類別／收入科目來自 entry.officialAccountingSubjectId，比照帳簿列表反查科目名稱的方式處理
         const expenseCategory = await resolveExpenseCategory(result.entry.officialAccountingSubjectId);
         if (cancelled) return;
-        setForm({
+        const nextForm: TransactionFormState = {
           ...mapInvoiceDetailToForm(side, result.invoice),
           expenseCategory,
           // 銷售管道對應 entry.paymentChannelUuid，直接帶入即可對應 channelField 下拉選項的 uuid
           channel: result.entry.paymentChannelUuid ?? '',
-        });
+        };
+        setForm(nextForm);
+        setSavedForm(nextForm);
+        setEditing(false);
         setEntryDetail(result.entry);
         setSettleEvents(result.settleEvents);
         setBuyOrSell(result.invoice?.buyOrSell ?? (side === 'sales' ? 1 : 2));
@@ -273,7 +279,6 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
             </div>
 
             <div className="flex flex-col gap-5">
-              {mode === 'edit' && <TransactionStatusSummary side={side} declarePeriod={form.declarePeriod} declared={form.declared} />}
               {mode === 'edit' && entryDetail && (
                 <TransactionSettlementStatus
                   entry={entryDetail}
@@ -283,35 +288,36 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                   onReverse={handleReverseSettlement}
                 />
               )}
+              <TransactionMetaCard
+                side={side}
+                mode={mode}
+                form={form}
+                onChange={handleChange}
+                readOnly={mode === 'edit' && !editing}
+                editing={editing}
+                onStartEdit={() => setEditing(true)}
+                onCancelEdit={() => {
+                  setForm(savedForm);
+                  setEditing(false);
+                }}
+                onVoidOrDelete={side === 'sales' ? () => setVoidConfirmOpen(true) : backToLedger}
+                onUpdate={backToLedger}
+                voidLabel={side === 'sales' ? '作廢' : '刪除'}
+              />
+              {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
               {mode === 'edit' && entryDetail && (
                 <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
               )}
-              <TransactionMetaCard side={side} mode={mode} form={form} onChange={handleChange} />
-              {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
 
               {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
 
-              <div className="sticky bottom-0 -mx-4 flex justify-end gap-3 border-t border-neutral-blue-gray/20 bg-surface-off-white px-4 py-4 nav:static nav:mx-0 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
-                {mode === 'create' && (
+              {mode === 'create' && (
+                <div className="sticky bottom-0 -mx-4 flex justify-end gap-3 border-t border-neutral-blue-gray/20 bg-surface-off-white px-4 py-4 nav:static nav:mx-0 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
                   <Button variant="primary" className="w-full nav:w-auto" onClick={handleCreate} disabled={submitting}>
                     {submitting ? '建立中…' : '建立交易'}
                   </Button>
-                )}
-                {mode === 'edit' && (
-                  <>
-                    <Button
-                      variant="danger"
-                      className="flex-1 nav:flex-none"
-                      onClick={side === 'sales' ? () => setVoidConfirmOpen(true) : backToLedger}
-                    >
-                      {side === 'sales' ? '作廢' : '刪除'}
-                    </Button>
-                    <Button variant="primary" className="flex-1 nav:flex-none" onClick={backToLedger}>
-                      更新
-                    </Button>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}

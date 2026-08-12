@@ -40,7 +40,7 @@ export default function AllowanceInvoiceDetail({ lineItems = ALLOWANCE_LINE_ITEM
 
   return (
     <div>
-      <h2 className="mb-2 text-base font-semibold text-neutral-dark">發票明細</h2>
+      <h2 className="mb-2 text-base font-semibold text-neutral-dark">折讓退款</h2>
       <p className="mb-4 text-sm leading-relaxed text-neutral-mid">
         為避免產生交易糾紛，若交易對象為公司行號，折讓後所產出之證明聯請提供給對方蓋發票章，若為個人則請對方簽收。
       </p>

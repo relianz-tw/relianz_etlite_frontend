@@ -39,6 +39,16 @@ interface TransactionMetaCardProps {
   mode: TransactionMode;
   form: TransactionFormState;
   onChange: (patch: Partial<TransactionFormState>) => void;
+  /** 編輯畫面預設唯讀，需按「修改交易資訊」才開放編輯；新增畫面不適用 */
+  readOnly?: boolean;
+  /** 以下皆僅編輯畫面使用：是否已進入可編輯狀態，及卡片標題列／底部操作按鈕的對應動作 */
+  editing?: boolean;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
+  onVoidOrDelete?: () => void;
+  onUpdate?: () => void;
+  /** 底部危險按鈕文字，銷項為「作廢」、進項為「刪除」 */
+  voidLabel?: string;
 }
 
 const ALLOWANCE_OPTIONS = [
@@ -85,7 +95,19 @@ function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
   };
 }
 
-export default function TransactionMetaCard({ side, mode, form, onChange }: TransactionMetaCardProps) {
+export default function TransactionMetaCard({
+  side,
+  mode,
+  form,
+  onChange,
+  readOnly = false,
+  editing = false,
+  onStartEdit,
+  onCancelEdit,
+  onVoidOrDelete,
+  onUpdate,
+  voidLabel,
+}: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
   const [newChannelOpen, setNewChannelOpen] = useState(false);
@@ -151,7 +173,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   const issueDateField = (
     <Field label="開立日期" required={isCreate}>
-      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} />
+      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} disabled={readOnly} />
     </Field>
   );
 
@@ -161,7 +183,12 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       <TextInput
         placeholder="請輸入賣家統一編號"
         value={form.sellerTaxId}
-        onChange={e => onChange({ sellerTaxId: e.target.value, sellerVendorUuid: '' })}
+        maxLength={8}
+        disabled={readOnly}
+        onChange={e => {
+          const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+          onChange({ sellerTaxId: v, sellerVendorUuid: '' });
+        }}
       />
     </Field>
   );
@@ -171,6 +198,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       <TextInput
         placeholder="請輸入賣家名稱"
         value={form.sellerName}
+        disabled={readOnly}
         onChange={e => onChange({ sellerName: e.target.value, sellerVendorUuid: '' })}
       />
     </Field>
@@ -185,6 +213,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
         <Select
           widthClassName="w-full"
           value={form.sellerVendorUuid}
+          disabled={readOnly}
           onValueChange={v => {
             const vendor = vendors.find(x => x.uuid === v);
             onChange({ sellerVendorUuid: v, ...(vendor ? { sellerName: vendor.name, sellerTaxId: vendor.taxId } : {}) });
@@ -197,7 +226,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
             </option>
           ))}
         </Select>
-        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewVendorOpen(true)}>
+        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewVendorOpen(true)} disabled={readOnly}>
           新增
         </Button>
       </div>
@@ -207,13 +236,27 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
   const buyerTaxIdField = (
     <Field label="買家統一編號">
-      <TextInput placeholder="請輸入買家統一編號" value={form.buyerTaxId} onChange={e => onChange({ buyerTaxId: e.target.value })} />
+      <TextInput
+        placeholder="請輸入買家統一編號"
+        value={form.buyerTaxId}
+        maxLength={8}
+        disabled={readOnly}
+        onChange={e => {
+          const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+          onChange({ buyerTaxId: v });
+        }}
+      />
     </Field>
   );
 
   const buyerNameField = (
     <Field label="買家名稱" required={isCreate}>
-      <TextInput placeholder="請輸入交易對象名稱" value={form.buyerName} onChange={e => onChange({ buyerName: e.target.value })} />
+      <TextInput
+        placeholder="請輸入交易對象名稱"
+        value={form.buyerName}
+        disabled={readOnly}
+        onChange={e => onChange({ buyerName: e.target.value })}
+      />
     </Field>
   );
 
@@ -225,6 +268,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       <Select
         widthClassName="w-full"
         value={form.channel}
+        disabled={readOnly}
         onValueChange={v => onChange({ channel: v })}
         onAddNew={() => setNewChannelOpen(true)}
       >
@@ -249,12 +293,14 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
         ]}
         value={form.deductible ? 'yes' : 'no'}
         onChange={v => onChange({ deductible: v === 'yes' })}
+        disabled={readOnly}
       />
       {!form.deductible && (
         <div className="mt-3">
           <TextInput
             placeholder="請輸入不可扣抵原因"
             value={form.unreportedReason}
+            disabled={readOnly}
             onChange={e => onChange({ unreportedReason: e.target.value })}
           />
         </div>
@@ -268,11 +314,12 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
       <TextInput
         placeholder="請輸入海關代徵營業稅繳納證號碼"
         value={form.importTaxNumber}
+        disabled={readOnly}
         onChange={e => onChange({ importTaxNumber: e.target.value })}
       />
     </Field>,
     <Field key="others" label="其他稅費">
-      <MoneyInput value={form.others} onChange={v => onChange({ others: v })} />
+      <MoneyInput value={form.others} onChange={v => onChange({ others: v })} disabled={readOnly} />
     </Field>,
   ];
 
@@ -401,7 +448,7 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     rows = [
       [
         <Field key="declarePeriod" label="申報期間">
-          <Select widthClassName="w-full" value={form.declarePeriod} onValueChange={v => onChange({ declarePeriod: v })}>
+          <Select widthClassName="w-full" value={form.declarePeriod} disabled={readOnly} onValueChange={v => onChange({ declarePeriod: v })}>
             {/* 交易明細 API 帶出的真實申報期間不一定在假選單內，確保它一定被列為可顯示/選取的選項 */}
             {Array.from(new Set([form.declarePeriod, ...DECLARE_PERIOD_OPTIONS])).map(v => (
               <option key={v} value={v}>
@@ -421,14 +468,26 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <ChannelRuleDialog open={newChannelOpen} onClose={() => setNewChannelOpen(false)} onSubmit={handleCreateChannel} accounts={bankAccounts} />
       <VendorDialog open={newVendorOpen} onClose={() => setNewVendorOpen(false)} onSubmit={handleCreateVendor} />
-      <h2 className="mb-5 text-base font-semibold text-neutral-dark">交易資訊</h2>
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-neutral-dark">交易資訊</h2>
+        {mode === 'edit' && !editing && (
+          <Button variant="primary" size="sm" onClick={onStartEdit}>
+            修改交易資訊
+          </Button>
+        )}
+        {mode === 'edit' && editing && (
+          <Button variant="outline" size="sm" onClick={onCancelEdit}>
+            取消
+          </Button>
+        )}
+      </div>
       <div className="flex flex-col gap-4">
         {mode === 'edit' && (
-          <Field label="發票號碼">
+          <Field label="發票號碼" badge={form.isAllowance ? <Badge tone="info">折讓退款</Badge> : undefined}>
             <Select
               widthClassName="w-full"
               value={form.invoiceNumber}
-              disabled={side === 'sales'}
+              disabled={side === 'sales' || readOnly}
               onValueChange={v => onChange({ invoiceNumber: v })}
             >
               {/* 進入編輯畫面的交易編碼本身不一定在假資料選單內，確保它一定被列為可顯示/選取的選項 */}
@@ -443,13 +502,16 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Field>
         )}
 
-        <Field label="是否為折讓？" helper="如要一部或全部退款/退貨請選是">
-          <SegmentedControl
-            options={[...ALLOWANCE_OPTIONS]}
-            value={form.isAllowance ? 'yes' : 'no'}
-            onChange={v => onChange({ isAllowance: v === 'yes' })}
-          />
-        </Field>
+        {/* 折讓與否僅新增時可選擇；編輯畫面改於上方發票號碼旁以唯讀標記呈現，不得再變更 */}
+        {mode === 'create' && (
+          <Field label="是否為折讓？" helper="如要一部或全部退款/退貨請選是">
+            <SegmentedControl
+              options={[...ALLOWANCE_OPTIONS]}
+              value={form.isAllowance ? 'yes' : 'no'}
+              onChange={v => onChange({ isAllowance: v === 'yes' })}
+            />
+          </Field>
+        )}
 
         {rows.map((row, i) => (
           <div key={i} className="flex flex-col gap-4">
@@ -460,19 +522,19 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
 
         <div className="flex flex-col gap-4 border-t border-neutral-blue-gray/20 pt-4">
           <Field label={side === 'purchase' ? '費用類別' : '收入科目'} required={mode === 'create'}>
-            <SubjectSelect value={form.expenseCategory} onChange={s => onChange({ expenseCategory: s })} />
+            <SubjectSelect value={form.expenseCategory} onChange={s => onChange({ expenseCategory: s })} disabled={readOnly} />
           </Field>
 
           <Field label="銷售額">
-            <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} />
+            <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} disabled={readOnly} />
           </Field>
 
           <Field label="免稅銷售額">
-            <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} />
+            <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} disabled={readOnly} />
           </Field>
 
           <Field label="稅額">
-            <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} />
+            <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} disabled={readOnly} />
           </Field>
 
           <Field label="總金額">
@@ -480,9 +542,20 @@ export default function TransactionMetaCard({ side, mode, form, onChange }: Tran
           </Field>
 
           <Field label="備註">
-            <Textarea value={form.note} onChange={e => onChange({ note: e.target.value })} placeholder="備註（選填）" />
+            <Textarea value={form.note} onChange={e => onChange({ note: e.target.value })} placeholder="備註（選填）" disabled={readOnly} />
           </Field>
         </div>
+
+        {mode === 'edit' && editing && (
+          <div className="flex justify-end gap-3 border-t border-neutral-blue-gray/20 pt-4">
+            <Button variant="danger" onClick={onVoidOrDelete}>
+              {voidLabel}
+            </Button>
+            <Button variant="primary" onClick={onUpdate}>
+              更新
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
