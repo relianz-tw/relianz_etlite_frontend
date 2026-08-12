@@ -229,8 +229,6 @@ export interface CreatePayableBody {
   deductible?: boolean;
   /** 交易付款日 YYYYMMDD；選填 */
   entryDate?: string;
-  /** 是否折讓 */
-  ifDebit: boolean;
   /** 進口專用：海關代徵營業稅繳納證號碼 */
   importTaxNumber?: string;
   /** 發票日 YYYYMMDD */
@@ -276,7 +274,6 @@ export interface CreateReceivableBody {
   deductible?: boolean;
   /** 交易收款日 YYYYMMDD；選填 */
   entryDate?: string;
-  ifDebit: boolean;
   /** 進口專用欄位（銷項通常不用） */
   importTaxNumber?: string;
   invoiceDate: string;
@@ -299,6 +296,72 @@ export interface CreateReceivableBody {
   unreportedReason?: string;
   /** 銷項憑證類型；實務可傳 1（統一發票） */
   voucherKind: number;
+}
+
+/** 建立進折／銷折交易紀錄（POST /ael/ledger/{payables,receivables}/allowance）body；兩支端點欄位完全相同 */
+export interface CreateAllowanceBody {
+  companyUuid: string;
+  /** 欲折讓的原單交易 uuid */
+  originLedgerUuid: string;
+  /** YYYYMMDD */
+  datetime: string;
+  /** 含稅總額 */
+  totalAmount: number;
+  /** 未稅 */
+  netAmount: number;
+  /** 稅額 */
+  taxAmount: number;
+  /** 科目 id */
+  officialAccountingSubjectId: number;
+  /** 備註；選填 */
+  memo?: string;
+}
+
+/** GET /ael/ledger/invoices/origin 回應的 entry 區塊；僅型別化折讓建立畫面會用到的欄位 */
+export interface InvoiceOriginEntryDto {
+  ledgerUuid: string;
+  orderCode: string;
+  transactionDate: string | null;
+  counterpartyName: string | null;
+  totalAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  officialAccountingSubjectId: number;
+  subjectName: string;
+  remainingAmount: number;
+}
+
+/** GET /ael/ledger/invoices/origin 回應的 invoice 區塊；僅型別化本次會使用的欄位 */
+export interface InvoiceOriginInvoiceDto {
+  invoiceUuid: string;
+  invoiceTrack: string;
+  invoiceNumber: string;
+}
+
+/**
+ * GET /ael/ledger/invoices/origin 回應（發票字軌＋號碼反查業務原單）。
+ * invoice／entry 為 null 代表查無對應的原始憑證，此時不可用來建立折讓單。
+ */
+export interface InvoiceOriginResult {
+  entry: InvoiceOriginEntryDto | null;
+  invoice: InvoiceOriginInvoiceDto | null;
+  isAllowance: boolean;
+}
+
+/** GET /ael/ledger/entries/detail 回應中，原單關聯的折讓單摘要 */
+export interface EntryDetailAllowanceDto {
+  /** 折讓單交易 uuid */
+  ledgerUuid: string;
+  orderCode: string;
+  /** 含稅總額 */
+  totalAmount: number;
+  /** 未稅額 */
+  netAmount: number;
+  taxAmount: number;
+  /** 折讓金額 */
+  allowanceAmount: number;
+  /** 0收入 1支出 2應收 3應付 4其他 */
+  direction: number;
 }
 
 /** 查詢進項應付交易列表（POST /ael/ledger/payables/filter）body */
@@ -364,6 +427,10 @@ export interface PayableListItemDto {
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
+  /** 進折為 true；paid/filter 未記載是否回傳此欄位，故為選填，讀取時應搭配 ?? false */
+  isAllowance?: boolean;
+  /** 折讓時有值，指原單交易 uuid */
+  originLedgerUuid?: string;
 }
 
 /** 查詢進項應付交易列表回應（data 內容） */
@@ -427,6 +494,10 @@ export interface ReceivableListItemDto {
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
+  /** 銷折為 true；collected/filter 未記載是否回傳此欄位，故為選填，讀取時應搭配 ?? false */
+  isAllowance?: boolean;
+  /** 折讓時有值，指原單交易 uuid */
+  originLedgerUuid?: string;
 }
 
 /** 查詢銷項應收交易列表回應（data 內容） */
@@ -860,14 +931,28 @@ export interface EntryInvoiceDetailDto {
   cmsYear: number;
   /** 申報期別代碼：1/3/5/7/9/11，對應雙月期間 */
   cmsPhase: number;
-  /** 是否為折讓：1 折讓、2 否 */
-  isDebit: number;
+  /** 是否折讓 */
+  isAllowance: boolean;
   /** 申報狀態：1 已申報、2 未申報 */
   declared: number;
 }
 
-/** GET /ael/ledger/entries/detail 回應的 entry 區塊；僅型別化本次會使用的沖帳狀態欄位 */
+/** GET /ael/ledger/entries/detail 回應的 entry 區塊；僅型別化本次會使用的沖帳狀態與折讓原單摘要欄位 */
 export interface EntryDetailEntryDto {
+  /** 交易編號 */
+  orderCode: string;
+  /** 交易發生日（ISO 字串） */
+  transactionDate: string | null;
+  /** 交易對象名稱 */
+  counterpartyName: string | null;
+  /** 總金額 */
+  totalAmount: number;
+  /** 淨額 */
+  netAmount: number;
+  /** 稅額 */
+  taxAmount: number;
+  /** 科目名稱 */
+  subjectName: string;
   /** 已沖金額（元） */
   settledAmount: number;
   /** 未沖金額（元） */
@@ -932,6 +1017,12 @@ export interface EntryDetailResult {
   settlements: EntryDetailSettlementDto[];
   /** 此原單相關沖帳事件（供撤銷）；無則空陣列 */
   settleEvents: EntryDetailSettleEventDto[];
+  /** 是否為折讓；api.md 200 範例 JSON 未含此欄位（只有 schema 表格記載），故為選填 */
+  isAllowance?: boolean;
+  /** 如果是查折讓單，這邊顯示原單交易 uuid；同上為選填 */
+  originLedgerUuid?: string;
+  /** 關聯折讓單；同上為選填，讀取時應搭配 ?? [] */
+  allowances?: EntryDetailAllowanceDto[];
 }
 
 /** POST /ael/ledger/settle/reverse 與 /ael/ledger/reconciliation/settle/reverse 共用 body */

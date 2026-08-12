@@ -5,6 +5,8 @@ export type TransactionMode = 'create' | 'edit';
 /** 新增/編輯交易表單的本地狀態，欄位涵蓋銷項與進項全部情境（依 side 顯示對應子集） */
 export interface TransactionFormState {
   isAllowance: boolean;
+  /** 折讓時查得的原單交易 uuid；查無原單或非折讓時為空字串，作為「是否可送出」的判斷依據 */
+  originLedgerUuid: string;
   /** 申報狀態，對應 API declared（1 已申報、2 未申報） */
   declared: boolean;
   invoicePeriod: string;

@@ -41,21 +41,6 @@ export interface SubRow {
   date?: string;
 }
 
-export interface AllowanceRecord {
-  id: string;
-  date: string;
-  amount: number;
-  note: string;
-}
-
-/** 可折讓的發票商品明細（未稅餘額 + 稅額），供「發票明細」折讓退回單使用 */
-export interface AllowanceLineItem {
-  id: string;
-  productName: string;
-  allowableNet: number;
-  allowableTax: number;
-}
-
 export interface SalesRow {
   id: string;
   /** 應收帳款真實 uuid（來自 /ael/ledger/receivables/filter） */
@@ -69,7 +54,6 @@ export interface SalesRow {
   /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
   voucherNumber?: string;
   voided: boolean;
-  allowances: AllowanceRecord[];
   children?: SubRow[];
   /** 已沖帳金額（累計）；僅應收帳款/應付帳款分頁顯示，已收款/已付款分頁不需要 */
   settledAmount?: number;
@@ -77,6 +61,8 @@ export interface SalesRow {
   remainingAmount?: number;
   /** 0平衡 1超沖 2少沖 */
   settlementStatus?: number;
+  /** 是否為折讓（銷折）；來自 /ael/ledger/receivables/filter 的 isAllowance */
+  isAllowance?: boolean;
 }
 
 export interface PurchaseRow {
@@ -100,4 +86,6 @@ export interface PurchaseRow {
   remainingAmount?: number;
   /** 0平衡 1超沖 2少沖 */
   settlementStatus?: number;
+  /** 是否為折讓（進折）；來自 /ael/ledger/payables/filter 的 isAllowance */
+  isAllowance?: boolean;
 }

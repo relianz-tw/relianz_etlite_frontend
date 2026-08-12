@@ -32,6 +32,7 @@ import {
   VOUCHER_TYPES,
 } from '../data';
 import type { TransactionFormState, TransactionMode } from '../types';
+import AllowanceOriginField from './AllowanceOriginField';
 import Field from './Field';
 
 interface TransactionMetaCardProps {
@@ -355,10 +356,29 @@ export default function TransactionMetaCard({
 
   const totalAmount = form.salesAmount + form.exemptSalesAmount + form.taxAmount;
 
+  // 新增折讓單：欄位大幅收斂，僅保留 API 需要的憑證號碼（查原單）／開立日期／科目／金額／備註
+  const isAllowanceCreate = isCreate && form.isAllowance;
+
+  const allowanceOriginField = (
+    <AllowanceOriginField
+      invoiceTrack={form.invoiceTrack}
+      invoiceSerial={form.invoiceSerial}
+      onInvoiceChange={patch => onChange(patch)}
+      onResolve={(ledgerUuid, origin) =>
+        onChange({
+          originLedgerUuid: ledgerUuid,
+          ...(origin ? { expenseCategory: { id: origin.officialAccountingSubjectId, subjectCode: '', name: origin.subjectName } } : {}),
+        })
+      }
+    />
+  );
+
   // 依 side/mode 排出成對列（每列各自獨立成一個 2 欄 grid），避免不同列的說明文字行數互相影響高度
   let rows: [ReactNode, ReactNode?][] = [];
 
-  if (mode === 'create' && side === 'sales') {
+  if (isAllowanceCreate) {
+    rows = [[allowanceOriginField], [issueDateField]];
+  } else if (mode === 'create' && side === 'sales') {
     rows = [
       [
         <Field key="invoicePeriod" label="發票期間">
@@ -517,7 +537,9 @@ export default function TransactionMetaCard({
             <SegmentedControl
               options={[...ALLOWANCE_OPTIONS]}
               value={form.isAllowance ? 'yes' : 'no'}
-              onChange={v => onChange({ isAllowance: v === 'yes' })}
+              // 切換折讓與否時清空原單查詢結果，避免切換前殘留的 originLedgerUuid 誤送出；
+              // 切為「是」同時歸零免稅銷售額（該欄位切換後隱藏，避免殘留值計入唯讀總金額）
+              onChange={v => onChange({ isAllowance: v === 'yes', originLedgerUuid: '', exemptSalesAmount: 0 })}
             />
           </Field>
         )}
@@ -538,9 +560,11 @@ export default function TransactionMetaCard({
             <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} disabled={readOnly} />
           </Field>
 
-          <Field label="免稅銷售額">
-            <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} disabled={readOnly} />
-          </Field>
+          {!isAllowanceCreate && (
+            <Field label="免稅銷售額">
+              <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} disabled={readOnly} />
+            </Field>
+          )}
 
           <Field label="稅額">
             <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} disabled={readOnly} />

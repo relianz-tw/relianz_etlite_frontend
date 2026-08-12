@@ -6,10 +6,12 @@
 import { apiFetch, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
 import type {
+  CreateAllowanceBody,
   CreatePayableBody,
   CreateReceivableBody,
   DailyDetailResult,
   EntryDetailResult,
+  InvoiceOriginResult,
   PayablesFilterBody,
   PayablesFilterResult,
   ReceivablesFilterBody,
@@ -42,6 +44,29 @@ export function createReceivable(body: Omit<CreateReceivableBody, 'companyUuid'>
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });
+}
+
+/** 建立進折交易紀錄 */
+export function createPayableAllowance(body: Omit<CreateAllowanceBody, 'companyUuid'>): Promise<unknown> {
+  return apiFetch<unknown>('/ael/ledger/payables/allowance', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 建立銷折交易紀錄 */
+export function createReceivableAllowance(body: Omit<CreateAllowanceBody, 'companyUuid'>): Promise<unknown> {
+  return apiFetch<unknown>('/ael/ledger/receivables/allowance', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 發票字軌＋號碼反查業務原單，供建立折讓單前取得 originLedgerUuid；查無原單時 entry／invoice 皆為 null */
+export function fetchInvoiceOrigin(params: { invoiceTrack?: string; invoiceNumber: string }): Promise<InvoiceOriginResult> {
+  return apiFetch<InvoiceOriginResult>(
+    `/ael/ledger/invoices/origin${buildQuery({ companyUuid: COMPANY_UUID, invoiceTrack: params.invoiceTrack, invoiceNumber: params.invoiceNumber })}`,
+  );
 }
 
 export function fetchPayables(filter: Omit<PayablesFilterBody, 'companyUuid'>): Promise<PayablesFilterResult> {

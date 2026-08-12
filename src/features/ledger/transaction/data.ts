@@ -1,7 +1,7 @@
 import { listOfficialSubjects } from '@/api/subjects';
 import type { EntryInvoiceDetailDto } from '@/api/types';
 import type { SubjectOption } from '@/components/ui/SubjectSelect';
-import type { AllowanceRecord, Side } from '../types';
+import type { Side } from '../types';
 import type { TransactionFormState } from './types';
 
 /** 路由 searchParams 的 side 參數解析：非 'purchase' 一律視為 'sales'，供新增/編輯頁共用 */
@@ -40,6 +40,7 @@ export const PURCHASE_INVOICE_NUMBER_OPTIONS = ['VG-12345678'];
 
 export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   isAllowance: false,
+  originLedgerUuid: '',
   declared: false,
   invoicePeriod: INVOICE_PERIOD_OPTIONS[0],
   voucherType: VOUCHER_TYPES[0],
@@ -72,11 +73,6 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   voucherPreviewUrl: null,
 };
 
-/** 編輯銷項交易的折讓歷史紀錄假資料 */
-export const TRANSACTION_ALLOWANCES: AllowanceRecord[] = [
-  { id: 'ALW-EDIT-01', date: '115/02/15', amount: 200, note: '出貨數量認列錯誤，折讓部分金額' },
-];
-
 /** cmsPhase 雙月期別代碼（1/3/5/7/9/11）→ 申報期間顯示字串，如 "115 年 01 - 02 月份" */
 function formatDeclarePeriod(cmsYear: number, cmsPhase: number): string {
   const start = String(cmsPhase).padStart(2, '0');
@@ -104,7 +100,7 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
     taxAmount: invoice.businessTax,
     note: invoice.remark,
     voucherPreviewUrl: invoice.invoicePicUrl || null,
-    isAllowance: invoice.isDebit === 1,
+    isAllowance: invoice.isAllowance,
     declared: invoice.declared === 1,
   };
   return side === 'sales'

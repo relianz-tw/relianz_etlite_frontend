@@ -1,7 +1,23 @@
 'use client';
 
-import { createPayable, createReceivable, fetchDailyDetail, fetchEntryDetail, reverseSummarySettle } from '@/api/ledger';
-import type { CreatePayableBody, CreateReceivableBody, DailyDetailLineDto, EntryDetailEntryDto, EntryDetailSettleEventDto } from '@/api/types';
+import {
+  createPayable,
+  createPayableAllowance,
+  createReceivable,
+  createReceivableAllowance,
+  fetchDailyDetail,
+  fetchEntryDetail,
+  reverseSummarySettle,
+} from '@/api/ledger';
+import type {
+  CreateAllowanceBody,
+  CreatePayableBody,
+  CreateReceivableBody,
+  DailyDetailLineDto,
+  EntryDetailAllowanceDto,
+  EntryDetailEntryDto,
+  EntryDetailSettleEventDto,
+} from '@/api/types';
 import Button from '@/components/ui/Button';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
@@ -14,9 +30,10 @@ import type { Side } from '../types';
 import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
 import SettlementEditDialog from './components/SettlementEditDialog';
 import SettlementReverseConfirmModal from './components/SettlementReverseConfirmModal';
-import TransactionAllowanceCard from './components/TransactionAllowanceCard';
+import TransactionAllowanceListCard from './components/TransactionAllowanceListCard';
 import TransactionJournalCard from './components/TransactionJournalCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
+import TransactionOriginCard from './components/TransactionOriginCard';
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import VoucherUpload from './components/VoucherUpload';
 import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, resolveExpenseCategory, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
@@ -34,6 +51,14 @@ const IMPORT_VOUCHER_TYPE = VOUCHER_TYPES[3]; // 進口稅單
 
 /** 送出前檢查必填欄位，回傳第一個錯誤訊息；全部通過回傳 null */
 function validateForm(side: Side, form: TransactionFormState): string | null {
+  // 折讓單欄位大幅收斂，驗證邏輯與一般交易分開處理
+  if (form.isAllowance) {
+    if (!form.originLedgerUuid) return '請先輸入可查得原始憑證的發票號碼';
+    if (!form.issueDate) return '請選擇開立日期';
+    if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
+    if (form.salesAmount + form.taxAmount <= 0) return '請輸入折讓金額';
+    return null;
+  }
   const counterpartyName = side === 'purchase' ? form.sellerName : form.buyerName;
   if (!counterpartyName.trim()) return side === 'purchase' ? '請輸入賣家名稱' : '請輸入交易對象名稱';
   if (!form.issueDate) return '請選擇開立日期';
@@ -47,6 +72,19 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     return '請輸入發票號碼';
   }
   return null;
+}
+
+/** 折讓單建立（POST /ael/ledger/{payables,receivables}/allowance）body 組裝；銷折/進折欄位完全相同 */
+function buildAllowanceBody(form: TransactionFormState): Omit<CreateAllowanceBody, 'companyUuid'> {
+  return {
+    originLedgerUuid: form.originLedgerUuid,
+    datetime: formatYmd(form.issueDate)!,
+    netAmount: form.salesAmount,
+    taxAmount: form.taxAmount,
+    totalAmount: form.salesAmount + form.taxAmount,
+    officialAccountingSubjectId: form.expenseCategory!.id!,
+    memo: form.note || undefined,
+  };
 }
 
 /** 進項發票號碼組裝：一般發票拆為字軌+流水號，其他憑證種類以憑證編號當純號碼 */
@@ -69,7 +107,6 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
     counterpartyUuid: form.sellerVendorUuid || undefined,
     datetime: formatYmd(form.issueDate)!,
     deductible: form.deductible,
-    ifDebit: form.isAllowance,
     importTaxNumber: isImport ? form.importTaxNumber || undefined : undefined,
     invoiceDate: formatYmd(form.issueDate)!,
     isReturnGoods: isImport ? false : undefined,
@@ -97,7 +134,6 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
     counterpartyTaxId: form.buyerTaxId || undefined,
     counterpartyType: form.buyerTaxId ? 0 : 1,
     datetime: formatYmd(form.issueDate)!,
-    ifDebit: form.isAllowance,
     invoiceDate: formatYmd(form.issueDate)!,
     memo: form.note || undefined,
     netAmount: form.salesAmount,
@@ -140,6 +176,15 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   const [reverseSubmitting, setReverseSubmitting] = useState(false);
   const [reverseError, setReverseError] = useState('');
 
+  // 折讓相關：是否為折讓單、（原單）已開立的折讓單清單、（折讓單）原單交易 uuid；
+  // isAllowance／allowances／originLedgerUuid 為選填欄位，皆搭配 fallback 讀取（見 api/types.ts 註解）
+  const [isAllowance, setIsAllowance] = useState(false);
+  const [allowances, setAllowances] = useState<EntryDetailAllowanceDto[]>([]);
+  const [originLedgerUuid, setOriginLedgerUuid] = useState('');
+  const [originEntry, setOriginEntry] = useState<EntryDetailEntryDto | null>(null);
+  const [originLoading, setOriginLoading] = useState(false);
+  const [originError, setOriginError] = useState('');
+
   const loadDetail = useCallback(() => {
     if (mode !== 'edit' || !transactionId) return () => {};
     let cancelled = false;
@@ -154,11 +199,14 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         // 費用類別／收入科目來自 entry.officialAccountingSubjectId，比照帳簿列表反查科目名稱的方式處理
         const expenseCategory = await resolveExpenseCategory(result.entry.officialAccountingSubjectId);
         if (cancelled) return;
+        // 是否為折讓：優先看頂層 isAllowance，api.md 200 範例 JSON 未含此欄位時退回 invoice.isAllowance
+        const allowanceFlag = result.isAllowance ?? result.invoice?.isAllowance ?? false;
         const nextForm: TransactionFormState = {
           ...mapInvoiceDetailToForm(side, result.invoice),
           expenseCategory,
           // 銷售管道對應 entry.paymentChannelUuid，直接帶入即可對應 channelField 下拉選項的 uuid
           channel: result.entry.paymentChannelUuid ?? '',
+          isAllowance: allowanceFlag,
         };
         setForm(nextForm);
         setSavedForm(nextForm);
@@ -167,6 +215,10 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         setSettleEvents(result.settleEvents);
         setBuyOrSell(result.invoice?.buyOrSell ?? (side === 'sales' ? 1 : 2));
         setDailyLines(daily.lines);
+        setIsAllowance(allowanceFlag);
+        setAllowances(result.allowances ?? []);
+        // 折讓單才查原單 uuid；非折讓單一律清空，避免殘留上一筆交易的原單卡片
+        setOriginLedgerUuid(allowanceFlag ? result.originLedgerUuid ?? '' : '');
       })
       .catch(err => {
         if (cancelled) return;
@@ -181,6 +233,34 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   }, [mode, side, transactionId]);
 
   useEffect(() => loadDetail(), [loadDetail, reloadKey]);
+
+  // 折讓單追加查詢一次原單完整資訊，供「原始交易憑證」卡片顯示；失敗僅記錄錯誤，不阻擋主畫面
+  useEffect(() => {
+    if (!originLedgerUuid) {
+      setOriginEntry(null);
+      setOriginError('');
+      return;
+    }
+    let cancelled = false;
+    setOriginLoading(true);
+    setOriginError('');
+    fetchEntryDetail({ ledgerUuid: originLedgerUuid })
+      .then(result => {
+        if (cancelled) return;
+        setOriginEntry(result.entry);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setOriginEntry(null);
+        setOriginError(getFriendlyErrorMessage(err, '載入原始交易憑證失敗'));
+      })
+      .finally(() => {
+        if (!cancelled) setOriginLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originLedgerUuid]);
 
   const reloadDetail = () => setReloadKey(k => k + 1);
 
@@ -228,7 +308,13 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
     setSubmitting(true);
     setSubmitError('');
     try {
-      if (side === 'purchase') {
+      if (form.isAllowance) {
+        if (side === 'purchase') {
+          await createPayableAllowance(buildAllowanceBody(form));
+        } else {
+          await createReceivableAllowance(buildAllowanceBody(form));
+        }
+      } else if (side === 'purchase') {
         await createPayable(buildPayableBody(form));
       } else {
         await createReceivable(buildReceivableBody(form));
@@ -305,7 +391,19 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 onUpdate={backToLedger}
                 voidLabel={side === 'sales' ? '作廢' : '刪除'}
               />
-              {side === 'sales' && mode === 'edit' && <TransactionAllowanceCard />}
+              {mode === 'edit' && isAllowance && (
+                <TransactionOriginCard
+                  side={side}
+                  originLedgerUuid={originLedgerUuid}
+                  returnQuery={returnQuery}
+                  loading={originLoading}
+                  error={originError}
+                  entry={originEntry}
+                />
+              )}
+              {mode === 'edit' && !isAllowance && allowances.length > 0 && (
+                <TransactionAllowanceListCard side={side} returnQuery={returnQuery} allowances={allowances} />
+              )}
               {mode === 'edit' && entryDetail && (
                 <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
               )}
@@ -314,7 +412,12 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
 
               {mode === 'create' && (
                 <div className="sticky bottom-0 -mx-4 flex justify-end gap-3 border-t border-neutral-blue-gray/20 bg-surface-off-white px-4 py-4 nav:static nav:mx-0 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
-                  <Button variant="primary" className="w-full nav:w-auto" onClick={handleCreate} disabled={submitting}>
+                  <Button
+                    variant="primary"
+                    className="w-full nav:w-auto"
+                    onClick={handleCreate}
+                    disabled={submitting || (form.isAllowance && !form.originLedgerUuid)}
+                  >
                     {submitting ? '建立中…' : '建立交易'}
                   </Button>
                 </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Select from '@/components/ui/Select';
@@ -7,7 +8,7 @@ import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Download, FileMinus, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Download, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -154,7 +155,6 @@ function SalesCard({
   isSelected,
   onSelectToggle,
   onLongPressStart,
-  allowanceCount,
 }: {
   row: SalesRow;
   subTab: SalesSubTab;
@@ -166,7 +166,6 @@ function SalesCard({
   isSelected: boolean;
   onSelectToggle: () => void;
   onLongPressStart: (id: string) => void;
-  allowanceCount: number;
 }) {
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
   return (
@@ -181,6 +180,11 @@ function SalesCard({
         <div className="flex items-center gap-1.5">
           {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
+          {row.isAllowance && (
+            <Badge tone="info" variant="muted">
+              折讓
+            </Badge>
+          )}
         </div>
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
@@ -196,9 +200,6 @@ function SalesCard({
                 作廢
               </Button>
             )}
-            <Button size="sm" variant="ghost" icon={FileMinus} disabled title="折讓功能尚未串接後端 API">
-              {allowanceCount > 0 ? `折讓 (${allowanceCount})` : '折讓'}
-            </Button>
           </div>
         )}
       </div>
@@ -246,6 +247,11 @@ function PurchaseCard({
         <div className="flex items-center gap-1.5">
           {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
+          {row.isAllowance && (
+            <Badge tone="info" variant="muted">
+              折讓
+            </Badge>
+          )}
         </div>
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
@@ -390,7 +396,6 @@ export default function LedgerCards(props: LedgerCardsProps) {
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
               onLongPressStart={enterSelectionMode}
-              allowanceCount={row.allowances.length}
             />
           ))
         : props.rows.map(row => (

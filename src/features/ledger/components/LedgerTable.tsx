@@ -1,11 +1,12 @@
 'use client';
 
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import Select from '@/components/ui/Select';
 import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
-import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, Download, FileMinus } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, Download } from 'lucide-react';
 import { cn, fmtCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -236,12 +237,12 @@ export default function LedgerTable(props: LedgerTableProps) {
         <table className="w-full table-fixed border-collapse">
           <colgroup>
             <col className="w-10" />
-            <col className="w-[160px]" />
+            <col className="w-[190px]" />
             <col className="w-[150px]" />
             <col />
             {showChannel && <col className="w-[150px]" />}
             <col className="w-[120px]" />
-            <col className={showChannel ? 'w-[300px]' : 'w-[380px]'} />
+            <col className="w-[120px]" />
           </colgroup>
           <thead className="bg-surface-off-white">
             <tr className="border-b border-neutral-blue-gray/40">
@@ -288,6 +289,11 @@ export default function LedgerTable(props: LedgerTableProps) {
                       >
                         {row.id}
                       </Link>
+                      {row.isAllowance && (
+                        <Badge tone="info" variant="muted">
+                          折讓
+                        </Badge>
+                      )}
                     </div>
                   </td>
                   <td className={tdClass}>
@@ -301,34 +307,15 @@ export default function LedgerTable(props: LedgerTableProps) {
                   )}
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
                   <td className={`${tdClass} text-right`}>
-                    <div className="flex justify-end gap-1.5">
-                      {row.voided ? (
-                        <Button size="sm" variant="ghost" disabled icon={CircleX} className="w-[84px]">
-                          已作廢
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon={CircleX}
-                          className="w-[84px]"
-                          disabled
-                          title="作廢功能尚未串接後端 API"
-                        >
-                          作廢
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={FileMinus}
-                        className="w-[104px]"
-                        disabled
-                        title="折讓功能尚未串接後端 API"
-                      >
-                        {row.allowances.length > 0 ? `折讓 (${row.allowances.length})` : '折讓'}
+                    {row.voided ? (
+                      <Button size="sm" variant="ghost" disabled icon={CircleX} className="w-[84px]">
+                        已作廢
                       </Button>
-                    </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" icon={CircleX} className="w-[84px]" disabled title="作廢功能尚未串接後端 API">
+                        作廢
+                      </Button>
+                    )}
                   </td>
                 </tr>
                 {expanded[row.id] &&
@@ -380,7 +367,7 @@ export default function LedgerTable(props: LedgerTableProps) {
       <table className="w-full table-fixed border-collapse">
         <colgroup>
           <col className="w-10" />
-          <col className="w-[160px]" />
+          <col className="w-[190px]" />
           <col className="w-[150px]" />
           <col />
           <col className="w-[190px]" />
@@ -439,6 +426,11 @@ export default function LedgerTable(props: LedgerTableProps) {
                       >
                         {row.id}
                       </Link>
+                      {row.isAllowance && (
+                        <Badge tone="info" variant="muted">
+                          折讓
+                        </Badge>
+                      )}
                     </div>
                   </td>
                   <td className={tdClass}>

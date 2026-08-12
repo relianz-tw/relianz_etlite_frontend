@@ -6535,7 +6535,6 @@ POST /ael/ledger/payables
 |» invoiceNum|body|string| no |完整號碼；統一發票可為「字軌+號碼」；voucherKind≠4 時必填|
 |» invoiceDate|body|string| yes |發票日 YYYYMMDD|
 |» voucherKind|body|integer| yes |進項：0收據 1統一發票 2交通 3水電 4進口|
-|» ifDebit|body|boolean| yes |是否折讓|
 |» deductible|body|boolean| no |可否扣抵；選填，未傳當可扣抵|
 |» remark|body|string| no |發票備註|
 |» summary|body|string| no |摘要|
@@ -6661,7 +6660,6 @@ POST /ael/ledger/receivables
 |» invoiceNum|body|string| yes |字軌後的號碼|
 |» invoiceDate|body|string| yes |發票日 YYYYMMDD|
 |» voucherKind|body|integer| yes |銷項憑證類型；實務可傳 1（統一發票）|
-|» ifDebit|body|boolean| yes |是否折讓|
 |» deductible|body|boolean| no |可否扣抵；選填|
 |» remark|body|string| no |發票備註|
 |» summary|body|string| no |摘要|
@@ -6754,9 +6752,190 @@ POST /ael/ledger/payables/filter
     "data": {
         "items": [
             {
-                "uuid": "9b435670-0281-4a26-b23d-743845b56323",
-                "orderCode": "TX-115072900003",
+                "ledgerUuid": "8e05c193-e3e3-41a1-91b0-e38ad6e833ca",
+                "orderCode": "TX-115073000005",
+                "entryDate": "2026-02-05T00:00:00Z",
+                "issueDate": "1150201",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試廠商",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 1050,
+                "netAmount": 1000,
+                "taxAmount": 50,
+                "taxFreeAmount": 0,
+                "settledAmount": 100,
+                "remainingAmount": 950,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-07-30T10:25:56Z",
+                "invoice": {
+                    "uuid": "160b87d0-6670-457e-9b28-efc1cb790aa1",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345678",
+                    "date": "1150201",
+                    "amount": 1050,
+                    "businessTax": 50,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "e94b8d25-d764-42aa-9e43-c8587f8fc220",
+                "orderCode": "TX-115073100007",
                 "entryDate": null,
+                "issueDate": "1150726",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "潤智教育有限公司",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "totalAmount": 3330,
+                "netAmount": 3330,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 3330,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-07-31T08:44:23Z",
+                "invoice": {
+                    "uuid": "7a07bd5f-b3f9-4fe4-be96-d2885a45a637",
+                    "invoiceTrack": "WE",
+                    "invoiceNumber": "90343000",
+                    "date": "1150726",
+                    "amount": 3330,
+                    "businessTax": 0,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "95441885"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "c901007d-4ce8-4763-bc56-ce017723a7df",
+                "orderCode": "TX-115080600010",
+                "entryDate": null,
+                "issueDate": "1150806",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "原味商行",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "totalAmount": 500,
+                "netAmount": 500,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 500,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-06T09:19:15Z",
+                "invoice": {
+                    "uuid": "20c8a59b-4ada-4281-a807-0adc272cbea1",
+                    "invoiceTrack": "TX",
+                    "invoiceNumber": "99900010",
+                    "date": "1150806",
+                    "amount": 500,
+                    "businessTax": 0,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "38965019"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "e11c2c7c-e794-481c-9ff3-f43e80e83b21",
+                "orderCode": "TX-115080700001",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試廠商A",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 10000,
+                "netAmount": 10000,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 6000,
+                "remainingAmount": 4000,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T01:57:29Z",
+                "invoice": {
+                    "uuid": "45842ed4-ee54-4051-8927-a2621c556771",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345671",
+                    "date": "1150807",
+                    "amount": 10000,
+                    "businessTax": 0,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "faa2a200-ccce-45da-8447-9dbd91983403",
+                "orderCode": "TX-115080700002",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試廠商A",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 5000,
+                "netAmount": 5000,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 5000,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T01:58:24Z",
+                "invoice": {
+                    "uuid": "9c40eea3-fe63-4917-b1a5-dadfaf969dc7",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345672",
+                    "date": "1150807",
+                    "amount": 5000,
+                    "businessTax": 0,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "17c9ea4e-53d4-416c-ba4f-35b7da09008d",
+                "orderCode": "TX-115080700020",
+                "entryDate": null,
+                "issueDate": "1150807",
                 "entryType": 0,
                 "entryKind": 0,
                 "direction": 3,
@@ -6764,24 +6943,181 @@ POST /ael/ledger/payables/filter
                 "counterpartyName": "和興商店",
                 "counterpartyType": 0,
                 "counterpartyUuid": "301b53f8-1b59-4ecc-8836-ba6673e6baa7",
-                "totalAmount": 210,
-                "netAmount": 200,
-                "taxAmount": 10,
+                "totalAmount": 630,
+                "netAmount": 600,
+                "taxAmount": 30,
                 "taxFreeAmount": 0,
-                "settledAmount": 180,
-                "remainingAmount": 30,
+                "settledAmount": 0,
+                "remainingAmount": 630,
                 "settlementStatus": 2,
                 "officialAccountingSubjectId": 10,
-                "memo": "TEST",
-                "createdAt": "2026-07-29T09:10:03Z"
+                "subjectName": "文具用品",
+                "memo": "測試手動沖帳reverse",
+                "createdAt": "2026-08-07T04:24:28Z",
+                "invoice": {
+                    "uuid": "60aa56cb-00e0-461e-8fa0-e645ecb0b26e",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "98765432",
+                    "date": "1150807",
+                    "amount": 630,
+                    "businessTax": 30,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "61194605"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "34076495-9edb-4c06-964f-ecd635187bf5",
+                "orderCode": "TX-115080700022",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試廠商四",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 840,
+                "netAmount": 800,
+                "taxAmount": 40,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 840,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T04:26:58Z",
+                "invoice": {
+                    "uuid": "972e507c-4d9c-4bed-ab20-bfb1f40a393e",
+                    "invoiceTrack": "EF",
+                    "invoiceNumber": "30000001",
+                    "date": "1150807",
+                    "amount": 840,
+                    "businessTax": 40,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "e32fc650-2949-41d0-95f2-92a4867bf1ae",
+                "orderCode": "TX-115080700031",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試供應商A",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 1050,
+                "netAmount": 1000,
+                "taxAmount": 50,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 1050,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T05:32:46Z",
+                "invoice": {
+                    "uuid": "4b423130-a491-40c1-b818-fb1c93ee5738",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345678",
+                    "date": "1150807",
+                    "amount": 1050,
+                    "businessTax": 50,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "0b28bf94-3e9a-4efc-8ea8-531558dcb525",
+                "orderCode": "TX-115080700032",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試供應商A",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "totalAmount": 2100,
+                "netAmount": 2000,
+                "taxAmount": 100,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 2100,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T05:34:24Z",
+                "invoice": {
+                    "uuid": "3728bf42-286d-4f5e-99d3-635be27a36ea",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345679",
+                    "date": "1150807",
+                    "amount": 2100,
+                    "businessTax": 100,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "f0ca3739-a0c7-464f-8dd9-d4e74e802f01",
+                "orderCode": "TX-115081100015",
+                "entryDate": null,
+                "issueDate": "1150812",
+                "entryType": 0,
+                "entryKind": 0,
+                "direction": 3,
+                "status": 1,
+                "counterpartyName": "測試廠商A",
+                "counterpartyType": 0,
+                "counterpartyUuid": "8208f5b3-3868-4868-afff-be8e83e483a7",
+                "totalAmount": 3000,
+                "netAmount": 3000,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 3000,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-11T10:08:38Z",
+                "invoice": {
+                    "uuid": "56e097b8-0974-4546-9be7-1e8186f61779",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "12345602",
+                    "date": "1150812",
+                    "amount": 3000,
+                    "businessTax": 0,
+                    "buyOrSell": 2,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "99999999"
+                },
+                "isAllowance": false
             }
         ],
-        "total": 1,
+        "total": 10,
         "limit": 10,
         "page": 1,
-        "receivedVoucherAmount": 210,
-        "paidAmount": 180,
-        "payableAmount": 30
+        "receivedVoucherAmount": 27500,
+        "paidAmount": 6100,
+        "payableAmount": 21400
     },
     "errorCode": "0000",
     "message": "操作成功",
@@ -6803,25 +7139,40 @@ HTTP Status Code **200**
 |---|---|---|---|---|---|
 |» data|object|true|none||none|
 |»» items|[object]|true|none||none|
-|»»» uuid|string|false|none||none|
-|»»» orderCode|string|false|none||none|
-|»»» entryDate|null|false|none||none|
-|»»» entryType|integer|false|none||none|
-|»»» direction|integer|false|none||none|
-|»»» status|integer|false|none||none|
-|»»» counterpartyName|string|false|none||none|
-|»»» counterpartyType|integer|false|none||none|
-|»»» counterpartyUuid|string|false|none||none|
-|»»» totalAmount|integer|false|none||none|
-|»»» netAmount|integer|false|none||none|
-|»»» taxAmount|integer|false|none||none|
-|»»» taxFreeAmount|integer|false|none||none|
-|»»» settledAmount|integer|false|none||none|
-|»»» remainingAmount|integer|false|none||none|
-|»»» settlementStatus|string|false|none||none|
-|»»» officialAccountingSubjectId|integer|false|none||none|
-|»»» memo|string|false|none||none|
-|»»» createdAt|string|false|none||none|
+|»»» ledgerUuid|string|true|none||none|
+|»»» orderCode|string|true|none||none|
+|»»» entryDate|string¦null|true|none||none|
+|»»» issueDate|string|true|none||none|
+|»»» entryType|integer|true|none||none|
+|»»» entryKind|integer|true|none||none|
+|»»» direction|integer|true|none||none|
+|»»» status|integer|true|none||none|
+|»»» counterpartyName|string|true|none||none|
+|»»» counterpartyType|integer|true|none||none|
+|»»» counterpartyUuid|string¦null|true|none||none|
+|»»» totalAmount|integer|true|none||none|
+|»»» netAmount|integer|true|none||none|
+|»»» taxAmount|integer|true|none||none|
+|»»» taxFreeAmount|integer|true|none||none|
+|»»» settledAmount|integer|true|none||none|
+|»»» remainingAmount|integer|true|none||none|
+|»»» settlementStatus|integer|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||none|
+|»»» subjectName|string|true|none||none|
+|»»» memo|string¦null|true|none||none|
+|»»» createdAt|string|true|none||none|
+|»»» invoice|object|true|none||none|
+|»»»» uuid|string|true|none||none|
+|»»»» invoiceTrack|string|true|none||none|
+|»»»» invoiceNumber|string|true|none||none|
+|»»»» date|string|true|none||none|
+|»»»» amount|integer|true|none||none|
+|»»»» businessTax|integer|true|none||none|
+|»»»» buyOrSell|integer|true|none||none|
+|»»»» ourInvoiceType|integer|true|none||none|
+|»»»» counterpartyTaxId|string|true|none||none|
+|»»» isAllowance|boolean|true|none||進折／銷折為 true|
+|»»» originLedgerUuid|string|true|none||折讓時有值，指原單|
 |»» total|integer|true|none||none|
 |»» limit|integer|true|none||none|
 |»» page|integer|true|none||none|
@@ -6876,35 +7227,392 @@ POST /ael/ledger/receivables/filter
     "data": {
         "items": [
             {
-                "uuid": "44790028-6c0d-4507-bf91-a7d2cec1ebaa",
-                "orderCode": "TX-115073000002",
+                "ledgerUuid": "44026f3e-4eba-4376-8f44-ecc125e82876",
+                "orderCode": "TX-115073100005",
                 "entryDate": null,
+                "issueDate": "1150710",
                 "entryType": 2,
                 "entryKind": 0,
                 "direction": 2,
                 "status": 1,
-                "counterpartyName": "是個人",
+                "counterpartyName": "潤智教育有限公司",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 5040,
+                "netAmount": 4000,
+                "taxAmount": 40,
+                "taxFreeAmount": 1000,
+                "settledAmount": 0,
+                "remainingAmount": 5040,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-07-31T07:06:51Z",
+                "invoice": {
+                    "uuid": "1a4b0bd9-3ad4-4966-866f-2d000dc2251d",
+                    "invoiceTrack": "HH",
+                    "invoiceNumber": "60889000",
+                    "date": "1150710",
+                    "amount": 5040,
+                    "businessTax": 40,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "95441885"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "f2ab9a2e-8cf0-43b7-89c4-29c2d4fc38a7",
+                "orderCode": "TX-115073100008",
+                "entryDate": null,
+                "issueDate": "1150701",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "潤智教育有限公司",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 30000,
+                "netAmount": 30000,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 30000,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-07-31T08:45:29Z",
+                "invoice": {
+                    "uuid": "029a4783-9767-4d0e-80bd-8305a6b46538",
+                    "invoiceTrack": "RR",
+                    "invoiceNumber": "56000000",
+                    "date": "1150701",
+                    "amount": 30000,
+                    "businessTax": 0,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "95441885"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "a10f2060-01d8-48b1-b26a-cbce12caaece",
+                "orderCode": "TX-115080600009",
+                "entryDate": null,
+                "issueDate": "1150806",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試買家C",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 0,
+                "netAmount": 100,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 0,
+                "settlementStatus": 0,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-08-06T09:16:47Z",
+                "invoice": {
+                    "uuid": "ac4ba738-a92b-4f48-a70a-b8f680ffb0c1",
+                    "invoiceTrack": "99",
+                    "invoiceNumber": "900003",
+                    "date": "1150806",
+                    "amount": 0,
+                    "businessTax": 0,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "ac93b74f-9861-404b-a417-df2e021e9c24",
+                "orderCode": "TX-115080700017",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試買家二",
                 "counterpartyType": 1,
                 "counterpartyUuid": null,
                 "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                "totalAmount": 1050,
-                "netAmount": 1000,
-                "taxAmount": 50,
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 2100,
+                "netAmount": 2000,
+                "taxAmount": 100,
                 "taxFreeAmount": 0,
                 "settledAmount": 0,
-                "remainingAmount": 1050,
+                "remainingAmount": 2100,
                 "settlementStatus": 2,
-                "officialAccountingSubjectId": 41,
-                "memo": "選填",
-                "createdAt": "2026-07-30T08:44:39Z"
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-08-07T04:21:58Z",
+                "invoice": {
+                    "uuid": "42d57d54-284e-4263-ab37-9d3aae591223",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "10000002",
+                    "date": "1150807",
+                    "amount": 2100,
+                    "businessTax": 100,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "986cedb4-1f69-40fc-94a4-e2f71d140503",
+                "orderCode": "TX-115080700018",
+                "entryDate": null,
+                "issueDate": "1150807",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試買家三",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 3150,
+                "netAmount": 3000,
+                "taxAmount": 150,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 3150,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-08-07T04:23:02Z",
+                "invoice": {
+                    "uuid": "f3e07762-efa0-4b37-89e6-f92b5b3a3549",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "10000003",
+                    "date": "1150807",
+                    "amount": 3150,
+                    "businessTax": 150,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "3b89af58-f323-4f76-84eb-6ef24ac80ef0",
+                "orderCode": "TX-115080700035",
+                "entryDate": null,
+                "issueDate": "1150804",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試公司一",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 300000,
+                "netAmount": 300000,
+                "taxAmount": 0,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 300000,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T07:56:33Z",
+                "invoice": {
+                    "uuid": "c0aa04e6-995d-4d81-968b-292af4c9f53a",
+                    "invoiceTrack": "OO",
+                    "invoiceNumber": "32340000",
+                    "date": "1150804",
+                    "amount": 300000,
+                    "businessTax": 0,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "32481939"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "a781b07d-4127-4055-b5cc-680f55daf985",
+                "orderCode": "TX-115080700037",
+                "entryDate": null,
+                "issueDate": "1150806",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試二二二",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 43730,
+                "netAmount": 40300,
+                "taxAmount": 3430,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 43730,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-08-07T07:58:21Z",
+                "invoice": {
+                    "uuid": "27d89a2e-0058-4ffc-80b3-5d343bf28652",
+                    "invoiceTrack": "ER",
+                    "invoiceNumber": "34342483",
+                    "date": "1150806",
+                    "amount": 43730,
+                    "businessTax": 3430,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "42834343"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "0b33c141-c694-40e1-b899-97bb42218dbd",
+                "orderCode": "TX-115080700038",
+                "entryDate": null,
+                "issueDate": "1150811",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試客戶一",
+                "counterpartyType": 1,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 12962,
+                "netAmount": 12345,
+                "taxAmount": 617,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 12962,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 1,
+                "subjectName": "營業收入總額",
+                "memo": null,
+                "createdAt": "2026-08-07T07:59:04Z",
+                "invoice": {
+                    "uuid": "66aa3c2e-108c-4808-a019-f48a00a829ad",
+                    "invoiceTrack": "AB",
+                    "invoiceNumber": "10000001",
+                    "date": "1150811",
+                    "amount": 12962,
+                    "businessTax": 617,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": ""
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "b2d3e3c7-0c62-414e-a0ad-9a04a30d865b",
+                "orderCode": "TX-115080700039",
+                "entryDate": null,
+                "issueDate": "1150707",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試測試",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 46490,
+                "netAmount": 43000,
+                "taxAmount": 3490,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 46490,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T07:59:08Z",
+                "invoice": {
+                    "uuid": "6e0ece6d-4f7c-400e-9c14-c9924775b9c3",
+                    "invoiceTrack": "EI",
+                    "invoiceNumber": "34234234",
+                    "date": "1150707",
+                    "amount": 46490,
+                    "businessTax": 3490,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "40343490"
+                },
+                "isAllowance": false
+            },
+            {
+                "ledgerUuid": "da6c16f7-e7d1-47a5-b4b0-d776c2cfd928",
+                "orderCode": "TX-115080700041",
+                "entryDate": null,
+                "issueDate": "1150803",
+                "entryType": 2,
+                "entryKind": 0,
+                "direction": 2,
+                "status": 1,
+                "counterpartyName": "測試測試",
+                "counterpartyType": 0,
+                "counterpartyUuid": null,
+                "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
+                "paymentChannelName": "蝦皮",
+                "totalAmount": 3434,
+                "netAmount": 3400,
+                "taxAmount": 34,
+                "taxFreeAmount": 0,
+                "settledAmount": 0,
+                "remainingAmount": 3434,
+                "settlementStatus": 2,
+                "officialAccountingSubjectId": 10,
+                "subjectName": "文具用品",
+                "memo": null,
+                "createdAt": "2026-08-07T08:00:28Z",
+                "invoice": {
+                    "uuid": "d362defc-2e1e-4a36-9dfe-79f7e68fb1c5",
+                    "invoiceTrack": "PE",
+                    "invoiceNumber": "34889234",
+                    "date": "1150803",
+                    "amount": 3434,
+                    "businessTax": 34,
+                    "buyOrSell": 3,
+                    "ourInvoiceType": 3,
+                    "counterpartyTaxId": "34892343"
+                },
+                "isAllowance": false
             }
         ],
-        "total": 1,
+        "total": 16,
         "limit": 10,
         "page": 1,
-        "issuedVoucherAmount": 1050,
-        "collectedAmount": 0,
-        "receivableAmount": 1050
+        "issuedVoucherAmount": 932190,
+        "collectedAmount": 33566,
+        "receivableAmount": 898624
     },
     "errorCode": "0000",
     "message": "操作成功",
@@ -6919,6 +7627,58 @@ POST /ael/ledger/receivables/filter
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» items|[object]|true|none||none|
+|»»» ledgerUuid|string|true|none||none|
+|»»» orderCode|string|true|none||none|
+|»»» entryDate|null|true|none||none|
+|»»» issueDate|string|true|none||none|
+|»»» entryType|integer|true|none||none|
+|»»» entryKind|integer|true|none||none|
+|»»» direction|integer|true|none||none|
+|»»» status|integer|true|none||none|
+|»»» counterpartyName|string|true|none||none|
+|»»» counterpartyType|integer|true|none||none|
+|»»» counterpartyUuid|null|true|none||none|
+|»»» paymentChannelUuid|string|true|none||none|
+|»»» paymentChannelName|string|true|none||none|
+|»»» totalAmount|integer|true|none||none|
+|»»» netAmount|integer|true|none||none|
+|»»» taxAmount|integer|true|none||none|
+|»»» taxFreeAmount|integer|true|none||none|
+|»»» settledAmount|integer|true|none||none|
+|»»» remainingAmount|integer|true|none||none|
+|»»» settlementStatus|integer|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||none|
+|»»» subjectName|string|true|none||none|
+|»»» memo|null|true|none||none|
+|»»» createdAt|string|true|none||none|
+|»»» invoice|object|true|none||none|
+|»»»» uuid|string|true|none||none|
+|»»»» invoiceTrack|string|true|none||none|
+|»»»» invoiceNumber|string|true|none||none|
+|»»»» date|string|true|none||none|
+|»»»» amount|integer|true|none||none|
+|»»»» businessTax|integer|true|none||none|
+|»»»» buyOrSell|integer|true|none||none|
+|»»»» ourInvoiceType|integer|true|none||none|
+|»»»» counterpartyTaxId|string|true|none||none|
+|»»» isAllowance|boolean|true|none||進折／銷折為 true|
+|»»» originLedgerUuid|string|true|none||折讓時有值，指原單|
+|»» total|integer|true|none||none|
+|»» limit|integer|true|none||none|
+|»» page|integer|true|none||none|
+|»» issuedVoucherAmount|integer|true|none||none|
+|»» collectedAmount|integer|true|none||none|
+|»» receivableAmount|integer|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
 
 ## POST 已付款列表篩選
 
@@ -7161,6 +7921,7 @@ HTTP Status Code **200**
 
 |Name|Type|Required|Restrictions|Title|description|
 |---|---|---|---|---|---|
+|» isAllowance|boolean|true|none||是否為折讓|
 |» entry|object|true|none||業務原單 header＋科目／管道名＋沖帳快照|
 |»» ledgerUuid|string|true|none||ledger_entries.uuid（業務原單）|
 |»» companyUuid|string|true|none||公司 uuid|
@@ -7189,6 +7950,15 @@ HTTP Status Code **200**
 |»» settledAmount|integer|true|none||已沖金額（元）＝relations.settlement_amount 合計|
 |»» remainingAmount|integer|true|none||未沖金額（元）；可為負（超沖）|
 |»» settlementStatus|integer|true|none||0平衡 1超沖 2少沖|
+|» originLedgerUuid|string|true|none||如果是查折讓單，這邊顯示的是原單uuid|
+|» allowances|[object]|true|none||關聯折讓單|
+|»» ledgerUuid|string|true|none||交易uuid|
+|»» orderCode|string|true|none||交易編號|
+|»» totalAmount|integer|true|none||含稅總額|
+|»» netAmount|integer|true|none||未稅額|
+|»» taxAmount|integer|true|none||稅額|
+|»» allowanceAmount|integer|true|none||折讓金額|
+|»» direction|integer|true|none||0收入 1支出 2應收 3應付 4其他|
 |» settlements|[object]|true|none||沖帳關聯列表；無沖帳為空陣列（撤銷後 relations 會刪除）|
 |»» relationUuid|string|true|none||receivable_payable_relations.uuid|
 |»» settlementAmount|integer|true|none||本次沖帳金額|
@@ -7197,6 +7967,7 @@ HTTP Status Code **200**
 |»» isOpen|boolean|true|none||true＝沖完後原單仍有餘額；false＝已結清（含超沖）|
 |»» remark|string¦null|false|none||關聯備註|
 |»» createdAt|string|true|none||none|
+|»» relationKind|string|true|none||1＝折讓沖減，0＝一般付款沖帳|
 |»» settlement|object¦null|false|none||結算帳 header（不含分錄 lines）|
 |»»» ledgerUuid|string|false|none||結算 ledger_entries.uuid|
 |»»» orderCode|string|false|none||結算交易編號|
@@ -7271,6 +8042,427 @@ HTTP Status Code **200**
 |»» summary|string|false|none||none|
 |»» carrierInfo|string|false|none||none|
 |»» savePoint|integer|false|none||none|
+
+## POST 建立進折交易紀錄
+
+POST /ael/ledger/payables/allowance
+
+建立進折交易紀錄
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "originLedgerUuid": "",
+    "datetime": "20260811",
+    "totalAmount": 1050,
+    "netAmount": 1000,
+    "taxAmount": 50,
+    "officialAccountingSubjectId": 20,
+    "memo": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» originLedgerUuid|body|string| yes |欲折讓的原單交易uuid|
+|» datetime|body|string| yes |YYYYMMDD|
+|» totalAmount|body|integer| yes |含稅總額|
+|» netAmount|body|integer| yes |未稅|
+|» taxAmount|body|integer| yes |稅額|
+|» officialAccountingSubjectId|body|integer| yes |科目id|
+|» memo|body|string| no |備註|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "allowance": {
+      "ledgerUuid": "string",
+      "orderCode": "string",
+      "entryType": 0,
+      "direction": 0,
+      "totalAmount": 0,
+      "netAmount": 0,
+      "taxAmount": 0,
+      "officialAccountingSubjectId": 0
+    },
+    "originLedgerUuid": "string",
+    "relation": {
+      "relationUuid": "string",
+      "settlementAmount": 0,
+      "beforeSettlementAmount": 0,
+      "afterSettlementAmount": 0,
+      "isOpen": true,
+      "relationKind": 0
+    },
+    "originRemainingAmount": 0,
+    "balanceBefore": 0,
+    "balanceAfter": 0,
+    "closed": true
+  }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|false|none||none|
+|» errorCode|string|false|none||none|
+|» message|string|false|none||none|
+|» data|object|false|none||none|
+|»» allowance|object|false|none||none|
+|»»» ledgerUuid|string|false|none||none|
+|»»» orderCode|string|false|none||none|
+|»»» entryType|integer|false|none||進折=進項退回類型|
+|»»» direction|integer¦null|false|none||none|
+|»»» totalAmount|number|false|none||none|
+|»»» netAmount|number|false|none||none|
+|»»» taxAmount|number|false|none||none|
+|»»» officialAccountingSubjectId|integer|false|none||none|
+|»» originLedgerUuid|string|false|none||none|
+|»» relation|object|false|none||none|
+|»»» relationUuid|string|false|none||none|
+|»»» settlementAmount|integer|false|none||none|
+|»»» beforeSettlementAmount|integer|false|none||none|
+|»»» afterSettlementAmount|integer|false|none||none|
+|»»» isOpen|boolean|false|none||none|
+|»»» relationKind|integer|false|none||折讓=1|
+|»» originRemainingAmount|integer|false|none||none|
+|»» balanceBefore|integer|false|none||none|
+|»» balanceAfter|integer|false|none||none|
+|»» closed|boolean|false|none||none|
+
+## POST 建立銷折交易紀錄
+
+POST /ael/ledger/receivables/allowance
+
+建立銷折交易紀錄
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "originLedgerUuid": "",
+    "datetime": "20260811",
+    "totalAmount": 1050,
+    "netAmount": 1000,
+    "taxAmount": 50,
+    "officialAccountingSubjectId": 20,
+    "memo": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» originLedgerUuid|body|string| yes |欲折讓的原單交易uuid|
+|» datetime|body|string| yes |YYYYMMDD|
+|» totalAmount|body|integer| yes |含稅總額|
+|» netAmount|body|integer| yes |未稅|
+|» taxAmount|body|integer| yes |稅額|
+|» officialAccountingSubjectId|body|integer| yes |科目id|
+|» memo|body|string| no |備註|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "allowance": {
+      "ledgerUuid": "string",
+      "orderCode": "string",
+      "entryType": 0,
+      "direction": 0,
+      "totalAmount": 0,
+      "netAmount": 0,
+      "taxAmount": 0,
+      "officialAccountingSubjectId": 0
+    },
+    "originLedgerUuid": "string",
+    "relation": {
+      "relationUuid": "string",
+      "settlementAmount": 0,
+      "beforeSettlementAmount": 0,
+      "afterSettlementAmount": 0,
+      "isOpen": true,
+      "relationKind": 0
+    },
+    "originRemainingAmount": 0,
+    "balanceBefore": 0,
+    "balanceAfter": 0,
+    "closed": true
+  }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|false|none||none|
+|» errorCode|string|false|none||none|
+|» message|string|false|none||none|
+|» data|object|false|none||none|
+|»» allowance|object|false|none||none|
+|»»» ledgerUuid|string|false|none||none|
+|»»» orderCode|string|false|none||none|
+|»»» entryType|integer|false|none||進折=進項退回類型|
+|»»» direction|integer¦null|false|none||none|
+|»»» totalAmount|number|false|none||none|
+|»»» netAmount|number|false|none||none|
+|»»» taxAmount|number|false|none||none|
+|»»» officialAccountingSubjectId|integer|false|none||none|
+|»» originLedgerUuid|string|false|none||none|
+|»» relation|object|false|none||none|
+|»»» relationUuid|string|false|none||none|
+|»»» settlementAmount|integer|false|none||none|
+|»»» beforeSettlementAmount|integer|false|none||none|
+|»»» afterSettlementAmount|integer|false|none||none|
+|»»» isOpen|boolean|false|none||none|
+|»»» relationKind|integer|false|none||折讓=1|
+|»» originRemainingAmount|integer|false|none||none|
+|»» balanceBefore|integer|false|none||none|
+|»» balanceAfter|integer|false|none||none|
+|»» closed|boolean|false|none||none|
+
+## GET 發票號碼反查業務原單
+
+GET /ael/ledger/invoices/origin
+
+發票號碼反查業務原單
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|invoiceTrack|query|string| no |發票字軌|
+|invoiceNumber|query|string| no |發票號碼|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": {
+        "invoiceUuid": "56e097b8-0974-4546-9be7-1e8186f61779",
+        "entry": {
+            "ledgerUuid": "f0ca3739-a0c7-464f-8dd9-d4e74e802f01",
+            "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+            "orderCode": "TX-115081100015",
+            "entryDate": null,
+            "transactionDate": "2026-08-12T00:00:00Z",
+            "entryType": 0,
+            "direction": 3,
+            "counterpartyName": "測試廠商A",
+            "counterpartyType": 0,
+            "counterpartyUuid": "8208f5b3-3868-4868-afff-be8e83e483a7",
+            "paymentChannelUuid": null,
+            "paymentChannelName": "",
+            "summary": null,
+            "memo": null,
+            "totalAmount": 3000,
+            "netAmount": 3000,
+            "taxAmount": 0,
+            "taxFreeAmount": 0,
+            "entryKind": 0,
+            "status": 1,
+            "officialAccountingSubjectId": 10,
+            "subjectName": "文具用品",
+            "createdAt": "2026-08-11T10:08:38Z",
+            "updatedAt": "2026-08-11T10:08:38Z",
+            "settledAmount": 0,
+            "remainingAmount": 3000,
+            "settlementStatus": 2
+        },
+        "isAllowance": false,
+        "allowances": [],
+        "settlements": [],
+        "settleEvents": [],
+        "invoice": {
+            "invoiceUuid": "56e097b8-0974-4546-9be7-1e8186f61779",
+            "ac_uuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+            "inoviceBookUuid": null,
+            "ourInvoiceType": 3,
+            "buyOrSell": 2,
+            "isDebit": 2,
+            "year": 115,
+            "month": 8,
+            "day": 12,
+            "date": "1150812",
+            "buyerTaxIdNumber": "82999614",
+            "sellerTaxIdNumber": "99999999",
+            "invoiceTrack": "AB",
+            "invoiceNumber": "12345602",
+            "customsNumber": "",
+            "sales": 3000,
+            "businessTax": 0,
+            "amount": 3000,
+            "taxFreeAmount": 0,
+            "taxType": "1",
+            "specialTaxRate": 0,
+            "invoicePicUrl": "",
+            "createTime": "2026-08-11T10:08:38Z",
+            "updateTime": "2026-08-11T10:08:38Z",
+            "costCategory": 0,
+            "remark": "",
+            "remarkCms": "",
+            "remarkMsgBoard": "",
+            "companyName": "測試廠商A",
+            "cmsYear": 115,
+            "cmsPhase": 7,
+            "deductible": 1,
+            "declared": 2,
+            "importData": 0,
+            "starCustomer": 0,
+            "isReturnGoods": false,
+            "importTaxNumber": "",
+            "others": 0,
+            "pdfPassword": "",
+            "unreportedReason": "",
+            "summary": "",
+            "carrierInfo": "",
+            "savePoint": 0
+        }
+    },
+    "errorCode": "0000",
+    "message": "操作成功",
+    "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» invoiceUuid|string|true|none||none|
+|»» entry|object|true|none||none|
+|»»» ledgerUuid|string|true|none||none|
+|»»» companyUuid|string|true|none||none|
+|»»» orderCode|string|true|none||none|
+|»»» entryDate|null|true|none||none|
+|»»» transactionDate|string|true|none||none|
+|»»» entryType|integer|true|none||none|
+|»»» direction|integer|true|none||none|
+|»»» counterpartyName|string|true|none||none|
+|»»» counterpartyType|integer|true|none||none|
+|»»» counterpartyUuid|string|true|none||none|
+|»»» paymentChannelUuid|null|true|none||none|
+|»»» paymentChannelName|string|true|none||none|
+|»»» summary|null|true|none||none|
+|»»» memo|null|true|none||none|
+|»»» totalAmount|integer|true|none||none|
+|»»» netAmount|integer|true|none||none|
+|»»» taxAmount|integer|true|none||none|
+|»»» taxFreeAmount|integer|true|none||none|
+|»»» entryKind|integer|true|none||none|
+|»»» status|integer|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||none|
+|»»» subjectName|string|true|none||none|
+|»»» createdAt|string|true|none||none|
+|»»» updatedAt|string|true|none||none|
+|»»» settledAmount|integer|true|none||none|
+|»»» remainingAmount|integer|true|none||none|
+|»»» settlementStatus|integer|true|none||none|
+|»» isAllowance|boolean|true|none||none|
+|»» allowances|[string]|true|none||none|
+|»» settlements|[string]|true|none||none|
+|»» settleEvents|[string]|true|none||none|
+|»» invoice|object|true|none||none|
+|»»» invoiceUuid|string|true|none||none|
+|»»» ac_uuid|string|true|none||none|
+|»»» inoviceBookUuid|null|true|none||none|
+|»»» ourInvoiceType|integer|true|none||none|
+|»»» buyOrSell|integer|true|none||none|
+|»»» isDebit|integer|true|none||none|
+|»»» year|integer|true|none||none|
+|»»» month|integer|true|none||none|
+|»»» day|integer|true|none||none|
+|»»» date|string|true|none||none|
+|»»» buyerTaxIdNumber|string|true|none||none|
+|»»» sellerTaxIdNumber|string|true|none||none|
+|»»» invoiceTrack|string|true|none||none|
+|»»» invoiceNumber|string|true|none||none|
+|»»» customsNumber|string|true|none||none|
+|»»» sales|integer|true|none||none|
+|»»» businessTax|integer|true|none||none|
+|»»» amount|integer|true|none||none|
+|»»» taxFreeAmount|integer|true|none||none|
+|»»» taxType|string|true|none||none|
+|»»» specialTaxRate|integer|true|none||none|
+|»»» invoicePicUrl|string|true|none||none|
+|»»» createTime|string|true|none||none|
+|»»» updateTime|string|true|none||none|
+|»»» costCategory|integer|true|none||none|
+|»»» remark|string|true|none||none|
+|»»» remarkCms|string|true|none||none|
+|»»» remarkMsgBoard|string|true|none||none|
+|»»» companyName|string|true|none||none|
+|»»» cmsYear|integer|true|none||none|
+|»»» cmsPhase|integer|true|none||none|
+|»»» deductible|integer|true|none||none|
+|»»» declared|integer|true|none||none|
+|»»» importData|integer|true|none||none|
+|»»» starCustomer|integer|true|none||none|
+|»»» isReturnGoods|boolean|true|none||none|
+|»»» importTaxNumber|string|true|none||none|
+|»»» others|integer|true|none||none|
+|»»» pdfPassword|string|true|none||none|
+|»»» unreportedReason|string|true|none||none|
+|»»» summary|string|true|none||none|
+|»»» carrierInfo|string|true|none||none|
+|»»» savePoint|integer|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
 
 # 帳簿/沖帳
 

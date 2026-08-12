@@ -2,7 +2,7 @@ import { listOfficialSubjects } from '@/api/subjects';
 import type { LedgerEntryInvoiceDto, PayableListItemDto, ReceivableListItemDto } from '@/api/types';
 import { formatRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
-import type { AllowanceLineItem, PurchaseRow, SalesRow } from './types';
+import type { PurchaseRow, SalesRow } from './types';
 
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
 
@@ -54,6 +54,7 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
     settledAmount: item.settledAmount,
     remainingAmount: item.remainingAmount,
     settlementStatus: item.settlementStatus,
+    isAllowance: item.isAllowance ?? false,
   }));
 }
 
@@ -74,10 +75,10 @@ export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesR
       paymentChannelUuid: item.paymentChannelUuid,
       voucherNumber: voucherNumberFromInvoice(item.invoice),
       voided: false,
-      allowances: [],
       settledAmount: item.settledAmount,
       remainingAmount: item.remainingAmount,
       settlementStatus: item.settlementStatus,
+      isAllowance: item.isAllowance ?? false,
     };
   });
 }
@@ -86,6 +87,3 @@ const TREND_END_DATE = '2026/03/27'; // 對齊既有假資料中最新的交易�
 
 export const SALES_DAILY = generateDailyTrend(0, 16000000, 0.9, TREND_END_DATE);
 export const PURCHASE_DAILY = generateDailyTrend(3, 14000000, 0.8, TREND_END_DATE);
-
-/** 銷貨折讓退回單「發票明細」的可折讓商品假資料；折讓功能尚未串接後端 API，僅供交易明細頁折讓卡沿用既有版面 */
-export const ALLOWANCE_LINE_ITEMS: AllowanceLineItem[] = [{ id: 'ALI-01', productName: '測試商品A', allowableNet: 952, allowableTax: 48 }];
