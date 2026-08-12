@@ -38,6 +38,7 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
   if (!counterpartyName.trim()) return side === 'purchase' ? '請輸入賣家名稱' : '請輸入交易對象名稱';
   if (!form.issueDate) return '請選擇開立日期';
   if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
+  if (side === 'sales' && !form.channel) return '請選擇銷售管道';
   if (side === 'purchase') {
     const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
     const invoiceNum = form.voucherType === VOUCHER_TYPES[0] ? form.invoiceSerial : form.invoiceNumber;

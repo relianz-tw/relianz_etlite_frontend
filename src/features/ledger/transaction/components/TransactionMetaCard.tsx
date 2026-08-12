@@ -118,10 +118,19 @@ export default function TransactionMetaCard({
   const [newVendorOpen, setNewVendorOpen] = useState(false);
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
+  // 「其他」管道（固定 UUID）固定排在清單最末，讓使用者優先看到具體管道
+  const OTHER_CHANNEL_UUID = '09dfec9d-178f-41ae-826f-9663b9c4eee2';
   useEffect(() => {
     if (side !== 'sales') return;
     listChannelRules()
-      .then(list => setChannelRules(list.filter(c => c.isActive)))
+      .then(list => {
+        const active = list.filter(c => c.isActive);
+        const sorted = [
+          ...active.filter(c => c.channelUuid !== OTHER_CHANNEL_UUID),
+          ...active.filter(c => c.channelUuid === OTHER_CHANNEL_UUID),
+        ];
+        setChannelRules(sorted);
+      })
       .catch(err => setChannelError(getFriendlyErrorMessage(err)));
   }, [side]);
 
@@ -264,7 +273,7 @@ export default function TransactionMetaCard({
   // （新增送出時不會一併送出，交易明細亦無對應資料可回填），新增與編輯畫面皆停用並標示提示
 
   const channelField = (
-    <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳，如不選擇，後續會需要自行逐筆手動入帳">
+    <Field label="銷售管道" required={isCreate} helper="系統會依照銷售管道設定之付款週期自動入帳；若無對應管道，請選擇「其他」或點擊「新增」建立新管道">
       <Select
         widthClassName="w-full"
         value={form.channel}
@@ -272,7 +281,7 @@ export default function TransactionMetaCard({
         onValueChange={v => onChange({ channel: v })}
         onAddNew={() => setNewChannelOpen(true)}
       >
-        <option value="">不指定</option>
+        <option value="" disabled>請選擇銷售管道</option>
         {channelRules.map(c => (
           <option key={c.channelUuid} value={c.channelUuid}>
             {c.channelName}
