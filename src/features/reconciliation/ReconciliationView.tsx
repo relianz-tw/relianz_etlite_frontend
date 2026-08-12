@@ -6,6 +6,7 @@ import { fetchReconciliationPayables, fetchReconciliationReceivables } from '@/a
 import type { BankAccountDto } from '@/api/types';
 import { listVendors } from '@/api/vendors';
 import Button from '@/components/ui/Button';
+import Checkbox from '@/components/ui/Checkbox';
 import PeriodFilterBar from '@/components/ui/PeriodFilterBar';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -167,24 +168,27 @@ export default function ReconciliationView() {
   const [dataError, setDataError] = useState('');
   // 對帳中心資料查詢區間，預設近一個月；套用新區間時會清空兩側快取觸發重新拉取（見 handleApplyDateRange）
   const [dateRange, setDateRange] = useState(defaultDateRange);
+  // 「不限日期」：勾選後略過 dateFrom/dateTo，一次撈出全部未結清交易（仍受後端限制，僅能查今年與去年）
+  const [unlimitedDate, setUnlimitedDate] = useState(false);
 
-  // 依 side 惰性載入並快取：切換回已載入過的一側不重新打 API；執行沖帳成功或套用新日期區間後會清空快取觸發重新拉取。
-  // 一律不帶 paymentChannelUuid／counterpartyUuid（抓全部分組），settled 固定帶 false（僅顯示未結清）
+  // 依 side 惰性載入並快取：切換回已載入過的一側不重新打 API；執行沖帳成功、套用新日期區間或切換「不限日期」後
+  // 會清空快取觸發重新拉取。一律不帶 paymentChannelUuid／counterpartyUuid（抓全部分組），settled 固定帶 false（僅顯示未結清）
   useEffect(() => {
     if (side === 'receivable' ? receivableData !== null : payableData !== null) return;
     let cancelled = false;
     setDataLoading(true);
     setDataError('');
+    const dateQuery = unlimitedDate ? {} : dateRange;
     const task =
       side === 'receivable'
-        ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateRange, settled: 'false' })]).then(([channelList, groups]) => {
+        ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateQuery, settled: 'false' })]).then(([channelList, groups]) => {
             const activeChannels = channelList.filter(c => c.isActive);
             const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance }));
             const nameByUuid = new Map(channelList.map(c => [c.channelUuid, c.channelName]));
             const candidates = receivableGroupsToCandidates(groups);
             if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })
-        : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateRange, settled: 'false' })]).then(([vendorList, groups]) => {
+        : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateQuery, settled: 'false' })]).then(([vendorList, groups]) => {
             const activeVendors = vendorList.filter(v => v.isActive);
             const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name, balance: v.balance }));
             const nameByUuid = new Map(vendorList.map(v => [v.uuid, v.name]));
@@ -201,11 +205,21 @@ export default function ReconciliationView() {
     return () => {
       cancelled = true;
     };
-  }, [side, receivableData, payableData, dateRange]);
+  }, [side, receivableData, payableData, dateRange, unlimitedDate]);
 
-  // 套用新查詢區間：兩側快取都失效，重置選取的群組與輸入，避免殘留舊區間的沖帳輸入誤送
+  // 套用新查詢區間：關閉「不限日期」改回依區間篩選，兩側快取都失效，重置選取的群組與輸入，避免殘留舊區間的沖帳輸入誤送
   const handleApplyDateRange = (dateFrom: string, dateTo: string) => {
     setDateRange({ dateFrom, dateTo });
+    setUnlimitedDate(false);
+    setReceivableData(null);
+    setPayableData(null);
+    setSelectedGroupKey(ALL_GROUP_KEY);
+    resetInputs();
+  };
+
+  // 切換「不限日期」：與套用新區間一樣需清空快取重抓，並重置選取的群組與輸入
+  const handleToggleUnlimitedDate = () => {
+    setUnlimitedDate(prev => !prev);
     setReceivableData(null);
     setPayableData(null);
     setSelectedGroupKey(ALL_GROUP_KEY);
@@ -636,7 +650,9 @@ export default function ReconciliationView() {
         ? previewLoading || statementAmount <= 0 || selectedMultiUuids.size === 0
         : previewLoading || statementAmount <= 0;
   const actionError = mode === 'single' ? singleActionError : previewError;
-  const showActionArea = mode === 'single' ? !!selectedRow : mode === 'multi' ? canSettle && selectedMultiUuids.size > 0 : canSettle;
+  // 多筆沖帳一律以 canSettle（已選定明確管道／廠商）決定是否顯示，不隨勾選筆數增減掛載／卸載——
+  // 否則勾選第一筆交易時這塊區域才出現，會把下方交易清單往下推，使接續快速勾選的第二、三筆點擊座標對不準（實測會漏勾）
+  const showActionArea = mode === 'single' ? !!selectedRow : canSettle;
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -650,14 +666,19 @@ export default function ReconciliationView() {
           <SegmentedControl options={SIDE_OPTIONS} value={side} onChange={handleSideChange} size="md" />
         </div>
 
-        <div className="mb-5">
+        <div className="mb-5 flex flex-col gap-2">
           <PeriodFilterBar
             dateFrom={dateRange.dateFrom}
             dateTo={dateRange.dateTo}
             defaultDateFrom={defaultDateRange().dateFrom}
             defaultDateTo={defaultDateRange().dateTo}
             onApply={handleApplyDateRange}
+            disabled={unlimitedDate}
           />
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-neutral-dark">
+            <Checkbox checked={unlimitedDate} onChange={handleToggleUnlimitedDate} aria-label="不限日期，顯示全部未結清交易" />
+            不限日期，顯示全部未結清交易
+          </label>
         </div>
 
         {dataLoading ? (
@@ -735,15 +756,17 @@ export default function ReconciliationView() {
                 />
 
                 <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-                  <p className="mb-3 text-sm font-semibold text-neutral-dark">{isAllGroup ? '全部交易' : '待沖帳款'}</p>
-                  {mode !== 'single' && !isAllGroup && <ReconPoolSummary statementAmount={statementAmount} previewResult={previewResult} />}
+                  <p className="mb-3 text-sm font-semibold text-neutral-dark">
+                    {isAllGroup ? '全部交易' : side === 'payable' ? '待付帳款' : '待收帳款'}
+                  </p>
+                  {mode !== 'single' && !isAllGroup && <ReconPoolSummary side={side} statementAmount={statementAmount} previewResult={previewResult} />}
                   <ReconTxnList
                     side={side}
                     sections={sections}
                     showSectionHeaders={isOtherGroup}
                     showStatusColumn={showStatusColumn}
                     mode={mode}
-                    emptyMessage={isAllGroup ? '目前沒有交易' : '此群組沒有待沖帳的交易'}
+                    emptyMessage={isAllGroup ? '目前沒有交易' : `此群組沒有${side === 'payable' ? '待付' : '待收'}的交易`}
                     channelNameByUuid={sideData?.nameByUuid ?? new Map()}
                     expandedUuid={expandedUuid}
                     onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
@@ -803,6 +826,7 @@ export default function ReconciliationView() {
       {mode !== 'single' && previewResult && (
         <ReconSurplusModal
           open={surplusOpen}
+          side={side}
           groupLabel={selectedGroupLabel}
           settleAmount={previewResult.settleAmount}
           totalBeforeRemaining={previewResult.totalBeforeRemaining}

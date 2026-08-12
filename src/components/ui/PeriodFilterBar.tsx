@@ -14,6 +14,8 @@ interface PeriodFilterBarProps {
   defaultDateFrom: string;
   defaultDateTo: string;
   onApply: (dateFrom: string, dateTo: string) => void;
+  /** 呼叫端另有「不限日期」等停用日期篩選的情境時傳入，停用兩個日期欄位與操作按鈕；預設 false 維持原行為 */
+  disabled?: boolean;
 }
 
 function ymdToDate(ymd: string): Date | undefined {
@@ -30,7 +32,7 @@ function dateToYmd(date: Date | undefined): string {
 }
 
 /** 期間查詢：兩個日期欄位同時作為「近一個月」預設值的顯示與自訂區間的輸入，套用前驗證結束日不得早於起始日 */
-export default function PeriodFilterBar({ dateFrom, dateTo, defaultDateFrom, defaultDateTo, onApply }: PeriodFilterBarProps) {
+export default function PeriodFilterBar({ dateFrom, dateTo, defaultDateFrom, defaultDateTo, onApply, disabled = false }: PeriodFilterBarProps) {
   const [fromDraft, setFromDraft] = useState<Date | undefined>(() => ymdToDate(dateFrom));
   const [toDraft, setToDraft] = useState<Date | undefined>(() => ymdToDate(dateTo));
   const [error, setError] = useState('');
@@ -68,15 +70,15 @@ export default function PeriodFilterBar({ dateFrom, dateTo, defaultDateFrom, def
     <div className="flex flex-col gap-2">
       <div className="flex flex-col items-start gap-2.5 nav:flex-row nav:items-center">
         <div className="flex flex-1 items-center gap-2">
-          <DatePicker value={fromDraft} onChange={setFromDraft} placeholder="起始日" />
+          <DatePicker value={fromDraft} onChange={setFromDraft} placeholder="起始日" disabled={disabled} />
           <span className="shrink-0 text-sm text-neutral-mid">–</span>
-          <DatePicker value={toDraft} onChange={setToDraft} placeholder="結束日" />
+          <DatePicker value={toDraft} onChange={setToDraft} placeholder="結束日" disabled={disabled} />
         </div>
         <div className="flex w-full gap-2.5 nav:w-auto">
-          <Button variant="ghost" icon={RotateCcw} className="flex-1 nav:flex-none" onClick={handleReset}>
+          <Button variant="ghost" icon={RotateCcw} className="flex-1 nav:flex-none" onClick={handleReset} disabled={disabled}>
             近一個月
           </Button>
-          <Button variant="primary" icon={Search} className="flex-1 nav:flex-none" onClick={handleApply}>
+          <Button variant="primary" icon={Search} className="flex-1 nav:flex-none" onClick={handleApply} disabled={disabled}>
             套用查詢
           </Button>
         </div>

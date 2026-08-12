@@ -54,6 +54,6 @@ export interface ReconTxnRef {
   counterparty: string;
   /** 該筆交易的銷售管道／廠商 uuid；未指定為 null */
   channelUuid?: string | null;
-  /** 未沖帳金額；可為負代表超沖。單筆沖帳模式用於顯示「待沖 $X」與預估沖後剩餘 */
+  /** 未沖帳金額；可為負代表超沖。單筆沖帳模式用於顯示「待付/待收 $X」與預估沖後剩餘 */
   remainingAmount?: number;
 }

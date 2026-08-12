@@ -3,13 +3,15 @@
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { fmtCurrency } from "@/lib/utils";
+import type { ReconSide } from "../types";
 
 interface ReconSurplusModalProps {
   open: boolean;
+  side: ReconSide;
   groupLabel: string;
   /** 本次沖帳金額（使用者輸入的對帳單金額） */
   settleAmount: number;
-  /** 待沖帳金額（該管道/廠商目前所有待沖總額） */
+  /** 待付(收)帳金額（該管道/廠商目前所有待付(收)總額） */
   totalBeforeRemaining: number;
   /** 尚未沖入的差額：少沖時為仍欠的錢，超沖時為多付/多收的錢 */
   diff: number;
@@ -30,6 +32,7 @@ interface ReconSurplusModalProps {
  */
 export default function ReconSurplusModal({
   open,
+  side,
   groupLabel,
   settleAmount,
   totalBeforeRemaining,
@@ -54,7 +57,7 @@ export default function ReconSurplusModal({
         <span className="font-mono font-semibold tabular-nums">
           {fmtCurrency(settleAmount)}
         </span>{" "}
-        元，待沖帳金額{" "}
+        元，{side === "payable" ? "待付帳金額" : "待收帳金額"}{" "}
         <span className="font-mono font-semibold tabular-nums">
           {fmtCurrency(totalBeforeRemaining)}
         </span>{" "}

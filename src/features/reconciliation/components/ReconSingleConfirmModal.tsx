@@ -24,14 +24,14 @@ export default function ReconSingleConfirmModal({ open, side, row, settleAmount,
   if (!open) return null;
 
   const remaining = row.remainingAmount ?? row.amount;
-  // 沖帳金額 vs 待沖金額比較出前端可預先推估的拆帳狀態，實際結果仍以後端回應為準（0平衡 1超沖 2少沖）
+  // 沖帳金額 vs 待付(收)金額比較出前端可預先推估的拆帳狀態，實際結果仍以後端回應為準（0平衡 1超沖 2少沖）
   const projectedStatus = settleAmount === remaining ? 0 : settleAmount > remaining ? 1 : 2;
   const statusBadge = getSettlementStatusBadge(projectedStatus);
 
   const rows: { label: string; value: string }[] = [
     { label: '開立日期', value: row.date },
     { label: '交易編號', value: row.orderCode || '—' },
-    { label: '待沖金額', value: fmtCurrency(remaining) },
+    { label: side === 'payable' ? '待付金額' : '待收金額', value: fmtCurrency(remaining) },
     { label: '沖帳金額', value: fmtCurrency(settleAmount) },
     { label: side === 'payable' ? '實際付出金額' : '實際存入金額', value: fmtCurrency(actualAmount) },
   ];

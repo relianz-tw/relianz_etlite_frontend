@@ -2,6 +2,9 @@
  * 匯總沖帳預覽／執行 API 的 side-dispatch 封裝：銷項（paymentChannelUuid／depositAmount）與
  * 進項（counterpartyUuid／paymentAmount）欄位不同，這裡統一轉換為共用的 ReconSettleResult 形狀，
  * 讓 ReconciliationView 與下游元件不需要再依 side 分別處理型別（見 ./types.ts 的 ReconSettleResult）。
+ *
+ * 符號約定：UI 側手續費與額外金額以「帶號」輸入（扣減項預設為負），API 欄位語意為「正的扣減金額」，
+ * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
 import type { SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
@@ -10,7 +13,8 @@ import type { ReconSettleResult, ReconSide } from './types';
 
 function toOtherDeductions(rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
   if (rows.length === 0) return undefined;
-  return rows.map(r => ({ name: r.name, amount: r.amount, officialAccountingSubjectId: r.subject!.id! }));
+  // UI 帶號（負）→ API 正值（扣減金額語意），此處反號
+  return rows.map(r => ({ name: r.name, amount: -r.amount, officialAccountingSubjectId: r.subject!.id! }));
 }
 
 interface PreviewParams {
@@ -38,7 +42,7 @@ interface PreviewParams {
  * ledgerUuids 與 isDefault=false，僅針對勾選的原單試算（見 api.md settle/preview）。
  */
 export async function previewSettle(params: PreviewParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: params.feeAmount };
+  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
   const isDefault = params.isDefault ?? true;
   const ledgerUuids = params.ledgerUuids ?? [];
@@ -114,7 +118,7 @@ interface SummaryParams {
  * （params.actualAmount 已依此公式算好，見 ReconciliationView 的 depositAmount 計算）。
  */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: params.feeAmount };
+  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   if (params.side === 'receivable') {
@@ -191,7 +195,7 @@ interface SingleSettleParams {
  * payload 組法比照該對話框：allocations 為陣列，手續費為 0 時不放此項；otherDeductions 空陣列時送 undefined。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<void> {
-  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '手續費', feeAmount: params.feeAmount }] : [];
+  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '手續費', feeAmount: -params.feeAmount }] : [];
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   if (params.side === 'receivable') {

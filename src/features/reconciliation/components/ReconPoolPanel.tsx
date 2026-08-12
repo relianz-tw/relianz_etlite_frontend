@@ -8,7 +8,7 @@ import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/O
 import DatePicker from '@/components/ui/DatePicker';
 import TabBar from '@/components/ui/TabBar';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { Minus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
 /** 額外金額單列：對應預覽 API 的 otherDeductions 項目，沿用共用元件的型別 */
@@ -136,7 +136,9 @@ export default function ReconPoolPanel({
                 <p className="truncate font-medium text-neutral-dark">
                   {selectedRow.date} · {selectedRow.orderCode}
                 </p>
-                <p className="text-xs text-neutral-mid">待沖 {fmtCurrency(selectedRow.remainingAmount ?? selectedRow.amount)}</p>
+                <p className="text-xs text-neutral-mid">
+                  {side === 'payable' ? '待付' : '待收'} {fmtCurrency(selectedRow.remainingAmount ?? selectedRow.amount)}
+                </p>
               </div>
               <button
                 type="button"
@@ -155,9 +157,13 @@ export default function ReconPoolPanel({
 
       {mode === 'multi' && (
         <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
-          {selectedCount > 0 ? (
-            <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
-              <span className="font-medium text-neutral-dark">已選取 {selectedCount} 筆交易</span>
+          {/* 勾選前後固定使用同一個帶底色的框（不切換成純文字），避免勾選第一筆時框高度變化，
+              把下方交易清單往下推，導致使用者接續快速勾選第二、三筆時點擊座標對不準（實測會漏勾）。 */}
+          <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
+            <span className={selectedCount > 0 ? 'font-medium text-neutral-dark' : 'text-neutral-mid'}>
+              {selectedCount > 0 ? `已選取 ${selectedCount} 筆交易` : '請從下方清單勾選要沖帳的交易（可複選）'}
+            </span>
+            {selectedCount > 0 && (
               <button
                 type="button"
                 onClick={onClearSelection}
@@ -166,10 +172,8 @@ export default function ReconPoolPanel({
               >
                 <X size={16} />
               </button>
-            </div>
-          ) : (
-            <p className="text-sm text-neutral-mid">請從下方清單勾選要沖帳的交易（可複選）</p>
-          )}
+            )}
+          </div>
         </div>
       )}
 
@@ -179,9 +183,13 @@ export default function ReconPoolPanel({
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-neutral-dark">手續費</span>
-          <MoneyInput widthClassName="w-40" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-neutral-dark">手續費</span>
+            {/* widthClassName 比其餘金額欄多留一個切換鈕（28px）＋間距（6px）的寬度，讓輸入框本身與其他欄位等寬對齊 */}
+            <MoneyInput widthClassName="w-[194px]" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
+          </div>
+          <p className="text-right text-xs text-neutral-mid">銀行或金流平台收取的費用，會從金額中扣除</p>
         </div>
 
         {balance !== undefined && (
@@ -189,22 +197,23 @@ export default function ReconPoolPanel({
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-neutral-dark">使用餘額</span>
               <div className="flex items-center gap-1.5">
-                <div
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-cream text-neutral-mid"
-                  aria-hidden="true"
-                >
-                  <Minus size={14} />
-                </div>
+                {/* 使用餘額固定為減項，不像手續費可正可負，故負號僅作純文字提示，不做成可點擊的切換鈕 */}
+                <span className="shrink-0 text-sm text-neutral-mid" aria-hidden="true">
+                  −
+                </span>
                 <MoneyInput widthClassName="w-40" value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
               </div>
             </div>
             <p className="text-right text-xs text-neutral-mid">
-              目前 {balanceLabel} 餘額 {fmtCurrency(balance)}
+              可扣抵目前餘額，減少本次{side === 'payable' ? '付出' : '存入'}金額；目前 {balanceLabel} 餘額 {fmtCurrency(balance)}
             </p>
           </div>
         )}
 
-        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} allowSign />
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-neutral-mid">如需認列折讓、罰款等其他項目，可於下方新增</p>
+          <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} allowSign />
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">

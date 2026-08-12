@@ -192,7 +192,7 @@ function TxnRow({
               {isSelectable
                 ? selected
                   ? '已選取此筆'
-                  : `待沖 ${fmtCurrency(row.remainingAmount ?? row.amount)}`
+                  : `${side === 'payable' ? '待付' : '待收'} ${fmtCurrency(row.remainingAmount ?? row.amount)}`
                 : allocation
                   ? allocation.closed
                     ? '本次已結清'
@@ -246,7 +246,7 @@ function TxnRow({
             <InfoRow label="開立日期" value={row.date} />
             <InfoRow label={side === 'payable' ? '賣方' : '買受人'} value={row.counterparty || '—'} />
             <InfoRow label="交易金額" value={fmtCurrency(row.amount)} />
-            <InfoRow label="銷售管道" value={channelLabel(row, channelNameByUuid)} />
+            <InfoRow label={side === 'payable' ? '廠商' : '銷售管道'} value={channelLabel(row, channelNameByUuid)} />
             {detailLoading ? (
               <p className="text-xs text-neutral-mid">憑證資料載入中…</p>
             ) : detailError ? (
@@ -266,7 +266,9 @@ function TxnRow({
                 <InfoRow label="沖後剩餘" value={fmtCurrency(allocation.afterRemaining)} />
               </>
             )}
-            {isSelectable && row.remainingAmount !== undefined && <InfoRow label="待沖金額" value={fmtCurrency(row.remainingAmount)} />}
+            {isSelectable && row.remainingAmount !== undefined && (
+              <InfoRow label={side === 'payable' ? '待付金額' : '待收金額'} value={fmtCurrency(row.remainingAmount)} />
+            )}
           </div>
           <div className="flex nav:justify-end">
             <Button variant="outline" size="sm" icon={FileSearch} onClick={onViewDetail} className="w-full nav:w-auto">
@@ -287,8 +289,8 @@ function TxnRow({
  * - 單筆沖帳（mode='single'）：狀態欄改為可點擊的選取圓圈（單選），由使用者自行勾選要沖帳的一筆交易。
  * - 多筆沖帳（mode='multi'）：狀態欄同樣是可點擊的選取圓圈，但為複選，由使用者勾選多筆要沖帳的交易。
  * 「其他」群組會拆成多個 section（依原始 groupUuid），每個 section 附標題。
- * 每一列固定顯示所屬「銷售管道」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
- * 展開區另顯示已預覽的本次沖帳額／沖後剩餘（或單筆模式的待沖金額），「查看詳細」按鈕導向獨立的交易明細頁（含憑證照片）。
+ * 每一列固定顯示所屬「銷售管道／廠商」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
+ * 展開區另顯示已預覽的本次沖帳額／沖後剩餘（或單筆模式的待付／待收金額），「查看詳細」按鈕導向獨立的交易明細頁（含憑證照片）。
  * 行動版（<1000px）改為卡片式版面，展開行為與桌機一致，避免欄位化列在窄螢幕擠成一行難以操作。
  */
 export default function ReconTxnList({
@@ -318,7 +320,7 @@ export default function ReconTxnList({
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
         <span className={cn(HEADER_CLASS, 'w-44 shrink-0')}>交易編號</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>交易金額</span>
-        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>銷售管道</span>
+        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
         <span className="w-4 shrink-0" />
       </div>
 
