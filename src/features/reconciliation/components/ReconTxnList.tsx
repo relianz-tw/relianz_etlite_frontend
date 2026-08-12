@@ -211,13 +211,15 @@ function TxnRow({
         )}
       >
         {showStatusColumn ? (
-          isSelectable ? (
-            <SelectCircle checked={selected} onToggle={onToggleSelect} />
-          ) : (
-            <StatusCircle allocation={allocation} />
-          )
+          <span className="flex w-10 shrink-0 items-center justify-center">
+            {isSelectable ? (
+              <SelectCircle checked={selected} onToggle={onToggleSelect} />
+            ) : (
+              <StatusCircle allocation={allocation} />
+            )}
+          </span>
         ) : (
-          <span className="w-5 shrink-0" />
+          <span className="w-10 shrink-0" />
         )}
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date}</span>
@@ -316,7 +318,7 @@ export default function ReconTxnList({
   return (
     <div className="flex flex-col gap-2 nav:gap-1">
       <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
-        <span className={cn(HEADER_CLASS, 'w-5 shrink-0')}>{showStatusColumn && (mode === 'single' || mode === 'multi') ? '選取' : ''}</span>
+        <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && (mode === 'single' || mode === 'multi') ? '選取' : ''}</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
         <span className={cn(HEADER_CLASS, 'w-44 shrink-0')}>交易編號</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>交易金額</span>

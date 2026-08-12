@@ -51,7 +51,7 @@ export default function ReconPoolSummary({ side, statementAmount, previewResult 
           {fmtCurrency(Math.abs(diff))}
         </span>
       </div>
-      <p className="mt-1 text-neutral-mid">本次沖帳 {previewResult.affectedCount} 筆</p>
+      <p className="mt-1 text-neutral-mid">本次沖帳 {previewResult.allocations.length} 筆</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 export interface NavChildLink {
   name: string;
   path: string;
+  icon?: 'plus';
 }
 
 export interface NavLink {
@@ -16,8 +17,8 @@ export const navLinks: NavLink[] = [
     name: '帳簿',
     path: '/ledger',
     children: [
+      { name: '新增交易', path: '/ledger/new', icon: 'plus' },
       { name: '帳簿總覽', path: '/ledger' },
-      { name: '新增交易', path: '/ledger/new' },
       { name: '沖帳中心', path: '/ledger/reconciliation' },
     ],
   },

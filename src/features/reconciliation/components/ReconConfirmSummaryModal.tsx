@@ -23,7 +23,7 @@ export default function ReconConfirmSummaryModal({ open, groupLabel, side, resul
 
   const rows: { label: string; value: string }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel },
-    { label: '本次沖帳', value: `${result.affectedCount} 筆` },
+    { label: '本次沖帳', value: `${result.allocations.length} 筆` },
     { label: '沖銷金額', value: fmtCurrency(result.appliedSettleAmount) },
     { label: '對帳單金額', value: fmtCurrency(result.settleAmount) },
   ];

@@ -25,10 +25,9 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
   const summaryRows: { label: string; value: string }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel },
     { label: '沖帳總額', value: fmtCurrency(result.settleAmount) },
-    { label: '有沖帳筆數', value: `${result.affectedCount} 筆` },
+    { label: '有沖帳筆數', value: `${result.allocations.length} 筆` },
     { label: '沖前餘額', value: fmtCurrency(result.balanceBefore) },
     { label: '沖後餘額', value: fmtCurrency(result.balanceAfter) },
-    { label: '差額處理方式', value: result.isBalance ? '記入餘額' : '沖入最後一筆' },
     { label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '', value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '' },
     { label: '結算單號', value: result.settlementOrderCode ?? '—' },
   ].filter(row => row.label);

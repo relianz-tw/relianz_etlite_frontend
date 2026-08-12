@@ -140,22 +140,13 @@ const Sidebar = ({ open, onToggle, onWidthChange, minWidth, maxWidth }: SidebarP
               const dropdownOpen = openOverride[link.name] ?? active;
               const toggleDropdown = () =>
                 setOpenOverride(cur => ({ ...cur, [link.name]: !dropdownOpen }));
-              // 只有當父項目路徑本身就是某個子項目（總覽頁）時，標題才可直接點擊導覽；
-              // 否則父項目路徑沒有對應頁面（如各類扣繳中心 /withholding），點擊僅切換展開
-              const hasOverviewPage = link.children.some(child => child.path === link.path);
 
               return (
                 <li key={link.name}>
                   <div className={`flex w-full items-center justify-between ${navItemClass(active)}`}>
-                    {hasOverviewPage ? (
-                      <Link href={link.path} className='flex-1'>
-                        {link.name}
-                      </Link>
-                    ) : (
-                      <button type='button' onClick={toggleDropdown} className='flex-1 text-left'>
-                        {link.name}
-                      </button>
-                    )}
+                    <button type='button' onClick={toggleDropdown} className='flex-1 text-left'>
+                      {link.name}
+                    </button>
                     <button
                       type='button'
                       aria-label={dropdownOpen ? `收合${link.name}` : `展開${link.name}`}
@@ -176,8 +167,9 @@ const Sidebar = ({ open, onToggle, onWidthChange, minWidth, maxWidth }: SidebarP
                         <li key={child.path}>
                           <Link
                             href={child.path}
-                            className='block rounded-md px-3 py-2 text-neutral-dark hover:bg-surface-cream hover:text-brand-primary'
+                            className='flex items-center gap-1 rounded-md px-3 py-2 text-neutral-dark hover:bg-surface-cream hover:text-brand-primary'
                           >
+                            {child.icon === 'plus' && <SquarePlus size={16} />}
                             {child.name}
                           </Link>
                         </li>

@@ -464,7 +464,7 @@ export default function ReconciliationView() {
     setConfirmSummaryOpen(false);
     setSurplusOpen(false);
     setSelectedMultiUuids(new Set());
-    setSubmittedInfo({ matchedCount: result.affectedCount, matchedAmount: result.appliedSettleAmount });
+    setSubmittedInfo({ matchedCount: result.allocations.length, matchedAmount: result.appliedSettleAmount });
     setSettleResult(result);
     setSettleResultOpen(true);
   };
@@ -490,7 +490,7 @@ export default function ReconciliationView() {
     try {
       const result = await submitSettle({
         side,
-        ledgerUuids: previewResult.allocations.map(a => a.ledgerUuid),
+        ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : previewResult.allocations.map(a => a.ledgerUuid),
         settleAmount: statementAmount,
         actualAmount: depositAmount,
         balanceUsed,
@@ -540,7 +540,7 @@ export default function ReconciliationView() {
       // appliedSettleAmount／actualAmount 取代（實測驗證過會被後端拒絕）。
       const result = await submitSettle({
         side,
-        ledgerUuids: rePreview.allocations.map(a => a.ledgerUuid),
+        ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : rePreview.allocations.map(a => a.ledgerUuid),
         settleAmount: statementAmount,
         actualAmount: depositAmount,
         balanceUsed,
@@ -566,7 +566,7 @@ export default function ReconciliationView() {
     try {
       const result = await submitSettle({
         side,
-        ledgerUuids: previewResult.allocations.map(a => a.ledgerUuid),
+        ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : previewResult.allocations.map(a => a.ledgerUuid),
         settleAmount: statementAmount,
         actualAmount: depositAmount,
         balanceUsed,
@@ -786,7 +786,7 @@ export default function ReconciliationView() {
           <div className="mx-auto flex max-w-[1200px] flex-col gap-1 nav:flex-row nav:items-center nav:justify-between">
             <div className="flex flex-col gap-0.5">
               <div className="text-sm text-neutral-dark">
-                本次沖帳 <span className="font-semibold">{previewResult.affectedCount}</span> 筆 · 合計{' '}
+                本次沖帳 <span className="font-semibold">{mode === 'multi' ? selectedMultiUuids.size : previewResult.affectedCount}</span> 筆 · 合計{' '}
                 <span className="font-mono font-semibold tabular-nums">{fmtCurrency(previewResult.appliedSettleAmount)}</span>
                 {hasDiff && (
                   <>

@@ -22,6 +22,16 @@ type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortSta
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
+/** 交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排 */
+function AmountCell({ amount, className = '' }: { amount: number; className?: string }) {
+  return (
+    <span className={cn('flex items-center justify-between font-mono tabular-nums', className)}>
+      <span className="text-neutral-mid">$</span>
+      <span>{amount.toLocaleString('en-US')}</span>
+    </span>
+  );
+}
+
 /** 銷售管道唯讀顯示：帳簿列表無單筆交易更新管道的 API，故僅反查真實 paymentChannelUuid 顯示名稱，不提供編輯 */
 function channelLabel(row: SalesRow, channelNameByUuid: Map<string, string>): string {
   if (!row.paymentChannelUuid) return '未分類';
@@ -280,8 +290,8 @@ export default function LedgerTable(props: LedgerTableProps) {
                       </Link>
                     </div>
                   </td>
-                  <td className={`${tdClass} text-right`}>
-                    <span className="font-mono font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
+                  <td className={tdClass}>
+                    <AmountCell amount={row.amount} className="font-semibold text-neutral-dark" />
                   </td>
                   <td className={cn(tdClass, 'whitespace-normal break-words')}>{row.counterparty}</td>
                   {showChannel && (
@@ -326,7 +336,9 @@ export default function LedgerTable(props: LedgerTableProps) {
                     <tr key={child.id} className="border-b border-neutral-blue-gray/20 bg-surface-off-white/60 last:border-0">
                       <td className={tdClass} />
                       <td className={`${tdClass} pl-8 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
-                      <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.amount)}</td>
+                      <td className={tdClass}>
+                        <AmountCell amount={child.amount} className="text-neutral-mid" />
+                      </td>
                       <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={showChannel ? 4 : 3}>
                         {child.date ?? ''}
                       </td>
@@ -429,8 +441,8 @@ export default function LedgerTable(props: LedgerTableProps) {
                       </Link>
                     </div>
                   </td>
-                  <td className={`${tdClass} text-right`}>
-                    <span className="font-mono font-semibold tabular-nums">{fmtCurrency(row.amount)}</span>
+                  <td className={tdClass}>
+                    <AmountCell amount={row.amount} className="font-semibold text-neutral-dark" />
                   </td>
                   <td className={cn(tdClass, 'whitespace-normal break-words')}>{row.party}</td>
                   <td className={tdClass}>
@@ -452,7 +464,9 @@ export default function LedgerTable(props: LedgerTableProps) {
                     <tr key={child.id} className="border-b border-neutral-blue-gray/20 bg-surface-off-white/60 last:border-0">
                       <td className={tdClass} />
                       <td className={`${tdClass} pl-8 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
-                      <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.amount)}</td>
+                      <td className={tdClass}>
+                        <AmountCell amount={child.amount} className="text-neutral-mid" />
+                      </td>
                       <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={4}>
                         {child.date ?? ''}
                       </td>
