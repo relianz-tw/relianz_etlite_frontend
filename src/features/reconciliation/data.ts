@@ -189,7 +189,10 @@ export function getOtherSubGroups(
   blankLabel: string,
 ): ReconSubGroup[] {
   const knownUuids = new Set(groupOptions.map(o => o.uuid));
-  const otherRows = candidates.filter(c => !c.groupUuid || !knownUuids.has(c.groupUuid));
+  // 與 getGroupRows 的 isCatchAllGroup 判斷對齊：使用者自建同名「其他」管道時，明確指到該 uuid 的交易
+  // 也要納入（該 uuid 本身在 knownUuids 內，單靠「不在啟用清單」判斷會漏掉這批交易）
+  const catchAllKey = resolveCatchAllKey(groupOptions);
+  const otherRows = candidates.filter(c => c.groupUuid === catchAllKey || !c.groupUuid || !knownUuids.has(c.groupUuid));
   const byKey = new Map<string, typeof otherRows>();
   otherRows.forEach(c => {
     const key = c.groupUuid ?? '__BLANK__';
