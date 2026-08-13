@@ -176,7 +176,10 @@ Border-radius: 16px
 Border: 1.5px solid #9AA7B9
 Border-radius: 6px
 Padding: 10px 14px
-Font: Baskerville Regular / Noto Sans TC, 16px
+Font: Baskerville Regular / Noto Sans TC
+  手機（< nav 1000px）：16px（text-base）—— 低於 16px 會觸發 iOS Safari 聚焦時自動放大版面，
+    放大後不會自動縮回，後續點擊座標全部偏移，故手機一律不可小於此值
+  桌機（≥ nav 1000px）：14px（text-sm）—— 維持原有密度
 Focus border: #005FA2
 Focus shadow: 0 0 0 3px rgba(0, 95, 162, 0.15)
 Error border: #DD6B5F（開創紅，semantic-error）
@@ -391,6 +394,11 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 - Tablet: 8-column, 720px, 16px gutters
 - Mobile: 4-column, full-width, 16px gutters
 
+### Touch Target
+互動元素（按鈕、勾選圓圈、關閉鈕、圖示按鈕等）最小可點區為 **44×44px**；視覺尺寸可依元件規格小於此值
+（如金額輸入正負切換鈕維持 24×24px 的視覺大小，見上方 Form Inputs 章節），但須以透明 padding 或
+`before:absolute before:-inset-*` 擴大實際可點擊範圍至 44×44px，不得讓視覺尺寸即為熱區尺寸。
+
 ---
 
 ## 6. Depth & Elevation
@@ -468,13 +476,15 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 
 ## 8. Responsive Breakpoints
 
-| Name | Width | Notes |
-|------|-------|-------|
-| Mobile | < 480px | Single column, stacked CTA |
-| Mobile L | 480–720px | Standard mobile |
-| Tablet | 720–1024px | 2-column layouts |
-| Desktop | 1024–1280px | Standard desktop |
-| Large | 1280–1920px | Full layout, max-width container |
+專案唯一自訂斷點為 `nav`（`tailwind.config.js` `theme.screens.nav: '1000px'`），對應 Tailwind 的
+`nav:` 前綴；**不使用** Tailwind 預設的 `sm` / `md` / `lg` / `xl` 斷點，避免同一專案出現兩套斷點語意。
+
+| 區間 | 寬度 | 說明 |
+|------|------|------|
+| 手機（< nav） | < 1000px | 單欄堆疊、卡片式版面、側邊欄收合為橫向 chips 或 Overlay |
+| 桌機（≥ nav） | ≥ 1000px | 多欄／可拖曳分割面板、欄位化表格、Sidebar 固定於左側 |
+
+實作慣例：預設樣式即手機版，桌機專屬樣式一律加 `nav:` 前綴覆寫（mobile-first）。
 
 ---
 

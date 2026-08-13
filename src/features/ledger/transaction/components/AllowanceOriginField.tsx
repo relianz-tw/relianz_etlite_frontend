@@ -5,12 +5,12 @@ import type { InvoiceOriginEntryDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import TextInput from '@/components/ui/TextInput';
 import { formatRocDate } from '@/components/ui/DatePicker';
+import EntryVoucherModal from '@/components/ui/EntryVoucherModal';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { FileSearch, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Side } from '../../types';
-import AllowanceOriginPreviewModal from './AllowanceOriginPreviewModal';
 import Field from './Field';
 
 interface AllowanceOriginFieldProps {
@@ -131,7 +131,7 @@ export default function AllowanceOriginField({ side, invoiceTrack, invoiceSerial
           >
             查看憑證明細
           </Button>
-          <AllowanceOriginPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} ledgerUuid={origin.ledgerUuid} side={side} />
+          <EntryVoucherModal open={previewOpen} onClose={() => setPreviewOpen(false)} ledgerUuid={origin.ledgerUuid} side={side} />
         </div>
       )}
       {!loading && !error && notFound && (

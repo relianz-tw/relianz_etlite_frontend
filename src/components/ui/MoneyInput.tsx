@@ -86,7 +86,7 @@ export default function MoneyInput({
           value={Math.abs(value).toLocaleString('en-US')}
           onChange={handleChange}
           onFocus={handleFocus}
-          className="w-full min-w-0 bg-transparent text-right text-sm text-neutral-dark outline-none disabled:text-neutral-mid"
+          className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none disabled:text-neutral-mid nav:text-sm"
         />
       </div>
     </div>

@@ -1,7 +1,14 @@
-import type { ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
+import type { EntryInvoiceDetailDto, ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
 import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { parseApiDate } from '@/features/ledger/data';
 import type { ReconSide, ReconTxnRef } from './types';
+
+/** 憑證明細民國年 year/month/day 欄位補零組成 YYY/MM/DD（ReconTxnList 展開面板的懶載入憑證資料使用） */
+export function formatInvoiceDate(invoice: EntryInvoiceDetailDto): string {
+  const month = String(invoice.month).padStart(2, '0');
+  const day = String(invoice.day).padStart(2, '0');
+  return `${invoice.year}/${month}/${day}`;
+}
 
 /** 側邊欄「其他」群組：找不到對應啟用中管道/廠商 uuid 的交易（含未指定與已停用/未知 uuid） */
 export const OTHER_GROUP_KEY = '__OTHER__';

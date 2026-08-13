@@ -2,20 +2,22 @@
 
 import { fetchEntryDetail } from '@/api/ledger';
 import type { EntryDetailResult } from '@/api/types';
-import Modal from '@/components/ui/Modal';
-import VoucherPreviewCard from '@/components/ui/VoucherPreviewCard';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import type { Side } from '../../types';
+import Modal from './Modal';
+import VoucherPreviewCard from './VoucherPreviewCard';
 
-interface AllowanceOriginPreviewModalProps {
+interface EntryVoucherModalProps {
   open: boolean;
   onClose: () => void;
   ledgerUuid: string;
-  side: Side;
+  /** 決定買家／賣家標籤與統編來源，並帶入「查看原發票」連結的 side 參數 */
+  side: 'sales' | 'purchase';
+  /** 呼叫端已載入過同一筆的憑證明細時傳入，直接沿用不重打 API（如沖帳中心展開列已懶載入過） */
+  preloadedDetail?: EntryDetailResult | null;
 }
 
 interface DetailRow {
@@ -30,24 +32,26 @@ function formatInvoiceDate(year: number, month: number, day: number): string {
 }
 
 /**
- * 新增折讓單畫面「查看憑證明細」彈窗：查到原單後顯示完整憑證照片與資訊，供使用者確認這就是要折的那張發票。
- * 開新分頁導向原發票詳情，避免蓋掉正在填寫的折讓表單（表單狀態僅存於 useState，離開頁面即遺失）。
+ * 憑證明細彈窗：查到指定交易後顯示完整憑證照片與資訊，供使用者確認這就是要折的那張發票／要查看的那筆交易。
+ * 新增折讓單畫面（AllowanceOriginField）與沖帳中心（ReconTxnList）的「查看憑證明細」共用此彈窗，確保兩處
+ * 呈現的資料與樣式完全一致。開新分頁導向原發票詳情，避免蓋掉正在填寫的表單或進行中的沖帳操作。
+ * 有傳入 preloadedDetail 時直接沿用，不重打 GET /ael/ledger/entries/detail。
  */
-export default function AllowanceOriginPreviewModal({ open, onClose, ledgerUuid, side }: AllowanceOriginPreviewModalProps) {
-  const [detail, setDetail] = useState<EntryDetailResult | null>(null);
+export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, preloadedDetail }: EntryVoucherModalProps) {
+  const [fetchedDetail, setFetchedDetail] = useState<EntryDetailResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 開啟後才查詢，且同一筆 ledgerUuid 查過後不重打；ledgerUuid 變動（切換憑證號碼後重新打開）時需要重新查詢
+  // 已有呼叫端預載的資料時，開啟不重打 API；否則開啟後才查詢
   useEffect(() => {
-    if (!open) return;
-    setDetail(null);
+    if (!open || preloadedDetail !== undefined) return;
+    setFetchedDetail(null);
     setError('');
     setLoading(true);
     let cancelled = false;
     fetchEntryDetail({ ledgerUuid })
       .then(result => {
-        if (!cancelled) setDetail(result);
+        if (!cancelled) setFetchedDetail(result);
       })
       .catch(err => {
         if (!cancelled) setError(getFriendlyErrorMessage(err, '載入憑證明細失敗'));
@@ -58,8 +62,9 @@ export default function AllowanceOriginPreviewModal({ open, onClose, ledgerUuid,
     return () => {
       cancelled = true;
     };
-  }, [open, ledgerUuid]);
+  }, [open, ledgerUuid, preloadedDetail]);
 
+  const detail = preloadedDetail !== undefined ? preloadedDetail : fetchedDetail;
   const entry = detail?.entry;
   const invoice = detail?.invoice ?? null;
 
@@ -107,13 +112,13 @@ export default function AllowanceOriginPreviewModal({ open, onClose, ledgerUuid,
       ) : (
         <div className="flex flex-col gap-5 nav:flex-row">
           <div className="nav:w-[340px] nav:shrink-0">
-            <VoucherPreviewCard voucherImage={invoice?.invoicePicUrl || null} />
+            <VoucherPreviewCard voucherImage={invoice?.invoicePicUrl || null} minHeightClassName="min-h-[220px] nav:min-h-[480px]" />
           </div>
           <div className="flex flex-1 flex-col gap-2">
             {rows.map(row => (
-              <div key={row.label} className="flex items-center justify-between gap-3 text-sm">
+              <div key={row.label} className="flex flex-col items-start gap-0.5 text-sm nav:flex-row nav:items-center nav:justify-between nav:gap-3">
                 <span className="text-neutral-mid">{row.label}</span>
-                <span className="font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
+                <span className="break-all font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
               </div>
             ))}
           </div>

@@ -92,7 +92,7 @@ export default function DatePicker({ value, onChange, placeholder = '選擇日�
             placeholder={placeholder}
             disabled={disabled}
             maxLength={9}
-            className="w-full min-w-0 bg-transparent text-sm text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid"
+            className="w-full min-w-0 bg-transparent text-base text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
           />
           <CalendarIcon size={16} className="shrink-0 cursor-pointer text-neutral-mid" />
         </div>

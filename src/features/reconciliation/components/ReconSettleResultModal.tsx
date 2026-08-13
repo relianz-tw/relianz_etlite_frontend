@@ -22,29 +22,37 @@ const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 export default function ReconSettleResultModal({ open, side, groupLabel, result, onClose }: ReconSettleResultModalProps) {
   if (!open || !result) return null;
 
-  const summaryRows: { label: string; value: string }[] = [
-    { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel },
-    { label: '沖帳總額', value: fmtCurrency(result.settleAmount) },
-    { label: '有沖帳筆數', value: `${result.allocations.length} 筆` },
-    { label: '沖前餘額', value: fmtCurrency(result.balanceBefore) },
-    { label: '沖後餘額', value: fmtCurrency(result.balanceAfter) },
-    { label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '', value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '' },
-    { label: '結算單號', value: result.settlementOrderCode ?? '—' },
+  // wrap 'nowrap'：金額／筆數／日期等短值不換行；'break'：結算單號可能很長，逐字斷行避免只在連字號處攔腰折斷
+  const summaryRows: { label: string; value: string; wrap: 'nowrap' | 'break' }[] = [
+    { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' as const },
+    { label: '沖帳總額', value: fmtCurrency(result.settleAmount), wrap: 'nowrap' as const },
+    { label: '有沖帳筆數', value: `${result.allocations.length} 筆`, wrap: 'nowrap' as const },
+    { label: '沖前餘額', value: fmtCurrency(result.balanceBefore), wrap: 'nowrap' as const },
+    { label: '沖後餘額', value: fmtCurrency(result.balanceAfter), wrap: 'nowrap' as const },
+    {
+      label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '',
+      value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '',
+      wrap: 'nowrap' as const,
+    },
+    { label: '結算單號', value: result.settlementOrderCode ?? '—', wrap: 'break' as const },
   ].filter(row => row.label);
 
   return (
     <Modal open onClose={onClose} title="沖帳結果" widthClassName="max-w-[840px]">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm nav:grid-cols-3">
+      <div className="grid grid-cols-1 gap-y-2 text-sm nav:grid-cols-3 nav:gap-x-6">
         {summaryRows.map(row => (
           <div key={row.label} className="flex items-center justify-between gap-2">
-            <span className="text-neutral-mid">{row.label}</span>
-            <span className="font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
+            <span className="shrink-0 text-neutral-mid">{row.label}</span>
+            <span className={`font-mono font-semibold tabular-nums text-neutral-dark ${row.wrap === 'nowrap' ? 'whitespace-nowrap' : 'break-all text-right'}`}>
+              {row.value}
+            </span>
           </div>
         ))}
       </div>
 
-      {/* 行動版：卡片式列表，避免窄螢幕橫向滑動表格導致狀態欄被切到看不見 */}
-      <div className="mt-4 flex flex-col gap-2 nav:hidden">
+      {/* 行動版：卡片式列表，避免窄螢幕橫向滑動表格導致狀態欄被切到看不見；筆數多時內容過長，限制最大高度可捲動，
+          避免使用者要捲好幾個螢幕才找得到底部的「關閉」鈕（見下方 sticky 動作列） */}
+      <div className="mt-4 flex max-h-[55vh] flex-col gap-2 overflow-y-auto overscroll-contain nav:hidden nav:max-h-none nav:overflow-visible">
         {result.allocations.map(a => {
           const badge = getSettlementStatusBadge(a.settlementStatus);
           return (
@@ -110,8 +118,10 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
         </table>
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <Button variant="primary" onClick={onClose}>
+      {/* 手機上筆數多時內容可能高達數千 px，關閉鈕黏在底部，避免使用者要捲到最底才找得到唯一的關閉出口；
+          負 margin 對齊 Modal 面板內距（手機 p-4／桌機 p-6，見 Modal.tsx） */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-6 flex justify-end border-t border-neutral-blue-gray/30 bg-white px-4 py-3 nav:static nav:mx-0 nav:mb-0 nav:mt-6 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
+        <Button variant="primary" onClick={onClose} className="w-full nav:w-auto">
           關閉
         </Button>
       </div>

@@ -68,6 +68,8 @@ interface ReconPoolPanelProps {
   actionLabel: string;
   actionDisabled: boolean;
   actionError: string;
+  /** 單筆沖帳成功後的提示文字，顯示於動作按鈕上方；手機版動作按鈕在畫面下方，訊息貼近按鈕才不會被使用者錯過 */
+  actionSuccess?: string;
   onAction: () => void;
 
   /** 銀行帳戶：確認沖帳時實際執行入帳／出帳的目標帳戶（bankAccountUuid） */
@@ -110,6 +112,7 @@ export default function ReconPoolPanel({
   actionLabel,
   actionDisabled,
   actionError,
+  actionSuccess,
   onAction,
   accounts,
   accountsLoading,
@@ -125,7 +128,7 @@ export default function ReconPoolPanel({
 
   return (
     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-      <TabBar options={MODE_OPTIONS} value={mode} onChange={onModeChange} />
+      <TabBar options={MODE_OPTIONS} value={mode} onChange={onModeChange} className="-mx-4 overflow-x-auto px-4 nav:mx-0 nav:overflow-visible nav:px-0" />
       <p className="mt-2 text-xs text-neutral-mid">{MODE_DESCRIPTION[mode]}</p>
 
       {mode === 'single' && (
@@ -177,31 +180,31 @@ export default function ReconPoolPanel({
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-2 border-t border-neutral-blue-gray/20 pt-3">
+      <div className="mt-4 flex flex-col items-stretch gap-1.5 border-t border-neutral-blue-gray/20 pt-3 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
         <label className="text-sm font-semibold text-neutral-dark">{amountLabel}</label>
-        <MoneyInput widthClassName="w-40" value={statementAmount} onChange={onStatementChange} />
+        <MoneyInput widthClassName="w-full nav:w-40" value={statementAmount} onChange={onStatementChange} />
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col items-stretch gap-1.5 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
             <span className="text-sm text-neutral-dark">手續費</span>
-            {/* widthClassName 比其餘金額欄多留一個切換鈕（28px）＋間距（6px）的寬度，讓輸入框本身與其他欄位等寬對齊 */}
-            <MoneyInput widthClassName="w-[194px]" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
+            {/* nav 斷點以上 widthClassName 比其餘金額欄多留一個切換鈕（28px）＋間距（6px）的寬度，讓輸入框本身與其他欄位等寬對齊 */}
+            <MoneyInput widthClassName="w-full nav:w-[194px]" value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault />
           </div>
           <p className="text-right text-xs text-neutral-mid">銀行或金流平台收取的費用，會從金額中扣除</p>
         </div>
 
         {balance !== undefined && (
           <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col items-stretch gap-1.5 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
               <span className="text-sm text-neutral-dark">使用餘額</span>
               <div className="flex items-center gap-1.5">
                 {/* 使用餘額固定為減項，不像手續費可正可負，故負號僅作純文字提示，不做成可點擊的切換鈕 */}
                 <span className="shrink-0 text-sm text-neutral-mid" aria-hidden="true">
                   −
                 </span>
-                <MoneyInput widthClassName="w-40" value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
+                <MoneyInput widthClassName="w-full nav:w-40" value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
               </div>
             </div>
             <p className="text-right text-xs text-neutral-mid">
@@ -226,14 +229,14 @@ export default function ReconPoolPanel({
 
       {showActionArea && (
         <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col items-stretch gap-1.5 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
             <span className="text-sm text-neutral-dark">{dateLabel}</span>
-            <div className="w-40">
+            <div className="w-full nav:w-40">
               <DatePicker value={paymentDate} onChange={onPaymentDateChange} />
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col items-stretch gap-1.5 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
             <span className="text-sm text-neutral-dark">{accountLabel}</span>
             {accountsLoading ? (
               <p className="text-xs text-neutral-mid">載入中…</p>
@@ -242,14 +245,15 @@ export default function ReconPoolPanel({
             ) : accounts.length === 0 ? (
               <p className="text-xs text-semantic-error">尚無啟用中的銀行帳戶，請先於設定新增銀行帳戶</p>
             ) : (
-              <div className="w-80">
+              <div className="w-full nav:w-80">
                 <AccountSelector accounts={accounts} value={bankAccountUuid} onChange={onBankAccountChange} />
               </div>
             )}
           </div>
 
-          <div className="flex flex-col items-end">
-            <Button variant="primary" onClick={onAction} disabled={actionDisabled}>
+          <div className="flex flex-col items-stretch nav:items-end">
+            {actionSuccess && <p className="mb-2 text-sm text-semantic-success">{actionSuccess}</p>}
+            <Button variant="primary" onClick={onAction} disabled={actionDisabled} className="w-full nav:w-auto">
               {actionLabel}
             </Button>
             {actionError && <p className="mt-2 text-sm text-semantic-error">{actionError}</p>}

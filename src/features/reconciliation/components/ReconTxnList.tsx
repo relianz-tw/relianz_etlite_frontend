@@ -5,12 +5,12 @@ import type { EntryDetailResult, SettleLedgerAllocation } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import EntryVoucherModal from '@/components/ui/EntryVoucherModal';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { formatInvoiceDate } from '../ReconTxnDetailView';
+import { useEffect, useRef, useState } from 'react';
+import { formatInvoiceDate } from '../data';
 import type { ReconSubGroup } from '../data';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
@@ -61,17 +61,11 @@ function AmountCell({ amount }: { amount: number }) {
   );
 }
 
-/** 交易明細頁網址：帶 side 供頁面判斷欄位標籤／稅籍方向，帶 name 沿用清單既有買受人/賣方名稱（發票明細 API 對銷項不含買受人名稱） */
-function buildDetailHref(row: ReconTxnRef, side: ReconSide): string {
-  const params = new URLSearchParams({ side, name: row.counterparty ?? '' });
-  return `/ledger/reconciliation/${row.uuid}?${params.toString()}`;
-}
-
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col items-start gap-0.5 nav:flex-row nav:items-center nav:justify-between nav:gap-4">
       <span className="shrink-0 text-neutral-mid">{label}</span>
-      <span className="truncate text-right font-medium text-neutral-dark" title={value}>
+      <span className="break-all text-left font-medium text-neutral-dark nav:truncate nav:text-right" title={value}>
         {value}
       </span>
     </div>
@@ -135,7 +129,6 @@ function TxnRow({
   channelNameByUuid,
   expanded,
   onToggleExpand,
-  onViewDetail,
 }: {
   row: ReconTxnRef;
   side: ReconSide;
@@ -147,7 +140,6 @@ function TxnRow({
   channelNameByUuid: Map<string, string>;
   expanded: boolean;
   onToggleExpand: () => void;
-  onViewDetail: () => void;
 }) {
   // 已有預覽結果、該筆尚未結清（少沖／超沖仍有殘餘）時，於金額旁標示狀態徽章，讓使用者一眼看出差異落在哪一筆
   const statusBadge = allocation && !allocation.closed ? (SETTLEMENT_STATUS_BADGE[allocation.settlementStatus] ?? null) : null;
@@ -158,21 +150,28 @@ function TxnRow({
   const invoice = detail?.invoice;
   const voucherNumber = invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : '—';
   const taxId = invoice ? (side === 'receivable' ? invoice.buyerTaxIdNumber : invoice.sellerTaxIdNumber) : '';
+  const [voucherOpen, setVoucherOpen] = useState(false);
+
+  // 展開面板可能出現在螢幕外（清單靠下方時），展開瞬間捲動到可視範圍，避免使用者以為點擊沒有反應
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (expanded) panelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [expanded]);
 
   return (
     <div>
       {/* 行動版：卡片式版面，主體可點擊展開大約資訊；狀態／選取圓圈為獨立控件 */}
       <div className={cn('flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-4 nav:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
         <button type="button" onClick={onToggleExpand} className="flex flex-col gap-1.5 text-left">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-xs text-neutral-mid">{row.date}</span>
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="shrink-0 whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
             <div className="flex items-center gap-2">
               {statusBadge && (
                 <Badge tone={statusBadge.tone} variant="muted">
                   {statusBadge.label}
                 </Badge>
               )}
-              <span className="font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+              <span className="shrink-0 whitespace-nowrap font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
               <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
@@ -182,7 +181,12 @@ function TxnRow({
           <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>
         {showStatusColumn && (
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={isSelectable ? onToggleSelect : undefined}
+            disabled={!isSelectable}
+            className="flex min-h-11 w-full items-center gap-2 rounded-md px-1 text-left disabled:cursor-default"
+          >
             {isSelectable ? (
               <SelectCircle checked={selected} onToggle={onToggleSelect} />
             ) : (
@@ -199,7 +203,7 @@ function TxnRow({
                     : '本次沖帳後仍有餘額'
                   : '尚未預覽'}
             </span>
-          </div>
+          </button>
         )}
       </div>
 
@@ -211,13 +215,19 @@ function TxnRow({
         )}
       >
         {showStatusColumn ? (
-          <span className="flex w-10 shrink-0 items-center justify-center">
+          <button
+            type="button"
+            onClick={isSelectable ? onToggleSelect : undefined}
+            disabled={!isSelectable}
+            aria-label={isSelectable ? '選取此筆進行沖帳' : undefined}
+            className="flex w-10 shrink-0 items-center justify-center disabled:cursor-default"
+          >
             {isSelectable ? (
               <SelectCircle checked={selected} onToggle={onToggleSelect} />
             ) : (
               <StatusCircle allocation={allocation} />
             )}
-          </span>
+          </button>
         ) : (
           <span className="w-10 shrink-0" />
         )}
@@ -242,7 +252,7 @@ function TxnRow({
       {/* 展開面板：交易編號／日期／買受人／金額／管道為清單既有資料即時顯示；憑證號碼／統一編號／開立日期
           懶載入自 GET /ael/ledger/entries/detail，桌機/行動版共用同一份 markup */}
       {expanded && (
-        <div className="mt-1 flex flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
+        <div ref={panelRef} className="mt-1 flex scroll-mt-16 flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
           <div className="flex flex-col gap-1.5">
             <InfoRow label="交易編號" value={row.orderCode || '—'} />
             <InfoRow label="開立日期" value={row.date} />
@@ -273,10 +283,19 @@ function TxnRow({
             )}
           </div>
           <div className="flex nav:justify-end">
-            <Button variant="outline" size="sm" icon={FileSearch} onClick={onViewDetail} className="w-full nav:w-auto">
-              查看詳細
+            <Button variant="outline" size="sm" icon={FileSearch} onClick={() => setVoucherOpen(true)} className="w-full nav:w-auto">
+              查看憑證明細
             </Button>
           </div>
+          <EntryVoucherModal
+            open={voucherOpen}
+            onClose={() => setVoucherOpen(false)}
+            ledgerUuid={row.uuid}
+            side={side === 'receivable' ? 'sales' : 'purchase'}
+            // 展開列的懶載入若還在進行中（detailLoading），不要把尚未到位的 null 當成「已載入」傳給彈窗，
+            // 否則彈窗會直接顯示空欄位、不會自行重新查詢；改傳 undefined 讓彈窗照常自己打 API
+            preloadedDetail={detailLoading ? undefined : detail}
+          />
         </div>
       )}
     </div>
@@ -292,7 +311,8 @@ function TxnRow({
  * - 多筆沖帳（mode='multi'）：狀態欄同樣是可點擊的選取圓圈，但為複選，由使用者勾選多筆要沖帳的交易。
  * 「其他」群組會拆成多個 section（依原始 groupUuid），每個 section 附標題。
  * 每一列固定顯示所屬「銷售管道／廠商」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
- * 展開區另顯示已預覽的本次沖帳額／沖後剩餘（或單筆模式的待付／待收金額），「查看詳細」按鈕導向獨立的交易明細頁（含憑證照片）。
+ * 展開區另顯示已預覽的本次沖帳額／沖後剩餘（或單筆模式的待付／待收金額），「查看憑證明細」按鈕開啟與建立折讓單
+ * 畫面共用的 EntryVoucherModal（見 @/components/ui/EntryVoucherModal），呈現同一份憑證資料與版面，不離開沖帳流程。
  * 行動版（<1000px）改為卡片式版面，展開行為與桌機一致，避免欄位化列在窄螢幕擠成一行難以操作。
  */
 export default function ReconTxnList({
@@ -309,7 +329,6 @@ export default function ReconTxnList({
   selectedUuids,
   onToggleSelect,
 }: ReconTxnListProps) {
-  const router = useRouter();
   const totalRows = sections.reduce((sum, s) => sum + s.rows.length, 0);
   if (totalRows === 0) {
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">{emptyMessage}</div>;
@@ -346,7 +365,6 @@ export default function ReconTxnList({
               channelNameByUuid={channelNameByUuid}
               expanded={expandedUuid === row.uuid}
               onToggleExpand={() => onToggleExpand(row.uuid)}
-              onViewDetail={() => router.push(buildDetailHref(row, side))}
             />
           ))}
         </div>

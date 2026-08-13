@@ -5,6 +5,7 @@ import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
 import TextInput from '@/components/ui/TextInput';
+import { cn } from '@/lib/utils';
 import { Plus, Trash2 } from 'lucide-react';
 
 /** 額外金額單列：對應沖帳 API 的 otherDeductions 項目，subject 未選時視為尚未填完整 */
@@ -49,7 +50,7 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
               <Trash2 size={16} />
             </button>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-col gap-2 nav:flex-row nav:items-end">
             <div className="min-w-0 flex-1">
               <Label required>項目名稱</Label>
               <TextInput
@@ -59,12 +60,12 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                 placeholder="項目名稱"
               />
             </div>
-            <div className="shrink-0">
+            <div className="w-full shrink-0 nav:w-auto">
               <Label required>金額</Label>
               <div className="flex items-center gap-1.5">
                 {!allowSign && <span className="text-lg text-neutral-mid">−</span>}
                 <MoneyInput
-                  widthClassName={allowSign ? 'w-36' : 'w-28'}
+                  widthClassName={cn('w-full', allowSign ? 'nav:w-36' : 'nav:w-28')}
                   value={row.amount}
                   onChange={value => onChange(row.id, { amount: value })}
                   allowSign={allowSign}

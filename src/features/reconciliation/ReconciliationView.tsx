@@ -708,8 +708,10 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
                 請從左側選擇{side === 'receivable' ? '銷售管道' : '廠商'}
               </div>
             ) : (
-              <div className={cn('flex flex-col gap-4', mode === 'summary' && !isAllGroup ? 'pb-20' : 'pb-4')}>
-                {submittedInfo && (
+              <div className={cn('flex flex-col gap-4', mode !== 'single' && !isAllGroup ? 'pb-32 nav:pb-20' : 'pb-4')}>
+                {/* 單筆沖帳成功後改在 ReconPoolPanel 動作按鈕上方顯示（見下方 actionSuccess），
+                    手機上動作按鈕在畫面下方，訊息貼著按鈕才不會被使用者錯過；此處橫幅僅供多筆／匯總沖帳使用 */}
+                {mode !== 'single' && submittedInfo && (
                   <div className="rounded-md border border-semantic-success/30 bg-semantic-success-muted p-3 text-sm text-semantic-success-dark">
                     已沖銷 {submittedInfo.matchedCount} 筆交易，共 {fmtCurrency(submittedInfo.matchedAmount)}。
                   </div>
@@ -727,44 +729,49 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
                   </div>
                 )}
 
-                <ReconPoolPanel
-                  mode={mode}
-                  onModeChange={handleModeChange}
-                  side={side}
-                  selectedRow={mode === 'single' ? selectedRow : null}
-                  selectedCount={selectedMultiUuids.size}
-                  onClearSelection={mode === 'multi' ? clearMultiSelection : clearSingleSelection}
-                  balanceLabel={selectedGroupLabel}
-                  balance={selectedGroup?.balance}
-                  balanceUsed={balanceUsed}
-                  onBalanceUsedChange={handleBalanceUsedChange}
-                  amountLabel={mode === 'single' ? '沖帳金額' : '對帳單金額'}
-                  statementAmount={statementAmount}
-                  feeAmount={feeAmount}
-                  onStatementChange={handleStatementChange}
-                  onFeeChange={handleFeeChange}
-                  otherDeductions={otherDeductions}
-                  onAddOtherDeduction={handleAddOtherDeduction}
-                  onRemoveOtherDeduction={handleRemoveOtherDeduction}
-                  onChangeOtherDeduction={handleChangeOtherDeduction}
-                  paymentDate={paymentDate}
-                  onPaymentDateChange={date => {
-                    setPaymentDate(date);
-                    clearComputedState();
-                  }}
-                  showActionArea={showActionArea}
-                  actionLabel={actionLabel}
-                  actionDisabled={actionDisabled}
-                  actionError={actionError}
-                  onAction={mode === 'single' ? handleOpenSingleConfirm : handlePreview}
-                  accounts={accounts}
-                  accountsLoading={accountsLoading}
-                  accountsError={accountsError}
-                  bankAccountUuid={bankAccountUuid}
-                  onBankAccountChange={setBankAccountUuid}
-                />
+                {/* 手機（<nav）單筆／多筆沖帳：實際操作是先勾交易再填金額，把清單移到輸入卡片上方，
+                    避免每次勾選都要往上捲一整個沖帳作業卡片的高度；匯總沖帳不需勾選交易，維持原順序 */}
+                <div className={cn(mode !== 'summary' && 'order-2 nav:order-none')}>
+                  <ReconPoolPanel
+                    mode={mode}
+                    onModeChange={handleModeChange}
+                    side={side}
+                    selectedRow={mode === 'single' ? selectedRow : null}
+                    selectedCount={selectedMultiUuids.size}
+                    onClearSelection={mode === 'multi' ? clearMultiSelection : clearSingleSelection}
+                    balanceLabel={selectedGroupLabel}
+                    balance={selectedGroup?.balance}
+                    balanceUsed={balanceUsed}
+                    onBalanceUsedChange={handleBalanceUsedChange}
+                    amountLabel={mode === 'single' ? '沖帳金額' : '對帳單金額'}
+                    statementAmount={statementAmount}
+                    feeAmount={feeAmount}
+                    onStatementChange={handleStatementChange}
+                    onFeeChange={handleFeeChange}
+                    otherDeductions={otherDeductions}
+                    onAddOtherDeduction={handleAddOtherDeduction}
+                    onRemoveOtherDeduction={handleRemoveOtherDeduction}
+                    onChangeOtherDeduction={handleChangeOtherDeduction}
+                    paymentDate={paymentDate}
+                    onPaymentDateChange={date => {
+                      setPaymentDate(date);
+                      clearComputedState();
+                    }}
+                    showActionArea={showActionArea}
+                    actionLabel={actionLabel}
+                    actionDisabled={actionDisabled}
+                    actionError={actionError}
+                    actionSuccess={mode === 'single' && submittedInfo ? `已沖銷 1 筆交易，共 ${fmtCurrency(submittedInfo.matchedAmount)}。` : undefined}
+                    onAction={mode === 'single' ? handleOpenSingleConfirm : handlePreview}
+                    accounts={accounts}
+                    accountsLoading={accountsLoading}
+                    accountsError={accountsError}
+                    bankAccountUuid={bankAccountUuid}
+                    onBankAccountChange={setBankAccountUuid}
+                  />
+                </div>
 
-                <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
+                <div className={cn('rounded-lg border border-neutral-blue-gray/30 bg-white p-4', mode !== 'summary' && 'order-1 nav:order-none')}>
                   <p className="mb-3 text-sm font-semibold text-neutral-dark">
                     {isAllGroup ? '全部交易' : side === 'payable' ? '待付帳款' : '待收帳款'}
                   </p>
@@ -791,7 +798,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       </div>
 
       {mode !== 'single' && selectedGroupKey && !isAllGroup && previewResult && (
-        <div className="sticky bottom-0 z-10 border-t border-neutral-blue-gray/30 bg-white px-4 py-3 nav:px-7">
+        <div className="sticky bottom-0 z-10 border-t border-neutral-blue-gray/30 bg-white px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 nav:px-7 nav:pb-3">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-1 nav:flex-row nav:items-center nav:justify-between">
             <div className="flex flex-col gap-0.5">
               <div className="text-sm text-neutral-dark">

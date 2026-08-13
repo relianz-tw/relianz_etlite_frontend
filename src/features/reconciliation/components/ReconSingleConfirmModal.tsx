@@ -40,13 +40,13 @@ export default function ReconSingleConfirmModal({ open, side, row, settleAmount,
     <Modal open onClose={onCancel} title="確認沖帳內容" widthClassName="max-w-[420px]">
       <div className="flex flex-col gap-2 text-sm">
         {rows.map(row2 => (
-          <div key={row2.label} className="flex items-center justify-between">
-            <span className="text-neutral-mid">{row2.label}</span>
-            <span className="font-mono font-semibold tabular-nums text-neutral-dark">{row2.value}</span>
+          <div key={row2.label} className="flex items-center justify-between gap-4">
+            <span className="shrink-0 text-neutral-mid">{row2.label}</span>
+            <span className="whitespace-nowrap font-mono font-semibold tabular-nums text-neutral-dark">{row2.value}</span>
           </div>
         ))}
-        <div className="flex items-center justify-between">
-          <span className="text-neutral-mid">沖帳後狀態</span>
+        <div className="flex items-center justify-between gap-4">
+          <span className="shrink-0 text-neutral-mid">沖帳後狀態</span>
           <Badge tone={statusBadge.tone} variant="muted">
             {statusBadge.label}
           </Badge>

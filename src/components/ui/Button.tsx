@@ -23,8 +23,9 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 };
 
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-[13px] gap-1.5',
-  md: 'px-4 py-2 text-sm gap-1.5',
+  // min-h 僅補手機觸控熱區（44px／40px 標準），padding／字級不變；桌機（nav 斷點以上）維持原本較緊湊的高度
+  sm: 'px-3 py-1.5 text-[13px] gap-1.5 min-h-10 nav:min-h-0',
+  md: 'px-4 py-2 text-sm gap-1.5 min-h-11 nav:min-h-0',
   lg: 'px-6 py-3 text-base gap-2',
 };
 

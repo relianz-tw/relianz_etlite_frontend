@@ -102,7 +102,7 @@ export default function SubjectSelect({ value, onChange, disabled, placeholder =
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="搜尋科目代碼或名稱"
-            className="w-full min-w-0 bg-transparent text-sm text-neutral-dark outline-none placeholder:text-neutral-mid"
+            className="w-full min-w-0 bg-transparent text-base text-neutral-dark outline-none placeholder:text-neutral-mid nav:text-sm"
           />
         </div>
         <div role="listbox" className="max-h-72 overflow-auto py-1">
