@@ -246,7 +246,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       count: availableCandidates.length,
       amount: availableCandidates.reduce((sum, c) => sum + c.amount, 0),
     };
-    return [allGroup, ...buildReconGroups(availableCandidates, groupOptions)];
+    return [allGroup, ...buildReconGroups(availableCandidates, groupOptions, side)];
   }, [availableCandidates, groupOptions, side]);
 
   const catchAllKey = useMemo(() => resolveCatchAllKey(groupOptions), [groupOptions]);

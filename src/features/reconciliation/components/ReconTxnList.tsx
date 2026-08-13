@@ -171,7 +171,7 @@ function TxnRow({
                   {statusBadge.label}
                 </Badge>
               )}
-              <span className="shrink-0 whitespace-nowrap font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
+              <span className="shrink-0 whitespace-nowrap font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.remainingAmount ?? row.amount)}</span>
               <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
@@ -236,7 +236,7 @@ function TxnRow({
           <span className="w-44 shrink-0 truncate font-mono text-neutral-dark" title={row.orderCode}>
             {row.orderCode}
           </span>
-          <AmountCell amount={row.amount} />
+          <AmountCell amount={row.remainingAmount ?? row.amount} />
           <span className="ml-3 min-w-0 flex-1 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
             {channelLabel(row, channelNameByUuid)}
           </span>
@@ -257,7 +257,7 @@ function TxnRow({
             <InfoRow label="交易編號" value={row.orderCode || '—'} />
             <InfoRow label="開立日期" value={row.date} />
             <InfoRow label={side === 'payable' ? '賣方' : '買受人'} value={row.counterparty || '—'} />
-            <InfoRow label="交易金額" value={fmtCurrency(row.amount)} />
+            <InfoRow label={side === 'payable' ? '待付金額' : '待收金額'} value={fmtCurrency(row.remainingAmount ?? row.amount)} />
             <InfoRow label={side === 'payable' ? '廠商' : '銷售管道'} value={channelLabel(row, channelNameByUuid)} />
             {detailLoading ? (
               <p className="text-xs text-neutral-mid">憑證資料載入中…</p>
@@ -277,9 +277,6 @@ function TxnRow({
                 <InfoRow label="本次沖帳額" value={fmtCurrency(allocation.settleAmount)} />
                 <InfoRow label="沖後剩餘" value={fmtCurrency(allocation.afterRemaining)} />
               </>
-            )}
-            {isSelectable && row.remainingAmount !== undefined && (
-              <InfoRow label={side === 'payable' ? '待付金額' : '待收金額'} value={fmtCurrency(row.remainingAmount)} />
             )}
           </div>
           <div className="flex nav:justify-end">
@@ -340,7 +337,7 @@ export default function ReconTxnList({
         <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && (mode === 'single' || mode === 'multi') ? '選取' : ''}</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
         <span className={cn(HEADER_CLASS, 'w-44 shrink-0')}>交易編號</span>
-        <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>交易金額</span>
+        <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>{side === 'payable' ? '待付金額' : '待收金額'}</span>
         <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
         <span className="w-4 shrink-0" />
       </div>
