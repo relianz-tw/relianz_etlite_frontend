@@ -119,7 +119,6 @@ export default function AllowanceOriginField({ side, invoiceTrack, invoiceSerial
           </p>
           <p className="mt-1">
             {formatRocDate(origin.transactionDate ? new Date(origin.transactionDate) : undefined)}　{fmtCurrency(origin.totalAmount)}
-            （可折讓 {fmtCurrency(origin.remainingAmount)}）
           </p>
           <Button
             type="button"

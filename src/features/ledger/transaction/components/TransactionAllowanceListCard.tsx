@@ -19,23 +19,17 @@ interface TransactionAllowanceListCardProps {
 /** 原單交易細節頁的「折讓紀錄」區塊：常駐顯示（折讓單本身不會渲染此卡片，由呼叫端排除），
  *  逐筆列出已開立的折讓單並可點擊前往細節頁；標題列右側提供「開立折讓單」入口。 */
 export default function TransactionAllowanceListCard({ side, returnQuery, entry, allowances, onCreate }: TransactionAllowanceListCardProps) {
-  const noRemaining = entry.remainingAmount <= 0;
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-4">
       <div className="mb-1 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-neutral-dark">折讓紀錄（{allowances.length}）</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          icon={Plus}
-          onClick={onCreate}
-          disabled={noRemaining}
-          title={noRemaining ? '此交易已無可折讓餘額' : undefined}
-        >
+        {/* entry.remainingAmount 是「未沖金額」（沖帳/收付款進度），不是可折讓額度：交易已沖帳完畢
+            （remainingAmount＝0）仍可能需要開立折讓單，故不可用它來 disable 這顆按鈕 */}
+        <Button variant="outline" size="sm" icon={Plus} onClick={onCreate}>
           開立折讓單
         </Button>
       </div>
-      <p className="mb-3 text-xs text-neutral-mid">可折讓餘額 {fmtCurrency(entry.remainingAmount)}</p>
+      <p className="mb-3 text-xs text-neutral-mid">未沖金額 {fmtCurrency(entry.remainingAmount)}</p>
       {allowances.length === 0 ? (
         <p className="text-sm text-neutral-mid">尚無折讓紀錄</p>
       ) : (

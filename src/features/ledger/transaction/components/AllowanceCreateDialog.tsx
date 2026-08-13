@@ -23,7 +23,7 @@ interface AllowanceCreateDialogProps {
   entry: EntryDetailEntryDto;
   /** 原單交易 uuid，即目前交易詳細頁的 transactionId */
   originLedgerUuid: string;
-  /** 建立成功後觸發，供父層重新載入交易明細（折讓紀錄／可折讓餘額／沖帳狀態一併更新） */
+  /** 建立成功後觸發，供父層重新載入交易明細（折讓紀錄／沖帳狀態一併更新） */
   onCreated: () => void;
 }
 
@@ -78,10 +78,6 @@ function AllowanceCreateDialogContent({
       setError('請輸入折讓金額');
       return;
     }
-    if (totalAmount > entry.remainingAmount) {
-      setError('折讓金額不可超過可折讓餘額');
-      return;
-    }
     setSubmitting(true);
     setError('');
     const body = {
@@ -116,9 +112,7 @@ function AllowanceCreateDialogContent({
             原始憑證：{entry.orderCode}
             {entry.counterpartyName ? ` · ${entry.counterpartyName}` : ''}
           </p>
-          <p className="mt-1">
-            總金額 {fmtCurrency(entry.totalAmount)}（可折讓 {fmtCurrency(entry.remainingAmount)}）
-          </p>
+          <p className="mt-1">總金額 {fmtCurrency(entry.totalAmount)}</p>
         </div>
 
         <div>
