@@ -529,11 +529,6 @@ export default function TransactionMetaCard({
             修改交易資訊
           </Button>
         )}
-        {mode === 'edit' && editing && (
-          <Button variant="outline" size="sm" onClick={onCancelEdit}>
-            取消
-          </Button>
-        )}
       </div>
       <div className="flex flex-col gap-4">
         {mode === 'edit' && (
@@ -612,6 +607,9 @@ export default function TransactionMetaCard({
           <div className="flex justify-end gap-3 border-t border-neutral-blue-gray/20 pt-4">
             <Button variant="danger" onClick={onVoidOrDelete}>
               {voidLabel}
+            </Button>
+            <Button variant="outline" onClick={onCancelEdit}>
+              取消
             </Button>
             <Button variant="primary" onClick={onUpdate}>
               更新
