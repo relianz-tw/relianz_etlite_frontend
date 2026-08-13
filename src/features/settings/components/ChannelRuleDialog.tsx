@@ -9,7 +9,7 @@ import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
-import { SETTLEMENT_MONTH_DAYS, SETTLEMENT_STYLE, SETTLEMENT_WEEKDAYS } from '../data';
+import { SETTLEMENT_MONTH_DAYS, SETTLEMENT_STYLE } from '../data';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
 
 interface ChannelRuleDialogProps {
@@ -101,23 +101,6 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
             <option value={String(SETTLEMENT_STYLE.MONTHLY)}>每月固定日期</option>
           </Select>
 
-          {form.settlementStyle === SETTLEMENT_STYLE.WEEKLY && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-mid">每週星期</span>
-              <Select
-                widthClassName="w-28"
-                value={String(form.settlementAmount)}
-                onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
-              >
-                {SETTLEMENT_WEEKDAYS.map((label, i) => (
-                  <option key={label} value={String(i + 1)}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-              <span className="text-sm text-neutral-mid">自動入帳</span>
-            </div>
-          )}
           {form.settlementStyle === SETTLEMENT_STYLE.MONTHLY && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-neutral-mid">每月</span>
