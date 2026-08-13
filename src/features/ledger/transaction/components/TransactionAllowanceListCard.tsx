@@ -44,7 +44,7 @@ export default function TransactionAllowanceListCard({ side, returnQuery, entry,
             <Link
               key={allowance.ledgerUuid}
               href={appendReturnQuery(`/ledger/${allowance.ledgerUuid}?side=${side}`, returnQuery)}
-              className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0 hover:bg-brand-blue/5"
+              className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0"
             >
               <div className="flex items-center justify-between text-sm">
                 <span className="font-mono font-semibold text-neutral-dark hover:text-brand-blue hover:underline">{allowance.orderCode}</span>
