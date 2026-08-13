@@ -9,7 +9,7 @@ import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
-import { SETTLEMENT_MONTH_DAYS, SETTLEMENT_STYLE } from '../data';
+import { SETTLEMENT_STYLE } from '../data';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
 
 interface ChannelRuleDialogProps {
@@ -85,39 +85,6 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
               setError('');
             }}
           />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <Select
-            widthClassName="w-full"
-            value={String(form.settlementStyle)}
-            onValueChange={v => {
-              const style = Number(v);
-              // 切換入帳規則類型時，settlementAmount 需帶入該類型合理的預設值
-              setForm(f => ({ ...f, settlementStyle: style, settlementAmount: 1 }));
-            }}
-          >
-            <option value={String(SETTLEMENT_STYLE.WEEKLY)}>每週固定星期</option>
-            <option value={String(SETTLEMENT_STYLE.MONTHLY)}>每月固定日期</option>
-          </Select>
-
-          {form.settlementStyle === SETTLEMENT_STYLE.MONTHLY && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-mid">每月</span>
-              <Select
-                widthClassName="w-24"
-                value={String(form.settlementAmount)}
-                onValueChange={v => setForm(f => ({ ...f, settlementAmount: Number(v) }))}
-              >
-                {SETTLEMENT_MONTH_DAYS.map(day => (
-                  <option key={day} value={String(day)}>
-                    {day} 號
-                  </option>
-                ))}
-              </Select>
-              <span className="text-sm text-neutral-mid">自動入帳</span>
-            </div>
-          )}
         </div>
 
         <div>
