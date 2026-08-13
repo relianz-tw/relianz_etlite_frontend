@@ -63,13 +63,19 @@ export default function AllowanceOriginPreviewModal({ open, onClose, ledgerUuid,
   const entry = detail?.entry;
   const invoice = detail?.invoice ?? null;
 
+  // 銷項的交易對象是買家、進項是賣家；統編緊接在名稱旁（見 TransactionMetaCard.tsx 的
+  // [sellerTaxIdField, sellerNameField] 欄位配對慣例，統編在前、名稱在後）
+  const counterpartyLabel = side === 'sales' ? '買家' : '賣家';
+  const counterpartyTaxId = side === 'sales' ? invoice?.buyerTaxIdNumber : invoice?.sellerTaxIdNumber;
+
   // 欄位順序對齊交易細節頁「交易資訊」卡片（見 TransactionMetaCard.tsx 編輯模式）：
-  // 發票號碼／開立日期／收入科目／銷售額／稅額／總金額／備註；交易編號、交易對象、已沖／未沖金額、
-  // 買賣方統編為該頁沒有的補充資訊，穿插在對應欄位後方，查無憑證時個別欄位退回 '—'
+  // 發票號碼／開立日期／收入科目／銷售額／稅額／總金額／備註；交易編號、已沖／未沖金額為該頁沒有的
+  // 補充資訊，穿插在對應欄位後方，查無憑證時個別欄位退回 '—'
   const rows: DetailRow[] = entry
     ? [
         { label: '交易編號', value: entry.orderCode },
-        { label: '交易對象', value: entry.counterpartyName || '—' },
+        { label: `${counterpartyLabel}統一編號`, value: counterpartyTaxId || '—' },
+        { label: `${counterpartyLabel}名稱`, value: entry.counterpartyName || '—' },
         { label: '憑證號碼', value: invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : '—' },
         { label: '開立日期', value: invoice ? formatInvoiceDate(invoice.year, invoice.month, invoice.day) : '—' },
         { label: '科目', value: entry.subjectName },
@@ -78,8 +84,6 @@ export default function AllowanceOriginPreviewModal({ open, onClose, ledgerUuid,
         { label: '總金額', value: fmtCurrency(entry.totalAmount) },
         { label: '已沖金額', value: fmtCurrency(entry.settledAmount) },
         { label: '未沖金額', value: fmtCurrency(entry.remainingAmount) },
-        { label: '買方統編', value: invoice?.buyerTaxIdNumber || '—' },
-        { label: '賣方統編', value: invoice?.sellerTaxIdNumber || '—' },
         { label: '備註', value: invoice?.remark || '—' },
       ]
     : [];
