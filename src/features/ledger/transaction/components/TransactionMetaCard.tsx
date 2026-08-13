@@ -17,7 +17,6 @@ import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog'
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { CirclePlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { PROJECT_NAMES } from '../../data';
@@ -190,11 +189,12 @@ export default function TransactionMetaCard({
   const sellerTaxIdField = (
     <Field label="賣家統一編號">
       {/* 手動編輯統編視為與下方「廠商」選擇的既有廠商脫鉤，清空 sellerVendorUuid 避免誤送舊廠商 uuid */}
+      {/* 已選擇既有廠商時統編由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
       <TextInput
         placeholder="請輸入賣家統一編號"
         value={form.sellerTaxId}
         maxLength={8}
-        disabled={readOnly}
+        disabled={readOnly || !!form.sellerVendorUuid}
         onChange={e => {
           const v = e.target.value.replace(/\D/g, '').slice(0, 8);
           onChange({ sellerTaxId: v, sellerVendorUuid: '' });
@@ -205,10 +205,11 @@ export default function TransactionMetaCard({
 
   const sellerNameField = (
     <Field label="賣家名稱" required={isCreate}>
+      {/* 已選擇既有廠商時名稱由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
       <TextInput
         placeholder="請輸入賣家名稱"
         value={form.sellerName}
-        disabled={readOnly}
+        disabled={readOnly || !!form.sellerVendorUuid}
         onChange={e => onChange({ sellerName: e.target.value, sellerVendorUuid: '' })}
       />
     </Field>
@@ -218,28 +219,27 @@ export default function TransactionMetaCard({
   // 供建立進項交易時設定 counterpartyUuid，讓帳簿「匯總沖帳」頁能依廠商正確分組；
   // 找不到對應廠商時仍可維持「不指定」，直接於下方統編/名稱欄位手動輸入（視為個人賣家，不關聯廠商）
   const sellerVendorField = (
-    <Field label="廠商" helper="選擇既有廠商可自動帶入統編與名稱；找不到對應廠商時可於下方欄位直接手動輸入">
-      <div className="flex items-center gap-2">
-        <Select
-          widthClassName="w-full"
-          value={form.sellerVendorUuid}
-          disabled={readOnly}
-          onValueChange={v => {
-            const vendor = vendors.find(x => x.uuid === v);
-            onChange({ sellerVendorUuid: v, ...(vendor ? { sellerName: vendor.name, sellerTaxId: vendor.taxId } : {}) });
-          }}
-        >
-          <option value="">不指定（手動輸入）</option>
-          {vendors.map(v => (
-            <option key={v.uuid} value={v.uuid}>
-              {v.name}
-            </option>
-          ))}
-        </Select>
-        <Button type="button" variant="outline" size="sm" icon={CirclePlus} onClick={() => setNewVendorOpen(true)} disabled={readOnly}>
-          新增
-        </Button>
-      </div>
+    <Field
+      label="廠商"
+      helper="選擇既有廠商可自動帶入統編與名稱（帶入後下方欄位鎖定不可編輯）；找不到對應廠商時可選「不指定」於下方欄位直接手動輸入，或點擊「新增」建立新廠商"
+    >
+      <Select
+        widthClassName="w-full"
+        value={form.sellerVendorUuid}
+        disabled={readOnly}
+        onValueChange={v => {
+          const vendor = vendors.find(x => x.uuid === v);
+          onChange({ sellerVendorUuid: v, ...(vendor ? { sellerName: vendor.name, sellerTaxId: vendor.taxId } : {}) });
+        }}
+        onAddNew={() => setNewVendorOpen(true)}
+      >
+        <option value="">不指定（手動輸入）</option>
+        {vendors.map(v => (
+          <option key={v.uuid} value={v.uuid}>
+            {v.name}
+          </option>
+        ))}
+      </Select>
       {vendorError && <p className="mt-1 text-xs text-semantic-error">{vendorError}</p>}
     </Field>
   );
