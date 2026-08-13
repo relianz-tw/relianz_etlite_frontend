@@ -20,7 +20,12 @@ export default function Checkbox({ checked, onChange, disabled, shape = 'square'
       role="checkbox"
       aria-checked={indeterminate ? 'mixed' : checked}
       disabled={disabled}
-      onClick={onChange}
+      onClick={e => {
+        // 阻止冒泡：部分呼叫端（如沖帳中心交易列）會在外層容器也綁同一個切換勾選的 onClick，
+        // 若不擋掉會讓點在勾選框正中心時觸發兩次切換、視覺上等於沒反應
+        e.stopPropagation();
+        onChange();
+      }}
       className={`flex h-5 w-5 shrink-0 items-center justify-center border transition-colors ${
         shape === 'circle' ? 'rounded-full' : 'rounded-sm'
       } ${active ? 'border-brand-blue bg-brand-blue' : 'border-neutral-blue-gray bg-white'} ${
