@@ -13,6 +13,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { subMonths } from 'date-fns';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReconConfirmSummaryModal from './components/ReconConfirmSummaryModal';
 import ReconGroupSidebar from './components/ReconGroupSidebar';
@@ -24,8 +25,8 @@ import ReconSurplusModal from './components/ReconSurplusModal';
 import ReconTxnList from './components/ReconTxnList';
 import {
   ALL_GROUP_KEY,
-  ALL_GROUP_LABEL,
   buildReconGroups,
+  getAllGroupLabel,
   getAllRows,
   getGroupRows,
   getOtherSubGroups,
@@ -97,8 +98,14 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
  * 使用餘額（balanceUsed）：ReconPoolPanel「本次抵銷」欄位，單筆／多筆／匯總沖帳共用同一個輸入框，
  * 使用者輸入後會一併帶入預覽／執行 API 的 balanceUsed 參數，決定該次沖帳要使用多少目前餘額。
  */
-export default function ReconciliationView() {
-  const [side, setSide] = useState<ReconSide>('receivable');
+interface ReconciliationViewProps {
+  /** 進頁時的初始應收／應付分頁，來自 URL 的 side query 參數；預設應收 */
+  initialSide?: ReconSide;
+}
+
+export default function ReconciliationView({ initialSide = 'receivable' }: ReconciliationViewProps) {
+  const router = useRouter();
+  const [side, setSide] = useState<ReconSide>(initialSide);
   const [mode, setMode] = useState<ReconMode>('single');
   // 預設顯示「全部管道」唯讀總覽，讓使用者一進頁面就能看到完整交易清單，不需先手動點選
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(ALL_GROUP_KEY);
@@ -235,12 +242,12 @@ export default function ReconciliationView() {
   const groups = useMemo(() => {
     const allGroup: ReconGroup = {
       key: ALL_GROUP_KEY,
-      label: ALL_GROUP_LABEL,
+      label: getAllGroupLabel(side),
       count: availableCandidates.length,
       amount: availableCandidates.reduce((sum, c) => sum + c.amount, 0),
     };
     return [allGroup, ...buildReconGroups(availableCandidates, groupOptions)];
-  }, [availableCandidates, groupOptions]);
+  }, [availableCandidates, groupOptions, side]);
 
   const catchAllKey = useMemo(() => resolveCatchAllKey(groupOptions), [groupOptions]);
   const isAllGroup = selectedGroupKey === ALL_GROUP_KEY;
@@ -317,6 +324,8 @@ export default function ReconciliationView() {
     setSide(next);
     setSelectedGroupKey(ALL_GROUP_KEY);
     resetInputs();
+    // 同步 side 到網址，讓重新整理、瀏覽器上一頁與交易明細頁的返回連結都能回到同一分頁
+    router.replace(`/ledger/reconciliation?side=${next}`, { scroll: false });
   };
 
   const handleModeChange = (next: ReconMode) => {
@@ -708,7 +717,7 @@ export default function ReconciliationView() {
 
                 {mode !== 'single' && isAllGroup && (
                   <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
-                    「全部管道」為唯讀總覽，{mode === 'multi' ? '多筆' : '匯總'}沖帳需先於左側選擇單一銷售管道／廠商；若要沖銷單一交易，可改用上方「單筆沖帳」
+                    「{getAllGroupLabel(side)}」為唯讀總覽，{mode === 'multi' ? '多筆' : '匯總'}沖帳需先於左側選擇單一{side === 'receivable' ? '銷售管道' : '廠商'}；若要沖銷單一交易，可改用上方「單筆沖帳」
                   </div>
                 )}
 

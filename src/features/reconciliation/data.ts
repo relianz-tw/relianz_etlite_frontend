@@ -1,15 +1,24 @@
 import type { ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
 import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { parseApiDate } from '@/features/ledger/data';
-import type { ReconTxnRef } from './types';
+import type { ReconSide, ReconTxnRef } from './types';
 
 /** 側邊欄「其他」群組：找不到對應啟用中管道/廠商 uuid 的交易（含未指定與已停用/未知 uuid） */
 export const OTHER_GROUP_KEY = '__OTHER__';
 export const OTHER_GROUP_LABEL = '其他';
 
-/** 側邊欄「全部管道」：唯讀列出整張交易清單，不參與沖帳勾選 */
+/** 側邊欄「全部管道／全部廠商」：唯讀列出整張交易清單，不參與沖帳勾選 */
 export const ALL_GROUP_KEY = '__ALL__';
-export const ALL_GROUP_LABEL = '全部管道';
+
+/** 應收顯示「全部管道」、應付顯示「全部廠商」，比照側邊欄其餘項目依 side 使用管道／廠商用語 */
+export function getAllGroupLabel(side: ReconSide): string {
+  return side === 'receivable' ? '全部管道' : '全部廠商';
+}
+
+/** 解析 URL 的 side query 參數；缺值或非 payable 一律回退為 receivable，供沖帳中心列表頁與交易明細頁共用 */
+export function parseReconSideParam(value: string | string[] | undefined): ReconSide {
+  return value === 'payable' ? 'payable' : 'receivable';
+}
 
 /** 側邊欄可選群組（銷售管道或廠商），key 一律為 uuid */
 export interface ReconGroupOption {
