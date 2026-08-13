@@ -1,6 +1,6 @@
 import { listOfficialSubjects } from '@/api/subjects';
 import type { LedgerEntryInvoiceDto, PayableListItemDto, ReceivableListItemDto } from '@/api/types';
-import { formatRocDate } from '@/components/ui/DatePicker';
+import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
 import type { PurchaseRow, SalesRow } from './types';
 
@@ -23,6 +23,12 @@ function voucherNumberFromInvoice(invoice: LedgerEntryInvoiceDto | null): string
   return invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : undefined;
 }
 
+/** 開立日期＝憑證上的開立日（invoice.date，民國年 YYYMMDD）；無對應憑證（如手動入帳、無票收據）時退回交易日/建立時間 */
+function issueDateFrom(invoice: LedgerEntryInvoiceDto | null, entryDate: string | null, createdAt: string): Date | undefined {
+  if (invoice) return parseRocDate(invoice.date);
+  return entryDate ? parseApiDate(entryDate) : parseApiDate(createdAt);
+}
+
 /**
  * /ael/ledger/payables/filter 一批項目 → 表格 PurchaseRow[]。
  * officialAccountingSubjectId 向 /ael/subject/official/list/latest 查詢最新科目清單反查名稱；
@@ -32,7 +38,7 @@ function voucherNumberFromInvoice(invoice: LedgerEntryInvoiceDto | null): string
  */
 export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promise<PurchaseRow[]> {
   const dated = items.map(item => {
-    const date = item.entryDate ? parseApiDate(item.entryDate) : parseApiDate(item.createdAt);
+    const date = issueDateFrom(item.invoice, item.entryDate, item.createdAt);
     return { item, rocDate: formatRocDate(date) };
   });
 
@@ -66,7 +72,7 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
  */
 export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesRow[] {
   return items.map(item => {
-    const date = item.entryDate ? parseApiDate(item.entryDate) : parseApiDate(item.createdAt);
+    const date = issueDateFrom(item.invoice, item.entryDate, item.createdAt);
     return {
       id: item.orderCode,
       uuid: item.ledgerUuid,
