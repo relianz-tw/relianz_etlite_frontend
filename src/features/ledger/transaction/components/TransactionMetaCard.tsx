@@ -487,9 +487,9 @@ export default function TransactionMetaCard({
       rows.push(importFields);
     }
   } else if (mode === 'edit' && side === 'sales') {
+    // 銷項交易的賣家一律是本公司，賣家統編／名稱無須再顯示（僅買家資訊有意義）
     rows = [
       [issueDateField, channelField],
-      [sellerTaxIdField, sellerNameField],
       [buyerTaxIdField, buyerNameField],
       [tagField, projectField],
     ];
