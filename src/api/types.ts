@@ -431,6 +431,8 @@ export interface PayableListItemDto {
   isAllowance?: boolean;
   /** 折讓時有值，指原單交易 uuid */
   originLedgerUuid?: string;
+  /** 該原單已開立的折讓單數量；大於 0 代表可展開查看折讓單清單 */
+  allowanceCount?: number;
 }
 
 /** 查詢進項應付交易列表回應（data 內容） */
@@ -498,6 +500,8 @@ export interface ReceivableListItemDto {
   isAllowance?: boolean;
   /** 折讓時有值，指原單交易 uuid */
   originLedgerUuid?: string;
+  /** 該原單已開立的折讓單數量；大於 0 代表可展開查看折讓單清單 */
+  allowanceCount?: number;
 }
 
 /** 查詢銷項應收交易列表回應（data 內容） */

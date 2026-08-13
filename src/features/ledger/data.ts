@@ -55,6 +55,7 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
     remainingAmount: item.remainingAmount,
     settlementStatus: item.settlementStatus,
     isAllowance: item.isAllowance ?? false,
+    allowanceCount: item.allowanceCount ?? 0,
   }));
 }
 
@@ -79,6 +80,7 @@ export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesR
       remainingAmount: item.remainingAmount,
       settlementStatus: item.settlementStatus,
       isAllowance: item.isAllowance ?? false,
+      allowanceCount: item.allowanceCount ?? 0,
     };
   });
 }

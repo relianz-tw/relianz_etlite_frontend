@@ -70,8 +70,7 @@ function SortHeader({
   );
 }
 
-// 折讓單清單改為展開時才向 API 查詢（見 LedgerAllowanceChildren），展開前無法得知該列是否有折讓單，
-// 故每一列皆顯示展開箭頭，收合狀態不做「查無折讓才隱藏箭頭」的判斷
+// 是否顯示展開箭頭由列表 API 的 allowanceCount 決定（>0 才有折讓單）；箭頭清單內容仍是展開時才向 API 查詢（見 LedgerAllowanceChildren）
 function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle} className="text-neutral-mid" aria-label={expanded ? '收合折讓單' : '展開折讓單'}>
@@ -284,7 +283,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   </td>
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
-                      <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
+                      {!!row.allowanceCount && <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />}
                       <Link
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=sales`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
@@ -415,7 +414,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   </td>
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
-                      <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
+                      {!!row.allowanceCount && <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />}
                       <Link
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=purchase`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"

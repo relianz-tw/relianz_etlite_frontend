@@ -55,6 +55,8 @@ export interface SalesRow {
   settlementStatus?: number;
   /** 是否為折讓（銷折）；來自 /ael/ledger/receivables/filter 的 isAllowance */
   isAllowance?: boolean;
+  /** 已開立的折讓單數量；大於 0 才顯示展開箭頭，來自 receivables/{filter,collected/filter} 的 allowanceCount */
+  allowanceCount?: number;
 }
 
 export interface PurchaseRow {
@@ -79,4 +81,6 @@ export interface PurchaseRow {
   settlementStatus?: number;
   /** 是否為折讓（進折）；來自 /ael/ledger/payables/filter 的 isAllowance */
   isAllowance?: boolean;
+  /** 已開立的折讓單數量；大於 0 才顯示展開箭頭，來自 payables/{filter,paid/filter} 的 allowanceCount */
+  allowanceCount?: number;
 }

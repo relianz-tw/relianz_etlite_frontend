@@ -116,8 +116,7 @@ function CardShell({
   );
 }
 
-// 折讓單清單改為展開時才向 API 查詢（見 LedgerAllowanceChildren），展開前無法得知該卡片是否有折讓單，
-// 故每張卡片皆顯示展開箭頭；stopPropagation 避免觸發卡片本身的點擊（進交易詳情）
+// 是否顯示展開箭頭由列表 API 的 allowanceCount 決定（>0 才有折讓單）；stopPropagation 避免觸發卡片本身的點擊（進交易詳情）
 function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   return (
     <button
@@ -170,7 +169,7 @@ function SalesCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {!selectionMode && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
+          {!selectionMode && !!row.allowanceCount && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
@@ -243,7 +242,7 @@ function PurchaseCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {!selectionMode && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
+          {!selectionMode && !!row.allowanceCount && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
