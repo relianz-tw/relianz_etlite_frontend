@@ -5,12 +5,12 @@ import DatePicker, { formatRocDate, parseRocDate } from '@/components/ui/DatePic
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
-import { ChevronDown, ChevronUp, Plus, Search, Upload, X } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import NewTransactionDialog from '@/components/NewTransactionDialog';
+import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { AdvancedFilter, QuickSearchField, Side } from '../types';
 import { withReturnParam } from '../urlState';
-import ImportInvoiceDialog from './ImportInvoiceDialog';
 
 export interface FilterBarProps {
   side: Side;
@@ -65,11 +65,11 @@ export default function FilterBar({
   onAdvancedChange,
   onAdvancedApply,
 }: FilterBarProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const goToNewTransaction = () => router.push(withReturnParam(`/ledger/new?side=${side}`, searchParams));
+  // 手開發票的目的地：帶入目前銷項／進項側別，並保留返回帳簿時的篩選狀態
+  const manualHref = withReturnParam(`/ledger/new?side=${side}`, searchParams);
   const [advOpen, setAdvOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const [newTxOpen, setNewTxOpen] = useState(false);
 
   // 交易期間：預設為「月」，切換月／年時自動對應到當下該月／該年的起訖日期，日期亦可再手動調整；
   // 三者的變更皆直接寫入 advanced.dateFrom/dateTo 並立即套用篩選（呼叫 filter API），銷項／進項共用同一組邏輯
@@ -171,10 +171,7 @@ export default function FilterBar({
             <span className="shrink-0 text-sm text-neutral-mid">–</span>
             <DatePicker value={periodTo} onChange={handlePeriodToChange} placeholder="迄" />
           </div>
-          <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
-            匯入電子發票
-          </Button>
-          <Button variant="warm" icon={Plus} className="flex-1" onClick={goToNewTransaction}>
+          <Button variant="warm" icon={Plus} onClick={() => setNewTxOpen(true)}>
             新增交易
           </Button>
         </div>
@@ -206,14 +203,9 @@ export default function FilterBar({
             <DatePicker value={periodTo} onChange={handlePeriodToChange} placeholder="迄" />
           </div>
         </div>
-        <div className="flex gap-2.5">
-          <Button variant="outline" icon={Upload} className="flex-1" onClick={() => setImportOpen(true)}>
-            匯入電子發票
-          </Button>
-          <Button variant="primary" icon={Plus} className="flex-1" onClick={goToNewTransaction}>
-            新增交易
-          </Button>
-        </div>
+        <Button variant="primary" icon={Plus} className="w-full" onClick={() => setNewTxOpen(true)}>
+          新增交易
+        </Button>
         <QuickFieldSelect widthClassName="w-full" />
         {quickInput}
         <div className="flex gap-2.5">
@@ -232,7 +224,7 @@ export default function FilterBar({
         {advOpen && AdvancedPanel}
       </div>
 
-      <ImportInvoiceDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <NewTransactionDialog open={newTxOpen} onClose={() => setNewTxOpen(false)} manualHref={manualHref} />
     </>
   );
 }

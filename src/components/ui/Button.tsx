@@ -30,6 +30,11 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
 
 const ICON_SIZE: Record<ButtonSize, number> = { sm: 14, md: 16, lg: 18 };
 
+/** 產生與 Button 一致的樣式 class，供需要用其他元素（如 next/link 的 <Link>）呈現按鈕外觀的場景使用 */
+export function buttonClassName(variant: ButtonVariant = 'primary', size: ButtonSize = 'md', className = '') {
+  return `inline-flex items-center justify-center whitespace-nowrap rounded-md font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`;
+}
+
 export default function Button({
   variant = 'primary',
   size = 'md',
@@ -43,7 +48,7 @@ export default function Button({
   return (
     <button
       disabled={disabled}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-45 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
+      className={buttonClassName(variant, size, className)}
       {...rest}
     >
       {Icon && iconPosition === 'left' && <Icon size={ICON_SIZE[size]} />}

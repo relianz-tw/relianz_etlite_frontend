@@ -1,6 +1,11 @@
+export type NavAction = 'newTransaction';
+
 export interface NavChildLink {
   name: string;
-  path: string;
+  /** 導覽連結路徑，與 action 二擇一 */
+  path?: string;
+  /** 點擊時開啟彈窗而非導頁，與 path 二擇一 */
+  action?: NavAction;
   icon?: 'plus';
 }
 
@@ -11,13 +16,15 @@ export interface NavLink {
   children?: NavChildLink[];
 }
 
+/** 側欄最上方的捷徑按鈕（跨頁面高頻主要動作），與一般導覽項目分開呈現 */
+export const navShortcut = { name: '開立電子發票', path: '/einvoice' };
+
 export const navLinks: NavLink[] = [
-  { name: '開立電子發票', path: '/einvoice', icon: 'plus' },
   {
     name: '帳簿',
     path: '/ledger',
     children: [
-      { name: '新增交易', path: '/ledger/new', icon: 'plus' },
+      { name: '新增交易', action: 'newTransaction', icon: 'plus' },
       { name: '帳簿總覽', path: '/ledger' },
       { name: '沖帳中心', path: '/ledger/reconciliation' },
     ],

@@ -2,18 +2,21 @@
 
 import { getBasicSetting } from "@/api/basicSettings";
 import { isDemoMode, isDemoModeAvailable, setDemoMode } from "@/api/config";
-import { navLinks } from "@/data/navLinks";
+import { buttonClassName } from "@/components/ui/Button";
+import { navLinks, navShortcut } from "@/data/navLinks";
 import {
   ArrowRight,
   Building2,
   Check,
   ChevronDown,
+  Plus,
   SquarePlus,
   X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import NewTransactionDialog from "./NewTransactionDialog";
 
 const isActive = (pathname: string, path: string) =>
   pathname === path || pathname.startsWith(`${path}/`);
@@ -48,6 +51,7 @@ const Sidebar = ({
   // isDemoMode 讀取 localStorage，SSR 階段一律視為 false；掛載後才校正，避免 hydration 內容不一致
   const [demoActive, setDemoActive] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [newTxOpen, setNewTxOpen] = useState(false);
 
   useEffect(() => {
     setDemoActive(isDemoMode);
@@ -92,6 +96,12 @@ const Sidebar = ({
       cancelled = true;
     };
   }, []);
+
+  // 開啟「新增交易」選擇彈窗；手機版側欄為浮層 overlay，開彈窗前先收合，避免兩層浮層互相遮擋
+  const openNewTransaction = () => {
+    if (open) onToggle();
+    setNewTxOpen(true);
+  };
 
   return (
     <>
@@ -145,6 +155,14 @@ const Sidebar = ({
           </picture>
         </div>
 
+        {/* 捷徑按鈕：跨頁面高頻主要動作，與一般導覽項目分開呈現 */}
+        <div className="shrink-0 border-b border-surface-cream p-3">
+          <Link href={navShortcut.path} className={buttonClassName("warm", "md", "w-full")}>
+            <Plus size={16} />
+            {navShortcut.name}
+          </Link>
+        </div>
+
         {/* 導覽項目 */}
         <ul className="flex flex-1 flex-col gap-1 overflow-y-auto p-3 text-sm">
           {navLinks.map((link) => {
@@ -191,17 +209,25 @@ const Sidebar = ({
                   </div>
                   {dropdownOpen && (
                     <ul className="ml-3 mt-1 flex flex-col gap-1 border-l border-surface-cream pl-3">
-                      {link.children.map((child) => (
-                        <li key={child.path}>
-                          <Link
-                            href={child.path}
-                            className="flex items-center gap-1 rounded-md px-3 py-2 text-neutral-dark hover:bg-surface-cream hover:text-brand-primary"
-                          >
-                            {child.icon === "plus" && <SquarePlus size={16} />}
-                            {child.name}
-                          </Link>
-                        </li>
-                      ))}
+                      {link.children.map((child) => {
+                        const childClassName =
+                          "flex w-full items-center gap-1 rounded-md px-3 py-2 text-left text-neutral-dark hover:bg-surface-cream hover:text-brand-primary";
+                        return (
+                          <li key={child.name}>
+                            {child.action === "newTransaction" ? (
+                              <button type="button" onClick={openNewTransaction} className={childClassName}>
+                                {child.icon === "plus" && <SquarePlus size={16} />}
+                                {child.name}
+                              </button>
+                            ) : (
+                              <Link href={child.path!} className={childClassName}>
+                                {child.icon === "plus" && <SquarePlus size={16} />}
+                                {child.name}
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </li>
@@ -301,6 +327,8 @@ const Sidebar = ({
           </button>
         </div>
       </aside>
+
+      <NewTransactionDialog open={newTxOpen} onClose={() => setNewTxOpen(false)} />
     </>
   );
 };

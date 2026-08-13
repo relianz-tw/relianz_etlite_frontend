@@ -156,6 +156,21 @@ Text: #FFFFFF
 Border-radius: 16px
 ```
 
+### Choice Modal（選擇型彈窗）
+
+用途：一個動作有多種進入方式時（如「新增交易」可選手開發票／電子發票／匯入電子發票），
+先讓使用者選類型再導向對應流程。
+
+```
+容器：Modal widthClassName="max-w-[480px]"
+選項列：垂直排列，gap 8px（gap-2）
+  每列：w-full、rounded-md（6px）、border 1px #C7CDD3（neutral-blue-gray/50）、px-4 py-3、bg #FFFFFF
+  左：lucide 圖示 20px，色 #005FA2（brand-primary）
+  中：標題 Noto Sans TC 14px font-semibold #3A3830；副標 12px #797C80
+  Hover：border-color #005FA2、bg rgba(0, 95, 162, 0.05)
+  無陰影（符合扁平原則）
+```
+
 ### Form Inputs
 ```
 Border: 1.5px solid #9AA7B9
@@ -227,8 +242,19 @@ Active / hover：文字 #005FA2（城信藍）+ 背景 #EAE5E3（surface-cream�
 
 結構（由上至下）：
   1. 頁首（手機：「選單」文字 + X 關閉鈕／桌機：Logo + 收合鈕）
-  2. 導覽項目（可捲動區）
-  3. 登出（頁尾，固定）
+  2. 捷徑按鈕（Shortcut，見下方）
+  3. 導覽項目（可捲動區）
+  4. 登出（頁尾，固定）
+
+捷徑按鈕（Shortcut）：
+  位置：導覽清單最上方，與清單之間 1px #EAE5E3 分隔
+  樣式：Button variant="warm"（bg #BE9F86 實心 / 白字）、size md、滿版寬度、左側 Plus 圖示
+  用途：跨頁面的高頻主要動作（目前僅「開立電子發票」），非一般導覽項目
+  一個側欄最多一顆，避免主行動色失焦
+
+動作型選單項目（action item）：
+  外觀與一般子項目相同（縮排、SquarePlus 圖示、hover 樣式）
+  差異僅在點擊後開啟彈窗（如「新增交易」開 Choice Modal）而非導頁；語意上為 <button> 而非 <a>
 
 下拉子項目：向下展開於父項目下方，縮排 + 左側 1px #EAE5E3 分隔線
 圖示：一律 lucide-react
