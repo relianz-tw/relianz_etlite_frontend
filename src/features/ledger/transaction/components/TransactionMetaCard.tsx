@@ -582,7 +582,11 @@ export default function TransactionMetaCard({
           </Field>
 
           <Field label="銷售額">
-            <MoneyInput value={form.salesAmount} onChange={v => onChange({ salesAmount: v })} disabled={readOnly} />
+            <MoneyInput
+              value={form.salesAmount}
+              onChange={v => onChange({ salesAmount: v, taxAmount: Math.round(v * 0.05) })}
+              disabled={readOnly}
+            />
           </Field>
 
           {!isAllowanceCreate && (
