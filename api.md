@@ -7173,6 +7173,7 @@ HTTP Status Code **200**
 |»»»» counterpartyTaxId|string|true|none||none|
 |»»» isAllowance|boolean|true|none||進折／銷折為 true|
 |»»» originLedgerUuid|string|true|none||折讓時有值，指原單|
+|»»» allowanceCount|integer|true|none||原單已開折讓張數；折讓列為 0|
 |»» total|integer|true|none||none|
 |»» limit|integer|true|none||none|
 |»» page|integer|true|none||none|
@@ -7670,6 +7671,7 @@ HTTP Status Code **200**
 |»»»» counterpartyTaxId|string|true|none||none|
 |»»» isAllowance|boolean|true|none||進折／銷折為 true|
 |»»» originLedgerUuid|string|true|none||折讓時有值，指原單|
+|»»» allowanceCount|integer|true|none||原單已開折讓張數；折讓列為 0|
 |»» total|integer|true|none||none|
 |»» limit|integer|true|none||none|
 |»» page|integer|true|none||none|
@@ -11079,6 +11081,53 @@ PATCH /ael/bankAccounts
     "message": "操作成功",
     "success": true
 }
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+## POST 拿取銀行帳戶相關沖帳事件列表
+
+POST /ael/bankAccounts/transactions
+
+拿取銀行帳戶相關沖帳事件列表，若要進一步瀏覽明細、日記帳跟關聯發票，請搭配GET /ael/ledger/entries/detail、GET /ael/ledger/entries/dailyDetail
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "dateFrom": "20260101",
+    "dateTo": "20260813",
+    "limit": 10,
+    "page": 1
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» bankAccountUuid|body|string| yes |銀行uuid|
+|» dateFrom|body|string| yes |起時間 YYYYMMDD|
+|» dateTo|body|string| yes |迄時間 YYYYMMDD|
+|» limit|body|integer| yes |一頁資料筆數|
+|» page|body|integer| yes |頁碼|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{}
 ```
 
 ### Responses
