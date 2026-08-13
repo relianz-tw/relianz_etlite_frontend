@@ -202,7 +202,7 @@ export default function TransactionMetaCard({
   );
 
   const sellerTaxIdField = (
-    <Field label="賣家統一編號">
+    <Field label="賣家統一編號" required={isCreate}>
       {/* 手動編輯統編視為與下方「廠商」選擇的既有廠商脫鉤，清空 sellerVendorUuid 避免誤送舊廠商 uuid */}
       {/* 已選擇既有廠商時統編由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
       <TextInput
@@ -275,9 +275,9 @@ export default function TransactionMetaCard({
   );
 
   const buyerNameField = (
-    <Field label="買家名稱" required={isCreate}>
+    <Field label="買家名稱">
       <TextInput
-        placeholder="請輸入交易對象名稱"
+        placeholder="請輸入買家名稱"
         value={form.buyerName}
         disabled={readOnly}
         onChange={e => onChange({ buyerName: e.target.value })}

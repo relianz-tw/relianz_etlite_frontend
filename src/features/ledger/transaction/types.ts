@@ -16,8 +16,9 @@ export interface TransactionFormState {
   invoiceNumber: string;
   declarePeriod: string;
   issueDate: Date | undefined;
+  /** 銷項：選填，但與 buyerName 需一併填寫（填一項則兩項皆必填） */
   buyerTaxId: string;
-  /** 銷項交易對象名稱（買方名稱），API counterpartyName 必填 */
+  /** 銷項：選填，但與 buyerTaxId 需一併填寫（填一項則兩項皆必填） */
   buyerName: string;
   sellerTaxId: string;
   sellerName: string;

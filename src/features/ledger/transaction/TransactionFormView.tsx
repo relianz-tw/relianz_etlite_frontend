@@ -60,8 +60,15 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     if (form.salesAmount + form.taxAmount <= 0) return '請輸入折讓金額';
     return null;
   }
-  const counterpartyName = side === 'purchase' ? form.sellerName : form.buyerName;
-  if (!counterpartyName.trim()) return side === 'purchase' ? '請輸入賣家名稱' : '請輸入交易對象名稱';
+  if (side === 'purchase') {
+    // 進項：賣家統編、名稱皆為必填
+    if (!form.sellerTaxId.trim()) return '請輸入賣家統一編號';
+    if (!form.sellerName.trim()) return '請輸入賣家名稱';
+  } else {
+    // 銷項：買家統編、名稱皆為選填，但填了其中一項就需要一併填另一項
+    if (form.buyerTaxId.trim() && !form.buyerName.trim()) return '請輸入買家名稱';
+    if (form.buyerName.trim() && !form.buyerTaxId.trim()) return '請輸入買家統一編號';
+  }
   if (!form.issueDate) return '請選擇開立日期';
   if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
   if (side === 'sales' && !form.channel) return '請選擇銷售管道';
@@ -182,6 +189,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   // isAllowance／allowances／originLedgerUuid 為選填欄位，皆搭配 fallback 讀取（見 api/types.ts 註解）
   const [isAllowance, setIsAllowance] = useState(false);
   const [allowances, setAllowances] = useState<EntryDetailAllowanceDto[]>([]);
+  // invoice.ourInvoiceType（憑證種類代號，值域 1~7）：僅此範圍內才顯示「折讓紀錄」區塊
+  const [ourInvoiceType, setOurInvoiceType] = useState<number | null>(null);
   const [originLedgerUuid, setOriginLedgerUuid] = useState('');
   const [originEntry, setOriginEntry] = useState<EntryDetailEntryDto | null>(null);
   const [originLoading, setOriginLoading] = useState(false);
@@ -221,6 +230,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         setDailyLines(daily.lines);
         setIsAllowance(allowanceFlag);
         setAllowances(result.allowances ?? []);
+        setOurInvoiceType(result.invoice?.ourInvoiceType ?? null);
         // 折讓單才查原單 uuid；非折讓單一律清空，避免殘留上一筆交易的原單卡片
         setOriginLedgerUuid(allowanceFlag ? result.originLedgerUuid ?? '' : '');
       })
@@ -409,8 +419,13 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
               )}
               {/* 折讓單本身不能再被折讓，故僅原單顯示此卡片；常駐顯示（無折讓紀錄時卡片內顯示「尚無折讓紀錄」），
-                  讓使用者能在交易詳細頁直接發現並開立折讓單 */}
-              {mode === 'edit' && !isAllowance && entryDetail && (
+                  讓使用者能在交易詳細頁直接發現並開立折讓單；僅 invoice.ourInvoiceType 落在 1~7 範圍才顯示 */}
+              {mode === 'edit' &&
+                !isAllowance &&
+                entryDetail &&
+                ourInvoiceType !== null &&
+                ourInvoiceType >= 1 &&
+                ourInvoiceType <= 7 && (
                 <TransactionAllowanceListCard
                   side={side}
                   returnQuery={returnQuery}

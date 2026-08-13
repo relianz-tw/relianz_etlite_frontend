@@ -942,6 +942,8 @@ export interface EntryInvoiceDetailDto {
   isAllowance: boolean;
   /** 申報狀態：1 已申報、2 未申報 */
   declared: number;
+  /** 憑證種類代號，值域 1~7；僅此範圍內才顯示折讓紀錄區塊 */
+  ourInvoiceType: number;
 }
 
 /** GET /ael/ledger/entries/detail 回應的 entry 區塊；僅型別化本次會使用的沖帳狀態與折讓原單摘要欄位 */
