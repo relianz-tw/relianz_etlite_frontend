@@ -180,9 +180,12 @@ export default function ReconPoolPanel({
         </div>
       )}
 
-      <div className="mt-4 flex flex-col items-stretch gap-1.5 border-t border-neutral-blue-gray/20 pt-3 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
-        <label className="text-sm font-semibold text-neutral-dark">{amountLabel}</label>
-        <MoneyInput widthClassName="w-full nav:w-40" value={statementAmount} onChange={onStatementChange} />
+      <div className="mt-4 flex flex-col gap-1 border-t border-neutral-blue-gray/20 pt-3">
+        <div className="flex flex-col items-stretch gap-1.5 nav:flex-row nav:items-center nav:justify-between nav:gap-2">
+          <label className="text-sm font-semibold text-neutral-dark">{amountLabel}</label>
+          <MoneyInput widthClassName="w-full nav:w-40" value={statementAmount} onChange={onStatementChange} />
+        </div>
+        <p className="text-right text-xs text-neutral-mid">用於沖銷帳款餘額，非實際入帳金額；實際{side === 'payable' ? '付出' : '存入'}金額請見下方</p>
       </div>
 
       <div className="mt-3 flex flex-col gap-2">

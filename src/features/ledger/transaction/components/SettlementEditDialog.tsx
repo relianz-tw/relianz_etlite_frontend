@@ -245,6 +245,7 @@ function SettlementEditDialogContent({
           <p className="text-xs text-neutral-mid">沖帳金額填 0 代表恢復（撤銷）此筆沖帳紀錄</p>
         ) : (
           <>
+            <p className="-mt-2 text-xs text-neutral-mid">用於沖銷帳款餘額，非實際入帳金額；實際{isSales ? '存入' : '付款'}金額請見下方</p>
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm font-semibold text-neutral-dark">各項手續費</span>
               <MoneyInput widthClassName="w-36" value={fee} onChange={setFee} disabled={reverted} />
