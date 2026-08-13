@@ -14,6 +14,7 @@ import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
+import LedgerAllowanceChildren from './LedgerAllowanceChildren';
 
 type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
   | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; channelNameByUuid: Map<string, string> }
@@ -69,10 +70,11 @@ function SortHeader({
   );
 }
 
-function ExpandToggle({ hasChildren, expanded, onToggle }: { hasChildren: boolean; expanded: boolean; onToggle: () => void }) {
-  if (!hasChildren) return null;
+// 折讓單清單改為展開時才向 API 查詢（見 LedgerAllowanceChildren），展開前無法得知該列是否有折讓單，
+// 故每一列皆顯示展開箭頭，收合狀態不做「查無折讓才隱藏箭頭」的判斷
+function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   return (
-    <button type="button" onClick={onToggle} className="text-neutral-mid">
+    <button type="button" onClick={onToggle} className="text-neutral-mid" aria-label={expanded ? '收合折讓單' : '展開折讓單'}>
       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
     </button>
   );
@@ -282,7 +284,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   </td>
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
-                      <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
+                      <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
                       <Link
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=sales`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
@@ -318,19 +320,13 @@ export default function LedgerTable(props: LedgerTableProps) {
                     )}
                   </td>
                 </tr>
-                {expanded[row.id] &&
-                  row.children?.map(child => (
-                    <tr key={child.id} className="border-b border-neutral-blue-gray/20 bg-surface-off-white/60 last:border-0">
-                      <td className={tdClass} />
-                      <td className={`${tdClass} pl-8 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
-                      <td className={tdClass}>
-                        <AmountCell amount={child.amount} className="text-neutral-mid" />
-                      </td>
-                      <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={showChannel ? 4 : 3}>
-                        {child.date ?? ''}
-                      </td>
-                    </tr>
-                  ))}
+                {expanded[row.id] && (
+                  <tr className="border-b border-neutral-blue-gray/20 last:border-0">
+                    <td className="p-2" colSpan={showChannel ? 7 : 6}>
+                      <LedgerAllowanceChildren ledgerUuid={row.uuid ?? row.id} expanded={!!expanded[row.id]} side="sales" searchParams={searchParams} />
+                    </td>
+                  </tr>
+                )}
               </Fragment>
             ))}
           </tbody>
@@ -419,7 +415,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   </td>
                   <td className={tdClass}>
                     <div className="flex items-center gap-1.5">
-                      <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
+                      <ExpandToggle expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
                       <Link
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=purchase`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
@@ -451,19 +447,18 @@ export default function LedgerTable(props: LedgerTableProps) {
                   </td>
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
                 </tr>
-                {expanded[row.id] &&
-                  row.children?.map(child => (
-                    <tr key={child.id} className="border-b border-neutral-blue-gray/20 bg-surface-off-white/60 last:border-0">
-                      <td className={tdClass} />
-                      <td className={`${tdClass} pl-8 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
-                      <td className={tdClass}>
-                        <AmountCell amount={child.amount} className="text-neutral-mid" />
-                      </td>
-                      <td className={`${tdClass} font-mono text-neutral-mid`} colSpan={4}>
-                        {child.date ?? ''}
-                      </td>
-                    </tr>
-                  ))}
+                {expanded[row.id] && (
+                  <tr className="border-b border-neutral-blue-gray/20 last:border-0">
+                    <td className="p-2" colSpan={7}>
+                      <LedgerAllowanceChildren
+                        ledgerUuid={row.uuid ?? row.id}
+                        expanded={!!expanded[row.id]}
+                        side="purchase"
+                        searchParams={searchParams}
+                      />
+                    </td>
+                  </tr>
+                )}
               </Fragment>
             );
           })}

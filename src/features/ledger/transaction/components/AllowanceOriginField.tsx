@@ -2,31 +2,40 @@
 
 import { fetchInvoiceOrigin } from '@/api/ledger';
 import type { InvoiceOriginEntryDto } from '@/api/types';
+import Button from '@/components/ui/Button';
 import TextInput from '@/components/ui/TextInput';
 import { formatRocDate } from '@/components/ui/DatePicker';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
+import { FileSearch, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import type { Side } from '../../types';
+import AllowanceOriginPreviewModal from './AllowanceOriginPreviewModal';
 import Field from './Field';
 
 interface AllowanceOriginFieldProps {
+  side: Side;
   invoiceTrack: string;
   invoiceSerial: string;
   /** 查詢結果變動時回報：ledgerUuid 供 originLedgerUuid 使用，origin 供帶入預設科目 */
   onResolve: (ledgerUuid: string, origin: InvoiceOriginEntryDto | null) => void;
   onInvoiceChange: (patch: { invoiceTrack?: string; invoiceSerial?: string }) => void;
+  /** 查無原始憑證時使用者點「建立原始發票」：呼叫端切回「是否為折讓＝否」，讓使用者接續新增該筆發票 */
+  onCreateOriginal: () => void;
 }
 
 /** 查無原始憑證時顯示的說明文字；後端對查無資料的情境是直接丟出錯誤（非 200 + invoice:null），
- *  訊息內容為「查無符合發票」，這裡統一改用較完整的說明取代，讓使用者知道下一步該做什麼 */
-const NOT_FOUND_MESSAGE = '查無符合的原始憑證，請確認發票字軌與流水號是否正確；若該筆進項/銷項尚未建立，請先新增該筆原始憑證的交易後再回來開立折讓單。';
+ *  訊息內容為「查無符合發票」，這裡統一改用較簡短的說明，下一步動作交由「建立原始發票」按鈕承擔 */
+const NOT_FOUND_MESSAGE = '查無此發票，可能尚未建立該筆交易。';
 
 /** 折讓建立畫面的「憑證號碼」輸入＋原單反查：輸入字軌＋流水號後 debounce 呼叫
- *  GET /ael/ledger/invoices/origin，查到才顯示原單摘要並開放送出，查無則提示先新增原始憑證。 */
-export default function AllowanceOriginField({ invoiceTrack, invoiceSerial, onResolve, onInvoiceChange }: AllowanceOriginFieldProps) {
+ *  GET /ael/ledger/invoices/origin，查到則顯示原單摘要並可開啟憑證明細彈窗確認，查無則提供建立原始發票的動線。 */
+export default function AllowanceOriginField({ side, invoiceTrack, invoiceSerial, onResolve, onInvoiceChange, onCreateOriginal }: AllowanceOriginFieldProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notFound, setNotFound] = useState(false);
   const [origin, setOrigin] = useState<InvoiceOriginEntryDto | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     const track = invoiceTrack.trim();
@@ -34,6 +43,7 @@ export default function AllowanceOriginField({ invoiceTrack, invoiceSerial, onRe
     if (!track || !serial) {
       setOrigin(null);
       setError('');
+      setNotFound(false);
       setLoading(false);
       onResolve('', null);
       return;
@@ -42,17 +52,17 @@ export default function AllowanceOriginField({ invoiceTrack, invoiceSerial, onRe
     let cancelled = false;
     setLoading(true);
     setError('');
+    setNotFound(false);
     const timer = setTimeout(() => {
       fetchInvoiceOrigin({ invoiceTrack: track, invoiceNumber: serial })
         .then(result => {
           if (cancelled) return;
           if (result.invoice && result.entry) {
             setOrigin(result.entry);
-            setError('');
             onResolve(result.entry.ledgerUuid, result.entry);
           } else {
             setOrigin(null);
-            setError(NOT_FOUND_MESSAGE);
+            setNotFound(true);
             onResolve('', null);
           }
         })
@@ -60,9 +70,13 @@ export default function AllowanceOriginField({ invoiceTrack, invoiceSerial, onRe
           if (cancelled) return;
           setOrigin(null);
           // 後端查無資料時是直接丟出錯誤（訊息含「查無」），非成功回應搭配 null 資料；
-          // 統一改用較完整的說明取代原始後端訊息，其餘技術性錯誤（如網路逾時）才顯示一般錯誤訊息
+          // 這種情況一律視為「查無」呈現建立原始發票的動線，其餘技術性錯誤（如網路逾時）才顯示一般錯誤訊息
           const message = err instanceof Error ? err.message : '';
-          setError(/查無|找不到/.test(message) ? NOT_FOUND_MESSAGE : getFriendlyErrorMessage(err, '查詢原始憑證失敗'));
+          if (/查無|找不到/.test(message)) {
+            setNotFound(true);
+          } else {
+            setError(getFriendlyErrorMessage(err, '查詢原始憑證失敗'));
+          }
           onResolve('', null);
         })
         .finally(() => {
@@ -107,6 +121,25 @@ export default function AllowanceOriginField({ invoiceTrack, invoiceSerial, onRe
             {formatRocDate(origin.transactionDate ? new Date(origin.transactionDate) : undefined)}　{fmtCurrency(origin.totalAmount)}
             （可折讓 {fmtCurrency(origin.remainingAmount)}）
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            icon={FileSearch}
+            className="mt-2"
+            onClick={() => setPreviewOpen(true)}
+          >
+            查看憑證明細
+          </Button>
+          <AllowanceOriginPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} ledgerUuid={origin.ledgerUuid} side={side} />
+        </div>
+      )}
+      {!loading && !error && notFound && (
+        <div className="mt-1.5 rounded-md bg-surface-cream p-3 text-xs text-neutral-mid">
+          <p>{NOT_FOUND_MESSAGE}</p>
+          <Button type="button" variant="outline" size="sm" icon={Plus} className="mt-2" onClick={onCreateOriginal}>
+            建立原始發票
+          </Button>
         </div>
       )}
     </Field>

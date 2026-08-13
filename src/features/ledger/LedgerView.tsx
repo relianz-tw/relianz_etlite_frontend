@@ -123,15 +123,18 @@ export default function LedgerView() {
     setTotals(null);
     const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced);
 
+    // 折讓單改為掛在原單展開區內顯示（見 LedgerTable/LedgerCards 的 LedgerAllowanceChildren），
+    // 故從最上層列表過濾掉；下方「共 N 筆／合計」因此是過濾後的前端筆數，與後端 total 不同（刻意如此），
+    // KPI 卡片（totals）與分頁頁數仍全部使用後端原始數字，不受影響
     const request =
       filters.side === 'purchase'
         ? (filters.subTab === 'payable' ? fetchPayables(body) : fetchPayablesPaid(body)).then(async result => ({
-            rows: await mapPayableItemsToRows(result.items),
+            rows: (await mapPayableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
             totals: { primary: result.receivedVoucherAmount, settled: result.paidAmount, outstanding: result.payableAmount },
           }))
         : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(result => ({
-            rows: mapReceivableItemsToRows(result.items),
+            rows: mapReceivableItemsToRows(result.items).filter(row => !row.isAllowance),
             total: result.total,
             totals: { primary: result.issuedVoucherAmount, settled: result.collectedAmount, outstanding: result.receivableAmount },
           }));

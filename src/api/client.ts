@@ -6,6 +6,10 @@
  * 可能夾帶的技術字眼（欄位名稱、旗標等）直接外洩到畫面。
  */
 
+// 後端已開放 CORS，統一直接打 NEXT_PUBLIC_API_BASE_URL（各環境 .env 檔設定，見 next.config.js 註解），
+// 不再依賴 Next.js rewrite 代理；未設定時退回相對路徑，交由 rewrite（若有設定）轉發
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
+
 interface ApiEnvelope<T> {
   success: boolean;
   data: T | null;
@@ -25,7 +29,7 @@ export function buildQuery(params: Record<string, string | number | undefined>):
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

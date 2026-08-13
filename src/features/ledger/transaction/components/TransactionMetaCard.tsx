@@ -361,6 +361,7 @@ export default function TransactionMetaCard({
 
   const allowanceOriginField = (
     <AllowanceOriginField
+      side={side}
       invoiceTrack={form.invoiceTrack}
       invoiceSerial={form.invoiceSerial}
       onInvoiceChange={patch => onChange(patch)}
@@ -370,6 +371,9 @@ export default function TransactionMetaCard({
           ...(origin ? { expenseCategory: { id: origin.officialAccountingSubjectId, subjectCode: '', name: origin.subjectName } } : {}),
         })
       }
+      // 查無原始憑證時使用者可直接建立：切回「是否為折讓＝否」，比照上方 SegmentedControl 選「否」的 patch，
+      // 但刻意不清空 invoiceTrack／invoiceSerial，讓已輸入的發票號碼沿用到新增發票流程
+      onCreateOriginal={() => onChange({ isAllowance: false, originLedgerUuid: '', exemptSalesAmount: 0 })}
     />
   );
 

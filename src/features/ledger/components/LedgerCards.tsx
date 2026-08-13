@@ -9,12 +9,14 @@ import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
 import { fmtCurrency } from '@/lib/utils';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CircleX, Download, X } from 'lucide-react';
+import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortState } from '../types';
 import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
+import LedgerAllowanceChildren from './LedgerAllowanceChildren';
 
 const SORT_KEY_LABELS: Record<SortKey, string> = {
   id: '交易編號',
@@ -114,8 +116,9 @@ function CardShell({
   );
 }
 
-function ExpandToggle({ hasChildren, expanded, onToggle }: { hasChildren: boolean; expanded: boolean; onToggle: () => void }) {
-  if (!hasChildren) return null;
+// 折讓單清單改為展開時才向 API 查詢（見 LedgerAllowanceChildren），展開前無法得知該卡片是否有折讓單，
+// 故每張卡片皆顯示展開箭頭；stopPropagation 避免觸發卡片本身的點擊（進交易詳情）
+function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -124,23 +127,10 @@ function ExpandToggle({ hasChildren, expanded, onToggle }: { hasChildren: boolea
         onToggle();
       }}
       className="text-neutral-mid"
+      aria-label={expanded ? '收合折讓單' : '展開折讓單'}
     >
       {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
     </button>
-  );
-}
-
-function ChildrenList({ children }: { children: SalesRow['children'] }) {
-  if (!children) return null;
-  return (
-    <div className="mt-1 flex flex-col gap-1.5 border-t border-neutral-blue-gray/20 pt-2">
-      {children.map(child => (
-        <div key={child.id} className="flex items-center justify-between text-xs text-neutral-mid">
-          <span className="font-mono">{child.label ?? child.id}</span>
-          <span className="font-mono tabular-nums">{fmtCurrency(child.amount)}</span>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -155,6 +145,7 @@ function SalesCard({
   isSelected,
   onSelectToggle,
   onLongPressStart,
+  searchParams,
 }: {
   row: SalesRow;
   subTab: SalesSubTab;
@@ -166,6 +157,7 @@ function SalesCard({
   isSelected: boolean;
   onSelectToggle: () => void;
   onLongPressStart: (id: string) => void;
+  searchParams: ReadonlyURLSearchParams;
 }) {
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
   return (
@@ -178,7 +170,7 @@ function SalesCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
+          {!selectionMode && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
@@ -204,7 +196,11 @@ function SalesCard({
         )}
       </div>
       {!selectionMode && subTab === 'received' && <div className="truncate text-xs text-neutral-mid">{channelText}</div>}
-      {!selectionMode && expanded && <ChildrenList children={row.children} />}
+      {!selectionMode && expanded && (
+        <div onClick={e => e.stopPropagation()} className="mt-1 border-t border-neutral-blue-gray/20 pt-2">
+          <LedgerAllowanceChildren ledgerUuid={row.uuid ?? row.id} expanded={expanded} side="sales" searchParams={searchParams} />
+        </div>
+      )}
     </CardShell>
   );
 }
@@ -220,6 +216,7 @@ function PurchaseCard({
   onLongPressStart,
   categoryValue,
   onCategorySelect,
+  searchParams,
 }: {
   row: PurchaseRow;
   subTab: PurchaseSubTab;
@@ -232,6 +229,7 @@ function PurchaseCard({
   onLongPressStart: (id: string) => void;
   categoryValue: string;
   onCategorySelect: (value: string) => void;
+  searchParams: ReadonlyURLSearchParams;
 }) {
   const locked = row.source !== 'invoice';
   const longPress = useLongPress({ onLongPress: () => onLongPressStart(row.id) });
@@ -245,7 +243,7 @@ function PurchaseCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {!selectionMode && <ExpandToggle hasChildren={!!row.children} expanded={expanded} onToggle={onToggle} />}
+          {!selectionMode && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
           <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
@@ -265,7 +263,11 @@ function PurchaseCard({
           </span>
         </div>
       )}
-      {!selectionMode && expanded && <ChildrenList children={row.children} />}
+      {!selectionMode && expanded && (
+        <div onClick={e => e.stopPropagation()} className="mt-1 border-t border-neutral-blue-gray/20 pt-2">
+          <LedgerAllowanceChildren ledgerUuid={row.uuid ?? row.id} expanded={expanded} side="purchase" searchParams={searchParams} />
+        </div>
+      )}
     </CardShell>
   );
 }
@@ -396,6 +398,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
               isSelected={!!selected[row.id]}
               onSelectToggle={() => toggleSelect(row.id)}
               onLongPressStart={enterSelectionMode}
+              searchParams={searchParams}
             />
           ))
         : props.rows.map(row => (
@@ -412,6 +415,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
               onLongPressStart={enterSelectionMode}
               categoryValue={categoryOverrides[row.id] ?? row.category}
               onCategorySelect={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
+              searchParams={searchParams}
             />
           ))}
     </div>

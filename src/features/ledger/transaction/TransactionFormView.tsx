@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
 import VoidConfirmDialog from '../components/VoidConfirmDialog';
 import type { Side } from '../types';
 import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
+import AllowanceCreateDialog from './components/AllowanceCreateDialog';
 import SettlementEditDialog from './components/SettlementEditDialog';
 import SettlementReverseConfirmModal from './components/SettlementReverseConfirmModal';
 import TransactionAllowanceListCard from './components/TransactionAllowanceListCard';
@@ -154,6 +155,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   // 編輯畫面預設唯讀，需按「修改交易資訊」才開放欄位編輯
   const [editing, setEditing] = useState(false);
   const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
+  const [allowanceCreateOpen, setAllowanceCreateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const backHref = resolveLedgerBackHref(returnQuery);
@@ -401,11 +403,19 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                   entry={originEntry}
                 />
               )}
-              {mode === 'edit' && !isAllowance && allowances.length > 0 && (
-                <TransactionAllowanceListCard side={side} returnQuery={returnQuery} allowances={allowances} />
-              )}
               {mode === 'edit' && entryDetail && (
                 <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
+              )}
+              {/* 折讓單本身不能再被折讓，故僅原單顯示此卡片；常駐顯示（無折讓紀錄時卡片內顯示「尚無折讓紀錄」），
+                  讓使用者能在交易詳細頁直接發現並開立折讓單 */}
+              {mode === 'edit' && !isAllowance && entryDetail && (
+                <TransactionAllowanceListCard
+                  side={side}
+                  returnQuery={returnQuery}
+                  entry={entryDetail}
+                  allowances={allowances}
+                  onCreate={() => setAllowanceCreateOpen(true)}
+                />
               )}
 
               {mode === 'create' && submitError && <p className="text-sm text-semantic-error">{submitError}</p>}
@@ -434,6 +444,17 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           onConfirm={backToLedger}
           transactionId={form.invoiceNumber}
           amount={totalAmount}
+        />
+      )}
+
+      {mode === 'edit' && transactionId && entryDetail && (
+        <AllowanceCreateDialog
+          open={allowanceCreateOpen}
+          onClose={() => setAllowanceCreateOpen(false)}
+          side={side}
+          entry={entryDetail}
+          originLedgerUuid={transactionId}
+          onCreated={reloadDetail}
         />
       )}
 

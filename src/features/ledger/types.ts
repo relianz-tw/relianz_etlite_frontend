@@ -34,13 +34,6 @@ export interface AdvancedFilter {
   dateTo: string;
 }
 
-export interface SubRow {
-  id: string;
-  label?: string;
-  amount: number;
-  date?: string;
-}
-
 export interface SalesRow {
   id: string;
   /** 應收帳款真實 uuid（來自 /ael/ledger/receivables/filter） */
@@ -54,7 +47,6 @@ export interface SalesRow {
   /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
   voucherNumber?: string;
   voided: boolean;
-  children?: SubRow[];
   /** 已沖帳金額（累計）；僅應收帳款/應付帳款分頁顯示，已收款/已付款分頁不需要 */
   settledAmount?: number;
   /** 未沖帳金額；可為負，代表超沖 */
@@ -79,7 +71,6 @@ export interface PurchaseRow {
   counterpartyUuid?: string | null;
   /** 憑證號碼：invoice.invoiceTrack + invoice.invoiceNumber；無對應憑證時為 undefined */
   voucherNumber?: string;
-  children?: SubRow[];
   /** 已沖帳金額（累計）；僅應收帳款/應付帳款分頁顯示，已收款/已付款分頁不需要 */
   settledAmount?: number;
   /** 未沖帳金額；可為負，代表超沖 */
