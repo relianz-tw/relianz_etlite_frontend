@@ -489,6 +489,8 @@ export default function TransactionMetaCard({
   } else if (mode === 'edit' && side === 'sales') {
     rows = [
       [issueDateField, channelField],
+      [sellerTaxIdField, sellerNameField],
+      [buyerTaxIdField, buyerNameField],
       [tagField, projectField],
     ];
   } else {

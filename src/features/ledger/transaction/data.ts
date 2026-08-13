@@ -103,8 +103,9 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
     isAllowance: invoice.isAllowance,
     declared: invoice.declared === 1,
   };
+  // sellerTaxId／companyName 為 invoice 通用欄位，銷項／進項皆有回傳，故不分 side 一併帶入
   return side === 'sales'
-    ? { ...common, buyerTaxId: invoice.buyerTaxIdNumber }
+    ? { ...common, buyerTaxId: invoice.buyerTaxIdNumber, sellerTaxId: invoice.sellerTaxIdNumber, sellerName: invoice.companyName }
     : { ...common, sellerTaxId: invoice.sellerTaxIdNumber, sellerName: invoice.companyName };
 }
 

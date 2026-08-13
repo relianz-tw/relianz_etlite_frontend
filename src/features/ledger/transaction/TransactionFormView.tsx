@@ -209,6 +209,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           // 銷售管道對應 entry.paymentChannelUuid，直接帶入即可對應 channelField 下拉選項的 uuid
           channel: result.entry.paymentChannelUuid ?? '',
           isAllowance: allowanceFlag,
+          // 買家名稱：invoice 明細無此欄位（EntryInvoiceDetailDto 僅有 companyName 供賣家使用），改取 entry.counterpartyName
+          ...(side === 'sales' ? { buyerName: result.entry.counterpartyName ?? '' } : {}),
         };
         setForm(nextForm);
         setSavedForm(nextForm);
