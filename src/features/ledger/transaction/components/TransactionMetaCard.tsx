@@ -14,8 +14,10 @@ import SubjectSelect from '@/components/ui/SubjectSelect';
 import TextInput from '@/components/ui/TextInput';
 import Textarea from '@/components/ui/Textarea';
 import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
+import InitOtherChannelDialog from '@/features/settings/components/InitOtherChannelDialog';
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
+import { SETTLEMENT_STYLE } from '@/features/settings/data';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -111,6 +113,7 @@ export default function TransactionMetaCard({
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
   const [newChannelOpen, setNewChannelOpen] = useState(false);
+  const [initOtherOpen, setInitOtherOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccountRecord[]>([]);
   const [bankAccountsLoaded, setBankAccountsLoaded] = useState(false);
   const [vendors, setVendors] = useState<VendorDto[]>([]);
@@ -118,17 +121,13 @@ export default function TransactionMetaCard({
   const [newVendorOpen, setNewVendorOpen] = useState(false);
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
-  // 「其他」管道（固定 UUID）固定排在清單最末，讓使用者優先看到具體管道
-  const OTHER_CHANNEL_UUID = '09dfec9d-178f-41ae-826f-9663b9c4eee2';
+  // 「其他」管道（各公司 uuid 不同，但固定名稱為「其他」）固定排在清單最末，讓使用者優先看到具體管道
   useEffect(() => {
     if (side !== 'sales') return;
     listChannelRules()
       .then(list => {
         const active = list.filter(c => c.isActive);
-        const sorted = [
-          ...active.filter(c => c.channelUuid !== OTHER_CHANNEL_UUID),
-          ...active.filter(c => c.channelUuid === OTHER_CHANNEL_UUID),
-        ];
+        const sorted = [...active.filter(c => c.channelName !== '其他'), ...active.filter(c => c.channelName === '其他')];
         setChannelRules(sorted);
       })
       .catch(err => setChannelError(getFriendlyErrorMessage(err)));
@@ -142,20 +141,36 @@ export default function TransactionMetaCard({
       .catch(err => setVendorError(getFriendlyErrorMessage(err)));
   }, [side]);
 
-  // 開啟「新增管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
+  // 開啟「新增管道」或「開通其他管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
   useEffect(() => {
-    if (!newChannelOpen || bankAccountsLoaded) return;
+    if ((!newChannelOpen && !initOtherOpen) || bankAccountsLoaded) return;
     listBankAccounts()
       .then(list => {
         setBankAccounts(list.filter(a => a.isActive).map(toBankAccountRecord));
         setBankAccountsLoaded(true);
       })
       .catch(err => setChannelError(getFriendlyErrorMessage(err)));
-  }, [newChannelOpen, bankAccountsLoaded]);
+  }, [newChannelOpen, initOtherOpen, bankAccountsLoaded]);
 
   // 新增管道成功後直接加入清單並選取，沿用設定頁 ChannelRuleDialog／createChannelRule 的表單與驗證邏輯
   const handleCreateChannel = async (rule: Omit<ChannelRuleRecord, 'id'>) => {
     const created = await createChannelRule(rule);
+    setChannelRules(list => [...list, created]);
+    onChange({ channel: created.channelUuid });
+  };
+
+  // 各公司「其他」管道的 uuid 不同，但名稱固定為「其他」；尚未開通前強制先完成此步驟才能新增其他管道
+  const hasOtherChannel = channelRules.some(c => c.channelName === '其他');
+  const handleInitOtherChannel = async (receivingAccountUuid: string) => {
+    const created = await createChannelRule({
+      channelName: '其他',
+      settlementStyle: SETTLEMENT_STYLE.WEEKLY,
+      settlementAmount: 1,
+      receivingAccountUuid,
+      remark: '',
+      isActive: true,
+      initDefaultOther: true,
+    });
     setChannelRules(list => [...list, created]);
     onChange({ channel: created.channelUuid });
   };
@@ -280,7 +295,7 @@ export default function TransactionMetaCard({
         value={form.channel}
         disabled={readOnly}
         onValueChange={v => onChange({ channel: v })}
-        onAddNew={() => setNewChannelOpen(true)}
+        onAddNew={() => (hasOtherChannel ? setNewChannelOpen(true) : setInitOtherOpen(true))}
       >
         <option value="" disabled>請選擇銷售管道</option>
         {channelRules.map(c => (
@@ -500,6 +515,12 @@ export default function TransactionMetaCard({
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
       <ChannelRuleDialog open={newChannelOpen} onClose={() => setNewChannelOpen(false)} onSubmit={handleCreateChannel} accounts={bankAccounts} />
+      <InitOtherChannelDialog
+        open={initOtherOpen}
+        onClose={() => setInitOtherOpen(false)}
+        onSubmit={handleInitOtherChannel}
+        accounts={bankAccounts}
+      />
       <VendorDialog open={newVendorOpen} onClose={() => setNewVendorOpen(false)} onSubmit={handleCreateVendor} />
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-base font-semibold text-neutral-dark">交易資訊</h2>

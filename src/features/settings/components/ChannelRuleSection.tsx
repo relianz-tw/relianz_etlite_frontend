@@ -5,12 +5,13 @@ import type { ChannelRuleDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { CirclePlus } from 'lucide-react';
+import { CirclePlus, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
-import { formatSettlement } from '../data';
+import { formatSettlement, SETTLEMENT_STYLE } from '../data';
 import ChannelRuleDialog from './ChannelRuleDialog';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
+import InitOtherChannelDialog from './InitOtherChannelDialog';
 
 interface ChannelRuleSectionProps {
   /** 收款帳戶下拉選項與表格解析用，僅傳入啟用中的實際銀行帳戶 */
@@ -38,9 +39,13 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
   const [loadError, setLoadError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ChannelRuleRecord | undefined>(undefined);
+  const [initOtherOpen, setInitOtherOpen] = useState(false);
   const [actionError, setActionError] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [pendingDeactivate, setPendingDeactivate] = useState<ChannelRuleRecord | null>(null);
+
+  // 各公司「其他」管道的 uuid 不同，但名稱固定為「其他」；已開通過就不再顯示開通按鈕
+  const hasOtherChannel = rules.some(rule => rule.channelName === '其他');
 
   const loadRules = () => {
     setLoading(true);
@@ -71,6 +76,19 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     } else {
       await createChannelRule(data);
     }
+    loadRules();
+  };
+
+  const handleInitOther = async (receivingAccountUuid: string) => {
+    await createChannelRule({
+      channelName: '其他',
+      settlementStyle: SETTLEMENT_STYLE.WEEKLY,
+      settlementAmount: 1,
+      receivingAccountUuid,
+      remark: '',
+      isActive: true,
+      initDefaultOther: true,
+    });
     loadRules();
   };
 
@@ -109,9 +127,19 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
           <h2 className="text-base font-semibold text-neutral-dark">銷售管道暨收款方式</h2>
           <p className="mt-1 text-xs text-neutral-mid">定義每個銷售管道的入帳規則與收款帳戶，供帳簿頁登錄銷售款項時選擇</p>
         </div>
-        <Button size="sm" icon={CirclePlus} onClick={openNew}>
-          新增銷售管道
-        </Button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2">
+            {!loading && !hasOtherChannel && (
+              <Button size="sm" variant="outline" icon={Sparkles} onClick={() => setInitOtherOpen(true)}>
+                啟用收款管道基本設定
+              </Button>
+            )}
+            <Button size="sm" icon={CirclePlus} disabled={loading || !hasOtherChannel} onClick={openNew}>
+              新增銷售管道
+            </Button>
+          </div>
+          {!loading && !hasOtherChannel && <p className="text-xs text-neutral-mid">請先完成基本設定，才能新增銷售管道</p>}
+        </div>
       </div>
 
       {actionError && <p className="mb-4 text-sm text-semantic-error">{actionError}</p>}
@@ -241,6 +269,13 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
       )}
 
       <ChannelRuleDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSubmit={handleSubmit} initial={editing} accounts={accounts} />
+
+      <InitOtherChannelDialog
+        open={initOtherOpen}
+        onClose={() => setInitOtherOpen(false)}
+        onSubmit={handleInitOther}
+        accounts={accounts}
+      />
 
       <ConfirmDeleteDialog
         open={!!pendingDeactivate}

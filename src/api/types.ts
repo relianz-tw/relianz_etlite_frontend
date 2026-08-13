@@ -201,7 +201,10 @@ export interface ChannelRuleDto {
 export type CreateChannelRuleBody = Pick<
   ChannelRuleDto,
   'companyUuid' | 'channelName' | 'settlementStyle' | 'settlementAmount' | 'receivingAccountUuid' | 'isActive' | 'remark'
->;
+> & {
+  /** 是否開通固定名稱為「其他」的管道；一般新增管道不帶此欄位 */
+  initDefaultOther?: boolean;
+};
 
 /** PATCH /ael/payment/channelRules body 的 uuid 為渠道 uuid，與回應 DTO 的 channelUuid 為同一值但欄位名不同（api.md 第 10224、10237 行） */
 export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'balance'> & { uuid: string };
