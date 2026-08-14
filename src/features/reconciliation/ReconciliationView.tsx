@@ -304,7 +304,10 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過），此時仍須讓使用者透過 A/B/C 選擇處理方式
   const hasDiff = !!previewResult && previewResult.allocations.some(a => a.settlementStatus !== 0);
-  const diffAmount = previewResult ? Math.abs(previewResult.appliedSettleAmount - previewResult.totalBeforeRemaining) : 0;
+  // 差額顯示須以「本次實際分配到的原單」沖前剩餘加總為準，不能用 previewResult.totalBeforeRemaining（該管道／廠商
+  // 全部未沖交易的合計，含本次完全沒被觸及的其他原單）——否則差額會混入不相干的交易金額，讓使用者誤解沖帳結果
+  const touchedRemaining = previewResult ? previewResult.allocations.reduce((sum, a) => sum + a.beforeRemaining, 0) : 0;
+  const diffAmount = previewResult ? Math.abs(previewResult.appliedSettleAmount - touchedRemaining) : 0;
 
   const resetInputs = () => {
     setStatementAmount(0);
@@ -850,7 +853,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           side={side}
           groupLabel={selectedGroupLabel}
           settleAmount={previewResult.appliedSettleAmount}
-          totalBeforeRemaining={previewResult.totalBeforeRemaining}
+          remainingAmount={touchedRemaining}
           diff={diffAmount}
           submitting={submitLoading}
           submitError={submitError}

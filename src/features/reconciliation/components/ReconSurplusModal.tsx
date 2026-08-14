@@ -12,8 +12,8 @@ interface ReconSurplusModalProps {
   /** 本次沖帳金額；須帶 appliedSettleAmount（已併入使用餘額的實際沖帳總額），
    * 否則與下方 diff（同樣以 appliedSettleAmount 計算）兜不起來 */
   settleAmount: number;
-  /** 待付(收)帳金額（該管道/廠商目前所有待付(收)總額） */
-  totalBeforeRemaining: number;
+  /** 本次實際分配到的原單沖前剩餘金額合計；僅本次沖帳觸及的原單，不含該管道/廠商其他未觸及的待付(收)交易 */
+  remainingAmount: number;
   /** 尚未沖入的差額：少沖時為仍欠的錢，超沖時為多付/多收的錢 */
   diff: number;
   submitting?: boolean;
@@ -36,7 +36,7 @@ export default function ReconSurplusModal({
   side,
   groupLabel,
   settleAmount,
-  totalBeforeRemaining,
+  remainingAmount,
   diff,
   submitting,
   submitError,
@@ -60,7 +60,7 @@ export default function ReconSurplusModal({
         </span>{" "}
         元，{side === "payable" ? "待付帳金額" : "待收帳金額"}{" "}
         <span className="font-mono font-semibold tabular-nums">
-          {fmtCurrency(totalBeforeRemaining)}
+          {fmtCurrency(remainingAmount)}
         </span>{" "}
         元，仍有{" "}
         <span className="font-mono font-semibold tabular-nums text-semantic-error">

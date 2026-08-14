@@ -72,9 +72,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** 沖帳狀態圓圈：已結清為綠色實心勾（沿用 Checkbox 圓形樣式，唯讀不可點擊）；尚無預覽結果或未分配時為空心圓（匯總模式使用） */
+/** 沖帳狀態圓圈（唯讀不可點擊，匯總模式使用）：已結清為實心勾；本次有分配但未結清（少沖／超沖）為實心橫線，
+ * 讓使用者仍能一眼看出這筆本次有被分配到，只是尚未沖平；尚無預覽結果或未分配時為空心圓 */
 function StatusCircle({ allocation }: { allocation?: SettleLedgerAllocation }) {
-  return <Checkbox checked={!!allocation?.closed} disabled shape="circle" onChange={() => {}} aria-label="沖帳狀態（僅供檢視）" />;
+  return (
+    <Checkbox
+      checked={!!allocation?.closed}
+      indeterminate={!!allocation && !allocation.closed}
+      disabled
+      shape="circle"
+      onChange={() => {}}
+      aria-label="沖帳狀態（僅供檢視）"
+    />
+  );
 }
 
 /** 選取圓圈：單筆／多筆沖帳模式用，可點擊勾選要沖帳的交易（單筆模式單選、多筆模式複選，由呼叫端 onToggleSelect 決定行為） */
