@@ -29,7 +29,9 @@ export default function ReconPoolSummary({ side, statementAmount, previewResult 
     );
   }
 
-  const diff = previewResult.settleAmount - previewResult.totalBeforeRemaining;
+  // 差額須以後端試算的 appliedSettleAmount（已併入使用餘額）為準，不可直接用 settleAmount 相減，
+  // 否則使用者一旦動用餘額，這裡算出的差額會跟下方沖帳列的差額（見 ReconciliationView 的 diffAmount）對不上
+  const diff = previewResult.appliedSettleAmount - previewResult.totalBeforeRemaining;
   const isBalanced = diff === 0;
 
   return (

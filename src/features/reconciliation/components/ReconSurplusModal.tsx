@@ -9,7 +9,8 @@ interface ReconSurplusModalProps {
   open: boolean;
   side: ReconSide;
   groupLabel: string;
-  /** 本次沖帳金額（使用者輸入的對帳單金額） */
+  /** 本次沖帳金額；須帶 appliedSettleAmount（已併入使用餘額的實際沖帳總額），
+   * 否則與下方 diff（同樣以 appliedSettleAmount 計算）兜不起來 */
   settleAmount: number;
   /** 待付(收)帳金額（該管道/廠商目前所有待付(收)總額） */
   totalBeforeRemaining: number;

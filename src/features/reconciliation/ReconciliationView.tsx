@@ -293,8 +293,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     return sections.flatMap(s => s.rows).find(r => r.uuid === selectedUuid) ?? null;
   }, [sections, selectedUuid]);
 
-  // 使用餘額為對帳單/沖帳金額下方的固定減項（見 ReconPoolPanel），從實際存入/付出金額中扣除
-  const depositAmount = statementAmount + feeAmount + otherDeductions.reduce((sum, r) => sum + r.amount, 0) - balanceUsed;
+  const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
+  // 使用餘額不是實際入帳/出帳的錢（僅為系統內部既有餘額，用來沖抵帳款），故不計入實際存入/付出金額，
+  // 只會計入下方的 settleAmount（實測驗證過：depositAmount 若加上 balanceUsed 會被後端拒絕）
+  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal;
+  // 真正的沖帳金額須把使用餘額併進去（使用餘額也是實際拿去沖銷帳款的錢，只是來源不是本次存入/付出），
+  // 不能只送使用者輸入框裡的原始金額，否則沖帳結果會少算這筆餘額，被後端判定少沖（見 ReconSingleConfirmModal 的沖帳後狀態）
+  const settleAmount = statementAmount + balanceUsed;
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過），此時仍須讓使用者透過 A/B/C 選擇處理方式
@@ -418,7 +423,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、使用餘額不可超過目前餘額、需選收/付款日
   const validateAmountInputs = (): string => {
     if (statementAmount <= 0) return `請先輸入${mode === 'single' ? '沖帳' : '對帳單'}金額`;
-    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費、使用餘額與額外金額`;
+    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額`;
     if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
     if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
@@ -443,7 +448,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         groupUuid: selectedGroupKey,
         ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : [],
         isDefault: mode !== 'multi',
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         isBalance: false,
@@ -500,7 +505,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       const result = await submitSettle({
         side,
         ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : previewResult.allocations.map(a => a.ledgerUuid),
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
@@ -535,7 +540,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         groupUuid: selectedGroupKey,
         ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : [],
         isDefault: mode !== 'multi',
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         isBalance: true,
@@ -544,13 +549,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       });
       // isBalance=true 時，後端只會沖能「完整結清」的原單——沖不滿的最後一筆會直接排除在 ledgerAllocations 外
       // （不勾選、不異動），差額改記入餘額；rePreview 僅用於取得正確的 ledgerUuids 子集合。
-      // settleAmount／實際存入(付出)金額一律沿用使用者原始輸入的對帳單金額與 depositAmount
-      // （＝settleAmount − balanceUsed − 手續費 − 額外金額），不可用 rePreview 的
-      // appliedSettleAmount／actualAmount 取代（實測驗證過會被後端拒絕）。
+      // settleAmount／實際存入(付出)金額一律沿用本地算好的 settleAmount 與 depositAmount
+      // （settleAmount ＝ statementAmount + balanceUsed；depositAmount ＝ statementAmount + 手續費 + 額外金額，
+      // 不含 balanceUsed），不可用 rePreview 的 appliedSettleAmount／actualAmount 取代（實測驗證過會被後端拒絕）。
       const result = await submitSettle({
         side,
         ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : rePreview.allocations.map(a => a.ledgerUuid),
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
@@ -576,7 +581,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       const result = await submitSettle({
         side,
         ledgerUuids: mode === 'multi' ? Array.from(selectedMultiUuids) : previewResult.allocations.map(a => a.ledgerUuid),
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
@@ -626,7 +631,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       await submitSingleSettle({
         side,
         ledgerUuid: selectedRow.uuid,
-        settleAmount: statementAmount,
+        settleAmount,
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
@@ -636,7 +641,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       });
       if (side === 'receivable') setReceivableData(null);
       else setPayableData(null);
-      setSubmittedInfo({ matchedCount: 1, matchedAmount: statementAmount });
+      setSubmittedInfo({ matchedCount: 1, matchedAmount: settleAmount });
       setStatementAmount(0);
       setFeeAmount(0);
       setOtherDeductions([]);
@@ -844,7 +849,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           open={surplusOpen}
           side={side}
           groupLabel={selectedGroupLabel}
-          settleAmount={previewResult.settleAmount}
+          settleAmount={previewResult.appliedSettleAmount}
           totalBeforeRemaining={previewResult.totalBeforeRemaining}
           diff={diffAmount}
           submitting={submitLoading}
@@ -864,7 +869,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           open={singleConfirmOpen}
           side={side}
           row={selectedRow}
-          settleAmount={statementAmount}
+          settleAmount={settleAmount}
+          balanceUsed={balanceUsed}
+          feeAndOtherAmount={feeAmount + otherDeductionsTotal}
           actualAmount={depositAmount}
           submitting={submitLoading}
           submitError={submitError}

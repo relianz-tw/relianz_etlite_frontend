@@ -25,7 +25,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
   // wrap 'nowrap'：金額／筆數／日期等短值不換行；'break'：結算單號可能很長，逐字斷行避免只在連字號處攔腰折斷
   const summaryRows: { label: string; value: string; wrap: 'nowrap' | 'break' }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' as const },
-    { label: '沖帳總額', value: fmtCurrency(result.settleAmount), wrap: 'nowrap' as const },
+    { label: '沖帳總額', value: fmtCurrency(result.appliedSettleAmount), wrap: 'nowrap' as const },
     { label: '有沖帳筆數', value: `${result.allocations.length} 筆`, wrap: 'nowrap' as const },
     { label: '沖前餘額', value: fmtCurrency(result.balanceBefore), wrap: 'nowrap' as const },
     { label: '沖後餘額', value: fmtCurrency(result.balanceAfter), wrap: 'nowrap' as const },
