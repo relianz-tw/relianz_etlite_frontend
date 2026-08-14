@@ -21,7 +21,7 @@ interface TransactionAllowanceListCardProps {
 export default function TransactionAllowanceListCard({ side, returnQuery, entry, allowances, onCreate }: TransactionAllowanceListCardProps) {
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-4">
-      <div className="mb-1 flex items-center justify-between gap-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-neutral-dark">折讓紀錄（{allowances.length}）</h2>
         {/* entry.remainingAmount 是「未沖金額」（沖帳/收付款進度），不是可折讓額度：交易已沖帳完畢
             （remainingAmount＝0）仍可能需要開立折讓單，故不可用它來 disable 這顆按鈕 */}
@@ -29,7 +29,6 @@ export default function TransactionAllowanceListCard({ side, returnQuery, entry,
           開立折讓單
         </Button>
       </div>
-      <p className="mb-3 text-xs text-neutral-mid">未沖金額 {fmtCurrency(entry.remainingAmount)}</p>
       {allowances.length === 0 ? (
         <p className="text-sm text-neutral-mid">尚無折讓紀錄</p>
       ) : (
