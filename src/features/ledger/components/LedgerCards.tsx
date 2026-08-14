@@ -135,7 +135,6 @@ function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () 
 
 function SalesCard({
   row,
-  subTab,
   expanded,
   onToggle,
   channelText,
@@ -194,7 +193,12 @@ function SalesCard({
           </div>
         )}
       </div>
-      {!selectionMode && subTab === 'received' && <div className="truncate text-xs text-neutral-mid">{channelText}</div>}
+      {!selectionMode && (
+        <div className="flex items-center justify-between gap-2 text-xs text-neutral-mid">
+          <span className="truncate">{channelText}</span>
+          <span className="truncate">{row.category}</span>
+        </div>
+      )}
       {!selectionMode && expanded && (
         <div onClick={e => e.stopPropagation()} className="mt-1 border-t border-neutral-blue-gray/20 pt-2">
           <LedgerAllowanceChildren ledgerUuid={row.uuid ?? row.id} expanded={expanded} side="sales" searchParams={searchParams} />

@@ -133,8 +133,8 @@ export default function LedgerView() {
             total: result.total,
             totals: { primary: result.receivedVoucherAmount, settled: result.paidAmount, outstanding: result.payableAmount },
           }))
-        : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(result => ({
-            rows: mapReceivableItemsToRows(result.items).filter(row => !row.isAllowance),
+        : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(async result => ({
+            rows: (await mapReceivableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
             totals: { primary: result.issuedVoucherAmount, settled: result.collectedAmount, outstanding: result.receivableAmount },
           }));

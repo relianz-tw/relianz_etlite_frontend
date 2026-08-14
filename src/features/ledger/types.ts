@@ -41,6 +41,8 @@ export interface SalesRow {
   amount: number;
   counterparty: string;
   date: string;
+  /** 收入科目名稱：officialAccountingSubjectId 反查 /ael/subject/official/list/latest 取得，查無對應科目時退回編號顯示 */
+  category: string;
   /** 銷售管道真實 uuid（來自 /ael/ledger/receivables/filter 的 paymentChannelUuid）；供匯總沖帳依 uuid 分組比對，
    * 亦供帳簿列表反查管道名稱顯示（見 LedgerView 的 channelNameByUuid） */
   paymentChannelUuid?: string | null;

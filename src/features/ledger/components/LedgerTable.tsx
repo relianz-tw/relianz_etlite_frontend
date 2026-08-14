@@ -228,8 +228,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   );
 
   if (props.side === 'sales') {
-    const { subTab, rows, totalCount, totalAmount, sort, onSortToggle, channelNameByUuid } = props;
-    const showChannel = subTab === 'received';
+    const { rows, totalCount, totalAmount, sort, onSortToggle, channelNameByUuid } = props;
     return (
       <>
       {exportDialog}
@@ -241,7 +240,8 @@ export default function LedgerTable(props: LedgerTableProps) {
             <col className="w-[190px]" />
             <col className="w-[150px]" />
             <col />
-            {showChannel && <col className="w-[150px]" />}
+            <col className="w-[150px]" />
+            <col className="w-[150px]" />
             <col className="w-[120px]" />
             <col className="w-[120px]" />
           </colgroup>
@@ -265,7 +265,8 @@ export default function LedgerTable(props: LedgerTableProps) {
               <th className={thClass}>
                 <SortHeader label="買受人" sortKey="counterparty" sort={sort} onToggle={onSortToggle} />
               </th>
-              {showChannel && <th className={thClass}>銷售管道</th>}
+              <th className={thClass}>銷售管道</th>
+              <th className={thClass}>費用類別</th>
               <th className={thClass}>
                 <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
               </th>
@@ -301,11 +302,12 @@ export default function LedgerTable(props: LedgerTableProps) {
                     <AmountCell amount={row.amount} className="font-semibold text-neutral-dark" />
                   </td>
                   <td className={cn(tdClass, 'whitespace-normal break-words')}>{row.counterparty}</td>
-                  {showChannel && (
-                    <td className={`${tdClass} truncate text-neutral-mid`} title={channelLabel(row, channelNameByUuid)}>
-                      {channelLabel(row, channelNameByUuid)}
-                    </td>
-                  )}
+                  <td className={`${tdClass} truncate text-neutral-mid`} title={channelLabel(row, channelNameByUuid)}>
+                    {channelLabel(row, channelNameByUuid)}
+                  </td>
+                  <td className={`${tdClass} truncate text-neutral-mid`} title={row.category}>
+                    {row.category}
+                  </td>
                   <td className={`${tdClass} font-mono`}>{row.date}</td>
                   <td className={`${tdClass} text-right`}>
                     {row.voided ? (
@@ -321,7 +323,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                 </tr>
                 {expanded[row.id] && (
                   <tr className="border-b border-neutral-blue-gray/20 last:border-0">
-                    <td className="p-2" colSpan={showChannel ? 7 : 6}>
+                    <td className="p-2" colSpan={8}>
                       <LedgerAllowanceChildren ledgerUuid={row.uuid ?? row.id} expanded={!!expanded[row.id]} side="sales" searchParams={searchParams} />
                     </td>
                   </tr>
@@ -329,10 +331,10 @@ export default function LedgerTable(props: LedgerTableProps) {
               </Fragment>
             ))}
           </tbody>
-          <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={showChannel ? 4 : 3}>
+          <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={5}>
             {selectedCount > 0 && (
               <SelectionExportRow
-                colSpan={showChannel ? 7 : 6}
+                colSpan={8}
                 selectedCount={selectedCount}
                 selectedAmount={selectedAmount}
                 onExport={() => setExportOpen(true)}

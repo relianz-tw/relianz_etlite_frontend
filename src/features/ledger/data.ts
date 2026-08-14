@@ -67,10 +67,15 @@ export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promis
 
 /**
  * /ael/ledger/receivables/filter 一批項目 → 表格 SalesRow[]。
- * 銷項表格不需科目名稱反查（不同於進項），故為同步函式；uuid 帶入真實應收帳款 uuid 供手動入帳沖帳與交易明細頁查詢使用。
+ * officialAccountingSubjectId 向 /ael/subject/official/list/latest 查詢最新科目清單反查收入科目名稱；
+ * 查無對應科目時，退回以編號顯示。uuid 帶入真實應收帳款 uuid 供手動入帳沖帳與交易明細頁查詢使用。
  * 銷售管道名稱由呼叫端另外以 paymentChannelUuid 反查（見 LedgerView 的 channelNameByUuid）。
  */
-export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesRow[] {
+export async function mapReceivableItemsToRows(items: ReceivableListItemDto[]): Promise<SalesRow[]> {
+  const subjectList = await listOfficialSubjects();
+  const subjectNameById = new Map<number, string>();
+  subjectList.forEach(subject => subjectNameById.set(subject.id, subject.name));
+
   return items.map(item => {
     const date = issueDateFrom(item.invoice, item.entryDate, item.createdAt);
     return {
@@ -79,6 +84,7 @@ export function mapReceivableItemsToRows(items: ReceivableListItemDto[]): SalesR
       amount: item.totalAmount,
       counterparty: item.counterpartyName,
       date: formatRocDate(date),
+      category: subjectNameById.get(item.officialAccountingSubjectId) ?? `科目 #${item.officialAccountingSubjectId}`,
       paymentChannelUuid: item.paymentChannelUuid,
       voucherNumber: voucherNumberFromInvoice(item.invoice),
       voided: false,
