@@ -31,7 +31,7 @@ export default function TransactionSettlementStatus({ entry, buyOrSell, settleEv
   const activeCount = settleEvents.filter(event => !event.isReverse).length;
 
   const rows: StatusRow[] = [
-    { icon: CircleDollarSign, label: isPurchase ? '已付金額' : '已收金額', value: fmtCurrency(entry.settledAmount) },
+    { icon: CircleDollarSign, label: isPurchase ? '已付金額/折讓金額' : '已收金額/折讓金額', value: fmtCurrency(entry.settledAmount) },
     { icon: Wallet, label: isPurchase ? '待付金額' : '待收金額', value: fmtCurrency(entry.remainingAmount) },
     {
       icon: Scale,

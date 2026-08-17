@@ -8,7 +8,7 @@ import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
-import TextInput from '@/components/ui/TextInput';
+import Textarea from '@/components/ui/Textarea';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { useState } from 'react';
@@ -71,7 +71,7 @@ function AllowanceCreateDialogContent({
       return;
     }
     if (!subject?.id) {
-      setError(side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目');
+      setError('請選擇會計科目');
       return;
     }
     if (totalAmount <= 0) {
@@ -121,7 +121,7 @@ function AllowanceCreateDialogContent({
         </div>
 
         <div>
-          <Label required>{side === 'purchase' ? '費用類別' : '收入科目'}</Label>
+          <Label required>會計科目</Label>
           <SubjectSelect value={subject} onChange={setSubject} disabled={submitting} />
         </div>
 
@@ -147,7 +147,7 @@ function AllowanceCreateDialogContent({
 
         <div>
           <Label>備註</Label>
-          <TextInput value={memo} onChange={e => setMemo(e.target.value)} disabled={submitting} />
+          <Textarea value={memo} onChange={e => setMemo(e.target.value)} disabled={submitting} />
         </div>
 
         {error && <p className="text-xs text-semantic-error">{error}</p>}

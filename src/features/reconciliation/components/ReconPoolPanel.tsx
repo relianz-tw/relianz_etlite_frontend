@@ -131,6 +131,7 @@ export default function ReconPoolPanel({
   const isDepositNegative = depositAmount < 0;
   const accountLabel = side === 'payable' ? '付款銀行帳戶' : '存入銀行帳戶';
   const dateLabel = side === 'payable' ? '付款日' : '收款日';
+  const balanceKindLabel = side === 'payable' ? '進項支出餘額' : '銷項收入餘額';
 
   return (
     <div className="rounded-lg border-[1.5px] border-brand-blue bg-white p-4">
@@ -188,7 +189,7 @@ export default function ReconPoolPanel({
               <MoneyInput value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
             </div>
             <p className="text-right text-xs text-neutral-mid">
-              目前 {balanceLabel} 餘額 {fmtCurrency(balance)}
+              目前 {balanceLabel} {balanceKindLabel} {fmtCurrency(balance)}
               {onBalanceUsedChange && balance > 0 && (
                 <>
                   {' '}

@@ -8875,7 +8875,6 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
     "paymentAmount": 750,
     "paymentDate": "20260805",
     "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
-    "isBalance": true,
     "allocations": {
         "feeAmount": 30,
         "name": "匯總手續費"
@@ -8903,7 +8902,6 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
 |» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
 |» memo|body|string| no |備註（選填）|
 |» balanceUsed|body|integer| yes |使用餘額|
-|» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
 |»» name|body|string| yes |沖帳項目名稱|
@@ -9277,7 +9275,6 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
     "paymentDate": "20260805",
     "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
     "memo": "匯總應收測試",
-    "isBalance" : true,
     "allocations": {
         "feeAmount": 200,
         "name": "匯總手續費"
@@ -9305,7 +9302,6 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
 |» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
 |» memo|body|string| no |備註（選填）|
 |» balanceUsed|body|integer| yes |使用餘額|
-|» isBalance|body|boolean| yes |是否將超沖少沖的金額記進餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
 |»» name|body|string| yes |沖帳項目名稱|
@@ -9518,6 +9514,77 @@ POST /ael/ledger/reconciliation/settle/reverse
 
 ### Responses Data Schema
 
+## GET 依沖帳事件查關聯交易
+
+GET /ael/ledger/settle/event
+
+依沖帳事件settleEventUuid查關聯交易ledgerUuid
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|settleEventUuid|query|string| no |沖帳事件uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": {
+        "settleEventUuid": "fbfe7e59-345e-46b9-81eb-5727a0fad06b",
+        "reconMethod": 2,
+        "side": 0,
+        "paymentDate": "20260811",
+        "settleAmount": 525,
+        "cashAmount": 525,
+        "isReverse": false,
+        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+        "mainSettlementLedgerUuid": "7da59c26-53fa-4c5f-975a-afe5d17fe58e",
+        "originLedgerUuids": [
+            "52d17953-4952-4de4-9322-88f414abd61d",
+            "636f9e81-4f38-4490-8ad0-b57304ca0336"
+        ],
+        "feeLedgerUuids": [],
+        "deductionLedgerUuids": []
+    },
+    "errorCode": "0000",
+    "message": "操作成功",
+    "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|false|none||none|
+|» errorCode|string|false|none||none|
+|» message|string|false|none||none|
+|» data|object|false|none||none|
+|»» settleEventUuid|string|false|none||沖帳事件uuid|
+|»» reconMethod|integer|false|none||0手動／1即沖／2匯總／4銀行提匯等|
+|»» side|integer|false|none||0銷項／1進項|
+|»» paymentDate|string|false|none||YYYYMMDD|
+|»» settleAmount|integer|false|none||沖帳金額|
+|»» cashAmount|integer|false|none||實際現金異動|
+|»» isReverse|boolean|false|none||是恢復交易嗎|
+|»» bankAccountUuid|string¦null|false|none||銀行帳號uuid|
+|»» mainSettlementLedgerUuid|string|false|none||主結算交易uuid|
+|»» originLedgerUuids|[string]|false|none||業務原單交易uuid|
+|»» feeLedgerUuids|[string]|false|none||手續費交易uuid|
+|»» deductionLedgerUuids|[string]|false|none||其他減項交易uuid|
+
 # 帳簿/對帳中心
 
 ## GET 拿取該公司的所有進項應付，依廠商分組列表
@@ -9649,6 +9716,21 @@ HTTP Status Code **200**
 |»»» settlementStatus|integer|false|none||none|
 |»»» officialAccountingSubjectId|integer|false|none||none|
 |»»» createdAt|string|false|none||none|
+|»»» invoice|[object]|true|none||none|
+|»»»» uuid|string|true|none||發票uuid|
+|»»»» invoiceTrack|string|true|none||發票字軌|
+|»»»» invoiceNumber|string|true|none||發票號碼|
+|»»»» voucherNumber|string|true|none||發票字軌+發票號碼|
+|»»»» date|string|true|none||YYYMMDD|
+|»»»» buyerName|string|true|none||買方名稱|
+|»»»» sellerName|string|true|none||賣方名稱|
+|»»»» buyerTaxIdNumber|string|true|none||買方統編|
+|»»»» sellerTaxIdNumber|string|true|none||賣方統編|
+|»»»» counterpartyTaxId|string|true|none||廠商統編|
+|»»»» amount|integer|true|none||未稅額|
+|»»»» businessTax|integer|true|none||稅額|
+|»»»» buyOrSell|integer|true|none||2進項,3銷項|
+|»»»» ourInvoiceType|integer|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
@@ -9691,11 +9773,11 @@ GET /ael/ledger/reconciliation/receivables
                 "settlementAmount": 7,
                 "feeRateBps": 200,
                 "feeFixedAmount": 3,
-                "balance": 0,
+                "balance": 43,
                 "isActive": true,
                 "remark": "2.00%+3元",
                 "createdAt": "2026-07-30T08:41:19Z",
-                "updatedAt": "2026-08-11T03:17:34Z"
+                "updatedAt": "2026-08-12T04:27:45Z"
             },
             "receivingAccount": {
                 "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
@@ -9705,18 +9787,18 @@ GET /ael/ledger/reconciliation/receivables
                 "bankName": "中國信託",
                 "branchName": "港墘分行",
                 "accountNo": "1234567890123456",
-                "currentBalance": 132605,
-                "lastBalanceUpdateDate": "20260811",
-                "isDefaultReceivingAccount": false,
+                "currentBalance": 301618,
+                "lastBalanceUpdateDate": "20260813",
+                "isDefaultReceivingAccount": true,
                 "isDefaultPaymentAccount": true,
                 "isActive": true,
                 "remark": "前端自動化測試備註",
                 "createdAt": "2026-07-30T04:17:46Z",
-                "updatedAt": "2026-08-11T04:36:40Z"
+                "updatedAt": "2026-08-13T04:25:21Z"
             },
-            "balance": 0,
-            "totalSettledAmount": 2000,
-            "totalRemainingAmount": 980599,
+            "balance": 43,
+            "totalSettledAmount": 5000,
+            "totalRemainingAmount": 811029,
             "settlementStatus": 2,
             "items": [
                 {
@@ -9731,11 +9813,27 @@ GET /ael/ledger/reconciliation/receivables
                     "netAmount": 30000,
                     "taxAmount": 0,
                     "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 30000,
+                    "settledAmount": 5000,
+                    "remainingAmount": 25000,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-07-31T08:45:29Z"
+                    "createdAt": "2026-07-31T08:45:29Z",
+                    "invoice": {
+                        "uuid": "029a4783-9767-4d0e-80bd-8305a6b46538",
+                        "invoiceTrack": "RR",
+                        "invoiceNumber": "56000000",
+                        "voucherNumber": "RR56000000",
+                        "date": "1150701",
+                        "amount": 30000,
+                        "businessTax": 0,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "95441885",
+                        "buyerTaxIdNumber": "95441885",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "潤智教育有限公司",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "b2d3e3c7-0c62-414e-a0ad-9a04a30d865b",
@@ -9753,7 +9851,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 46490,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T07:59:08Z"
+                    "createdAt": "2026-08-07T07:59:08Z",
+                    "invoice": {
+                        "uuid": "6e0ece6d-4f7c-400e-9c14-c9924775b9c3",
+                        "invoiceTrack": "EI",
+                        "invoiceNumber": "34234234",
+                        "voucherNumber": "EI34234234",
+                        "date": "1150707",
+                        "amount": 46490,
+                        "businessTax": 3490,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "40343490",
+                        "buyerTaxIdNumber": "40343490",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試測試",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "44026f3e-4eba-4376-8f44-ecc125e82876",
@@ -9771,79 +9885,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 5040,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-07-31T07:06:51Z"
-                },
-                {
-                    "ledgerUuid": "6d0f26aa-94cf-4c23-8d3a-a53d7dcbb47a",
-                    "orderCode": "TX-115073100006",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "潤智教育有限公司",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 34000,
-                    "netAmount": 34000,
-                    "taxAmount": 0,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 34000,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 11,
-                    "createdAt": "2026-07-31T08:43:46Z"
-                },
-                {
-                    "ledgerUuid": "c6ef0f9f-7b49-4196-907e-16ea21dd9723",
-                    "orderCode": "TX-115080700036",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "923848234",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 34000,
-                    "netAmount": 34000,
-                    "taxAmount": 0,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 34000,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T07:57:29Z"
-                },
-                {
-                    "ledgerUuid": "0190bf3a-3716-4a74-9694-2bec305d7b48",
-                    "orderCode": "TX-115080300010",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "原味商行",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 1050,
-                    "netAmount": 1000,
-                    "taxAmount": 50,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 1000,
-                    "remainingAmount": 50,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 41,
-                    "createdAt": "2026-08-03T08:58:28Z"
-                },
-                {
-                    "ledgerUuid": "1ed3867e-4c56-4b21-9597-fd3a9a0d82fc",
-                    "orderCode": "TX-115080700040",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "測試測試",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 34349,
-                    "netAmount": 34000,
-                    "taxAmount": 349,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 34349,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 11,
-                    "createdAt": "2026-08-07T07:59:36Z"
+                    "createdAt": "2026-07-31T07:06:51Z",
+                    "invoice": {
+                        "uuid": "1a4b0bd9-3ad4-4966-866f-2d000dc2251d",
+                        "invoiceTrack": "HH",
+                        "invoiceNumber": "60889000",
+                        "voucherNumber": "HH60889000",
+                        "date": "1150710",
+                        "amount": 5040,
+                        "businessTax": 40,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "95441885",
+                        "buyerTaxIdNumber": "95441885",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "潤智教育有限公司",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "f26bc332-2d45-405e-b993-8f31fa1d0290",
@@ -9861,61 +9919,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 312240,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T08:00:57Z"
-                },
-                {
-                    "ledgerUuid": "1b7c3bac-262c-434e-8a0d-115c15a193d5",
-                    "orderCode": "TX-115080700043",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "測試測試",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 23737,
-                    "netAmount": 23434,
-                    "taxAmount": 303,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 23737,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T08:01:33Z"
-                },
-                {
-                    "ledgerUuid": "d4d9f931-776b-4bb5-9120-61177490941b",
-                    "orderCode": "TX-115080700044",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "測試測試",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 34340,
-                    "netAmount": 34000,
-                    "taxAmount": 340,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 34340,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T08:01:59Z"
-                },
-                {
-                    "ledgerUuid": "183d22a1-2859-42db-9efc-1fa9d15755b9",
-                    "orderCode": "TX-115080700046",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "測試測試",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 4044,
-                    "netAmount": 4000,
-                    "taxAmount": 44,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 0,
-                    "remainingAmount": 4044,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 11,
-                    "createdAt": "2026-08-07T08:03:12Z"
+                    "createdAt": "2026-08-07T08:00:57Z",
+                    "invoice": {
+                        "uuid": "a69f9dcb-feb6-4980-995c-112ff671e4cb",
+                        "invoiceTrack": "ER",
+                        "invoiceNumber": "24024903",
+                        "voucherNumber": "ER24024903",
+                        "date": "1150801",
+                        "amount": 312240,
+                        "businessTax": 3040,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "49030034",
+                        "buyerTaxIdNumber": "49030034",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試測試",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "5603d33c-d301-4b10-9c45-f664bec4a11e",
@@ -9933,25 +9953,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 3454,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-07T08:03:35Z"
-                },
-                {
-                    "ledgerUuid": "f2cb960e-6aac-4b85-8ae6-3133ae86b9f4",
-                    "orderCode": "TX-115080300003",
-                    "entryDate": null,
-                    "entryKind": 0,
-                    "direction": 2,
-                    "counterpartyName": "原味商行",
-                    "paymentChannelUuid": "5900d3b6-d6b3-4075-92ad-890aee377301",
-                    "totalAmount": 1050,
-                    "netAmount": 1000,
-                    "taxAmount": 50,
-                    "taxFreeAmount": 0,
-                    "settledAmount": 1000,
-                    "remainingAmount": 50,
-                    "settlementStatus": 2,
-                    "officialAccountingSubjectId": 41,
-                    "createdAt": "2026-08-03T07:03:52Z"
+                    "createdAt": "2026-08-07T08:03:35Z",
+                    "invoice": {
+                        "uuid": "2d051b3d-52f8-40fa-a46e-25d93d60d033",
+                        "invoiceTrack": "OE",
+                        "invoiceNumber": "32434333",
+                        "voucherNumber": "OE32434333",
+                        "date": "1150801",
+                        "amount": 3454,
+                        "businessTax": 30,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "34293234",
+                        "buyerTaxIdNumber": "34293234",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試測試",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "da6c16f7-e7d1-47a5-b4b0-d776c2cfd928",
@@ -9969,7 +9987,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 3434,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T08:00:28Z"
+                    "createdAt": "2026-08-07T08:00:28Z",
+                    "invoice": {
+                        "uuid": "d362defc-2e1e-4a36-9dfe-79f7e68fb1c5",
+                        "invoiceTrack": "PE",
+                        "invoiceNumber": "34889234",
+                        "voucherNumber": "PE34889234",
+                        "date": "1150803",
+                        "amount": 3434,
+                        "businessTax": 34,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "34892343",
+                        "buyerTaxIdNumber": "34892343",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試測試",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "3b89af58-f323-4f76-84eb-6ef24ac80ef0",
@@ -9987,7 +10021,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 300000,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T07:56:33Z"
+                    "createdAt": "2026-08-07T07:56:33Z",
+                    "invoice": {
+                        "uuid": "c0aa04e6-995d-4d81-968b-292af4c9f53a",
+                        "invoiceTrack": "OO",
+                        "invoiceNumber": "32340000",
+                        "voucherNumber": "OO32340000",
+                        "date": "1150804",
+                        "amount": 300000,
+                        "businessTax": 0,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "32481939",
+                        "buyerTaxIdNumber": "32481939",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試公司一",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "c9cf71a4-aafc-498c-bbd3-081c6b2785b1",
@@ -10005,7 +10055,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 53429,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 10,
-                    "createdAt": "2026-08-07T08:02:34Z"
+                    "createdAt": "2026-08-07T08:02:34Z",
+                    "invoice": {
+                        "uuid": "e44210d2-b0aa-4d94-9249-9726b8698c60",
+                        "invoiceTrack": "RU",
+                        "invoiceNumber": "43449343",
+                        "voucherNumber": "RU43449343",
+                        "date": "1150804",
+                        "amount": 53429,
+                        "businessTax": 3430,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "34034243",
+                        "buyerTaxIdNumber": "34034243",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試測試",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "a10f2060-01d8-48b1-b26a-cbce12caaece",
@@ -10023,7 +10089,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 0,
                     "settlementStatus": 0,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-06T09:16:47Z"
+                    "createdAt": "2026-08-06T09:16:47Z",
+                    "invoice": {
+                        "uuid": "ac4ba738-a92b-4f48-a70a-b8f680ffb0c1",
+                        "invoiceTrack": "99",
+                        "invoiceNumber": "900003",
+                        "voucherNumber": "99900003",
+                        "date": "1150806",
+                        "amount": 0,
+                        "businessTax": 0,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "",
+                        "buyerTaxIdNumber": "",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試買家C",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "a781b07d-4127-4055-b5cc-680f55daf985",
@@ -10041,7 +10123,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 43730,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-07T07:58:21Z"
+                    "createdAt": "2026-08-07T07:58:21Z",
+                    "invoice": {
+                        "uuid": "27d89a2e-0058-4ffc-80b3-5d343bf28652",
+                        "invoiceTrack": "ER",
+                        "invoiceNumber": "34342483",
+                        "voucherNumber": "ER34342483",
+                        "date": "1150806",
+                        "amount": 43730,
+                        "businessTax": 3430,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "42834343",
+                        "buyerTaxIdNumber": "42834343",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試二二二",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "ac93b74f-9861-404b-a417-df2e021e9c24",
@@ -10059,7 +10157,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 2100,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-07T04:21:58Z"
+                    "createdAt": "2026-08-07T04:21:58Z",
+                    "invoice": {
+                        "uuid": "42d57d54-284e-4263-ab37-9d3aae591223",
+                        "invoiceTrack": "AB",
+                        "invoiceNumber": "10000002",
+                        "voucherNumber": "AB10000002",
+                        "date": "1150807",
+                        "amount": 2100,
+                        "businessTax": 100,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "",
+                        "buyerTaxIdNumber": "",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試買家二",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "986cedb4-1f69-40fc-94a4-e2f71d140503",
@@ -10077,7 +10191,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 3150,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-07T04:23:02Z"
+                    "createdAt": "2026-08-07T04:23:02Z",
+                    "invoice": {
+                        "uuid": "f3e07762-efa0-4b37-89e6-f92b5b3a3549",
+                        "invoiceTrack": "AB",
+                        "invoiceNumber": "10000003",
+                        "voucherNumber": "AB10000003",
+                        "date": "1150807",
+                        "amount": 3150,
+                        "businessTax": 150,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "",
+                        "buyerTaxIdNumber": "",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試買家三",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 },
                 {
                     "ledgerUuid": "0b33c141-c694-40e1-b899-97bb42218dbd",
@@ -10095,7 +10225,23 @@ GET /ael/ledger/reconciliation/receivables
                     "remainingAmount": 12962,
                     "settlementStatus": 2,
                     "officialAccountingSubjectId": 1,
-                    "createdAt": "2026-08-07T07:59:04Z"
+                    "createdAt": "2026-08-07T07:59:04Z",
+                    "invoice": {
+                        "uuid": "66aa3c2e-108c-4808-a019-f48a00a829ad",
+                        "invoiceTrack": "AB",
+                        "invoiceNumber": "10000001",
+                        "voucherNumber": "AB10000001",
+                        "date": "1150811",
+                        "amount": 12962,
+                        "businessTax": 617,
+                        "buyOrSell": 3,
+                        "ourInvoiceType": 3,
+                        "counterpartyTaxId": "",
+                        "buyerTaxIdNumber": "",
+                        "sellerTaxIdNumber": "82999614",
+                        "buyerName": "測試客戶一",
+                        "sellerName": "盤古投資有限公司"
+                    }
                 }
             ]
         }
@@ -10174,6 +10320,21 @@ HTTP Status Code **200**
 |»»» settlementStatus|integer|true|none||none|
 |»»» officialAccountingSubjectId|integer|true|none||none|
 |»»» createdAt|string|true|none||none|
+|»»» invoice|object|true|none||none|
+|»»»» uuid|string|true|none||none|
+|»»»» invoiceTrack|string|true|none||none|
+|»»»» invoiceNumber|string|true|none||none|
+|»»»» voucherNumber|string|true|none||none|
+|»»»» date|string|true|none||none|
+|»»»» amount|integer|true|none||none|
+|»»»» businessTax|integer|true|none||none|
+|»»»» buyOrSell|integer|true|none||none|
+|»»»» ourInvoiceType|integer|true|none||none|
+|»»»» counterpartyTaxId|string|true|none||none|
+|»»»» buyerTaxIdNumber|string|true|none||none|
+|»»»» sellerTaxIdNumber|string|true|none||none|
+|»»»» buyerName|string|true|none||none|
+|»»»» sellerName|string|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
@@ -11116,7 +11277,7 @@ POST /ael/bankAccounts/transactions
 |---|---|---|---|---|
 |body|body|object| yes |none|
 |» companyUuid|body|string| yes |公司uuid|
-|» bankAccountUuid|body|string| yes |銀行uuid|
+|» bankAccountUuid|body|string| yes |銀行帳戶uuid|
 |» dateFrom|body|string| yes |起時間 YYYYMMDD|
 |» dateTo|body|string| yes |迄時間 YYYYMMDD|
 |» limit|body|integer| yes |一頁資料筆數|
@@ -11127,7 +11288,38 @@ POST /ael/bankAccounts/transactions
 > 200 Response
 
 ```json
-{}
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "bankAccountUuid": "string",
+    "items": [
+      {
+        "settleEventUuid": "string",
+        "reconMethod": 0,
+        "side": 0,
+        "paymentDate": "string",
+        "settleAmount": 0,
+        "cashAmount": 0,
+        "cashDirection": 0,
+        "isReverse": true,
+        "mainSettlementLedgerUuid": "string",
+        "originLedgerUuids": [
+          "string"
+        ],
+        "primaryOriginLedgerUuid": "string",
+        "hasInvoice": true,
+        "counterpartyName": "string",
+        "paymentChannelName": "string",
+        "createdAt": "2019-08-24T14:15:22Z"
+      }
+    ],
+    "total": 0,
+    "limit": 0,
+    "page": 0
+  }
+}
 ```
 
 ### Responses
@@ -11137,6 +11329,113 @@ POST /ael/bankAccounts/transactions
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|false|none||none|
+|» errorCode|string|false|none||none|
+|» message|string|false|none||none|
+|» data|object|false|none||none|
+|»» bankAccountUuid|string|false|none||銀行帳戶uuid|
+|»» items|[object]|false|none||none|
+|»»» settleEventUuid|string|false|none||沖帳事件uuid|
+|»»» reconMethod|integer|false|none||0手動／1即沖／2匯總／4銀行提匯等|
+|»»» side|integer|false|none||0銷項／1進項|
+|»»» paymentDate|string|false|none||YYYYMMDD|
+|»»» settleAmount|integer|false|none||實際沖帳金額|
+|»»» cashAmount|integer|false|none||none|
+|»»» cashDirection|integer|false|none||0存入／1付出|
+|»»» isReverse|boolean|false|none||是交易恢復嗎|
+|»»» mainSettlementLedgerUuid|string|false|none||交易原單uuid|
+|»»» originLedgerUuids|[string]|false|none||交易關聯單uuid|
+|»»» primaryOriginLedgerUuid|string|false|none||none|
+|»»» hasInvoice|boolean|false|none||有發票嗎|
+|»»» counterpartyName|string|false|none||廠商名稱|
+|»»» paymentChannelName|string|false|none||銷售管道名稱|
+|»»» createdAt|string(date-time)|false|none||none|
+|»» total|integer|false|none||全部資料筆數|
+|»» limit|integer|false|none||一頁資料筆數|
+|»» page|integer|false|none||頁碼|
+
+## POST 銀行提／匯款
+
+POST /ael/bankAccounts/cashMovements
+
+建立一筆銀行直接提／匯款的交易紀錄
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "cashDirection": 0,
+    "amount": 1000,
+    "paymentDate": "20260813",
+    "officialAccountingSubjectId": 123,
+    "memo": "股東往來匯入"
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» bankAccountUuid|body|string| yes |銀行帳戶uuid|
+|» cashDirection|body|integer| yes |0 匯入／1 提出|
+|» amount|body|integer| yes |金額|
+|» paymentDate|body|string| yes |YYYYMMDD|
+|» officialAccountingSubjectId|body|integer| yes |科目id|
+|» memo|body|string| yes |備註|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "ledgerEntryUuid": "string",
+    "orderCode": "string",
+    "settleEventUuid": "string",
+    "bankAccountUuid": "string",
+    "cashDirection": 0,
+    "amount": 0,
+    "paymentDate": "string"
+  }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|false|none||none|
+|» errorCode|string|false|none||none|
+|» message|string|false|none||none|
+|» data|object|false|none||none|
+|»» ledgerEntryUuid|string|false|none||交易uuid|
+|»» orderCode|string|false|none||交易編號|
+|»» settleEventUuid|string|false|none||沖帳事件uuid|
+|»» bankAccountUuid|string|false|none||銀行帳戶uuid|
+|»» cashDirection|integer|false|none||0匯入／1提出|
+|»» amount|integer|false|none||金額|
+|»» paymentDate|string|false|none||YYYYMMDD|
 
 # 基礎設定
 
