@@ -531,7 +531,30 @@ export interface ReconciliationQuery {
   settled?: string;
 }
 
-/** 對帳中心進項應付單筆項目；與 PayableListItemDto 不同，無 invoice／memo／entryType／status／counterpartyType 欄位 */
+/** 對帳中心項目關聯發票資訊；GET /ael/ledger/reconciliation/{payables,receivables} 各筆項目皆附帶此欄位 */
+export interface ReconInvoiceDto {
+  uuid: string;
+  invoiceTrack: string;
+  invoiceNumber: string;
+  /** 發票字軌＋發票號碼 */
+  voucherNumber: string;
+  /** 憑證開立日，YYYMMDD（民國年，無分隔符） */
+  date: string;
+  buyerName: string;
+  sellerName: string;
+  buyerTaxIdNumber: string;
+  sellerTaxIdNumber: string;
+  counterpartyTaxId: string;
+  /** 未稅額 */
+  amount: number;
+  /** 稅額 */
+  businessTax: number;
+  /** 2 進項／3 銷項 */
+  buyOrSell: number;
+  ourInvoiceType: number;
+}
+
+/** 對帳中心進項應付單筆項目；與 PayableListItemDto 不同，無 memo／entryType／status／counterpartyType 欄位 */
 export interface ReconPayableItemDto {
   ledgerUuid: string;
   orderCode: string;
@@ -550,6 +573,7 @@ export interface ReconPayableItemDto {
   settlementStatus: number;
   officialAccountingSubjectId: number;
   createdAt: string;
+  invoice: ReconInvoiceDto;
 }
 
 /** 對帳中心進項應付分組（依廠商） */
@@ -564,7 +588,7 @@ export interface ReconPayableGroupDto {
   items: ReconPayableItemDto[];
 }
 
-/** 對帳中心銷項應收單筆項目；與 ReceivableListItemDto 不同，無 invoice／memo／entryType／status／counterpartyType 欄位 */
+/** 對帳中心銷項應收單筆項目；與 ReceivableListItemDto 不同，無 memo／entryType／status／counterpartyType 欄位 */
 export interface ReconReceivableItemDto {
   ledgerUuid: string;
   orderCode: string;
@@ -584,6 +608,7 @@ export interface ReconReceivableItemDto {
   settlementStatus: number;
   officialAccountingSubjectId: number;
   createdAt: string;
+  invoice: ReconInvoiceDto;
 }
 
 /** 對帳中心銷項應收分組（依銷售管道） */
@@ -736,7 +761,7 @@ export interface SettleLedgerAllocation {
   afterRemaining: number;
   /** 沖後狀態：0平衡 1超沖 2少沖 */
   settlementStatus: number;
-  /** 本次沖後是否結清（after<=0 且有沖）；isBalance=false 時超沖少沖差額會強制沖入最後一筆並標記結清 */
+  /** 本次沖後是否結清（after<=0 且有沖）；超沖少沖差額一律強制沖入最後一筆並標記結清 */
   closed: boolean;
   /** 結算傳票 uuid（alloc>0 才有） */
   settlementLedgerUuid?: string;
@@ -761,8 +786,6 @@ export interface SettleReceivablePreviewBody {
   depositAmount: number;
   /** 使用餘額 */
   balanceUsed: number;
-  /** 是否將超沖少沖的金額記進餘額 */
-  isBalance: boolean;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   /** 使用者未新增任何額外金額時不傳此參數 */
@@ -784,8 +807,6 @@ export interface SettlePayablePreviewBody {
   paymentAmount: number;
   /** 使用餘額 */
   balanceUsed: number;
-  /** 是否將超沖少沖的金額記進餘額 */
-  isBalance: boolean;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   /** 使用者未新增任何額外金額時不傳此參數 */
@@ -812,8 +833,6 @@ interface SettlePreviewResultBase {
   balanceBefore: number;
   /** 沖後餘額（廠商／銷售管道） */
   balanceAfter: number;
-  /** 是否將超沖少沖的金額記進餘額 */
-  isBalance: boolean;
   /** 拆帳前各原單 remaining 合計 */
   totalBeforeRemaining: number;
 }
@@ -838,9 +857,7 @@ export interface SettlePayablePreviewResult extends SettlePreviewResultBase {
 
 /**
  * POST /ael/ledger/reconciliation/receivables/settle/summary body：真正執行沖帳（非預覽）。
- * isBalance=true 時，depositAmount 須帶「實際沖完整的那幾筆金額總和」（即預覽回應 ledgerAllocations 中
- * closed=true 各筆 settleAmount 加總），而非使用者原始輸入的存入金額；isBalance=false 時沿用原始輸入值，
- * 差額直接沖入最後一筆交易。ledgerUuids 取自預覽回應的 ledgerAllocations（依所選 isBalance 重新預覽後的結果）。
+ * ledgerUuids 取自預覽回應的 ledgerAllocations；差額（超沖／少沖）一律直接沖入最後一筆交易。
  */
 export interface SettleReceivableSummaryBody {
   companyUuid: string;
@@ -858,8 +875,6 @@ export interface SettleReceivableSummaryBody {
   memo?: string;
   /** 使用餘額 */
   balanceUsed: number;
-  /** 是否將超沖少沖的金額記進餘額 */
-  isBalance: boolean;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   otherDeductions?: SettleSummaryOtherDeduction[];
@@ -879,7 +894,6 @@ export interface SettlePayableSummaryBody {
   memo?: string;
   /** 使用餘額 */
   balanceUsed: number;
-  isBalance: boolean;
   allocations: SettleSummaryFee;
   otherDeductions?: SettleSummaryOtherDeduction[];
 }
@@ -902,8 +916,6 @@ interface SettleSummaryResultBase {
   balanceBefore: number;
   /** 沖後餘額（廠商／銷售管道） */
   balanceAfter: number;
-  /** 是否將超沖少沖的金額記進餘額 */
-  isBalance: boolean;
   /** 沖前剩餘合計 */
   totalBeforeRemaining: number;
   /** 唯一匯總結算帳 uuid */

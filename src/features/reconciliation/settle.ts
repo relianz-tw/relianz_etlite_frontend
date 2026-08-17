@@ -30,7 +30,6 @@ interface PreviewParams {
   actualAmount: number;
   /** 本次沖帳使用的餘額（元），對應 ReconPoolPanel「本次抵銷」欄位的使用者輸入值 */
   balanceUsed: number;
-  isBalance: boolean;
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
 }
@@ -55,7 +54,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       settleAmount: params.settleAmount,
       depositAmount: params.actualAmount,
       balanceUsed: params.balanceUsed,
-      isBalance: params.isBalance,
       allocations,
       otherDeductions,
     });
@@ -65,7 +63,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       actualAmount: res.actualDepositAmount,
       balanceBefore: res.balanceBefore,
       balanceAfter: res.balanceAfter,
-      isBalance: res.isBalance,
       affectedCount: res.affectedCount,
       totalBeforeRemaining: res.totalBeforeRemaining,
       allocations: res.ledgerAllocations,
@@ -79,7 +76,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     settleAmount: params.settleAmount,
     paymentAmount: params.actualAmount,
     balanceUsed: params.balanceUsed,
-    isBalance: params.isBalance,
     allocations,
     otherDeductions,
   });
@@ -89,7 +85,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     actualAmount: res.actualPaymentAmount,
     balanceBefore: res.balanceBefore,
     balanceAfter: res.balanceAfter,
-    isBalance: res.isBalance,
     affectedCount: res.affectedCount,
     totalBeforeRemaining: res.totalBeforeRemaining,
     allocations: res.ledgerAllocations,
@@ -106,7 +101,6 @@ interface SummaryParams {
   /** YYYYMMDD */
   paymentDate: string;
   bankAccountUuid: string;
-  isBalance: boolean;
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
 }
@@ -131,7 +125,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       paymentDate: params.paymentDate,
       bankAccountUuid: params.bankAccountUuid,
       balanceUsed: params.balanceUsed,
-      isBalance: params.isBalance,
       allocations,
       otherDeductions,
     });
@@ -141,7 +134,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       actualAmount: res.actualDepositAmount,
       balanceBefore: res.balanceBefore,
       balanceAfter: res.balanceAfter,
-      isBalance: res.isBalance,
       affectedCount: res.affectedCount,
       totalBeforeRemaining: res.totalBeforeRemaining,
       allocations: res.ledgerAllocations,
@@ -157,7 +149,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     paymentDate: params.paymentDate,
     bankAccountUuid: params.bankAccountUuid,
     balanceUsed: params.balanceUsed,
-    isBalance: params.isBalance,
     allocations,
     otherDeductions,
   });
@@ -167,7 +158,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     actualAmount: res.actualPaymentAmount,
     balanceBefore: res.balanceBefore,
     balanceAfter: res.balanceAfter,
-    isBalance: res.isBalance,
     affectedCount: res.affectedCount,
     totalBeforeRemaining: res.totalBeforeRemaining,
     allocations: res.ledgerAllocations,
@@ -196,7 +186,7 @@ interface SingleSettleParams {
  * 允許超沖少沖，事後可在交易明細頁編輯金額（見 SettlementEditDialog）。
  * payload 組法比照該對話框：allocations 為陣列，手續費為 0 時不放此項；otherDeductions 空陣列時送 undefined。
  * 回應正規化為 ReconSettleResult（單一 allocation），讓確認彈窗／結果彈窗能與多筆／匯總沖帳共用同一套元件——
- * 手動沖帳 API 沒有 balanceBefore／balanceAfter／isBalance 的概念（不影響管道／廠商餘額），對應欄位留空／固定 false。
+ * 手動沖帳 API 沒有 balanceBefore／balanceAfter 的概念（不影響管道／廠商餘額），對應欄位留空。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
   const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '手續費', feeAmount: -params.feeAmount }] : [];
@@ -242,7 +232,6 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
     settleAmount: params.settleAmount,
     appliedSettleAmount: res.settledAmount,
     actualAmount: params.actualAmount,
-    isBalance: false,
     affectedCount: 1,
     totalBeforeRemaining: res.beforeRemaining,
     allocations: [allocation],

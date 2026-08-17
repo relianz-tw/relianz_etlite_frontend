@@ -2,16 +2,9 @@
  * 已知會外洩技術字眼的後端訊息 → 對應的親善化中文說明。
  * 新增規則前請先確認該訊息實際出現於畫面上，避免臆測後端措辭。
  */
-const KNOWN_MESSAGE_OVERRIDES: Array<{ match: RegExp; friendly: string }> = [
-  {
-    // 後端於「差額記入餘額」（isBalance=true）模式下，若沒有任何一筆原始憑證能被完整沖銷時回傳的原始訊息，
-    // 直接顯示會讓使用者看到 API 參數名稱 isBalance，故改用業務語言重新描述同一限制
-    match: /無可沖原單.*isBalance/,
-    friendly: '沒有任何一筆原始憑證能被完整沖銷。「差額記入餘額」模式下請確保至少一筆能全額沖銷，或改選「將差額沖入最後一筆交易」。',
-  },
-];
+const KNOWN_MESSAGE_OVERRIDES: Array<{ match: RegExp; friendly: string }> = [];
 
-/** 技術字眼特徵：英文駝峰命名（如 isBalance、ledgerUuid）常見於後端訊息中夾帶的欄位／旗標名稱 */
+/** 技術字眼特徵：英文駝峰命名（如 ledgerUuid、bankAccountUuid）常見於後端訊息中夾帶的欄位／旗標名稱 */
 const TECHNICAL_TOKEN = /\b[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b/;
 
 /**

@@ -1,14 +1,7 @@
-import type { EntryInvoiceDetailDto, ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
+import type { ReconPayableGroupDto, ReconReceivableGroupDto } from '@/api/types';
 import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { parseApiDate } from '@/features/ledger/data';
 import type { ReconSide, ReconTxnRef } from './types';
-
-/** 憑證明細民國年 year/month/day 欄位補零組成 YYY/MM/DD（ReconTxnList 展開面板的懶載入憑證資料使用） */
-export function formatInvoiceDate(invoice: EntryInvoiceDetailDto): string {
-  const month = String(invoice.month).padStart(2, '0');
-  const day = String(invoice.day).padStart(2, '0');
-  return `${invoice.year}/${month}/${day}`;
-}
 
 /** 側邊欄「其他」群組：找不到對應啟用中管道/廠商 uuid 的交易（含未指定與已停用/未知 uuid） */
 export const OTHER_GROUP_KEY = '__OTHER__';
@@ -69,15 +62,22 @@ interface ReconCandidate {
   groupUuid: string | null;
   /** 未沖帳金額；可為負代表超沖 */
   remainingAmount?: number;
+  /** 憑證號碼（發票字軌＋發票號碼），供確認沖帳／沖帳結果彈窗顯示（沖帳 API 本身不回傳此欄位，需反查候選清單） */
+  voucherNumber: string;
 }
 
 function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
   return (parseRocDate(a.date)?.getTime() ?? 0) - (parseRocDate(b.date)?.getTime() ?? 0);
 }
 
-/** 對帳中心 items 的 entryDate（YYYYMMDD，未入帳時為 null）→ 民國年 YYY/MM/DD；缺值時退回 createdAt（ISO 字串） */
-function toRocDate(entryDate: string | null, createdAt: string): string {
-  return formatRocDate(parseApiDate(entryDate ?? createdAt));
+/**
+ * 開立日期＝憑證上的開立日（item.invoice.date，民國年 YYYMMDD），與 features/ledger/data.ts 的
+ * issueDateFrom 相同慣例；查無憑證日期時退回 entryDate（交易收款/付款日 YYYYMMDD，未入帳時為 null，
+ * 此時不顯示日期）。
+ */
+function toIssueDate(invoiceDate: string, entryDate: string | null): string {
+  const date = parseRocDate(invoiceDate) ?? (entryDate ? parseApiDate(entryDate) : undefined);
+  return formatRocDate(date);
 }
 
 /** 對帳中心銷項應收分組回應 → 攤平為統一候選交易形狀，分組鍵為 paymentChannelUuid */
@@ -87,10 +87,11 @@ export function receivableGroupsToCandidates(groups: ReconReceivableGroupDto[]):
       uuid: item.ledgerUuid,
       orderCode: item.orderCode,
       amount: item.totalAmount,
-      date: toRocDate(item.entryDate, item.createdAt),
+      date: toIssueDate(item.invoice.date, item.entryDate),
       counterparty: item.counterpartyName,
       groupUuid: item.paymentChannelUuid,
       remainingAmount: item.remainingAmount,
+      voucherNumber: item.invoice.voucherNumber,
     })),
   );
 }
@@ -102,10 +103,11 @@ export function payableGroupsToCandidates(groups: ReconPayableGroupDto[]): Recon
       uuid: item.ledgerUuid,
       orderCode: item.orderCode,
       amount: item.totalAmount,
-      date: toRocDate(item.entryDate, item.createdAt),
+      date: toIssueDate(item.invoice.date, item.entryDate),
       counterparty: item.counterpartyName,
       groupUuid: item.counterpartyUuid,
       remainingAmount: item.remainingAmount,
+      voucherNumber: item.invoice.voucherNumber,
     })),
   );
 }
@@ -117,6 +119,7 @@ function toTxnRef(candidate: ReconCandidate): ReconTxnRef {
     amount: candidate.amount,
     date: candidate.date,
     counterparty: candidate.counterparty,
+    voucherNumber: candidate.voucherNumber,
     channelUuid: candidate.groupUuid,
     remainingAmount: candidate.remainingAmount,
   };

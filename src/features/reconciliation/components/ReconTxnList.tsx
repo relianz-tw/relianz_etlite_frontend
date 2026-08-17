@@ -11,7 +11,6 @@ import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { ChevronDown, FileSearch, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { formatInvoiceDate } from '../data';
 import type { ReconSubGroup } from '../data';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 
@@ -167,7 +166,6 @@ function TxnRow({
   const badge = statusBadge ?? negativeRemainingBadge;
   const { detail, loading: detailLoading, error: detailError } = useLazyEntryDetail(row.uuid, expanded);
   const invoice = detail?.invoice;
-  const voucherNumber = invoice ? `${invoice.invoiceTrack}${invoice.invoiceNumber}` : '—';
   const taxId = invoice ? (side === 'receivable' ? invoice.buyerTaxIdNumber : invoice.sellerTaxIdNumber) : '';
   const [voucherOpen, setVoucherOpen] = useState(false);
 
@@ -183,7 +181,7 @@ function TxnRow({
       <div className={cn('flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-4 nav:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
         <button type="button" onClick={onToggleExpand} className="flex flex-col gap-1.5 text-left">
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <span className="shrink-0 whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date || '—'}</span>
             <div className="flex items-center gap-2">
               {badge && (
                 <Badge tone={badge.tone} variant="muted">
@@ -194,8 +192,11 @@ function TxnRow({
               <ChevronDown size={16} className={chevronClass} />
             </div>
           </div>
-          <span className="truncate font-mono text-sm text-neutral-dark" title={row.orderCode}>
-            {row.orderCode}
+          <span className="truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
+            {row.voucherNumber || '—'}
+          </span>
+          <span className="truncate text-xs text-neutral-mid" title={row.counterparty}>
+            {row.counterparty || '—'}
           </span>
           <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
         </button>
@@ -253,10 +254,15 @@ function TxnRow({
           <span className="w-10 shrink-0" />
         )}
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date}</span>
-          <span className="w-44 shrink-0 truncate font-mono text-neutral-dark" title={row.orderCode}>
-            {row.orderCode}
-          </span>
+          <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date || '—'}</span>
+          <div className="flex w-48 min-w-0 shrink-0 flex-col">
+            <span className="truncate font-mono font-semibold text-neutral-dark" title={row.voucherNumber}>
+              {row.voucherNumber || '—'}
+            </span>
+            <span className="truncate text-xs text-neutral-mid" title={row.counterparty}>
+              {row.counterparty || '—'}
+            </span>
+          </div>
           <AmountCell amount={remainingAmount} />
           <span className="ml-3 min-w-0 flex-1 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
             {channelLabel(row, channelNameByUuid)}
@@ -266,33 +272,30 @@ function TxnRow({
               {badge.label}
             </Badge>
           )}
+          <ChevronDown size={16} className={chevronClass} />
         </button>
-        <ChevronDown size={16} className={chevronClass} />
       </div>
 
-      {/* 展開面板：交易編號／日期／買受人／金額／管道為清單既有資料即時顯示；憑證號碼／統一編號／開立日期
-          懶載入自 GET /ael/ledger/entries/detail，桌機/行動版共用同一份 markup */}
+      {/* 展開面板：交易編號／買受人／憑證號碼／憑證開立日期／金額／管道為清單既有資料即時顯示；統一編號
+          懶載入自 GET /ael/ledger/entries/detail，緊接在買受人下方，桌機/行動版共用同一份 markup */}
       {expanded && (
         <div ref={panelRef} className="mt-1 flex scroll-mt-16 flex-col gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream p-4 text-sm">
           <div className="flex flex-col gap-1.5">
             <InfoRow label="交易編號" value={row.orderCode || '—'} />
-            <InfoRow label="開立日期" value={row.date} />
             <InfoRow label={side === 'payable' ? '賣方' : '買受人'} value={row.counterparty || '—'} />
-            <InfoRow label={side === 'payable' ? '待付金額' : '待收金額'} value={fmtCurrency(remainingAmount)} />
-            <InfoRow label={side === 'payable' ? '廠商' : '銷售管道'} value={channelLabel(row, channelNameByUuid)} />
             {detailLoading ? (
-              <p className="text-xs text-neutral-mid">憑證資料載入中…</p>
+              <p className="text-xs text-neutral-mid">統一編號載入中…</p>
             ) : detailError ? (
               <p className="text-xs text-semantic-error">{detailError}</p>
             ) : detail && !invoice ? (
               <p className="text-xs text-neutral-mid">此交易尚無對應憑證</p>
             ) : invoice ? (
-              <>
-                <InfoRow label="憑證號碼" value={voucherNumber} />
-                <InfoRow label="統一編號" value={taxId || '—'} />
-                <InfoRow label="憑證開立日期" value={formatInvoiceDate(invoice)} />
-              </>
+              <InfoRow label="統一編號" value={taxId || '—'} />
             ) : null}
+            <InfoRow label="憑證號碼" value={row.voucherNumber || '—'} />
+            <InfoRow label="憑證開立日期" value={row.date || '—'} />
+            <InfoRow label={side === 'payable' ? '待付金額' : '待收金額'} value={fmtCurrency(remainingAmount)} />
+            <InfoRow label={side === 'payable' ? '廠商' : '銷售管道'} value={channelLabel(row, channelNameByUuid)} />
             {allocation && (
               <>
                 <InfoRow label="本次沖帳額" value={fmtCurrency(allocation.settleAmount)} />
@@ -425,7 +428,7 @@ export default function ReconTxnList({
           <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
             <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && mode === 'perTxn' ? '選取' : ''}</span>
             <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
-            <span className={cn(HEADER_CLASS, 'w-44 shrink-0')}>交易編號</span>
+            <span className={cn(HEADER_CLASS, 'w-48 shrink-0')}>{side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}</span>
             <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>{side === 'payable' ? '待付金額' : '待收金額'}</span>
             <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
             <span className="w-4 shrink-0" />
