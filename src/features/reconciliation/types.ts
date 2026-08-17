@@ -4,14 +4,16 @@ export type ReconSide = 'receivable' | 'payable';
 
 /**
  * 沖帳操作模式：
- * - single：單筆沖帳，走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0），
- *   事後可在交易明細頁用 SettlementEditDialog 編輯金額；不限定管道／廠商，「全部管道」「其他」亦可操作。
- * - multi：多筆沖帳，使用者勾選多筆交易後試算並沖帳；與 summary 共用 settle/preview + settle/summary API，
- *   差別僅在於帶入使用者勾選的 ledgerUuids 與 isDefault=false（summary 固定 isDefault=true、ledgerUuids=[]，
- *   由後端自動拆帳），需先於左側選擇明確銷售管道／廠商。
+ * - perTxn：逐筆沖帳（單筆／多筆整合），使用者從右側清單勾選交易，依勾選筆數自動分流 API——
+ *   勾 1 筆走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0，允許超沖少沖，
+ *   事後可在交易明細頁用 SettlementEditDialog 編輯金額，不限定管道／廠商，「全部管道」「其他」亦可操作）；
+ *   勾多筆走 settle/preview + settle/summary（明確帶入使用者勾選的 ledgerUuids 與 isDefault=false），
+ *   需先於左側選擇明確銷售管道／廠商。兩種筆數在畫面上共用同一套「預覽→確認→結果」流程
+ *   （見 ReconciliationView 的 handlePreview），僅差在有差額時：多筆彈 A/B/C 三選一（見 ReconSurplusModal），
+ *   單筆因手動沖帳 API 無 isBalance 參數，差額一律直接留在該筆原單，不彈三選一。
  * - summary：匯總沖帳，沿用既有 settle/preview + settle/summary 流程（reconMethod=2），僅能整批恢復。
  */
-export type ReconMode = 'single' | 'multi' | 'summary';
+export type ReconMode = 'perTxn' | 'summary';
 
 /**
  * 匯總沖帳預覽／執行結果，正規化銷項（depositAmount／paymentChannelUuid）與進項
@@ -25,11 +27,11 @@ export interface ReconSettleResult {
   appliedSettleAmount: number;
   /** 實際異動銀行金額 */
   actualAmount: number;
-  /** 沖前餘額（廠商／銷售管道） */
-  balanceBefore: number;
-  /** 沖後餘額（廠商／銷售管道） */
-  balanceAfter: number;
-  /** 是否將超沖少沖的金額記進餘額 */
+  /** 沖前餘額（廠商／銷售管道）；逐筆沖帳勾 1 筆走手動沖帳 API 無此欄位 */
+  balanceBefore?: number;
+  /** 沖後餘額（廠商／銷售管道）；逐筆沖帳勾 1 筆走手動沖帳 API 無此欄位 */
+  balanceAfter?: number;
+  /** 是否將超沖少沖的金額記進餘額；逐筆沖帳勾 1 筆走手動沖帳 API 無此概念，固定 false */
   isBalance: boolean;
   /** 實際有分配金額的原單筆數 */
   affectedCount: number;

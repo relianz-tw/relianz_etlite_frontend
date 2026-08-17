@@ -687,6 +687,24 @@ export interface SettleSummaryOtherDeduction {
   officialAccountingSubjectId: number;
 }
 
+/**
+ * 手動沖帳（POST /ael/ledger/receivables/settle、/ael/ledger/payables/settle）回應 data 區塊，
+ * 銷項／進項共用同一形狀（見 api.md「手動沖帳銷項應收帳款／進項應付帳款」）。
+ * 沒有 balanceBefore／balanceAfter（手動沖帳不影響管道／廠商餘額），也沒有 isBalance（不支援自動記入餘額）。
+ */
+export interface ManualSettleResult {
+  orderCode: string;
+  settledAmount: number;
+  beforeRemaining: number;
+  afterRemaining: number;
+  /** 0平衡 1超沖 2少沖 */
+  settlementStatus: number;
+  closed: boolean;
+  settlementLedgerUuid: string;
+  paymentDate: string;
+  relationUuid: string;
+}
+
 /** 匯總沖帳預覽回應中，請求手續費物件的回填（後端附加欄位，實測皆為空字串，用途未知） */
 export interface SettlePreviewFeeEcho {
   feeAmount: number;

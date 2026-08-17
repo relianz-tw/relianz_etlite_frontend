@@ -12,6 +12,7 @@ import type {
   DailyDetailResult,
   EntryDetailResult,
   InvoiceOriginResult,
+  ManualSettleResult,
   PayablesFilterBody,
   PayablesFilterResult,
   ReceivablesFilterBody,
@@ -107,15 +108,15 @@ export function fetchReconciliationReceivables(params: ReconciliationQuery): Pro
   return apiFetch<ReconReceivableGroupDto[]>(`/ael/ledger/reconciliation/receivables${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`);
 }
 
-export function settleReceivable(body: Omit<SettleReceivableBody, 'companyUuid'>): Promise<unknown> {
-  return apiFetch<unknown>('/ael/ledger/receivables/settle', {
+export function settleReceivable(body: Omit<SettleReceivableBody, 'companyUuid'>): Promise<ManualSettleResult> {
+  return apiFetch<ManualSettleResult>('/ael/ledger/receivables/settle', {
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });
 }
 
-export function settlePayable(body: Omit<SettlePayableBody, 'companyUuid'>): Promise<unknown> {
-  return apiFetch<unknown>('/ael/ledger/payables/settle', {
+export function settlePayable(body: Omit<SettlePayableBody, 'companyUuid'>): Promise<ManualSettleResult> {
+  return apiFetch<ManualSettleResult>('/ael/ledger/payables/settle', {
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });

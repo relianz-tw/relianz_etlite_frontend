@@ -23,12 +23,13 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
   if (!open || !result) return null;
 
   // wrap 'nowrap'：金額／筆數／日期等短值不換行；'break'：結算單號可能很長，逐字斷行避免只在連字號處攔腰折斷
+  // 沖前/沖後餘額僅匯總／多筆沖帳（settle/summary API）才有；逐筆沖帳勾 1 筆走手動沖帳 API 無此概念，故留空時整列略過
   const summaryRows: { label: string; value: string; wrap: 'nowrap' | 'break' }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' as const },
     { label: '沖帳總額', value: fmtCurrency(result.appliedSettleAmount), wrap: 'nowrap' as const },
     { label: '有沖帳筆數', value: `${result.allocations.length} 筆`, wrap: 'nowrap' as const },
-    { label: '沖前餘額', value: fmtCurrency(result.balanceBefore), wrap: 'nowrap' as const },
-    { label: '沖後餘額', value: fmtCurrency(result.balanceAfter), wrap: 'nowrap' as const },
+    { label: result.balanceBefore !== undefined ? '沖前餘額' : '', value: fmtCurrency(result.balanceBefore ?? 0), wrap: 'nowrap' as const },
+    { label: result.balanceAfter !== undefined ? '沖後餘額' : '', value: fmtCurrency(result.balanceAfter ?? 0), wrap: 'nowrap' as const },
     {
       label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '',
       value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '',

@@ -7,7 +7,7 @@
  * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
-import type { SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
+import type { SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
 import type { ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import type { ReconSettleResult, ReconSide } from './types';
 
@@ -192,38 +192,60 @@ interface SingleSettleParams {
 }
 
 /**
- * 單筆沖帳：走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0），
+ * 逐筆沖帳勾 1 筆：走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0），
  * 允許超沖少沖，事後可在交易明細頁編輯金額（見 SettlementEditDialog）。
  * payload 組法比照該對話框：allocations 為陣列，手續費為 0 時不放此項；otherDeductions 空陣列時送 undefined。
+ * 回應正規化為 ReconSettleResult（單一 allocation），讓確認彈窗／結果彈窗能與多筆／匯總沖帳共用同一套元件——
+ * 手動沖帳 API 沒有 balanceBefore／balanceAfter／isBalance 的概念（不影響管道／廠商餘額），對應欄位留空／固定 false。
  */
-export async function submitSingleSettle(params: SingleSettleParams): Promise<void> {
+export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
   const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '手續費', feeAmount: -params.feeAmount }] : [];
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
-  if (params.side === 'receivable') {
-    await settleReceivable({
-      ledgerUuid: params.ledgerUuid,
-      paymentDate: params.paymentDate,
-      bankAccountUuid: params.bankAccountUuid,
-      settleAmount: params.settleAmount,
-      depositAmount: params.actualAmount,
-      balanceUsed: params.balanceUsed,
-      memo: '',
-      allocations,
-      otherDeductions,
-    });
-    return;
-  }
+  const res =
+    params.side === 'receivable'
+      ? await settleReceivable({
+          ledgerUuid: params.ledgerUuid,
+          paymentDate: params.paymentDate,
+          bankAccountUuid: params.bankAccountUuid,
+          settleAmount: params.settleAmount,
+          depositAmount: params.actualAmount,
+          balanceUsed: params.balanceUsed,
+          memo: '',
+          allocations,
+          otherDeductions,
+        })
+      : await settlePayable({
+          ledgerUuid: params.ledgerUuid,
+          paymentDate: params.paymentDate,
+          bankAccountUuid: params.bankAccountUuid,
+          settleAmount: params.settleAmount,
+          paymentAmount: params.actualAmount,
+          balanceUsed: params.balanceUsed,
+          memo: '',
+          allocations,
+          otherDeductions,
+        });
 
-  await settlePayable({
+  const allocation: SettleLedgerAllocation = {
     ledgerUuid: params.ledgerUuid,
-    paymentDate: params.paymentDate,
-    bankAccountUuid: params.bankAccountUuid,
+    orderCode: res.orderCode,
+    beforeRemaining: res.beforeRemaining,
+    settleAmount: res.settledAmount,
+    afterRemaining: res.afterRemaining,
+    settlementStatus: res.settlementStatus,
+    closed: res.closed,
+    settlementLedgerUuid: res.settlementLedgerUuid,
+    relationUuid: res.relationUuid,
+  };
+  return {
     settleAmount: params.settleAmount,
-    paymentAmount: params.actualAmount,
-    balanceUsed: params.balanceUsed,
-    memo: '',
-    allocations,
-    otherDeductions,
-  });
+    appliedSettleAmount: res.settledAmount,
+    actualAmount: params.actualAmount,
+    isBalance: false,
+    affectedCount: 1,
+    totalBeforeRemaining: res.beforeRemaining,
+    allocations: [allocation],
+    paymentDate: res.paymentDate,
+  };
 }
