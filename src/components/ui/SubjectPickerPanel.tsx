@@ -148,7 +148,7 @@ export default function SubjectPickerPanel({
 
       <div
         ref={listRef}
-        className={`overscroll-contain ${fullScreen ? 'flex-1 overflow-y-auto' : 'max-h-80 overflow-y-auto py-1'}`}
+        className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${fullScreen ? '' : 'max-h-80 py-1'}`}
       >
         {loading && <p className="px-3 py-2 text-sm text-neutral-mid">載入中...</p>}
         {!loading && error && <p className="px-3 py-2 text-sm text-semantic-error">{error}</p>}
