@@ -23,17 +23,6 @@ export const SETTINGS_TAGS: TagRecord[] = [
   { id: 't3', name: '28-A湖西國小' },
 ];
 
-export interface InvoiceBookRecord {
-  id: string;
-  name: string;
-  trackCode: string;
-  startNumber: string;
-}
-export const INVOICE_PERIOD_LABEL = '115 年 07 月 - 08 月';
-export const HAND_INVOICE_BOOKS: InvoiceBookRecord[] = [
-  { id: 'ib1', name: '三聯式手開', trackCode: 'CA', startNumber: '32323200' },
-];
-
 export interface PlanServiceItem {
   id: string;
   label: string;

@@ -2,9 +2,9 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { createChannelRule, listChannelRules } from '@/api/channelRules';
-import { checkInvoiceTrackRule } from '@/api/invoice';
+import { listInvoiceBookPeriods, listInvoiceBooks } from '@/api/invoiceBook';
 import { createVendor, initDefaultOtherVendor, listVendors } from '@/api/vendors';
-import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
+import type { BankAccountDto, ChannelRuleDto, InvoiceBookDto, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
@@ -19,15 +19,16 @@ import InitOtherChannelDialog from '@/features/settings/components/InitOtherChan
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
 import { SETTLEMENT_STYLE } from '@/features/settings/data';
-import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
+import { getFriendlyErrorMessage } from '@/lib/errors';
+import { parseInvoicePeriodValue, toInvoicePeriodOption } from '@/lib/invoicePeriod';
+import type { InvoicePeriodOption } from '@/lib/invoicePeriod';
+import { ChevronsRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { PROJECT_NAMES } from '../../data';
 import type { Side } from '../../types';
 import {
   DECLARE_PERIOD_OPTIONS,
-  INVOICE_PERIOD_OPTIONS,
-  parseInvoicePeriod,
   PROJECT_PLACEHOLDER,
   PURCHASE_INVOICE_NUMBER_OPTIONS,
   SALES_INVOICE_BOOK_OPTIONS,
@@ -37,6 +38,7 @@ import {
 import type { TransactionFormState, TransactionMode } from '../types';
 import AllowanceOriginField from './AllowanceOriginField';
 import Field from './Field';
+import PassNumberDialog from './PassNumberDialog';
 
 interface TransactionMetaCardProps {
   side: Side;
@@ -121,8 +123,12 @@ export default function TransactionMetaCard({
   const [vendors, setVendors] = useState<VendorDto[]>([]);
   const [vendorError, setVendorError] = useState('');
   const [newVendorOpen, setNewVendorOpen] = useState(false);
-  // 新增銷項發票字軌是否符合當期規則（GET /ael/invoice/trackRule）；僅新增銷項使用
-  const [trackRuleError, setTrackRuleError] = useState('');
+  // 新增銷項：「發票期間」下拉選項改由後端動態取得，依選取期間載入可用發票簿清單供「發票號碼」下拉選擇
+  const [periods, setPeriods] = useState<InvoicePeriodOption[]>([]);
+  const [invoiceBooks, setInvoiceBooks] = useState<InvoiceBookDto[]>([]);
+  const [invoiceBooksLoading, setInvoiceBooksLoading] = useState(false);
+  const [invoiceBooksError, setInvoiceBooksError] = useState('');
+  const [passNumberOpen, setPassNumberOpen] = useState(false);
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
   // 「其他」管道（各公司 uuid 不同，但固定名稱為「其他」）固定排在清單最末，讓使用者優先看到具體管道
@@ -156,32 +162,44 @@ export default function TransactionMetaCard({
       .catch(err => setVendorError(getFriendlyErrorMessage(err)));
   }, [side]);
 
-  // 新增銷項：字軌／發票期間有變動時 debounce 檢查字軌是否符合當期規則；不符合（400）才提示，
-  // 其餘錯誤（如網路逾時）不視為字軌錯誤，避免誤導使用者
+  // 新增銷項：載入「發票期間」下拉可選期別；載入完成後預設選第一個，觸發下方發票簿清單載入
+  useEffect(() => {
+    if (side !== 'sales' || mode !== 'create') return;
+    listInvoiceBookPeriods()
+      .then(list => {
+        const options = list.map(toInvoicePeriodOption);
+        setPeriods(options);
+        if (!form.invoicePeriod && options.length > 0) onChange({ invoicePeriod: options[0].value });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [side, mode]);
+
+  // 新增銷項：發票期間變動時重新載入該期間可用發票簿清單；字軌是否符合期別規則已改在設定頁新增發票簿時檢查
   useEffect(() => {
     if (side !== 'sales' || mode !== 'create' || form.isAllowance) return;
-    const track = form.invoiceTrack.trim();
-    const period = parseInvoicePeriod(form.invoicePeriod);
-    if (!track || !period) {
-      setTrackRuleError('');
-      return;
-    }
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      checkInvoiceTrackRule({ track, year: period.year, phase: period.phase })
-        .then(() => {
-          if (!cancelled) setTrackRuleError('');
-        })
-        .catch(err => {
-          if (cancelled) return;
-          setTrackRuleError(err instanceof ApiError && err.status === 400 ? '此發票字軌非屬於這期別的，請確認輸入內容是否正確' : '');
-        });
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [side, mode, form.isAllowance, form.invoiceTrack, form.invoicePeriod]);
+    const parsed = parseInvoicePeriodValue(form.invoicePeriod);
+    if (!parsed) return;
+    setInvoiceBooksLoading(true);
+    setInvoiceBooksError('');
+    listInvoiceBooks({ year: parsed.rocYear, phase: parsed.phase })
+      .then(result => setInvoiceBooks(result.invoiceBook))
+      .catch(err => setInvoiceBooksError(getFriendlyErrorMessage(err)))
+      .finally(() => setInvoiceBooksLoading(false));
+  }, [side, mode, form.isAllowance, form.invoicePeriod]);
+
+  // 跳號成功後重新載入發票簿清單，並將表單當前選取的發票簿號碼一併更新為新的 currentNum
+  const reloadInvoiceBooksAfterPassNumber = () => {
+    const parsed = parseInvoicePeriodValue(form.invoicePeriod);
+    if (!parsed) return;
+    listInvoiceBooks({ year: parsed.rocYear, phase: parsed.phase })
+      .then(result => {
+        setInvoiceBooks(result.invoiceBook);
+        const current = result.invoiceBook.find(b => b.invoiceBookId === form.invoiceBookUuid);
+        if (current) onChange({ invoiceTrack: current.aphabeticLetter, invoiceSerial: current.currentNum });
+      })
+      .catch(err => setInvoiceBooksError(getFriendlyErrorMessage(err)));
+  };
 
   // 開啟「新增管道」或「開通其他管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
   useEffect(() => {
@@ -449,32 +467,66 @@ export default function TransactionMetaCard({
       [
         <Field key="invoicePeriod" label="發票期間">
           <Select widthClassName="w-full" value={form.invoicePeriod} onValueChange={v => onChange({ invoicePeriod: v })}>
-            {INVOICE_PERIOD_OPTIONS.map(v => (
-              <option key={v} value={v}>
-                {v}
+            {periods.length === 0 && (
+              <option value="" disabled>
+                載入中…
+              </option>
+            )}
+            {periods.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </Select>
         </Field>,
-        <Field key="invoiceNumber" label="發票號碼" required={isCreate}>
+        <Field
+          key="invoiceNumber"
+          label="發票號碼"
+          required={isCreate}
+          helper="請選擇發票簿，銷項發票號碼為系統自動帶入。如該張發票須作廢請按跳號，系統會跳過該號並不得重新使用。"
+        >
           <div className="flex gap-2">
-            <TextInput
-              widthClassName="w-16"
-              placeholder="字軌"
-              maxLength={2}
-              value={form.invoiceTrack}
-              className={trackRuleError ? 'border-semantic-error focus:border-semantic-error focus:ring-semantic-error/15' : ''}
-              onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
-            />
-            <TextInput
-              widthClassName="flex-1"
-              placeholder="流水號"
-              maxLength={8}
-              value={form.invoiceSerial}
-              onChange={e => onChange({ invoiceSerial: e.target.value })}
-            />
+            <div className="min-w-0 flex-1">
+              <Select
+                widthClassName="w-full"
+                value={form.invoiceBookUuid}
+                disabled={invoiceBooksLoading}
+                onValueChange={v => {
+                  const book = invoiceBooks.find(b => b.invoiceBookId === v);
+                  onChange({
+                    invoiceBookUuid: v,
+                    ...(book ? { invoiceTrack: book.aphabeticLetter, invoiceSerial: book.currentNum } : {}),
+                  });
+                }}
+              >
+                <option value="" disabled>
+                  請選擇發票簿
+                </option>
+                {invoiceBooks.map(b => (
+                  <option key={b.invoiceBookId} value={b.invoiceBookId}>
+                    {b.name}　{b.aphabeticLetter}
+                    {b.currentNum}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={ChevronsRight}
+              iconPosition="right"
+              className="shrink-0"
+              disabled={!form.invoiceBookUuid}
+              onClick={() => setPassNumberOpen(true)}
+            >
+              跳號
+            </Button>
           </div>
-          {trackRuleError && <p className="mt-1.5 text-xs text-semantic-error">{trackRuleError}</p>}
+          {invoiceBooksError && <p className="mt-1.5 text-xs text-semantic-error">{invoiceBooksError}</p>}
+          {!invoiceBooksLoading && !invoiceBooksError && invoiceBooks.length === 0 && (
+            <p className="mt-1.5 text-xs text-semantic-error">此發票期間尚無發票簿，請先至設定頁新增發票簿</p>
+          )}
         </Field>,
       ],
       [buyerTaxIdField, buyerNameField],
@@ -573,6 +625,12 @@ export default function TransactionMetaCard({
         accounts={bankAccounts}
       />
       <VendorDialog open={newVendorOpen} onClose={() => setNewVendorOpen(false)} onSubmit={handleCreateVendor} />
+      <PassNumberDialog
+        open={passNumberOpen}
+        onClose={() => setPassNumberOpen(false)}
+        invoiceBookId={form.invoiceBookUuid}
+        onSuccess={reloadInvoiceBooksAfterPassNumber}
+      />
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-base font-semibold text-neutral-dark">交易資訊</h2>
         {mode === 'edit' && !editing && (

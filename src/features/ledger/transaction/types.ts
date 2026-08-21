@@ -14,6 +14,8 @@ export interface TransactionFormState {
   invoiceTrack: string;
   invoiceSerial: string;
   invoiceNumber: string;
+  /** 新增銷項：選中的發票簿 uuid（GET /ael/invoiceBook 回應的 invoiceBookId），對應 API invoiceBookUuid */
+  invoiceBookUuid: string;
   declarePeriod: string;
   issueDate: Date | undefined;
   /** 銷項：選填，但與 buyerName 需一併填寫（填一項則兩項皆必填） */

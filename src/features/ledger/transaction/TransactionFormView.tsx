@@ -77,8 +77,8 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
     const invoiceNum = form.voucherType === VOUCHER_TYPES[0] ? form.invoiceSerial : form.invoiceNumber;
     if (!isImport && !invoiceNum.trim()) return '請輸入發票號碼';
-  } else if (!form.invoiceSerial.trim()) {
-    return '請輸入發票號碼';
+  } else if (!form.invoiceBookUuid) {
+    return '請選擇發票簿';
   }
   return null;
 }
@@ -131,9 +131,9 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
   };
 }
 
-/** 銷項發票號碼組裝：字軌（invoiceTrack）+ 流水號（invoiceSerial），與進項一般發票輸入模式一致 */
-function buildReceivableInvoice(form: TransactionFormState): Pick<CreateReceivableBody, 'alphabeticLetter' | 'invoiceNum'> {
-  return { alphabeticLetter: form.invoiceTrack || undefined, invoiceNum: form.invoiceSerial };
+/** 銷項發票號碼組裝：字軌／流水號由選中的發票簿自動帶入，另附上該發票簿 uuid（API 必填） */
+function buildReceivableInvoice(form: TransactionFormState): Pick<CreateReceivableBody, 'alphabeticLetter' | 'invoiceNum' | 'invoiceBookUuid'> {
+  return { alphabeticLetter: form.invoiceTrack || undefined, invoiceNum: form.invoiceSerial, invoiceBookUuid: form.invoiceBookUuid };
 }
 
 function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableBody, 'companyUuid'> {

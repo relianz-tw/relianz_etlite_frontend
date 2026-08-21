@@ -283,6 +283,22 @@ Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
 ```
 對應元件：`src/components/ui/MoneyInput.tsx` 的 `allowSign` prop（選用，預設關閉時為一般金額輸入，行為不變）。
 
+**檔案上傳區塊（Dashed Upload Drop Zone）**（點擊或拖放上傳單一檔案，如匯入表單、憑證/照片上傳）
+```
+容器：min-height 160px（單張照片類）或 480px（憑證預覽類），寬度 100%
+Border: 2px dashed #9AA7B9（neutral-blue-gray/50），rounded-lg（8px）
+Background: #FFFFFF
+未選取狀態：置中圖示 + 文字（lucide Search 或 ImagePlus，24-28px，strokeWidth 1.5）+ 「瀏覽照片／瀏覽檔案」文字
+已選取狀態：圖示改 lucide FileCheck2（#377456 裁切綠，semantic-success）+ 檔名文字；
+  若為圖片預覽，改直接顯示縮圖（object-contain，保留完整內容不裁切）
+Hover：border 與文字轉 #005FA2（brand-primary）
+Drag-over：border #005FA2、background rgba(0, 95, 162, 0.05)（brand-blue/5）、文字 #005FA2
+說明文字（格式/大小限制）：置中，Noto Sans TC 12px（text-xs）、#797C80（neutral-mid），置於上傳框下方
+```
+對應元件：`src/components/ImportDropSection.tsx`（匯入 Excel）、
+`src/features/ledger/transaction/components/VoucherUpload.tsx`（憑證照片預覽）、
+`src/features/ledger/transaction/components/PassNumberDialog.tsx`（發票跳號作廢憑證照片，僅前端驗證格式與大小）。
+
 ### Navigation — Sidebar（側邊欄導覽）
 
 全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +

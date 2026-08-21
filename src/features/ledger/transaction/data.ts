@@ -1,7 +1,6 @@
 import { listOfficialSubjects } from '@/api/subjects';
 import type { EntryInvoiceDetailDto } from '@/api/types';
 import type { SubjectOption } from '@/components/ui/SubjectSelect';
-import { monthToBimonthlyPhase } from '@/lib/utils';
 import type { Side } from '../types';
 import type { TransactionFormState } from './types';
 
@@ -13,7 +12,6 @@ export function parseSideParam(value: string | string[] | undefined): Side {
 export const TAG_PLACEHOLDER = '新增一般標籤';
 export const PROJECT_PLACEHOLDER = '選擇專案';
 
-export const INVOICE_PERIOD_OPTIONS = ['115 年 01 - 02 月份', '115 年 03 - 04 月份', '115 年 05 - 06 月份'];
 export const DECLARE_PERIOD_OPTIONS = ['115/02/09', '115/01/09', '115/03/09'];
 
 export const VOUCHER_TYPES = ['一般發票', '交通通聯', '水電瓦斯', '進口稅單', '收據 (無稅額)'];
@@ -43,12 +41,14 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   isAllowance: false,
   originLedgerUuid: '',
   declared: false,
-  invoicePeriod: INVOICE_PERIOD_OPTIONS[0],
+  // 由 TransactionMetaCard 掛載後透過 GET /ael/invoiceBook/getDate/forSetting 動態帶入第一個可選期別
+  invoicePeriod: '',
   voucherType: VOUCHER_TYPES[0],
   invoiceTrack: '',
   invoiceSerial: '',
-  // 新增銷項的發票號碼為單選發票簿下拉（僅一個選項，瀏覽器會自動帶入）；新增進項若憑證種類非一般發票則改用這個欄位輸入憑證編號
+  // 新增進項若憑證種類非一般發票則改用這個欄位輸入憑證編號；新增銷項的號碼改由 invoiceBookUuid 選定的發票簿帶入
   invoiceNumber: '',
+  invoiceBookUuid: '',
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
   issueDate: undefined,
   buyerTaxId: '',
@@ -79,18 +79,6 @@ function formatDeclarePeriod(cmsYear: number, cmsPhase: number): string {
   const start = String(cmsPhase).padStart(2, '0');
   const end = String(cmsPhase + 1).padStart(2, '0');
   return `${cmsYear} 年 ${start} - ${end} 月份`;
-}
-
-/**
- * 「發票期間」下拉字串（如 "115 年 01 - 02 月份"）→ trackRule 查詢所需的 year（西元年）／phase（期別代碼）。
- * phase 統一透過 monthToBimonthlyPhase 換算，與 formatDeclarePeriod 互為反向轉換。
- */
-export function parseInvoicePeriod(period: string): { year: string; phase: string } | null {
-  const match = /^(\d+)\s*年\s*(\d+)\s*-\s*\d+\s*月份$/.exec(period.trim());
-  if (!match) return null;
-  const rocYear = Number(match[1]);
-  const startMonth = Number(match[2]);
-  return { year: String(rocYear + 1911), phase: String(monthToBimonthlyPhase(startMonth)) };
 }
 
 /**

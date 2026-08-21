@@ -50,6 +50,60 @@ export interface VendorExistsResult {
 }
 
 /**
+ * 發票本 DTO，對應 api.md「發票本」章節（GET /ael/invoiceBook 回應內的 invoiceBook 陣列項目）。
+ * 注意欄位名 aphabeticLetter 為後端既有拼字（少一個 l），與 ledger 交易 API 的 alphabeticLetter 不同，照抄勿改。
+ */
+export interface InvoiceBookDto {
+  /** 發票簿 uuid；save 端點稱 invoiceId，receivables 端點稱 invoiceBookUuid，list 端點稱 invoiceBookId，三者同義 */
+  invoiceBookId: string;
+  /** invoice_type */
+  part: number;
+  name: string;
+  aphabeticLetter: string;
+  startNum: string;
+  /** 當前發票號，選發票簿時據此帶入交易頁的流水號 */
+  currentNum: string;
+}
+
+export interface InvoiceBookListResult {
+  /** 該年期全部發票本數（含 ezreceipt）；無紙本時為 0 */
+  count: number;
+  invoiceBook: InvoiceBookDto[];
+}
+
+/**
+ * 新增發票本（POST /ael/invoiceBook/save）。
+ * 注意：實測 dev 環境此發票本三支 API 皆用 companyUuid（非 api.md 舊版文件標示的 uuid）。
+ * 依最新 api.md，此端點僅支援新增（不含 invoiceId），uuid 由後端產生並於 response 回傳；
+ * 實測確認多次帶相同 name/year/phase/aphabeticLetter/startNum 呼叫會建立多筆，並非依欄位比對更新既有紀錄。
+ */
+export interface SaveInvoiceBookBody {
+  companyUuid: string;
+  name: string;
+  /** 民國年 */
+  year: number;
+  /** 期別（1/3/5/7/9/11） */
+  phase: number;
+  aphabeticLetter: string;
+  startNum: string;
+}
+
+/** POST /ael/invoiceBook/save 回應；後端產生的發票本 uuid */
+export interface SaveInvoiceBookResult {
+  invoiceBookId: string;
+}
+
+/** GET /ael/invoiceBook/getDate/forSetting 回應項目：設定頁「發票期間」下拉可選期別 */
+export interface InvoiceBookPeriodDto {
+  /** 民國年 */
+  year: number;
+  /** 期別（1/3/5/7/9/11） */
+  phase: number;
+  /** 該期別下已建立的發票本數 */
+  count: number;
+}
+
+/**
  * 公司銀行帳戶 DTO，對應 bank.html 內嵌 OpenAPI 規格（/ael/bankAccounts 群組）。
  * lastBalanceUpdateDate 格式為 YYYYMMDD 字串，新建帳戶尚未有紀錄時為 null。
  */
@@ -333,6 +387,8 @@ export interface CreateReceivableBody {
   unreportedReason?: string;
   /** 銷項憑證類型；實務可傳 1（統一發票） */
   voucherKind: number;
+  /** 發票簿 uuid（對應 GET /ael/invoiceBook 回應的 invoiceBookId），銷項建立交易必填 */
+  invoiceBookUuid: string;
 }
 
 /** 建立進折／銷折交易紀錄（POST /ael/ledger/{payables,receivables}/allowance）body；兩支端點欄位完全相同 */
