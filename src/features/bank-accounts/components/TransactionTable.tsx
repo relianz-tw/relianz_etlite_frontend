@@ -6,7 +6,6 @@ import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Fragment } from 'react';
-import { formatCounterpartyLabel } from '../data';
 import { cashDirectionLabel } from '../labels';
 import { useLazyLinkedTransactions } from '../useLazyLinkedTransactions';
 import InlineLinkedTransactions from './InlineLinkedTransactions';
@@ -24,6 +23,8 @@ interface TransactionTableProps {
   onToggle: (id: string) => void;
   /** 展開列「查看完整明細」按鈕導向的交易詳細頁網址 */
   detailHref: (row: BankTxnRow) => string;
+  /** 科目 id → 名稱對照表，供展開列關聯帳簿交易的科目名稱使用 */
+  subjectNameById: Map<number, string>;
 }
 
 /** 展開列的重點欄位（沖帳金額/實際收付/建立時間）＋關聯帳簿交易（懶載入）＋導向詳細頁按鈕 */
@@ -73,23 +74,30 @@ function ExpandedDetail({
   );
 }
 
-/** 單列（含收合列與展開內容）：獨立成元件讓 useLazyLinkedTransactions 有自己的 hook 實例，
- *  並讓收合列的交易對象文字（formatCounterpartyLabel）能拿到已展開載入的 items 補上科目 fallback */
+/** 單列（含收合列與展開內容）：獨立成元件讓 useLazyLinkedTransactions 有自己的 hook 實例 */
 function TransactionRow({
   row,
   expanded,
   isOdd,
   onToggle,
   detailHref,
+  subjectNameById,
 }: {
   row: BankTxnRow;
   expanded: boolean;
   isOdd: boolean;
   onToggle: () => void;
   detailHref: string;
+  subjectNameById: Map<number, string>;
 }) {
-  const { items, loading, error } = useLazyLinkedTransactions(row.originLedgerUuids, row.settleEventUuid, expanded);
-  const counterpartyLabel = formatCounterpartyLabel(row, items);
+  const { items, loading, error } = useLazyLinkedTransactions(
+    row.originLedgerUuids,
+    row.originOfficialAccountingSubjectIds,
+    row.settleEventUuid,
+    subjectNameById,
+    expanded,
+  );
+  const counterpartyLabel = row.counterpartyLabel;
 
   return (
     <Fragment>
@@ -124,7 +132,7 @@ function TransactionRow({
 }
 
 /** 桌機交易明細表：整列可點擊 inline 展開重點欄位，展開內含導向交易詳細頁的按鈕；樣式沿用帳簿表格（thClass/tdClass/斑馬紋）慣例 */
-export default function TransactionTable({ rows, totalCount, expandedId, onToggle, detailHref }: TransactionTableProps) {
+export default function TransactionTable({ rows, totalCount, expandedId, onToggle, detailHref, subjectNameById }: TransactionTableProps) {
   return (
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
@@ -160,6 +168,7 @@ export default function TransactionTable({ rows, totalCount, expandedId, onToggl
                 isOdd={i % 2 === 1}
                 onToggle={() => onToggle(row.settleEventUuid)}
                 detailHref={detailHref(row)}
+                subjectNameById={subjectNameById}
               />
             ))
           )}

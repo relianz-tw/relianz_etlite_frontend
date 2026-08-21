@@ -31,7 +31,7 @@ export interface BankTxnRow {
   reconMethod: number;
   /** 0銷項／1進項 */
   side: number;
-  /** 交易對象顯示名稱：優先取廠商名稱，取不到（空字串）則回退備註 */
+  /** 交易對象顯示名稱：優先取廠商名稱，取不到則回退備註，皆空再回退科目名稱（見 data.ts 的 resolveCounterpartyLabel） */
   counterpartyLabel: string;
   /** 帳面沖帳金額 */
   settleAmount: number;
@@ -51,6 +51,8 @@ export interface BankTxnRow {
   mainSettlementLedgerUuid: string;
   /** 交易關聯單 uuid 列表，供查詢關聯帳簿交易 */
   originLedgerUuids: string[];
+  /** 交易關聯單科目 id 列表，與 originLedgerUuids 同序，供反查關聯帳簿交易的科目名稱 */
+  originOfficialAccountingSubjectIds: number[];
   primaryOriginLedgerUuid: string;
   createdAt: string;
 }

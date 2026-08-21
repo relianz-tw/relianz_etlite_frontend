@@ -10,8 +10,15 @@ import type { LinkedLedgerTxn } from './types';
  * 僅在使用者實際展開該列時才逐筆呼叫 GET /ael/ledger/entries/detail 補齊，避免整頁一次打上百支請求
  * （比照 src/features/reconciliation/components/ReconTxnList.tsx 的 useLazyEntryDetail 寫法）。
  * 已抓過的結果留在 state 內，收合再展開不重複請求。
+ * subjectIds／subjectNameById 供補上各筆關聯帳簿交易的科目名稱（見 data.ts 的 loadLinkedTransactions）。
  */
-export function useLazyLinkedTransactions(ledgerUuids: string[], settleEventUuid: string, expanded: boolean) {
+export function useLazyLinkedTransactions(
+  ledgerUuids: string[],
+  subjectIds: number[],
+  settleEventUuid: string,
+  subjectNameById: Map<number, string>,
+  expanded: boolean,
+) {
   const [items, setItems] = useState<LinkedLedgerTxn[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,7 +29,7 @@ export function useLazyLinkedTransactions(ledgerUuids: string[], settleEventUuid
     let cancelled = false;
     setLoading(true);
     setError('');
-    loadLinkedTransactions(ledgerUuids, settleEventUuid)
+    loadLinkedTransactions(ledgerUuids, subjectIds, settleEventUuid, subjectNameById)
       .then(result => {
         if (cancelled) return;
         setItems(result);
@@ -38,7 +45,7 @@ export function useLazyLinkedTransactions(ledgerUuids: string[], settleEventUuid
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, fetched, ledgerUuids.join(','), settleEventUuid]);
+  }, [expanded, fetched, ledgerUuids.join(','), subjectIds.join(','), settleEventUuid]);
 
   return { items, loading, error };
 }

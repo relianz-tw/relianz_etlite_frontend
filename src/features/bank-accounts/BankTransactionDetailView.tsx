@@ -75,7 +75,7 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
           return;
         }
         const { dateFrom, dateTo } = resolveDateRange(returnQuery);
-        const rows = await loadBankTransactions(account.bankAccountUuid, dateFrom, dateTo);
+        const { rows, subjectNameById } = await loadBankTransactions(account.bankAccountUuid, dateFrom, dateTo);
         const found = rows.find(r => r.settleEventUuid === transactionId);
         if (!found) {
           if (!cancelled) setError('找不到此筆交易，請從銀行帳戶總覽重新進入');
@@ -85,7 +85,7 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
         setRow(found);
 
         setLinkedLoading(true);
-        loadLinkedTransactions(found.originLedgerUuids, found.settleEventUuid)
+        loadLinkedTransactions(found.originLedgerUuids, found.originOfficialAccountingSubjectIds, found.settleEventUuid, subjectNameById)
           .then(items => {
             if (!cancelled) setLinked(items);
           })

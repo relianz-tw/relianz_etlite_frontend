@@ -5,7 +5,6 @@ import Button from '@/components/ui/Button';
 import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { formatCounterpartyLabel } from '../data';
 import { cashDirectionLabel } from '../labels';
 import { useLazyLinkedTransactions } from '../useLazyLinkedTransactions';
 import InlineLinkedTransactions from './InlineLinkedTransactions';
@@ -18,15 +17,35 @@ interface TransactionCardsProps {
   onToggle: (id: string) => void;
   /** 展開區「查看完整明細」按鈕導向的交易詳細頁網址 */
   detailHref: (row: BankTxnRow) => string;
+  /** 科目 id → 名稱對照表，供展開列關聯帳簿交易的科目名稱使用 */
+  subjectNameById: Map<number, string>;
 }
 
 /** 單張交易卡片：獨立成元件讓 useLazyLinkedTransactions 有自己的 hook 實例，
  *  避免在 .map() callback 內直接呼叫 hook 違反 Hooks 規則 */
-function TransactionCard({ row, expanded, onToggle, detailHref }: { row: BankTxnRow; expanded: boolean; onToggle: () => void; detailHref: string }) {
+function TransactionCard({
+  row,
+  expanded,
+  onToggle,
+  detailHref,
+  subjectNameById,
+}: {
+  row: BankTxnRow;
+  expanded: boolean;
+  onToggle: () => void;
+  detailHref: string;
+  subjectNameById: Map<number, string>;
+}) {
   const router = useRouter();
   const amountLabel = row.expense != null ? '支出金額' : '存入金額';
   const amountValue = fmtCurrency(row.expense ?? row.deposit ?? 0);
-  const { items, loading, error } = useLazyLinkedTransactions(row.originLedgerUuids, row.settleEventUuid, expanded);
+  const { items, loading, error } = useLazyLinkedTransactions(
+    row.originLedgerUuids,
+    row.originOfficialAccountingSubjectIds,
+    row.settleEventUuid,
+    subjectNameById,
+    expanded,
+  );
 
   return (
     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white">
@@ -36,7 +55,7 @@ function TransactionCard({ row, expanded, onToggle, detailHref }: { row: BankTxn
           <Badge tone={row.cashDirection === 0 ? 'success' : 'error'}>{cashDirectionLabel(row.cashDirection)}</Badge>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm text-neutral-dark">{formatCounterpartyLabel(row, items)}</span>
+          <span className="truncate text-sm text-neutral-dark">{row.counterpartyLabel}</span>
           <ChevronDown size={16} className={`shrink-0 text-neutral-mid transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
         <div className="flex items-center justify-end gap-2 text-xs text-neutral-mid">
@@ -71,7 +90,7 @@ function TransactionCard({ row, expanded, onToggle, detailHref }: { row: BankTxn
 }
 
 /** 手機版交易明細卡片，與 TransactionTable 顯示同一份資料，點擊卡片標頭 inline 展開重點欄位 */
-export default function TransactionCards({ rows, expandedId, onToggle, detailHref }: TransactionCardsProps) {
+export default function TransactionCards({ rows, expandedId, onToggle, detailHref, subjectNameById }: TransactionCardsProps) {
   if (rows.length === 0) {
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid nav:hidden">此期間尚無交易紀錄</div>;
   }
@@ -85,6 +104,7 @@ export default function TransactionCards({ rows, expandedId, onToggle, detailHre
           expanded={expandedId === row.settleEventUuid}
           onToggle={() => onToggle(row.settleEventUuid)}
           detailHref={detailHref(row)}
+          subjectNameById={subjectNameById}
         />
       ))}
     </div>

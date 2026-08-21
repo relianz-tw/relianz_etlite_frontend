@@ -1196,7 +1196,11 @@ export interface BankSettleEventDto {
   mainSettlementLedgerUuid: string;
   /** 交易關聯單uuid */
   originLedgerUuids: string[];
+  /** 所有交易關聯單科目id */
+  originOfficialAccountingSubjectIds: number[];
   primaryOriginLedgerUuid: string;
+  /** 最早的那筆交易關聯單科目id */
+  primaryOfficialAccountingSubjectId: number;
   /** 有發票嗎 */
   hasInvoice: boolean;
   /** 廠商名稱 */

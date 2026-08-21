@@ -51,6 +51,7 @@ export default function BankAccountsView() {
   const [accountsError, setAccountsError] = useState('');
 
   const [transactions, setTransactions] = useState<BankTxnRow[]>([]);
+  const [subjectNameById, setSubjectNameById] = useState<Map<number, string>>(new Map());
   const [txnLoading, setTxnLoading] = useState(false);
   const [txnError, setTxnError] = useState('');
 
@@ -105,8 +106,9 @@ export default function BankAccountsView() {
     setTxnLoading(true);
     setTxnError('');
     try {
-      const rows = await loadBankTransactions(bankAccountUuid, effectiveDateFrom, effectiveDateTo);
+      const { rows, subjectNameById } = await loadBankTransactions(bankAccountUuid, effectiveDateFrom, effectiveDateTo);
       setTransactions(rows);
+      setSubjectNameById(subjectNameById);
     } catch (err) {
       setTxnError(getFriendlyErrorMessage(err));
     } finally {
@@ -121,9 +123,10 @@ export default function BankAccountsView() {
     setTxnLoading(true);
     setTxnError('');
     loadBankTransactions(selectedAccount.bankAccountUuid, effectiveDateFrom, effectiveDateTo)
-      .then(rows => {
+      .then(({ rows, subjectNameById }) => {
         if (cancelled) return;
         setTransactions(rows);
+        setSubjectNameById(subjectNameById);
       })
       .catch(err => {
         if (cancelled) return;
@@ -221,12 +224,14 @@ export default function BankAccountsView() {
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
                   detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
+                  subjectNameById={subjectNameById}
                 />
                 <TransactionCards
                   rows={pagedRows}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
                   detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
+                  subjectNameById={subjectNameById}
                 />
                 <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
               </>
