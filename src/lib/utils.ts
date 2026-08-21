@@ -28,6 +28,14 @@ export function formatYyyymmddRoc(value: string): string {
   return `${year - 1911}/${month}/${day}`;
 }
 
+/**
+ * 月份（1-12）→ 營業稅雙月期別代碼（1/3/5/7/9/11），如 1-2 月為 1、3-4 月為 3……。
+ * 統一供所有需要帶入「期別」查詢參數的 API 使用（如 GET /ael/invoice/trackRule 的 phase）。
+ */
+export function monthToBimonthlyPhase(month: number): number {
+  return month % 2 === 0 ? month - 1 : month;
+}
+
 /** 回傳今天日期的 YYYYMMDD 字串，供需要送出此格式的 API（如銀行帳戶餘額更新日）使用 */
 export function todayYyyymmdd(): string {
   const d = new Date();

@@ -2,6 +2,7 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { createChannelRule, listChannelRules } from '@/api/channelRules';
+import { checkInvoiceTrackRule } from '@/api/invoice';
 import { createVendor, initDefaultOtherVendor, listVendors } from '@/api/vendors';
 import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
@@ -18,7 +19,7 @@ import InitOtherChannelDialog from '@/features/settings/components/InitOtherChan
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
 import { SETTLEMENT_STYLE } from '@/features/settings/data';
-import { getFriendlyErrorMessage } from '@/lib/errors';
+import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { PROJECT_NAMES } from '../../data';
@@ -26,6 +27,7 @@ import type { Side } from '../../types';
 import {
   DECLARE_PERIOD_OPTIONS,
   INVOICE_PERIOD_OPTIONS,
+  parseInvoicePeriod,
   PROJECT_PLACEHOLDER,
   PURCHASE_INVOICE_NUMBER_OPTIONS,
   SALES_INVOICE_BOOK_OPTIONS,
@@ -119,6 +121,8 @@ export default function TransactionMetaCard({
   const [vendors, setVendors] = useState<VendorDto[]>([]);
   const [vendorError, setVendorError] = useState('');
   const [newVendorOpen, setNewVendorOpen] = useState(false);
+  // 新增銷項發票字軌是否符合當期規則（GET /ael/invoice/trackRule）；僅新增銷項使用
+  const [trackRuleError, setTrackRuleError] = useState('');
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
   // 「其他」管道（各公司 uuid 不同，但固定名稱為「其他」）固定排在清單最末，讓使用者優先看到具體管道
@@ -151,6 +155,33 @@ export default function TransactionMetaCard({
       })
       .catch(err => setVendorError(getFriendlyErrorMessage(err)));
   }, [side]);
+
+  // 新增銷項：字軌／發票期間有變動時 debounce 檢查字軌是否符合當期規則；不符合（400）才提示，
+  // 其餘錯誤（如網路逾時）不視為字軌錯誤，避免誤導使用者
+  useEffect(() => {
+    if (side !== 'sales' || mode !== 'create' || form.isAllowance) return;
+    const track = form.invoiceTrack.trim();
+    const period = parseInvoicePeriod(form.invoicePeriod);
+    if (!track || !period) {
+      setTrackRuleError('');
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      checkInvoiceTrackRule({ track, year: period.year, phase: period.phase })
+        .then(() => {
+          if (!cancelled) setTrackRuleError('');
+        })
+        .catch(err => {
+          if (cancelled) return;
+          setTrackRuleError(err instanceof ApiError && err.status === 400 ? '此發票字軌非屬於這期別的，請確認輸入內容是否正確' : '');
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [side, mode, form.isAllowance, form.invoiceTrack, form.invoicePeriod]);
 
   // 開啟「新增管道」或「開通其他管道」對話框且尚未載入過收款帳戶時才抓取，避免每次開關都重打 API
   useEffect(() => {
@@ -432,6 +463,7 @@ export default function TransactionMetaCard({
               placeholder="字軌"
               maxLength={2}
               value={form.invoiceTrack}
+              className={trackRuleError ? 'border-semantic-error focus:border-semantic-error focus:ring-semantic-error/15' : ''}
               onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
             />
             <TextInput
@@ -442,6 +474,7 @@ export default function TransactionMetaCard({
               onChange={e => onChange({ invoiceSerial: e.target.value })}
             />
           </div>
+          {trackRuleError && <p className="mt-1.5 text-xs text-semantic-error">{trackRuleError}</p>}
         </Field>,
       ],
       [buyerTaxIdField, buyerNameField],

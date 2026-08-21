@@ -1,6 +1,7 @@
 import { listOfficialSubjects } from '@/api/subjects';
 import type { EntryInvoiceDetailDto } from '@/api/types';
 import type { SubjectOption } from '@/components/ui/SubjectSelect';
+import { monthToBimonthlyPhase } from '@/lib/utils';
 import type { Side } from '../types';
 import type { TransactionFormState } from './types';
 
@@ -78,6 +79,18 @@ function formatDeclarePeriod(cmsYear: number, cmsPhase: number): string {
   const start = String(cmsPhase).padStart(2, '0');
   const end = String(cmsPhase + 1).padStart(2, '0');
   return `${cmsYear} 年 ${start} - ${end} 月份`;
+}
+
+/**
+ * 「發票期間」下拉字串（如 "115 年 01 - 02 月份"）→ trackRule 查詢所需的 year（西元年）／phase（期別代碼）。
+ * phase 統一透過 monthToBimonthlyPhase 換算，與 formatDeclarePeriod 互為反向轉換。
+ */
+export function parseInvoicePeriod(period: string): { year: string; phase: string } | null {
+  const match = /^(\d+)\s*年\s*(\d+)\s*-\s*\d+\s*月份$/.exec(period.trim());
+  if (!match) return null;
+  const rocYear = Number(match[1]);
+  const startMonth = Number(match[2]);
+  return { year: String(rocYear + 1911), phase: String(monthToBimonthlyPhase(startMonth)) };
 }
 
 /**
