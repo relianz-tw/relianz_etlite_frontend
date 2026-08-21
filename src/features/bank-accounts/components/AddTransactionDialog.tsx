@@ -6,8 +6,8 @@ import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import SubjectSelect from '@/components/ui/SubjectSelect';
-import type { SubjectOption } from '@/components/ui/SubjectSelect';
+import SubjectPicker from '@/components/ui/SubjectPicker';
+import type { SubjectOption } from '@/components/ui/SubjectPicker';
 import Textarea from '@/components/ui/Textarea';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
@@ -130,7 +130,7 @@ export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTra
 
         <div>
           <Label required>會計科目</Label>
-          <SubjectSelect value={form.subject} onChange={subject => setForm(f => ({ ...f, subject }))} placeholder="請選擇會計科目" scope="bank" />
+          <SubjectPicker value={form.subject} onChange={subject => setForm(f => ({ ...f, subject }))} placeholder="請選擇會計科目" scope="bank" />
         </div>
 
         {error && <p className="-mt-1 text-xs text-semantic-error">{error}</p>}

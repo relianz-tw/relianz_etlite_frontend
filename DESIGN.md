@@ -219,6 +219,7 @@ z-[55] Bottom Sheet 遮罩
 z-[60] Bottom Sheet 面板
 z-[70] Modal（確認彈窗等）
 z-[80] Popover（日期篩選、下拉選單等）
+z-[90] 全螢幕選擇頁（手機版科目選擇器，見 Subject Picker）
 ```
 Bottom Sheet 蓋在底部操作條與側邊欄 Overlay 之上，但仍低於 Modal／Popover——彈窗與下拉選單需要能
 疊在 Bottom Sheet 上方顯示（如面板內開出的確認沖帳彈窗）。
@@ -463,6 +464,53 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 對應元件：`src/features/reconciliation/components/ReconTargetAllocation.tsx`、
 `src/features/reconciliation/components/ReconTargetSelect.tsx`。
 
+### Subject Picker（分頁式科目選擇器）
+
+用途：科目數量較多、使用者不熟悉科目代碼的情境（如銀行新增交易），在既有的單層搜尋下拉之外，
+提供「常用／基礎／全部」三個分頁瀏覽，並附一個 AI 輔助入口（描述交易文字，呼叫 POST /ael/subject/identify
+取得建議科目，內容與科目辨識無關或無法辨識時後端回 400）。與帳簿、折讓、沖帳中心等頁面仍在用的單層
+`SubjectSelect` 並存，不互相取代。
+
+```
+觸發器：h-10、rounded-lg、border-[1.5px] border-neutral-blue-gray/50，樣式同 Form Inputs／
+  現有 SubjectSelect 觸發器
+
+面板（桌機為 Popover，手機為全螢幕頁，兩者共用同一套內部排版）：
+  1. 搜尋列：放大鏡圖示 + input（text-base，nav 斷點以上 text-sm，防 iOS 自動放大）+
+     有輸入時右側「清除」
+  2. 分頁列（底線式，樣式同 Tab Bar (Underline)）：常用／基礎／全部，各自右側附小字灰色計數；
+     **有輸入搜尋字時整列隱藏**，搜尋範圍自動視為「全部」
+  3. 分類說明列：bg-surface-cream、text-xs、text-neutral-mid，一行文字說明目前分頁的排序／篩選依據
+  4. 搜尋範圍提示列（僅搜尋時顯示）：bg-brand-blue/5、text-brand-blue、text-xs，
+     顯示「搜尋範圍為完整科目表，找到 N 筆符合「關鍵字」」
+  5. 科目清單：可捲動，桌機 max-h-80（320px）；每列代碼（font-mono、tabular-nums）+ 名稱，
+     選中列 bg-brand-blue/10 + 右側 Check 圖示；一律扁平列表，不做主／子科目分組或說明文字
+     （官方科目 API 目前無父子階層與 remark 資料）
+  6. 空狀態（搜尋無結果）：置中圖示 + 標題「找不到「關鍵字」」+ 說明 + 主要按鈕「讓 AI 判斷」
+  7. 底部固定 AI 入口列：bg-surface-warm、border-t border-brand-tan/30，
+     文字「不確定用哪個科目？描述這筆交易，讓 AI 幫你選」，點擊展開 AI 區塊
+
+AI 區塊（暖色面，展開於面板底部）：
+  bg-surface-warm、border-t border-brand-tan/30、p-3
+  內含：說明文字、textarea（描述交易）、範例 chip（rounded-sm border border-brand-tan/50）、
+  送出按鈕（variant="warm"，暖色區維持單一色相，不與城信藍混用）、
+  loading 態（LoaderCircle 動畫 + 說明文字）、建議卡（最多 3 張，首選卡
+  border-[1.5px] border-brand-blue/40 + Badge tone="info" 標示「首選」）
+  選定後於觸發器下方顯示「AI 已為你選擇」註記列（bg-surface-warm、text-xs）+ 「重新詢問」連結；
+  手動從清單改選會清除此註記
+
+手機全螢幕頁（< nav 1000px）：
+  fixed inset-0、z-[90]、bg-white，取代 Popover；頂部標題列「選擇會計科目」+ 右側「取消」
+  分頁列可橫向捲動；清單列最小高度 48px（見 Touch Target）
+  科目選取採兩段式：第一次點擊該列右側顯示「確認」按鈕，第二次點擊（或點確認）才真正選定，
+  避免手機誤觸直接送出
+  搜尋框不 autoFocus（避免虛擬鍵盤立即遮住清單與底部 AI 入口列）
+```
+
+對應元件：`src/components/ui/SubjectPicker.tsx`（觸發器與狀態）、
+`src/components/ui/SubjectPickerPanel.tsx`（面板內容）、
+`src/components/ui/SubjectAiAssistant.tsx`（AI 輔助區塊）。
+
 ---
 
 ## 5. Layout Principles
@@ -499,6 +547,9 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 互動元素（按鈕、勾選圓圈、關閉鈕、圖示按鈕等）最小可點區為 **44×44px**；視覺尺寸可依元件規格小於此值
 （如金額輸入正負切換鈕維持 24×24px 的視覺大小，見上方 Form Inputs 章節），但須以透明 padding 或
 `before:absolute before:-inset-*` 擴大實際可點擊範圍至 44×44px，不得讓視覺尺寸即為熱區尺寸。
+
+**清單列例外**：可捲動清單中逐列可點的列項（如全螢幕選擇頁的科目列）不受 44px 限制，
+最小高度以 48px（`min-h-12`）為準，兩者皆遠高於一般文字行高，足以避免誤觸。
 
 ---
 
