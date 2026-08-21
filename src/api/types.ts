@@ -199,6 +199,13 @@ export interface SubjectBalanceDto {
   balance: number;
 }
 
+/** AI 依交易描述建議的會計科目（/ael/subject/identify），最多 3 筆，依信心排序 */
+export interface SubjectIdentifyCandidateDto {
+  subjectCode: string;
+  name: string;
+  reason: string;
+}
+
 /**
  * 銷售管道規則 DTO，對應 sale.md 內嵌 OpenAPI 規格（/ael/payment/channelRules 群組）。
  * feeRateBps／feeFixedAmount（手續費）本次介面暫不編輯，建立/更新時一律不帶這兩個欄位，留待日後補上。

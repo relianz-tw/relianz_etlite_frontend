@@ -7,6 +7,7 @@ import { COMPANY_UUID } from "./config";
 import type {
   OfficialSubjectDto,
   SubjectBalanceDto,
+  SubjectIdentifyCandidateDto,
   SubjectUsageDto,
 } from "./types";
 
@@ -57,4 +58,21 @@ export async function listSubjectBalances(
 ): Promise<SubjectBalanceDto[]> {
   void subjectCodes;
   return [];
+}
+
+/**
+ * 依交易描述請 AI 建議最多 3 個會計科目（/ael/subject/identify）。
+ * 描述與會計科目辨識無關或無法辨識時，後端回 400（errorCode 0003），呼叫端需另外處理，
+ * 不當一般錯誤丟出（見 SubjectPicker.handleAiSubmit）。
+ */
+export function identifySubject(
+  text: string,
+): Promise<SubjectIdentifyCandidateDto[]> {
+  return apiFetch<{ candidates: SubjectIdentifyCandidateDto[] }>(
+    "/ael/subject/identify",
+    {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    },
+  ).then((res) => res.candidates);
 }
