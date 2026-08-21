@@ -289,95 +289,6 @@ GET /invoice/count
 
 ### Responses Data Schema
 
-## POST 單張發票 Gemini 結構化辨識
-
-POST /ael/invoice/identification/one
-
-單張發票 Gemini 結構化辨識
-
-> Body Parameters
-
-```yaml
-ac_uuid: ""
-isbuy: ""
-file: ""
-
-```
-
-### Params
-
-|Name|Location|Type|Required|Description|
-|---|---|---|---|---|
-|body|body|object| yes |none|
-|» ac_uuid|body|string| no |公司uuid|
-|» isbuy|body|boolean| no |true進項,false銷項|
-|» file|body|string(binary)| no |none|
-
-> Response Examples
-
-> 200 Response
-
-```json
-{
-    "data": {
-        "gui_type": 4,
-        "gui_alphabetic_letter": "KF",
-        "gui_number": "08419450",
-        "gui_date_year": 114,
-        "gui_date_month": 1,
-        "gui_date_day": 3,
-        "total_amount": 4100,
-        "buyer_name": "多幕創意有限公司",
-        "buyer_tax_id": "96775852",
-        "subtotal": 3905,
-        "tax": 195,
-        "tax_free_amount": null,
-        "summary": "物流費",
-        "angle": 0,
-        "document_template": 2
-    },
-    "errorCode": "0000",
-    "geminiMs": 3780,
-    "message": "操作成功",
-    "success": true,
-    "totalMs": 3799
-}
-```
-
-### Responses
-
-|HTTP Status Code |Meaning|Description|Data schema|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
-
-### Responses Data Schema
-
-HTTP Status Code **200**
-
-|Name|Type|Required|Restrictions|Title|description|
-|---|---|---|---|---|---|
-|» data|object|true|none||none|
-|»» gui_type|integer|true|none||1~7:一般憑證 8:交通憑證 9:水電瓦斯 10:其他 11:進口|
-|»» gui_alphabetic_letter|string|true|none||none|
-|»» gui_number|string|true|none||none|
-|»» gui_date_year|integer|true|none||none|
-|»» gui_date_month|integer|true|none||none|
-|»» gui_date_day|integer|true|none||none|
-|»» total_amount|integer|true|none||none|
-|»» buyer_name|string|true|none||none|
-|»» buyer_tax_id|string|true|none||none|
-|»» subtotal|integer|true|none||none|
-|»» tax|integer|true|none||none|
-|»» tax_free_amount|null|true|none||none|
-|»» summary|string|true|none||none|
-|»» angle|integer|true|none||none|
-|»» document_template|integer|true|none||none|
-|» errorCode|string|true|none||none|
-|» geminiMs|integer|true|none||none|
-|» message|string|true|none||none|
-|» success|boolean|true|none||none|
-|» totalMs|integer|true|none||none|
-
 # 導入流程
 
 ## GET 根據統編查詢公司資訊
@@ -6579,6 +6490,96 @@ HTTP Status Code **200**
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
 
+## POST 依描述請Gemini 建議最多 3 個會計科目
+
+POST /ael/subject/identify
+
+依描述請Gemini 建議最多 3 個會計科目，字數限制100，超過或傳太無關的內容都會擋掉
+
+> Body Parameters
+
+```json
+{
+    "text": "."
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» text|body|string| yes |中文描述|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": {
+        "candidates": [
+            {
+                "subjectCode": "6251",
+                "name": "租金支出",
+                "reason": "描述為辦公室租金，對應租金相關費用科目。"
+            }
+        ]
+    },
+    "errorCode": "0000",
+    "message": "操作成功",
+    "geminiMs": 1234,
+    "totalMs": 1456
+}
+```
+
+> 400 Response
+
+```json
+{
+    "success": false,
+    "data": null,
+    "errorCode": "0003",
+    "message": "資料格式、規則驗證錯誤：與會計科目辨識無關"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+|400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|object|true|none||none|
+|»» candidates|[object]|true|none||建議科目|
+|»»» subjectCode|string|true|none||科目代碼|
+|»»» name|string|true|none||名稱|
+|»»» reason|string|true|none||理由|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» geminiMs|integer|true|none||none|
+|» totalMs|integer|true|none||none|
+
+HTTP Status Code **400**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|null|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» geminiMs|integer|false|none||none|
+|» totalMs|integer|false|none||none|
+
 # 帳簿
 
 ## GET 產生一組帳簿交易編號
@@ -6765,7 +6766,8 @@ POST /ael/ledger/receivables
     "deductible": true,
     "remark": "測試",
     "summary": "",
-    "counterpartyTaxId": "38965019"
+    "counterpartyTaxId": "38965019",
+    "invoiceBookUuid": ""
 }
 ```
 
@@ -6799,6 +6801,7 @@ POST /ael/ledger/receivables
 |» others|body|integer| no |進口專用其他稅費加總（銷項通常 0）|
 |» unreportedReason|body|string| no |未申報／不可扣抵原因|
 |» alphabeticLetter|body|string| no |字軌；有值時 invoiceNum 當純號碼|
+|» invoiceBookUuid|body|string| yes |發票簿uuid|
 
 #### Enum
 
@@ -10469,6 +10472,155 @@ HTTP Status Code **200**
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
 
+# 帳簿/發票與字軌
+
+## POST 單張發票 Gemini 結構化辨識
+
+POST /ael/invoice/identification/one
+
+單張發票 Gemini 結構化辨識
+
+> Body Parameters
+
+```yaml
+ac_uuid: ""
+isbuy: ""
+file: ""
+
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» ac_uuid|body|string| no |公司uuid|
+|» isbuy|body|boolean| no |true進項,false銷項|
+|» file|body|string(binary)| no |none|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": {
+        "gui_type": 4,
+        "gui_alphabetic_letter": "KF",
+        "gui_number": "08419450",
+        "gui_date_year": 114,
+        "gui_date_month": 1,
+        "gui_date_day": 3,
+        "total_amount": 4100,
+        "buyer_name": "多幕創意有限公司",
+        "buyer_tax_id": "96775852",
+        "subtotal": 3905,
+        "tax": 195,
+        "tax_free_amount": null,
+        "summary": "物流費",
+        "angle": 0,
+        "document_template": 2
+    },
+    "errorCode": "0000",
+    "geminiMs": 3780,
+    "message": "操作成功",
+    "success": true,
+    "totalMs": 3799
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» gui_type|integer|true|none||1~7:一般憑證 8:交通憑證 9:水電瓦斯 10:其他 11:進口|
+|»» gui_alphabetic_letter|string|true|none||none|
+|»» gui_subject_candidates|[object]|true|none||none|
+|»»» gui_subject_code|string|true|none||科目代號|
+|»»» gui_subject_name|string|true|none||科目名稱|
+|»»» reason|string|true|none||理由|
+|»» gui_number|string|true|none||none|
+|»» gui_date_year|integer|true|none||none|
+|»» gui_date_month|integer|true|none||none|
+|»» gui_date_day|integer|true|none||none|
+|»» seller_name|string|true|none||none|
+|»» buyer_name|string|true|none||none|
+|»» seller_tax_id|string|true|none||none|
+|»» buyer_tax_id|string|true|none||none|
+|»» subtotal|integer|true|none||none|
+|»» tax|integer|true|none||none|
+|»» tax_free_amount|integer|true|none||none|
+|»» others|integer|true|none||none|
+|»» total_amount|integer|true|none||none|
+|»» summary|string|true|none||none|
+|»» angle|integer|true|none||none|
+|»» document_template|integer|true|none||none|
+|» errorCode|string|true|none||none|
+|» geminiMs|integer|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
+|» totalMs|integer|true|none||none|
+
+## GET 依字軌＋年＋期別查發票類型
+
+GET /ael/invoice/trackRule
+
+依字軌＋年＋期別查發票類型
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|track|query|string| no |發票字軌|
+|year|query|string| no |西元年|
+|phase|query|string| no |期別|
+
+> Response Examples
+
+> 400 Response
+
+```json
+{
+    "data": null,
+    "errorCode": "0003",
+    "message": "發票字軌不符合當期規則",
+    "success": false
+}
+```
+
+> 200 Response
+
+```json
+{}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+|400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **400**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|null|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
+
 # 日記帳
 
 ## POST 產生日記帳
@@ -11440,7 +11592,11 @@ POST /ael/bankAccounts/transactions
         "originLedgerUuids": [
           "string"
         ],
+        "originOfficialAccountingSubjectIds": [
+          0
+        ],
         "primaryOriginLedgerUuid": "string",
+        "primaryOfficialAccountingSubjectId": 0,
         "hasInvoice": true,
         "counterpartyName": "string",
         "paymentChannelName": "string",
@@ -11480,11 +11636,13 @@ HTTP Status Code **200**
 |»»» cashAmount|integer|false|none||none|
 |»»» cashDirection|integer|false|none||0存入／1付出|
 |»»» isReverse|boolean|false|none||是交易恢復嗎|
-|»»» mainSettlementLedgerUuid|string|false|none||交易原單uuid|
-|»»» originLedgerUuids|[string]|false|none||交易關聯單uuid|
-|»»» primaryOriginLedgerUuid|string|false|none||none|
+|»»» mainSettlementLedgerUuid|string|false|none||none|
+|»»» originLedgerUuids|[string]|false|none||所有交易關聯單uuid|
+|»»» originOfficialAccountingSubjectIds|[integer]|true|none||所有交易關聯單科目id|
+|»»» primaryOriginLedgerUuid|string|false|none||最早的那筆交易關聯單uuid|
+|»»» primaryOfficialAccountingSubjectId|integer|true|none||最早的那筆交易關聯單科目id|
 |»»» hasInvoice|boolean|false|none||有發票嗎|
-|»»» counterpartyName|string|false|none||廠商名稱|
+|»»» counterpartyName|string|false|none||最早的那筆交易關聯單廠商名稱|
 |»»» paymentChannelName|string|false|none||銷售管道名稱|
 |»»» createdAt|string(date-time)|false|none||none|
 |»» total|integer|false|none||全部資料筆數|
@@ -12306,6 +12464,245 @@ HTTP Status Code **200**
 |»» outputInvoiceAmountTotal|integer|true|none||銷項非作廢 amount 合計；折讓以負值計入|
 |»» inputInvoiceAmountTotal|integer|true|none||進項非作廢 amount 合計；折讓以負值計入|
 |»» businessTaxTotal|integer|true|none||銷項稅合計 − 進項稅合計；可為負|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+
+# 發票本
+
+## POST 新增或更新發票本
+
+POST /ael/invoiceBook/save
+
+新增或更新發票本
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "name": "第一本",
+    "year": 115,
+    "phase": 7,
+    "aphabeticLetter": "AB",
+    "startNum": "00000001"
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 uuid|
+|» name|body|string| yes |發票本名稱|
+|» year|body|integer| yes |民國年|
+|» phase|body|integer| yes |期別|
+|» aphabeticLetter|body|string| yes |字軌|
+|» startNum|body|string| yes |起始號碼，如 00000001|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": null,
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|any|false|none||none|
+|» data|null|false|none||none|
+|» errorCode|any|false|none||none|
+|» message|string|false|none||none|
+
+## POST 發票本跳號
+
+POST /ael/invoiceBook/passNumber
+
+發票本跳號
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "invoiceBookId": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 uuid|
+|» invoiceBookId|body|string| yes |發票本 uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": {
+        "invoiceUuid": ""
+    },
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|any|false|none||none|
+|» data|object|false|none||none|
+|»» invoiceUuid|string|true|none||新建跳號／作廢銷項發票 uuid|
+|» errorCode|any|false|none||none|
+|» message|string|false|none||none|
+
+## GET 依公司+年+期列發票本
+
+GET /ael/invoiceBook
+
+依公司+年+期列發票本
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|year|query|string| no |民國年|
+|phase|query|string| no |期別|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 0,
+    "invoiceBook": [
+      {
+        "invoiceBookId": "string",
+        "part": 0,
+        "name": "string",
+        "aphabeticLetter": "string",
+        "startNum": "string",
+        "currentNum": "string"
+      }
+    ]
+  },
+  "errorCode": "0000",
+  "message": "string"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|any|false|none||none|
+|» data|object|false|none||none|
+|»» count|integer|true|none||該年期全部發票本數（含 ezreceipt）；無紙本時為 0|
+|»» invoiceBook|[object]|true|none||發票簿物件|
+|»»» invoiceBookId|string|false|none||發票簿uuid|
+|»»» part|integer|false|none||invoice_type|
+|»»» name|string|false|none||名稱|
+|»»» aphabeticLetter|string|false|none||字軌|
+|»»» startNum|string|false|none||起始發票號|
+|»»» currentNum|string|false|none||當前發票號|
+|» errorCode|any|false|none||none|
+|» message|string|false|none||none|
+
+## GET 設定頁顯示發票簿期別
+
+GET /ael/invoiceBook/getDate/forSetting
+
+設定頁顯示發票簿期別
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "year": 115,
+            "phase": 7,
+            "count": 1
+        },
+        {
+            "year": 115,
+            "phase": 9,
+            "count": 0
+        }
+    ],
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|[object]|true|none||none|
+|»» year|integer|true|none||none|
+|»» phase|integer|true|none||none|
+|»» count|integer|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 
