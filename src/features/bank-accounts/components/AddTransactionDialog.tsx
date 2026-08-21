@@ -6,7 +6,8 @@ import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import TextInput from '@/components/ui/TextInput';
+import SubjectSelect from '@/components/ui/SubjectSelect';
+import type { SubjectOption } from '@/components/ui/SubjectSelect';
 import Textarea from '@/components/ui/Textarea';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useState } from 'react';
@@ -15,34 +16,32 @@ import type { NewBankTransactionInput } from '../types';
 interface AddTransactionDialogProps {
   open: boolean;
   onClose: () => void;
-  bankAccountUuid: string;
-  /** 呼叫端負責實際寫入；失敗時 throw Error，對話框會攔截並顯示錯誤訊息、不關閉 */
+  /** 呼叫端負責實際寫入（含帶入 bankAccountUuid）；失敗時 throw Error，對話框會攔截並顯示錯誤訊息、不關閉 */
   onSubmit: (input: NewBankTransactionInput) => Promise<void>;
 }
 
-type Direction = 'expense' | 'deposit';
+type Direction = '0' | '1';
 
+// 順序與標籤比照交易列表「支出金額／存入金額」欄位慣例；cashDirection 0=存入／1=支出
 const DIRECTION_OPTIONS: { value: Direction; label: string }[] = [
-  { value: 'expense', label: '支出' },
-  { value: 'deposit', label: '存入' },
+  { value: '1', label: '支出' },
+  { value: '0', label: '存入' },
 ];
 
 interface FormState {
-  transactionDate: Date | undefined;
-  accountingDate: Date | undefined;
-  summary: string;
+  paymentDate: Date | undefined;
   direction: Direction;
   amount: number;
-  remark: string;
+  subject: SubjectOption | null;
+  memo: string;
 }
 
 const EMPTY_FORM: FormState = {
-  transactionDate: undefined,
-  accountingDate: undefined,
-  summary: '',
-  direction: 'expense',
+  paymentDate: undefined,
+  direction: '1',
   amount: 0,
-  remark: '',
+  subject: null,
+  memo: '',
 };
 
 function toYmd(date: Date | undefined): string {
@@ -54,10 +53,10 @@ function toYmd(date: Date | undefined): string {
 }
 
 /**
- * 新增銀行帳戶交易：以「收支方向」切換單一金額欄位所代表的支出/存入，
- * 由結構上避免同一筆同時填寫支出與存入金額造成的互斥驗證問題。
+ * 新增銀行直接提／匯款交易（POST /ael/bankAccounts/cashMovements）：與一般沖帳交易不同，
+ * 此類交易無關聯原單，需另外指定會計科目（如股東往來、銀行手續費等）。
  */
-export default function AddTransactionDialog({ open, onClose, bankAccountUuid, onSubmit }: AddTransactionDialogProps) {
+export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTransactionDialogProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -74,35 +73,35 @@ export default function AddTransactionDialog({ open, onClose, bankAccountUuid, o
   if (!open) return null;
 
   const handleSubmit = async () => {
-    if (!form.transactionDate || !form.accountingDate) {
-      setError('請選擇交易時間與帳務時間');
-      return;
-    }
-    if (!form.summary.trim()) {
-      setError('請輸入摘要');
+    if (!form.paymentDate) {
+      setError('請選擇交易日期');
       return;
     }
     if (form.amount <= 0) {
       setError('請輸入大於 0 的金額');
       return;
     }
+    if (!form.subject) {
+      setError('請選擇會計科目');
+      return;
+    }
+    if (!form.memo.trim()) {
+      setError('請輸入備註');
+      return;
+    }
+    if (form.subject.id == null) {
+      setError('此科目缺少科目代碼，請重新選擇');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
       await onSubmit({
-        bankAccountUuid,
-        transactionDate: toYmd(form.transactionDate),
-        accountingDate: toYmd(form.accountingDate),
-        summary: form.summary.trim(),
-        expense: form.direction === 'expense' ? form.amount : null,
-        deposit: form.direction === 'deposit' ? form.amount : null,
-        remark: form.remark.trim(),
-        // 手動新增的交易尚無對應帳簿分錄，關聯清單留空
-        linkedTransactions: [],
-        // 手動新增交易由使用者親自登打，非銀行系統匯入
-        channel: '手動輸入',
-        handler: '本人操作',
-        voucherImage: null,
+        paymentDate: toYmd(form.paymentDate),
+        cashDirection: Number(form.direction),
+        amount: form.amount,
+        officialAccountingSubjectId: form.subject.id,
+        memo: form.memo.trim(),
       });
       onClose();
     } catch (err) {
@@ -114,35 +113,31 @@ export default function AddTransactionDialog({ open, onClose, bankAccountUuid, o
   return (
     <Modal open onClose={onClose} title="新增交易" widthClassName="max-w-[480px]">
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label required>交易時間</Label>
-            <DatePicker value={form.transactionDate} onChange={date => setForm(f => ({ ...f, transactionDate: date }))} />
-          </div>
-          <div>
-            <Label required>帳務時間</Label>
-            <DatePicker value={form.accountingDate} onChange={date => setForm(f => ({ ...f, accountingDate: date }))} />
-          </div>
-        </div>
-
         <div>
-          <Label required>摘要</Label>
-          <TextInput placeholder="例：貨款收入" value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} />
+          <Label required>交易日期</Label>
+          <DatePicker value={form.paymentDate} onChange={date => setForm(f => ({ ...f, paymentDate: date }))} />
         </div>
 
         <div>
           <Label required>收支方向與金額</Label>
-          <div className="mb-2 w-40">
-            <SegmentedControl options={DIRECTION_OPTIONS} value={form.direction} onChange={v => setForm(f => ({ ...f, direction: v }))} size="sm" />
+          <div className="flex items-center gap-3">
+            <div className="w-32 shrink-0">
+              <SegmentedControl options={DIRECTION_OPTIONS} value={form.direction} onChange={v => setForm(f => ({ ...f, direction: v }))} size="sm" />
+            </div>
+            <MoneyInput value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} widthClassName="flex-1" />
           </div>
-          <MoneyInput value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} />
+        </div>
+
+        <div>
+          <Label required>會計科目</Label>
+          <SubjectSelect value={form.subject} onChange={subject => setForm(f => ({ ...f, subject }))} placeholder="請選擇會計科目" scope="bank" />
         </div>
 
         {error && <p className="-mt-1 text-xs text-semantic-error">{error}</p>}
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
-          <Textarea placeholder="憑證備註（選填）" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
+          <Label required>備註</Label>
+          <Textarea placeholder="例：股東往來匯入" value={form.memo} onChange={e => setForm(f => ({ ...f, memo: e.target.value }))} />
         </div>
       </div>
       <div className="mt-6 flex justify-end gap-3">

@@ -16,8 +16,8 @@ import AccountSummaryCard from './components/AccountSummaryCard';
 import AddTransactionDialog from './components/AddTransactionDialog';
 import TransactionCards from './components/TransactionCards';
 import TransactionTable from './components/TransactionTable';
-import { createBankTransaction, listBankTransactions } from './data';
-import type { BankTransactionRow, NewBankTransactionInput } from './types';
+import { createBankCashMovement, loadBankTransactions } from './data';
+import type { BankTxnRow, NewBankTransactionInput } from './types';
 import { buildBankQueryString, parseBankFilters, withReturnParam } from './urlState';
 import type { BankFilterState } from './urlState';
 
@@ -50,7 +50,7 @@ export default function BankAccountsView() {
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountsError, setAccountsError] = useState('');
 
-  const [transactions, setTransactions] = useState<BankTransactionRow[]>([]);
+  const [transactions, setTransactions] = useState<BankTxnRow[]>([]);
   const [txnLoading, setTxnLoading] = useState(false);
   const [txnError, setTxnError] = useState('');
 
@@ -97,13 +97,30 @@ export default function BankAccountsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountsLoading, selectedAccount?.bankAccountUuid]);
 
-  // 切換帳戶時重新載入該帳戶的交易紀錄（全期資料，期間篩選於下方以 useMemo 對全期資料做篩選）
+  const { from: defaultFrom, to: defaultTo } = defaultRange();
+  const effectiveDateFrom = filters.dateFrom || defaultFrom;
+  const effectiveDateTo = filters.dateTo || defaultTo;
+
+  const reloadTransactions = async (bankAccountUuid: string) => {
+    setTxnLoading(true);
+    setTxnError('');
+    try {
+      const rows = await loadBankTransactions(bankAccountUuid, effectiveDateFrom, effectiveDateTo);
+      setTransactions(rows);
+    } catch (err) {
+      setTxnError(getFriendlyErrorMessage(err));
+    } finally {
+      setTxnLoading(false);
+    }
+  };
+
+  // 切換帳戶或查詢期間時重新載入沖帳事件（期間篩選交給後端，一次取回全期資料供前端分頁與合計）
   useEffect(() => {
     if (!selectedAccount) return;
     let cancelled = false;
     setTxnLoading(true);
     setTxnError('');
-    listBankTransactions(selectedAccount.bankAccountUuid, selectedAccount.currentBalance)
+    loadBankTransactions(selectedAccount.bankAccountUuid, effectiveDateFrom, effectiveDateTo)
       .then(rows => {
         if (cancelled) return;
         setTransactions(rows);
@@ -118,27 +135,15 @@ export default function BankAccountsView() {
     return () => {
       cancelled = true;
     };
-  }, [selectedAccount?.bankAccountUuid]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount?.bankAccountUuid, effectiveDateFrom, effectiveDateTo]);
 
-  const { from: defaultFrom, to: defaultTo } = defaultRange();
-  const effectiveDateFrom = filters.dateFrom || defaultFrom;
-  const effectiveDateTo = filters.dateTo || defaultTo;
+  // 存入／支出合計僅計入未恢復（撤銷）的事件，比照帳戶餘額的實際意義
+  const depositTotal = useMemo(() => transactions.filter(r => !r.isReverse).reduce((sum, r) => sum + (r.deposit ?? 0), 0), [transactions]);
+  const expenseTotal = useMemo(() => transactions.filter(r => !r.isReverse).reduce((sum, r) => sum + (r.expense ?? 0), 0), [transactions]);
 
-  // 依查詢期間篩選顯示範圍；餘額欄位在載入時已依全期交易累計計算完成，篩選僅影響顯示筆數，不影響餘額正確性；
-  // 顯示順序由新到舊（存摺瀏覽習慣看最近交易），但排序依 id 而非重新計算餘額，故餘額仍對應正確的累計時序
-  const displayedRows = useMemo(
-    () =>
-      transactions
-        .filter(row => row.transactionDate >= effectiveDateFrom && row.transactionDate <= effectiveDateTo)
-        .sort((a, b) => (a.transactionDate === b.transactionDate ? b.id.localeCompare(a.id) : b.transactionDate.localeCompare(a.transactionDate))),
-    [transactions, effectiveDateFrom, effectiveDateTo],
-  );
-
-  const depositTotal = displayedRows.reduce((sum, r) => sum + (r.deposit ?? 0), 0);
-  const expenseTotal = displayedRows.reduce((sum, r) => sum + (r.expense ?? 0), 0);
-
-  const totalPages = Math.max(1, Math.ceil(displayedRows.length / PAGE_LIMIT));
-  const pagedRows = displayedRows.slice((filters.page - 1) * PAGE_LIMIT, filters.page * PAGE_LIMIT);
+  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_LIMIT));
+  const pagedRows = transactions.slice((filters.page - 1) * PAGE_LIMIT, filters.page * PAGE_LIMIT);
 
   const handlePageChange = (page: number) => {
     setExpandedId(null);
@@ -155,8 +160,8 @@ export default function BankAccountsView() {
 
   const handleCreate = async (input: NewBankTransactionInput) => {
     if (!selectedAccount) return;
-    const rows = await createBankTransaction(selectedAccount.bankAccountUuid, selectedAccount.currentBalance, input);
-    setTransactions(rows);
+    await createBankCashMovement(selectedAccount.bankAccountUuid, input);
+    await reloadTransactions(selectedAccount.bankAccountUuid);
   };
 
   return (
@@ -176,12 +181,12 @@ export default function BankAccountsView() {
         ) : (
           <>
             <div className="mb-5 flex flex-col gap-3 nav:flex-row nav:items-end nav:justify-between">
-              <div className="w-full nav:w-72">
+              <div className="w-full nav:w-96">
                 <label className="mb-1.5 block text-xs font-semibold text-neutral-mid">選擇帳戶</label>
                 <AccountSelector accounts={accounts} value={selectedAccount.bankAccountUuid} onChange={handleAccountChange} />
               </div>
               <div className="flex gap-2.5">
-                <Button variant="outline" icon={Download} onClick={() => setExportOpen(true)}>
+                <Button variant="outline" icon={Download} disabled onClick={() => setExportOpen(true)}>
                   下載交易紀錄
                 </Button>
                 <Button variant="primary" icon={Plus} onClick={() => setAddOpen(true)}>
@@ -212,22 +217,22 @@ export default function BankAccountsView() {
               <>
                 <TransactionTable
                   rows={pagedRows}
-                  totalCount={displayedRows.length}
+                  totalCount={transactions.length}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
-                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
                 />
                 <TransactionCards
                   rows={pagedRows}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
-                  detailHref={row => withReturnParam(`/bank-accounts/${row.id}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
+                  detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
                 />
                 <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
               </>
             )}
 
-            <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} bankAccountUuid={selectedAccount.bankAccountUuid} onSubmit={handleCreate} />
+            <AddTransactionDialog open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} />
             {/*
               下載交易紀錄：本階段僅示意，沿用既有的 ExportRangeDialog（尚未接上實際產檔邏輯，見其原始 stub 說明）。
               TODO: 待確認匯出格式（CSV/Excel）與欄位順序後，接上依目前查詢帳戶/期間產出檔案的實際邏輯。

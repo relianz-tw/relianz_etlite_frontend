@@ -25,6 +25,8 @@ interface OtherDeductionsEditorProps {
   onChange: (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) => void;
   /** 開啟後每列金額改用 MoneyInput 的正負切換鈕，取代原本寫死的 − 字元；預設 false 維持原行為 */
   allowSign?: boolean;
+  /** 停用整個編輯器（新增按鈕與既有列的科目／名稱／金額／編輯／刪除皆不可操作），用於呼叫端尚未滿足前置條件時 */
+  disabled?: boolean;
 }
 
 /**
@@ -35,7 +37,7 @@ interface OtherDeductionsEditorProps {
  * 新增的列預設展開為編輯卡片；科目／項目名稱／金額都填妥後按「確認」收合為單行顯示（label 在上、金額輸入框在下，
  * 與同容器內的「手續費」欄位同一種格式），收合後金額仍可直接編輯，另提供編輯（展開回卡片改科目／名稱）與刪除操作。
  */
-export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, allowSign = false }: OtherDeductionsEditorProps) {
+export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, allowSign = false, disabled = false }: OtherDeductionsEditorProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(row => {
@@ -51,22 +53,24 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                   <button
                     type="button"
                     onClick={() => onChange(row.id, { confirmed: false })}
+                    disabled={disabled}
                     aria-label="編輯此項"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-surface-cream hover:text-brand-blue"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-surface-cream hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-neutral-mid"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => onRemove(row.id)}
+                    disabled={disabled}
                     aria-label="移除此項"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-surface-cream hover:text-semantic-error"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-surface-cream hover:text-semantic-error disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-neutral-mid"
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
               </div>
-              <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} allowSign={allowSign} negativeByDefault />
+              <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} allowSign={allowSign} negativeByDefault disabled={disabled} />
             </div>
           );
         }
@@ -76,13 +80,14 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
                 <Label required>科目</Label>
-                <SubjectSelect value={row.subject} onChange={s => onChange(row.id, { subject: s })} placeholder="請選擇科目" />
+                <SubjectSelect value={row.subject} onChange={s => onChange(row.id, { subject: s })} placeholder="請選擇科目" disabled={disabled} />
               </div>
               <button
                 type="button"
                 onClick={() => onRemove(row.id)}
+                disabled={disabled}
                 aria-label="移除此項"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-mid transition-colors hover:bg-white hover:text-semantic-error"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-neutral-mid transition-colors hover:bg-white hover:text-semantic-error disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-neutral-mid"
               >
                 <Trash2 size={16} />
               </button>
@@ -95,6 +100,7 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                   value={row.name}
                   onChange={e => onChange(row.id, { name: e.target.value })}
                   placeholder="項目名稱"
+                  disabled={disabled}
                 />
               </div>
               <div className="w-full shrink-0 nav:w-auto">
@@ -107,12 +113,13 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                     onChange={value => onChange(row.id, { amount: value })}
                     allowSign={allowSign}
                     negativeByDefault
+                    disabled={disabled}
                   />
                 </div>
               </div>
             </div>
             <div className="flex justify-end">
-              <Button variant="primary" size="sm" onClick={() => onChange(row.id, { confirmed: true })} disabled={isIncomplete}>
+              <Button variant="primary" size="sm" onClick={() => onChange(row.id, { confirmed: true })} disabled={isIncomplete || disabled}>
                 確認
               </Button>
             </div>
@@ -120,7 +127,7 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
         );
       })}
 
-      <Button variant="outline" size="sm" icon={Plus} onClick={onAdd} className="self-end">
+      <Button variant="outline" size="sm" icon={Plus} onClick={onAdd} disabled={disabled} className="self-end">
         新增額外金額
       </Button>
     </div>

@@ -10,11 +10,6 @@ export const OTHER_GROUP_LABEL = '其他';
 /** 側邊欄「全部管道／全部廠商」：唯讀列出整張交易清單，不參與沖帳勾選 */
 export const ALL_GROUP_KEY = '__ALL__';
 
-/** 側邊欄「其他」桶的顯示文字：應收沿用「其他」，應付因無統編廠商多為個人交易，改用更貼切的「個人無統編」 */
-export function getOtherGroupLabel(side: ReconSide): string {
-  return side === 'payable' ? '個人無統編' : OTHER_GROUP_LABEL;
-}
-
 /** 應收顯示「全部管道」、應付顯示「全部廠商」，比照側邊欄其餘項目依 side 使用管道／廠商用語 */
 export function getAllGroupLabel(side: ReconSide): string {
   return side === 'receivable' ? '全部管道' : '全部廠商';
@@ -140,7 +135,7 @@ export function resolveCatchAllKey(groupOptions: ReconGroupOption[]): string {
  * 找不到對應的一律歸入「其他」（合併規則見 resolveCatchAllKey）。
  * candidates 需先排除已沖帳的交易再傳入。
  */
-export function buildReconGroups(candidates: ReconCandidate[], groupOptions: ReconGroupOption[], side: ReconSide): ReconGroup[] {
+export function buildReconGroups(candidates: ReconCandidate[], groupOptions: ReconGroupOption[]): ReconGroup[] {
   const knownUuids = new Set(groupOptions.map(o => o.uuid));
   const catchAllKey = resolveCatchAllKey(groupOptions);
   const isUnclassified = (groupUuid: string | null) => !groupUuid || !knownUuids.has(groupUuid);
@@ -150,14 +145,13 @@ export function buildReconGroups(candidates: ReconCandidate[], groupOptions: Rec
 
   const groups: ReconGroup[] = sortedOptions.map(opt => {
     const matchRows = candidates.filter(c => c.groupUuid === opt.uuid || (opt.uuid === catchAllKey && isUnclassified(c.groupUuid)));
-    const label = opt.name === OTHER_GROUP_LABEL ? getOtherGroupLabel(side) : opt.name;
-    return { key: opt.uuid, label, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + c.amount, 0), balance: opt.balance };
+    return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + c.amount, 0), balance: opt.balance };
   });
 
   // 沒有使用者自建的「其他」管道時，才需要前端合成一個桶收納未分類交易
   if (catchAllKey === OTHER_GROUP_KEY) {
     const otherRows = candidates.filter(c => isUnclassified(c.groupUuid));
-    groups.push({ key: OTHER_GROUP_KEY, label: getOtherGroupLabel(side), count: otherRows.length, amount: otherRows.reduce((sum, c) => sum + c.amount, 0) });
+    groups.push({ key: OTHER_GROUP_KEY, label: OTHER_GROUP_LABEL, count: otherRows.length, amount: otherRows.reduce((sum, c) => sum + c.amount, 0) });
   }
   return groups;
 }

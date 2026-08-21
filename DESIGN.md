@@ -171,6 +171,58 @@ Border-radius: 16px
   無陰影（符合扁平原則）
 ```
 
+### Bottom Sheet（行動版底部面板）
+
+用途：手機（< nav 1000px）下需要一份完整表單但螢幕沒有並排空間時，把表單疊在當前畫面下方，
+可下拉／點遮罩／Esc 關閉回到原畫面且狀態不流失（如沖帳中心的金額表單）。桌機一律不出現，
+改回原本的並排／sticky 面板呈現。
+
+```
+容器：portal 至 document.body（沿用 Modal.tsx 的 createPortal / Escape 監聽 / 鎖背景捲動邏輯）
+遮罩（scrim）：fixed inset-0、bg-neutral-dark/40、z-[55]
+面板：fixed inset-x-0 bottom-0、z-[60]
+  背景：#FFFFFF
+  圓角：rounded-t-lg（僅上緣兩角，10px）
+  陰影：shadow-level1（浮動面板，符合陰影例外規則）
+  內容區：max-h-[80vh]、overflow-y-auto、overscroll-contain
+  內距：px-4 pb-4（另加 pb 隨安全區域 env(safe-area-inset-bottom)）
+拖曳握把：頂部置中、40×4px、bg #9AA7B9（neutral-blue-gray/40）、整條握把區為 min-h-11 的按鈕
+  （符合 44px 熱區），點擊或下拉（位移 > 80px）即關閉
+過渡：面板 translate-y transition-transform（--transition-base 200ms）；遮罩 opacity 同步淡入淡出
+nav:hidden（≥ nav 1000px 不掛載）
+```
+對應元件：`src/components/ui/BottomSheet.tsx`。
+
+### Sticky Action Bar（行動版底部固定操作條）
+
+用途：手機版清單頁在使用者捲動瀏覽時，仍需隨時看到目前已選摘要與主要動作按鈕（如沖帳中心的
+「已選 N 筆／金額」+「確認金額」）。桌機一律不出現，主要動作改回置於側欄面板內。
+
+```
+容器：fixed inset-x-0 bottom-0、z-30
+背景：#FFFFFF
+邊框：上緣 1px #C7CDD3（neutral-blue-gray/30）
+內距：px-4 py-3，另加 pb-[calc(12px+env(safe-area-inset-bottom))] 避開 iOS Home Indicator
+內容：左側摘要文字（label 12px #797C80 + 金額 14px 半粗體 #3A3830）、右側／下方主要按鈕（Button
+  variant="primary"、滿版寬度）
+nav:hidden（≥ nav 1000px 不掛載）
+```
+對應元件：`src/features/reconciliation/components/ReconMobileActionBar.tsx`（沖帳中心專用範例，
+其餘頁面如需相同模式可比照建立）。
+
+**z-index 分層**（由低到高，新增 Bottom Sheet／Sticky Action Bar 後的完整順序）：
+```
+z-30  Sticky Action Bar（行動版底部固定操作條）
+z-40  AppShell 手機固定頂部列
+z-50  Sidebar 行動版 Overlay 抽屜
+z-[55] Bottom Sheet 遮罩
+z-[60] Bottom Sheet 面板
+z-[70] Modal（確認彈窗等）
+z-[80] Popover（日期篩選、下拉選單等）
+```
+Bottom Sheet 蓋在底部操作條與側邊欄 Overlay 之上，但仍低於 Modal／Popover——彈窗與下拉選單需要能
+疊在 Bottom Sheet 上方顯示（如面板內開出的確認沖帳彈窗）。
+
 ### Form Inputs
 ```
 Border: 1.5px solid #9AA7B9
@@ -219,13 +271,14 @@ Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
 
 **金額輸入正負切換（Signed Money Input）**（金額欄位需要讓使用者選擇正值或負值，如沖帳中心的手續費、額外金額）
 ```
-切換鈕：24×24px（h-7 w-7）、rounded-md（6px）
-  背景: #EAE5E3（surface-cream）
-  Hover 背景: #F0EBE5（surface-warm）
-  圖示: lucide Plus（正）/ Minus（負），14px，色彩隨文字 #797C80（neutral-mid）→ hover #3A3830
-  Disabled：opacity 50%、cursor-not-allowed，維持背景不變（不 hover）
-排列：切換鈕 + 金額輸入框，中間 gap 6px（gap-1.5），切換鈕在左
-輸入框本身沿用上方 Form Inputs 規格，顯示絕對值（不顯示負號字元），正負完全由切換鈕圖示表達
+容器（toggle）：28×28px（h-7），rounded-md（6px）、bg #EAE5E3（surface-cream）、內距 2px（p-0.5）、
+  內含兩顆等寬選項（各 h-6 w-6），同時顯示正／負兩個狀態，不像單顆按鈕需點擊才知道另一狀態
+  已選取：背景 #005FA2（brand-primary）、圖示 #FFFFFF
+  未選取：圖示 #797C80（neutral-mid），Hover 背景 #F0EBE5（surface-warm）、圖示轉 #3A3830
+  圖示: lucide Plus（正，左）/ Minus（負，右），14px
+  Disabled：整個容器 opacity 50%、cursor-not-allowed，兩顆選項皆不 hover
+排列：toggle 容器 + 金額輸入框，中間 gap 6px（gap-1.5），toggle 在左
+輸入框本身沿用上方 Form Inputs 規格，顯示絕對值（不顯示負號字元），正負完全由 toggle 選取狀態表達
 ```
 對應元件：`src/components/ui/MoneyInput.tsx` 的 `allowSign` prop（選用，預設關閉時為一般金額輸入，行為不變）。
 
@@ -362,6 +415,54 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 
 對應元件：`src/components/ui/TabBar.tsx`（`TabBarOption.disabled` / `hint`）。
 
+### Step Number Badge（操作順序編號）
+
+用途：同一頁面內有多個必須依序完成的操作區塊時，在各區塊標題前標示順序編號
+（如沖帳中心：選擇管道 → 選擇交易 → 輸入金額）。步驟數會隨模式改變，故編號由呼叫端傳入。
+
+```
+徽章：inline-flex、h-5 w-5、rounded-full、bg #005FA2（brand-primary）、色 #FFFFFF
+字：Noto Sans TC 12px font-semibold、tabular-nums、置中
+與標題文字間距：8px（gap-2）
+標題本身沿用該區塊原有字級／字重，不因加編號而改變
+aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
+```
+對應元件：`src/components/ui/StepNumber.tsx`。
+
+### Allocation Row（沖帳對象分配列）
+
+用途：一筆實際存入／付出金額需要分配給多個對象（銀行帳戶／會計科目）時，以「主對象自動補足
+未分配金額＋可增減的分出列」呈現（如沖帳中心的沖帳對象分配）。窄欄容器（如沖帳中心右欄
+340px 面板）一律採上下堆疊排版，不左右並排。
+
+```
+主對象列：rounded-lg（10px）、border-[1.5px] border-brand-blue/40、bg-brand-blue/5、p-3
+分出列：  rounded-lg（10px）、border border-neutral-blue-gray/30、bg #FFFFFF、p-3
+列間距：8px（gap-2）
+
+角色徽章：沿用 Status Badge 元件（variant="muted"）
+  主對象 → tone="info"（bg rgba(0,95,162,0.1)、文字 #005FA2）
+  分出   → tone="neutral"（bg #EAE5E3、文字 #797C80）
+
+對象下拉：h-10、rounded-lg、border-[1.5px] border-neutral-blue-gray/50，樣式比照 Form Inputs；
+  選單列出銀行帳戶（顯示目前餘額）與可用會計科目（餘額未提供時顯示「—」），
+  已被其他列選走的固定科目於選單中 disabled
+
+副標文字（帳號／科目代碼／餘額）：Noto Sans TC 12px（text-xs）、#797C80（neutral-mid）
+分配金額：font-mono、tabular-nums，16px（text-base）font-semibold、#3A3830；
+  金額為負（分出總額超額）時轉 #DD6B5F（semantic-error）
+
+彙總列：上緣 border-t 1px rgba(154,167,185,0.3)（neutral-blue-gray/20）、mt-3 pt-3
+  左側說明：12px（text-xs）#797C80
+  右側總額：16px（text-base）font-semibold tabular-nums #3A3830
+
+新增對象按鈕：Button variant="outline" size="sm" icon={Plus}，滿版寬度，
+  與同容器內其他「新增」按鈕（如額外金額編輯器）視覺一致
+移除按鈕：圖示按鈕（lucide Trash2），h-7 w-7，hover 轉 #DD6B5F（semantic-error）
+```
+對應元件：`src/features/reconciliation/components/ReconTargetAllocation.tsx`、
+`src/features/reconciliation/components/ReconTargetSelect.tsx`。
+
 ---
 
 ## 5. Layout Principles
@@ -481,7 +582,7 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 
 | 區間 | 寬度 | 說明 |
 |------|------|------|
-| 手機（< nav） | < 1000px | 單欄堆疊、卡片式版面、側邊欄收合為橫向 chips 或 Overlay |
+| 手機（< nav） | < 1000px | 單欄堆疊、卡片式版面、側邊欄收合為橫向 chips 或 Overlay；需要並排欄位（如同時輸入表單＋看清單）時改用 Bottom Sheet 疊加，主要動作常駐 Sticky Action Bar（見 §4 Bottom Sheet / Sticky Action Bar） |
 | 桌機（≥ nav） | ≥ 1000px | 多欄／可拖曳分割面板、欄位化表格、Sidebar 固定於左側 |
 
 實作慣例：預設樣式即手機版，桌機專屬樣式一律加 `nav:` 前綴覆寫（mobile-first）。

@@ -1,58 +1,69 @@
 'use client';
 
+import Select from '@/components/ui/Select';
+import StepNumber from '@/components/ui/StepNumber';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { useEffect, useRef } from 'react';
 import { ALL_GROUP_KEY } from '../data';
 import type { ReconGroup } from '../data';
+import type { ReconSide } from '../types';
 
 interface ReconGroupSidebarProps {
+  side: ReconSide;
   groups: ReconGroup[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
 }
 
 /**
- * 沖帳中心左側群組側邊欄：第一項固定為唯讀總覽「全部管道」，其後銷項列銷售管道、進項列廠商，皆含一個「其他」。
- * 每個項目顯示筆數與金額（使用者關心的是還有多少錢沒沖，不只是筆數），長名稱手機無法依賴 hover title，改為
- * 可換行的兩行顯示。桌機為卡片化直向清單（與全站主導覽的側邊欄樣式區隔，避免雙左欄視覺混淆）；
- * 手機收合為頂部水平 chips 橫向捲動，選取項會自動捲到可視範圍（切換應收/應付或套用新查詢區間後選取項重置為
- * 「全部管道」，若清單已捲到別處使用者容易找不到目前選了誰）。「全部管道」與其後管道間加一條分隔線，區隔總覽與個別管道。
- * 寬度由外層 ResizableSplitPane 控制（可拖曳調整），此處桌機恆為 w-full 填滿外層容器。
+ * 沖帳中心頂部群組選擇列（操作順序第 1 步，見 DESIGN.md「Step Number Badge」）：第一項固定為唯讀總覽
+ * 「全部管道」，其後銷項列銷售管道、進項列廠商，皆含一個「其他」。
+ * 桌機（≥ nav 1000px）採橫向 chips，管道數量多時自動換行，不做「更多」收合——換行才不會讓任何管道被隱藏。
+ * 手機（< nav）螢幕寬度有限，換行會把整個清單往下推一大塊，改為下拉選單（見 @/components/ui/Select），
+ * 選項文字帶入名稱與筆數／金額，方便管道多時直接搜尋比對。「全部管道」與其後管道間（桌機版）加一條垂直
+ * 分隔線，區隔總覽與個別管道。
  */
-export default function ReconGroupSidebar({ groups, selectedKey, onSelect }: ReconGroupSidebarProps) {
-  const activeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' });
-  }, [selectedKey]);
+export default function ReconGroupSidebar({ side, groups, selectedKey, onSelect }: ReconGroupSidebarProps) {
+  const stepLabel = side === 'receivable' ? '選擇銷售管道' : '選擇廠商';
 
   return (
-    <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-2 nav:w-full nav:p-3">
-      <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto nav:flex-col nav:gap-1 nav:overflow-visible nav:[scroll-snap-type:none]">
+    <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <StepNumber value={1} />
+        <span className="text-sm font-semibold text-neutral-dark">{stepLabel}</span>
+      </div>
+
+      {/* 手機（< nav）：下拉選單 */}
+      <div className="nav:hidden">
+        <Select value={selectedKey ?? undefined} onValueChange={onSelect}>
+          {groups.map(group => (
+            <option key={group.key} value={group.key}>
+              {group.label} · {group.count} 筆 · {fmtCurrency(group.amount)}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {/* 桌機（≥ nav）：橫向 chips，數量多時自動換行 */}
+      <div className="hidden flex-wrap items-stretch gap-2 nav:flex">
         {groups.map((group, index) => {
           const active = group.key === selectedKey;
-          // 「全部管道」後接的第一個管道項目加上分隔線，區隔唯讀總覽與個別管道（僅桌機直向清單看得出間距差異）
+          // 「全部管道」後接的第一個管道項目加上左側分隔線，區隔唯讀總覽與個別管道
           const showDivider = index > 0 && groups[index - 1].key === ALL_GROUP_KEY;
           return (
-            <div
-              key={group.key}
-              ref={active ? activeRef : undefined}
-              className={cn(
-                'flex shrink-0 snap-start items-start gap-1 rounded-md pl-3 pr-1 py-2 transition-colors nav:w-full',
-                showDivider && 'nav:mt-1 nav:border-t nav:border-neutral-blue-gray/20 nav:pt-2',
-                active ? 'bg-surface-cream' : 'hover:bg-surface-cream',
-              )}
-            >
-              <button type="button" onClick={() => onSelect(group.key)} title={group.label} className="min-w-0 flex-1 text-left">
-                <span
-                  className={cn(
-                    'line-clamp-2 max-w-[14rem] whitespace-normal break-words text-sm nav:max-w-none nav:line-clamp-none',
-                    active ? 'font-semibold text-brand-blue' : 'text-neutral-dark',
-                  )}
-                >
+            <div key={group.key} className={cn('flex shrink-0 items-stretch', showDivider && 'ml-1 border-l border-neutral-blue-gray/20 pl-3')}>
+              <button
+                type="button"
+                onClick={() => onSelect(group.key)}
+                title={group.label}
+                className={cn(
+                  'flex flex-col items-start gap-0.5 rounded-md border px-3 py-1.5 text-left transition-colors',
+                  active ? 'border-brand-blue bg-surface-cream' : 'border-neutral-blue-gray/30 hover:bg-surface-cream',
+                )}
+              >
+                <span className={cn('max-w-[14rem] truncate text-sm', active ? 'font-semibold text-brand-blue' : 'text-neutral-dark')} title={group.label}>
                   {group.label}
                 </span>
-                <span className={cn('block whitespace-nowrap text-xs', active ? 'text-brand-blue' : 'text-neutral-mid')}>
+                <span className={cn('whitespace-nowrap text-xs', active ? 'text-brand-blue' : 'text-neutral-mid')}>
                   {group.count} 筆 · {fmtCurrency(group.amount)}
                 </span>
               </button>

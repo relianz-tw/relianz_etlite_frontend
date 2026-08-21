@@ -6,13 +6,18 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import EntryVoucherModal from '@/components/ui/EntryVoucherModal';
-import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { ChevronDown, FileSearch, Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, FileSearch } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReconSubGroup } from '../data';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
+
+/** 供 ReconciliationView 在清單卡標題列渲染「全選本管道」連結：目前（該群組全部）可勾選的交易 uuid
+ * （待收/付金額為負代表已超沖，不可選）。純函式，與 ReconTxnList 內部搜尋/篩選無關（本版已移除清單內搜尋）。 */
+export function getSelectableUuids(sections: ReconSubGroup[]): string[] {
+  return sections.flatMap(s => s.rows).filter(r => (r.remainingAmount ?? r.amount) >= 0).map(r => r.uuid);
+}
 
 interface ReconTxnListProps {
   side: ReconSide;
@@ -35,9 +40,6 @@ interface ReconTxnListProps {
   selectedUuids: Set<string>;
   /** perTxn 模式下切換單筆勾選狀態 */
   onToggleSelect: (uuid: string) => void;
-  /** perTxn 模式下「全選本管道」：傳入目前（已套用搜尋篩選後）畫面上可勾選的全部 uuid，
-   * 由呼叫端判斷是否已全選以決定這次是要「全選」還是「取消全選」 */
-  onSelectAllToggle?: (uuids: string[]) => void;
 }
 
 const HEADER_CLASS = 'text-xs font-semibold text-neutral-mid';
@@ -177,56 +179,37 @@ function TxnRow({
 
   return (
     <div>
-      {/* 行動版：卡片式版面，主體可點擊展開大約資訊；狀態／選取圓圈為獨立控件 */}
-      <div className={cn('flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-4 nav:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
-        <button type="button" onClick={onToggleExpand} className="flex flex-col gap-1.5 text-left">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <span className="shrink-0 whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date || '—'}</span>
-            <div className="flex items-center gap-2">
-              {badge && (
-                <Badge tone={badge.tone} variant="muted">
-                  {badge.label}
-                </Badge>
-              )}
-              <span className="shrink-0 whitespace-nowrap font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(remainingAmount)}</span>
-              <ChevronDown size={16} className={chevronClass} />
-            </div>
-          </div>
-          <span className="truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
-            {row.voucherNumber || '—'}
-          </span>
-          <span className="truncate text-xs text-neutral-mid" title={row.counterparty}>
-            {row.counterparty || '—'}
-          </span>
-          <span className="truncate text-xs text-neutral-mid">{channelLabel(row, channelNameByUuid)}</span>
-        </button>
-        {showStatusColumn && (
-          <button
-            type="button"
-            onClick={isSelectable ? onToggleSelect : undefined}
-            disabled={!isSelectable}
-            className="flex min-h-11 w-full items-center gap-2 rounded-md px-1 text-left disabled:cursor-default"
-          >
-            {isSelectable ? (
-              <SelectCircle checked={selected} onToggle={onToggleSelect} />
-            ) : (
-              <StatusCircle allocation={allocation} />
-            )}
-            <span className="text-xs text-neutral-mid">
-              {isSelectable
-                ? selected
-                  ? '已選取此筆'
-                  : `${side === 'payable' ? '待付' : '待收'} ${fmtCurrency(remainingAmount)}`
-                : negativeRemainingBadge
-                  ? '已超沖，無法選取沖帳'
-                  : allocation
-                    ? allocation.closed
-                      ? '本次已結清'
-                      : '本次沖帳後仍有餘額'
-                    : '尚未預覽'}
+      {/* 行動版：精簡列，整列點擊＝勾選（僅 isSelectable 時可點），右側獨立 chevron 展開大約資訊；
+          買受人／銷售管道等細節不在列上重複顯示，統一收在展開面板（見下方 InfoRow） */}
+      <div className={cn('flex items-center gap-1 rounded-lg border border-neutral-blue-gray/30 bg-white pr-1 nav:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
+        <button
+          type="button"
+          onClick={isSelectable ? onToggleSelect : undefined}
+          disabled={!isSelectable}
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left disabled:cursor-default"
+        >
+          {showStatusColumn &&
+            (isSelectable ? <SelectCircle checked={selected} onToggle={onToggleSelect} /> : <StatusCircle allocation={allocation} />)}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
+              {row.voucherNumber || '—'}
             </span>
-          </button>
-        )}
+            <span className="block truncate text-xs text-neutral-mid">
+              {row.date || '—'} · {channelLabel(row, channelNameByUuid)}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {badge && (
+              <Badge tone={badge.tone} variant="muted">
+                {badge.label}
+              </Badge>
+            )}
+            <span className="whitespace-nowrap font-mono text-sm font-semibold tabular-nums text-neutral-dark">{fmtCurrency(remainingAmount)}</span>
+          </span>
+        </button>
+        <button type="button" onClick={onToggleExpand} aria-label="展開明細" className="flex min-h-11 w-11 shrink-0 items-center justify-center">
+          <ChevronDown size={16} className={chevronClass} />
+        </button>
       </div>
 
       {/* 桌機：欄位化列 */}
@@ -331,14 +314,15 @@ function TxnRow({
  * - 逐筆沖帳（mode='perTxn'）：狀態欄改為可點擊的選取圓圈（複選），由使用者勾選要沖帳的交易——
  *   勾 1 筆走手動沖帳 API、勾多筆走 summary API（分流邏輯見 ReconciliationView），畫面上不需要先選模式。
  * 「其他」群組會拆成多個 section（依原始 groupUuid），每個 section 附標題。
- * 每一列固定顯示所屬「銷售管道／廠商」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊列主體就地展開大約資訊，
- * 展開區另顯示已預覽的本次沖帳額／沖後剩餘（或逐筆沖帳的待付／待收金額），「查看憑證明細」按鈕開啟與建立折讓單
- * 畫面共用的 EntryVoucherModal（見 @/components/ui/EntryVoucherModal），呈現同一份憑證資料與版面，不離開沖帳流程。
- * 行動版（<1000px）改為卡片式版面，展開行為與桌機一致，避免欄位化列在窄螢幕擠成一行難以操作。
+ * 每一列固定顯示所屬「銷售管道／廠商」名稱（唯讀，後端無編輯單筆交易管道的 API）；點擊桌機列主體或行動版
+ * 右側 chevron 就地展開大約資訊，展開區另顯示已預覽的本次沖帳額／沖後剩餘（或逐筆沖帳的待付／待收金額），
+ * 「查看憑證明細」按鈕開啟與建立折讓單畫面共用的 EntryVoucherModal（見 @/components/ui/EntryVoucherModal），
+ * 呈現同一份憑證資料與版面，不離開沖帳流程。
+ * 行動版（<1000px）改為精簡列（勾選圓圈／狀態圓圈＋憑證號碼＋日期·管道＋金額），整列點擊＝勾選、
+ * chevron 才展開明細，避免欄位化列在窄螢幕擠成一行難以操作；買受人等次要欄位收進展開面板。
  *
- * 逐筆沖帳另加清單頂部工具列（搜尋交易編號／金額、全選本管道、已選筆數與金額），純前端就地過濾——搜尋僅影響
- * 畫面顯示與「全選」涵蓋的範圍，不重新打 API；已選筆數／金額固定以目前 sections（該群組全部交易，不受搜尋
- * 篩選影響）計算，避免使用者清空搜尋字串時誤以為選取被重置。
+ * 本版已移除清單頂部的搜尋欄與工具列（見 getSelectableUuids）：「全選本管道」與已選筆數／金額改由呼叫端
+ * （ReconciliationView）在清單卡標題列與右側金額面板呈現，此元件僅負責清單本身的顯示與勾選互動。
  */
 export default function ReconTxnList({
   side,
@@ -353,113 +337,48 @@ export default function ReconTxnList({
   allocationByUuid,
   selectedUuids,
   onToggleSelect,
-  onSelectAllToggle,
 }: ReconTxnListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
   const totalRows = sections.reduce((sum, s) => sum + s.rows.length, 0);
-
-  const filteredSections = useMemo(() => {
-    const q = searchQuery.trim();
-    if (!q) return sections;
-    return sections.map(s => ({
-      ...s,
-      rows: s.rows.filter(r => r.orderCode.includes(q) || String(Math.abs(r.remainingAmount ?? r.amount)).includes(q)),
-    }));
-  }, [sections, searchQuery]);
-  const totalFilteredRows = filteredSections.reduce((sum, s) => sum + s.rows.length, 0);
-
-  const showToolbar = mode === 'perTxn' && showStatusColumn;
-  const canSearch = totalRows > 0;
-  const allRows = useMemo(() => sections.flatMap(s => s.rows), [sections]);
-  const selectedRowsInView = allRows.filter(r => selectedUuids.has(r.uuid));
-  const selectedAmountInView = selectedRowsInView.reduce((sum, r) => sum + (r.remainingAmount ?? r.amount), 0);
-  const selectableUuids = useMemo(
-    () => filteredSections.flatMap(s => s.rows).filter(r => (r.remainingAmount ?? r.amount) >= 0).map(r => r.uuid),
-    [filteredSections],
-  );
-  const allSelectableSelected = selectableUuids.length > 0 && selectableUuids.every(uuid => selectedUuids.has(uuid));
 
   if (totalRows === 0) {
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">{emptyMessage}</div>;
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {(showToolbar || canSearch) && (
-        <div className="flex flex-col gap-2 nav:flex-row nav:items-center nav:gap-3">
-          {canSearch && (
-            <div className="relative w-full nav:w-56">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-mid" />
-              <TextInput
-                widthClassName="w-full"
-                className="h-9 pl-8 text-sm"
-                placeholder="搜尋交易編號／金額"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            </div>
-          )}
-          {showToolbar && onSelectAllToggle && (
-            <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-surface-off-white px-3 py-2 text-xs">
-              <button
-                type="button"
-                onClick={() => onSelectAllToggle(selectableUuids)}
-                disabled={selectableUuids.length === 0}
-                className="shrink-0 font-semibold text-brand-blue hover:underline disabled:cursor-not-allowed disabled:text-neutral-blue-gray disabled:no-underline"
-              >
-                {allSelectableSelected ? '取消全選' : '全選本管道'}
-              </button>
-              <span className="text-neutral-mid">勾 1 筆＝逐筆沖帳，勾多筆＝多筆沖帳，金額自動加總</span>
-              {selectedRowsInView.length > 0 && (
-                <span className="ml-auto shrink-0 text-neutral-dark">
-                  已選 <span className="font-mono font-semibold">{selectedRowsInView.length}</span> 筆 ·{' '}
-                  <span className="font-mono font-semibold">{fmtCurrency(selectedAmountInView)}</span>
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+    <div className="flex flex-col gap-2 nav:gap-1">
+      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
+        <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && mode === 'perTxn' ? '選取' : ''}</span>
+        <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
+        <span className={cn(HEADER_CLASS, 'w-48 shrink-0')}>{side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}</span>
+        <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>{side === 'payable' ? '待付金額' : '待收金額'}</span>
+        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
+        <span className="w-4 shrink-0" />
+      </div>
 
-      {totalFilteredRows === 0 ? (
-        <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">查無符合搜尋條件的交易</div>
-      ) : (
-        <div className="flex flex-col gap-2 nav:gap-1">
-          <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
-            <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && mode === 'perTxn' ? '選取' : ''}</span>
-            <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
-            <span className={cn(HEADER_CLASS, 'w-48 shrink-0')}>{side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}</span>
-            <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>{side === 'payable' ? '待付金額' : '待收金額'}</span>
-            <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
-            <span className="w-4 shrink-0" />
-          </div>
-
-          {filteredSections.map(section => (
-            <div key={section.key} className="flex flex-col gap-2 nav:gap-1">
-              {showSectionHeaders && section.rows.length > 0 && (
-                <p className="mb-1 mt-3 px-1 text-xs font-semibold text-neutral-mid first:mt-2 nav:px-3">
-                  {section.label}（{section.rows.length}）
-                </p>
-              )}
-              {section.rows.map(row => (
-                <TxnRow
-                  key={row.uuid}
-                  row={row}
-                  side={side}
-                  showStatusColumn={showStatusColumn}
-                  mode={mode}
-                  allocation={allocationByUuid.get(row.uuid)}
-                  selected={selectedUuids.has(row.uuid)}
-                  onToggleSelect={() => onToggleSelect(row.uuid)}
-                  channelNameByUuid={channelNameByUuid}
-                  expanded={expandedUuid === row.uuid}
-                  onToggleExpand={() => onToggleExpand(row.uuid)}
-                />
-              ))}
-            </div>
+      {sections.map(section => (
+        <div key={section.key} className="flex flex-col gap-2 nav:gap-1">
+          {showSectionHeaders && section.rows.length > 0 && (
+            <p className="mb-1 mt-3 px-1 text-xs font-semibold text-neutral-mid first:mt-2 nav:px-3">
+              {section.label}（{section.rows.length}）
+            </p>
+          )}
+          {section.rows.map(row => (
+            <TxnRow
+              key={row.uuid}
+              row={row}
+              side={side}
+              showStatusColumn={showStatusColumn}
+              mode={mode}
+              allocation={allocationByUuid.get(row.uuid)}
+              selected={selectedUuids.has(row.uuid)}
+              onToggleSelect={() => onToggleSelect(row.uuid)}
+              channelNameByUuid={channelNameByUuid}
+              expanded={expandedUuid === row.uuid}
+              onToggleExpand={() => onToggleExpand(row.uuid)}
+            />
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }

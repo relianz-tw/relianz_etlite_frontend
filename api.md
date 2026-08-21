@@ -318,7 +318,30 @@ file: ""
 > 200 Response
 
 ```json
-{}
+{
+    "data": {
+        "gui_type": 4,
+        "gui_alphabetic_letter": "KF",
+        "gui_number": "08419450",
+        "gui_date_year": 114,
+        "gui_date_month": 1,
+        "gui_date_day": 3,
+        "total_amount": 4100,
+        "buyer_name": "多幕創意有限公司",
+        "buyer_tax_id": "96775852",
+        "subtotal": 3905,
+        "tax": 195,
+        "tax_free_amount": null,
+        "summary": "物流費",
+        "angle": 0,
+        "document_template": 2
+    },
+    "errorCode": "0000",
+    "geminiMs": 3780,
+    "message": "操作成功",
+    "success": true,
+    "totalMs": 3799
+}
 ```
 
 ### Responses
@@ -328,6 +351,32 @@ file: ""
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|object|true|none||none|
+|»» gui_type|integer|true|none||1~7:一般憑證 8:交通憑證 9:水電瓦斯 10:其他 11:進口|
+|»» gui_alphabetic_letter|string|true|none||none|
+|»» gui_number|string|true|none||none|
+|»» gui_date_year|integer|true|none||none|
+|»» gui_date_month|integer|true|none||none|
+|»» gui_date_day|integer|true|none||none|
+|»» total_amount|integer|true|none||none|
+|»» buyer_name|string|true|none||none|
+|»» buyer_tax_id|string|true|none||none|
+|»» subtotal|integer|true|none||none|
+|»» tax|integer|true|none||none|
+|»» tax_free_amount|null|true|none||none|
+|»» summary|string|true|none||none|
+|»» angle|integer|true|none||none|
+|»» document_template|integer|true|none||none|
+|» errorCode|string|true|none||none|
+|» geminiMs|integer|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
+|» totalMs|integer|true|none||none|
 
 # 導入流程
 
@@ -6308,12 +6357,17 @@ HTTP Status Code **200**
 |Name|Type|Required|Restrictions|Title|description|
 |---|---|---|---|---|---|
 |» data|[object]|true|none||none|
-|»» id|integer|true|none||none|
-|»» year|integer|true|none||none|
-|»» subjectCode|string|true|none||none|
-|»» name|string|true|none||none|
-|»» debitCreditType|null|true|none||none|
-|»» remark|null|true|none||none|
+|»» id|integer|true|none||流水號|
+|»» year|integer|true|none||年份|
+|»» subjectCode|string|true|none||會計項目代號|
+|»» name|string|true|none||項目中文名稱|
+|»» debitCreditType|string|true|none||借方或貸方|
+|»» remark|string|true|none||備註|
+|»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
+|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»» industryBitmask|integer|true|none||買賣業:1,勞務業:2,製造業:4|
+|»» isBank|boolean|true|none||銀行項目專用科目嗎|
+|»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |»» createdAt|string|true|none||none|
 |»» updatedAt|string|true|none||none|
 |» errorCode|string|true|none||none|
@@ -6448,6 +6502,82 @@ POST /ael/subject/usage
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+## GET 進階篩選官方會計科目列表
+
+GET /ael/subject/official/list/filter
+
+進階篩選官方會計科目列表
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|type|query|string| no |0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
+|calculationType|query|string| no |0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|industry|query|string| no |業別，0:買賣業，1:勞務業，2:製造業|
+|value|query|string| no |關鍵字|
+|isBank|query|string| no |0：false，1：true；沒傳不篩|
+|buyOrSell|query|string| no |2：進項， 3：銷項|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "data": [
+    {
+      "id": 0,
+      "year": 0,
+      "subjectCode": "string",
+      "name": "string",
+      "debitCreditType": "string",
+      "remark": "string",
+      "type": 0,
+      "calculationType": 0,
+      "industryBitmask": 0,
+      "isBank": true,
+      "buyOrSell": 0,
+      "createdAt": "string",
+      "updatedAt": "string"
+    }
+  ],
+  "errorCode": "string",
+  "message": "string",
+  "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» data|[object]|true|none||none|
+|»» id|integer|true|none||流水號|
+|»» year|integer|true|none||年份|
+|»» subjectCode|string|true|none||會計項目代號|
+|»» name|string|true|none||項目中文名稱|
+|»» debitCreditType|string|true|none||借方或貸方|
+|»» remark|string|true|none||備註|
+|»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
+|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»» industryBitmask|integer|true|none||買賣業:1,勞務業:2,製造業:4|
+|»» isBank|boolean|true|none||銀行項目專用科目嗎|
+|»» buyOrSell|integer|true|none||進項:2，銷項:3|
+|»» createdAt|string|true|none||none|
+|»» updatedAt|string|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» success|boolean|true|none||none|
 
 # 帳簿
 
@@ -10754,7 +10884,8 @@ POST /ael/vendors
   "bankName": "中國信託",
   "branchName": "港墘分行",
   "accountNo": "123456789012",
-  "remark": "常用廠商"
+  "remark": "常用廠商",
+  "initDefaultOther": false
 }
 ```
 
@@ -10773,6 +10904,7 @@ POST /ael/vendors
 |» branchName|body|string| yes |分行名稱|
 |» accountNo|body|string| yes |銀行帳號|
 |» remark|body|string| yes |備註|
+|» initDefaultOther|body|boolean| yes |初始化“其他”嗎？|
 
 > Response Examples
 
@@ -10837,7 +10969,7 @@ HTTP Status Code **200**
 
 PATCH /ael/vendors
 
-更新廠商資料
+更新廠商資料，「其他」不可更新任何欄位
 
 > Body Parameters
 
@@ -11831,6 +11963,351 @@ PATCH /ael/payment/channelRules
 |400|[Bad Request](https://tools.ietf.org/html/rfc7231#section-6.5.1)|none|Inline|
 
 ### Responses Data Schema
+
+# 營業稅中心
+
+## POST 指定期別進項發票列表
+
+POST /ael/vat/input/filter
+
+指定期別進項發票列表
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "cmsYear": 115,
+    "cmsPhase": 7,
+    "invoiceNumber": "",
+    "amountFrom": 221,
+    "amountTo": 280,
+    "dateFrom": "20260701",
+    "dateTo": "20260817",
+    "limit": 10,
+    "page": 1
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |none|
+|» cmsYear|body|integer| yes |民國年|
+|» cmsPhase|body|integer| yes |1, 3, 5, 7, 9, 11|
+|» invoiceNumber|body|string| no |選填；字軌+號碼模糊比對|
+|» amountFrom|body|number| no |選填；金額下限，比對 invoice amount|
+|» amountTo|body|number| no |選填；金額上限，比對 invoice amount|
+|» dateFrom|body|string| no |選填；起日，西元 YYYYMMDD|
+|» dateTo|body|string| no |選填；迄日，西元 YYYYMMDD|
+|» limit|body|integer| no |選填；預設 10|
+|» page|body|integer| no |選填；預設 1|
+
+#### Enum
+
+|Name|Value|
+|---|---|
+|» cmsPhase|1|
+|» cmsPhase|3|
+|» cmsPhase|5|
+|» cmsPhase|7|
+|» cmsPhase|9|
+|» cmsPhase|11|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "items": [
+      {
+        "invoiceUuid": "string",
+        "invoiceTrack": "string",
+        "invoiceNumber": "string",
+        "voucherNumber": "string",
+        "invoiceDate": "string",
+        "sales": 0,
+        "businessTax": 0,
+        "amount": 0,
+        "taxFreeAmount": 0,
+        "isDebit": 0,
+        "buyOrSell": 0,
+        "ourInvoiceType": 0,
+        "companyName": "string",
+        "buyerTaxIdNumber": "string",
+        "sellerTaxIdNumber": "string",
+        "ledgerUuid": "string",
+        "orderCode": "string",
+        "entryType": 0,
+        "entryKind": 0,
+        "direction": 0,
+        "counterpartyName": "string",
+        "officialAccountingSubjectId": 0,
+        "subjectName": "string"
+      }
+    ],
+    "total": 0,
+    "limit": 0,
+    "page": 0,
+    "totalSales": 0,
+    "totalBusinessTax": 0,
+    "totalAmount": 0
+  }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» items|[object]|true|none||none|
+|»»» invoiceUuid|string|false|none||發票uuid|
+|»»» invoiceTrack|string|false|none||發票字軌|
+|»»» invoiceNumber|string|false|none||發票號碼|
+|»»» voucherNumber|string|false|none||發票字軌+發票號碼|
+|»»» invoiceDate|string|false|none||YYYMMDD|
+|»»» sales|integer|false|none||未稅銷售額|
+|»»» businessTax|integer|false|none||稅額|
+|»»» amount|integer|false|none||總額|
+|»»» taxFreeAmount|integer|false|none||免稅銷售額|
+|»»» isDebit|integer|false|none||0一般／1折讓|
+|»»» buyOrSell|integer|false|none||2進項／3銷項|
+|»»» ourInvoiceType|integer|false|none||none|
+|»»» companyName|string|false|none||公司名稱|
+|»»» buyerTaxIdNumber|string|false|none||買方統編|
+|»»» sellerTaxIdNumber|string|false|none||賣方統編|
+|»»» ledgerUuid|string|false|none||交易uuid|
+|»»» orderCode|string|false|none||交易編號|
+|»»» entryType|integer|false|none||0:進項交易，1:進折交易，2:銷項交易，3:銷折交易|
+|»»» entryKind|integer|false|none||0:業務原單 1:沖帳結算付款帳|
+|»»» direction|integer¦null|false|none||0:收入(銷項)，1:支出(進項)，2:應收(銷項)，3:應付(進項)，4:其他|
+|»»» counterpartyName|string¦null|false|none||廠商名稱|
+|»»» officialAccountingSubjectId|integer|false|none||科目id|
+|»»» subjectName|string|false|none||科目名稱|
+|»» total|integer|true|none||總筆數|
+|»» limit|integer|true|none||一頁資料筆數|
+|»» page|integer|true|none||頁碼|
+|»» totalSales|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» totalBusinessTax|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» totalAmount|integer|true|none||篩選後不分頁；折讓以負值計入|
+
+## POST 指定期別銷項發票列表
+
+POST /ael/vat/output/filter
+
+指定期別銷項發票列表
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "cmsYear": 115,
+    "cmsPhase": 7,
+    "invoiceNumber": "",
+    "amountFrom": 221,
+    "amountTo": 280,
+    "dateFrom": "20260701",
+    "dateTo": "20260817",
+    "limit": 10,
+    "page": 1
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |none|
+|» cmsYear|body|integer| yes |民國年|
+|» cmsPhase|body|integer| yes |1, 3, 5, 7, 9, 11|
+|» invoiceNumber|body|string| no |選填；字軌+號碼模糊比對|
+|» amountFrom|body|number| no |選填；金額下限，比對 invoice amount|
+|» amountTo|body|number| no |選填；金額上限，比對 invoice amount|
+|» dateFrom|body|string| no |選填；起日，西元 YYYYMMDD|
+|» dateTo|body|string| no |選填；迄日，西元 YYYYMMDD|
+|» limit|body|integer| no |選填；預設 10|
+|» page|body|integer| no |選填；預設 1|
+
+#### Enum
+
+|Name|Value|
+|---|---|
+|» cmsPhase|1|
+|» cmsPhase|3|
+|» cmsPhase|5|
+|» cmsPhase|7|
+|» cmsPhase|9|
+|» cmsPhase|11|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "errorCode": "string",
+  "message": "string",
+  "data": {
+    "items": [
+      {
+        "invoiceUuid": "string",
+        "invoiceTrack": "string",
+        "invoiceNumber": "string",
+        "voucherNumber": "string",
+        "invoiceDate": "string",
+        "sales": 0,
+        "businessTax": 0,
+        "amount": 0,
+        "taxFreeAmount": 0,
+        "isDebit": 0,
+        "buyOrSell": 0,
+        "ourInvoiceType": 0,
+        "companyName": "string",
+        "buyerTaxIdNumber": "string",
+        "sellerTaxIdNumber": "string",
+        "ledgerUuid": "string",
+        "orderCode": "string",
+        "entryType": 0,
+        "entryKind": 0,
+        "direction": 0,
+        "counterpartyName": "string",
+        "officialAccountingSubjectId": 0,
+        "subjectName": "string"
+      }
+    ],
+    "total": 0,
+    "limit": 0,
+    "page": 0,
+    "totalSales": 0,
+    "totalBusinessTax": 0,
+    "totalAmount": 0
+  }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» items|[object]|true|none||none|
+|»»» invoiceUuid|string|false|none||發票uuid|
+|»»» invoiceTrack|string|false|none||發票字軌|
+|»»» invoiceNumber|string|false|none||發票號碼|
+|»»» voucherNumber|string|false|none||發票字軌+發票號碼|
+|»»» invoiceDate|string|false|none||YYYMMDD|
+|»»» sales|integer|false|none||未稅銷售額|
+|»»» businessTax|integer|false|none||稅額|
+|»»» amount|integer|false|none||總額|
+|»»» taxFreeAmount|integer|false|none||免稅銷售額|
+|»»» isDebit|integer|false|none||0一般／1折讓|
+|»»» buyOrSell|integer|false|none||2進項／3銷項|
+|»»» ourInvoiceType|integer|false|none||none|
+|»»» companyName|string|false|none||公司名稱|
+|»»» buyerTaxIdNumber|string|false|none||買方統編|
+|»»» sellerTaxIdNumber|string|false|none||賣方統編|
+|»»» ledgerUuid|string|false|none||交易uuid|
+|»»» orderCode|string|false|none||交易編號|
+|»»» entryType|integer|false|none||0:進項交易，1:進折交易，2:銷項交易，3:銷折交易|
+|»»» entryKind|integer|false|none||0:業務原單 1:沖帳結算付款帳|
+|»»» direction|integer¦null|false|none||0:收入(銷項)，1:支出(進項)，2:應收(銷項)，3:應付(進項)，4:其他|
+|»»» counterpartyName|string¦null|false|none||廠商名稱|
+|»»» officialAccountingSubjectId|integer|false|none||科目id|
+|»»» subjectName|string|false|none||科目名稱|
+|»» total|integer|true|none||總筆數|
+|»» limit|integer|true|none||一頁資料筆數|
+|»» page|integer|true|none||頁碼|
+|»» totalSales|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» totalBusinessTax|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» totalAmount|integer|true|none||篩選後不分頁；折讓以負值計入|
+
+## GET 計算本期銷／進發票金額與應納營業稅
+
+GET /ael/vat/periodSummary
+
+計算本期銷／進發票金額與應納營業稅
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|cmsYear|query|string| no |民國年|
+|cmsPhase|query|string| no |期別|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "cmsYear": 0,
+    "cmsPhase": 0,
+    "outputInvoiceAmountTotal": 0,
+    "inputInvoiceAmountTotal": 0,
+    "businessTaxTotal": 0
+  },
+  "errorCode": "string",
+  "message": "string"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|object|true|none||none|
+|»» cmsYear|integer|true|none||民國年|
+|»» cmsPhase|integer|true|none||期別|
+|»» outputInvoiceAmountTotal|integer|true|none||銷項非作廢 amount 合計；折讓以負值計入|
+|»» inputInvoiceAmountTotal|integer|true|none||進項非作廢 amount 合計；折讓以負值計入|
+|»» businessTaxTotal|integer|true|none||銷項稅合計 − 進項稅合計；可為負|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
 
 # Data Schema
 

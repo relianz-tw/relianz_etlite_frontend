@@ -1,59 +1,68 @@
-/** 與銀行交易關聯的帳簿交易（inline 展開與交易明細頁的「關聯帳簿交易」清單皆使用）；uuid 對應 /ledger/[id] 編輯頁 */
+/** 與銀行沖帳事件關聯的帳簿交易（展開列與交易明細頁的「關聯帳簿交易」清單皆使用），
+ *  由 GET /ael/ledger/entries/detail 回應對映而來（見 data.ts 的 mapEntryDetailToLinked）；
+ *  ledgerUuid 對應 /ledger/[id] 編輯頁。 */
 export interface LinkedLedgerTxn {
-  /** 帳簿交易編號（比照帳簿表格「交易編號」欄位格式，如 UA40435900），與 invoiceNo（發票號碼）為不同概念 */
-  id: string;
-  uuid: string;
+  ledgerUuid: string;
+  /** 帳簿交易編號 */
+  orderCode: string;
   side: 'sales' | 'purchase';
-  /** 買受人／賣家名稱 */
-  counterparty: string;
-  amount: number;
-  /** 交易日期，YYYYMMDD */
-  date: string;
-  /** 發票號碼 */
+  /** 交易對象名稱 */
+  counterpartyName: string;
+  /** 總金額 */
+  totalAmount: number;
+  /** 交易發生日（ISO 字串），查無則為 null */
+  transactionDate: string | null;
+  /** 科目名稱 */
+  subjectName: string;
+  /** 本次沖帳事件對該原單的沖帳金額；該原單的 settleEvents 內找不到對應事件時為 null */
+  eventSettleAmount: number | null;
+  /** 發票號碼（字軌＋號碼）；無發票（如未開立發票的應收/應付）時為空字串 */
   invoiceNo: string;
-  /** 項目／交易摘要 */
-  itemSummary: string;
-  /** 費用類別；僅進項（purchase）交易有值，比照帳簿表格只有進項顯示此欄位 */
-  category?: string;
-  /** 專案名稱；僅進項（purchase）交易有值，未歸屬專案時為空字串 */
-  project?: string;
 }
 
-/** 銀行帳戶總覽的單筆交易紀錄（存摺模式：交易時間／帳務時間／摘要／支出／存入／餘額／備註）；
- *  channel／referenceNo／handler／counterpartyBank／counterpartyAccount／voucherImage 僅交易明細頁顯示，
- *  inline 展開呈現基礎欄位（帳務時間/摘要/支出/存入/備註）＋關聯帳簿交易清單（文字呈現，比照帳簿表格欄位） */
-export interface BankTransactionRow {
-  id: string;
-  bankAccountUuid: string;
-  /** 交易時間，YYYYMMDD */
-  transactionDate: string;
-  /** 帳務時間（出入帳），YYYYMMDD */
-  accountingDate: string;
-  summary: string;
-  /** 支出金額；與 deposit 互斥，同一筆恰有一者有值 */
+/** 銀行帳戶總覽的單筆沖帳事件（由 POST /ael/bankAccounts/transactions 回應的 BankSettleEventDto 對映，
+ *  見 data.ts 的 mapSettleEventToRow）；後端僅提供沖帳事件，無逐筆累計餘額，故不含餘額欄位。 */
+export interface BankTxnRow {
+  /** 沖帳事件 uuid，列表 key 與交易明細頁路由參數 */
+  settleEventUuid: string;
+  /** 付款／收款日，YYYYMMDD */
+  paymentDate: string;
+  /** 0手動／1即沖／2匯總／4銀行提匯等 */
+  reconMethod: number;
+  /** 0銷項／1進項 */
+  side: number;
+  /** 交易對象顯示名稱：優先取廠商名稱，取不到（空字串）則回退備註 */
+  counterpartyLabel: string;
+  /** 帳面沖帳金額 */
+  settleAmount: number;
+  /** 實際收付金額 */
+  cashAmount: number;
+  /** 0 匯入／1 提出 */
+  cashDirection: number;
+  /** 支出金額；與 deposit 互斥，由 cashDirection 展開，比照既有元件慣例 */
   expense: number | null;
-  /** 存入金額；與 expense 互斥，同一筆恰有一者有值 */
+  /** 存入金額；與 expense 互斥 */
   deposit: number | null;
-  /** 逐筆累計餘額，由 data.ts 的 recalcBalances 依交易時間排序後統一計算，不由使用者輸入 */
-  balance: number;
-  /** 備註（憑證備註），選填 */
-  remark: string;
-  /** 此筆銀行交易對應的帳簿交易（可能為 0～多筆），僅交易詳細頁使用 */
-  linkedTransactions: LinkedLedgerTxn[];
-  /** 銀行流水編號，由銀行系統產生 */
-  referenceNo: string;
-  /** 交易管道（如網路銀行、自動扣款、临柜辦理） */
-  channel: string;
-  /** 經辦人員；系統自動處理的交易顯示「系統自動」 */
-  handler: string;
-  /** 對方銀行；僅轉帳類交易有值 */
-  counterpartyBank?: string;
-  /** 對方帳號；僅轉帳類交易有值 */
-  counterpartyAccount?: string;
-  /** 憑證照片，data URI 形式；null 代表尚無憑證（僅交易明細頁顯示，見 VoucherPreviewCard） */
-  voucherImage: string | null;
+  /** 是否為交易恢復（撤銷） */
+  isReverse: boolean;
+  /** 是否有發票 */
+  hasInvoice: boolean;
+  /** 交易原單 uuid，供查詢日記帳分錄 */
+  mainSettlementLedgerUuid: string;
+  /** 交易關聯單 uuid 列表，供查詢關聯帳簿交易 */
+  originLedgerUuids: string[];
+  primaryOriginLedgerUuid: string;
+  createdAt: string;
 }
 
-/** 新增交易表單送出的資料：不含 id／balance／referenceNo（由 data.ts 產生 id 並重新計算餘額，
- *  referenceNo 為銀行流水編號，比照 id 由系統產生） */
-export type NewBankTransactionInput = Omit<BankTransactionRow, 'id' | 'balance' | 'referenceNo'>;
+/** 新增銀行提／匯款交易表單送出的資料，對應 POST /ael/bankAccounts/cashMovements body
+ *  （companyUuid／bankAccountUuid 由呼叫端另外帶入，見 data.ts createCashMovementTxn） */
+export interface NewBankTransactionInput {
+  /** 0 匯入／1 提出 */
+  cashDirection: number;
+  amount: number;
+  /** YYYYMMDD */
+  paymentDate: string;
+  officialAccountingSubjectId: number;
+  memo: string;
+}

@@ -2,7 +2,7 @@
 
 import { listBankAccounts } from '@/api/bankAccounts';
 import { createChannelRule, listChannelRules } from '@/api/channelRules';
-import { createVendor, listVendors } from '@/api/vendors';
+import { createVendor, initDefaultOtherVendor, listVendors } from '@/api/vendors';
 import type { BankAccountDto, ChannelRuleDto, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -134,10 +134,21 @@ export default function TransactionMetaCard({
   }, [side]);
 
   // 廠商改為串接真實廠商名單（與設定頁「廠商管理」同一份 API），取代純文字輸入；僅進項新增需要，只載入一次
+  // 清單沒有「其他」時自動開通一筆（比照設定頁 VendorSection），確保進項交易一定有「其他」可選
   useEffect(() => {
     if (side !== 'purchase') return;
     listVendors()
-      .then(list => setVendors(list.filter(v => v.isActive)))
+      .then(async list => {
+        if (!list.some(v => v.name === '其他')) {
+          try {
+            await initDefaultOtherVendor();
+            list = await listVendors();
+          } catch (err) {
+            setVendorError(getFriendlyErrorMessage(err));
+          }
+        }
+        setVendors(list.filter(v => v.isActive));
+      })
       .catch(err => setVendorError(getFriendlyErrorMessage(err)));
   }, [side]);
 
@@ -195,6 +206,10 @@ export default function TransactionMetaCard({
   // 送出前驗證（validateForm）僅在新增（create）模式生效，故必填星號只在新增模式顯示
   const isCreate = mode === 'create';
 
+  // 「其他」廠商固定名稱、無真實統編，選取後統編欄位改開放自由輸入（非必填）；選其餘既有廠商則統編鎖定帶入
+  const selectedVendor = vendors.find(v => v.uuid === form.sellerVendorUuid);
+  const isOtherVendor = selectedVendor?.name === '其他';
+
   const issueDateField = (
     <Field label="開立日期" required={isCreate}>
       <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} disabled={readOnly} />
@@ -202,17 +217,17 @@ export default function TransactionMetaCard({
   );
 
   const sellerTaxIdField = (
-    <Field label="賣家統一編號" required={isCreate}>
-      {/* 手動編輯統編視為與下方「廠商」選擇的既有廠商脫鉤，清空 sellerVendorUuid 避免誤送舊廠商 uuid */}
-      {/* 已選擇既有廠商時統編由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
+    <Field label="賣家統一編號" required={isCreate && !isOtherVendor}>
+      {/* 已選擇既有廠商（非「其他」）時統編由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
+      {/* 廠商選「其他」無真實統編，開放自由輸入且非必填；此時編輯不影響已選定的「其他」廠商 */}
       <TextInput
         placeholder="請輸入賣家統一編號"
         value={form.sellerTaxId}
         maxLength={8}
-        disabled={readOnly || !!form.sellerVendorUuid}
+        disabled={readOnly || (!!form.sellerVendorUuid && !isOtherVendor)}
         onChange={e => {
           const v = e.target.value.replace(/\D/g, '').slice(0, 8);
-          onChange({ sellerTaxId: v, sellerVendorUuid: '' });
+          onChange({ sellerTaxId: v, ...(isOtherVendor ? {} : { sellerVendorUuid: '' }) });
         }}
       />
     </Field>
@@ -232,11 +247,12 @@ export default function TransactionMetaCard({
 
   // 廠商選單串接真實廠商名單（與設定頁「廠商管理」同一份 API），選擇後自動帶入統編／名稱與 uuid，
   // 供建立進項交易時設定 counterpartyUuid，讓帳簿「匯總沖帳」頁能依廠商正確分組；
-  // 找不到對應廠商時仍可維持「不指定」，直接於下方統編/名稱欄位手動輸入（視為個人賣家，不關聯廠商）
+  // 進項交易一律要指定廠商，找不到對應廠商時至少選「其他」（其他無真實統編，下方統編欄位可自由輸入）
   const sellerVendorField = (
     <Field
       label="廠商"
-      helper="選擇既有廠商可自動帶入統編與名稱（帶入後下方欄位鎖定不可編輯）；找不到對應廠商時可選「不指定」於下方欄位直接手動輸入，或點擊「新增」建立新廠商"
+      required={isCreate}
+      helper="選擇既有廠商可自動帶入統編與名稱（帶入後下方欄位鎖定不可編輯）；找不到對應廠商時請選「其他」，並於下方統一編號欄位自由輸入，或點擊「新增」建立新廠商"
     >
       <Select
         widthClassName="w-full"
@@ -248,7 +264,7 @@ export default function TransactionMetaCard({
         }}
         onAddNew={() => setNewVendorOpen(true)}
       >
-        <option value="">不指定（手動輸入）</option>
+        <option value="" disabled>請選擇廠商</option>
         {vendors.map(v => (
           <option key={v.uuid} value={v.uuid}>
             {v.name}
@@ -575,7 +591,12 @@ export default function TransactionMetaCard({
 
         <div className="flex flex-col gap-4 border-t border-neutral-blue-gray/20 pt-4">
           <Field label={side === 'purchase' ? '費用類別' : '收入科目'} required={mode === 'create'}>
-            <SubjectSelect value={form.expenseCategory} onChange={s => onChange({ expenseCategory: s })} disabled={readOnly} />
+            <SubjectSelect
+              value={form.expenseCategory}
+              onChange={s => onChange({ expenseCategory: s })}
+              disabled={readOnly}
+              scope={side === 'purchase' ? 'purchase' : 'sales'}
+            />
           </Field>
 
           <Field label="銷售額">

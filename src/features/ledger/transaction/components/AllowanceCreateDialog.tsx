@@ -122,7 +122,7 @@ function AllowanceCreateDialogContent({
 
         <div>
           <Label required>會計科目</Label>
-          <SubjectSelect value={subject} onChange={setSubject} disabled={submitting} />
+          <SubjectSelect value={subject} onChange={setSubject} disabled={submitting} scope={side === 'purchase' ? 'purchase' : 'sales'} />
         </div>
 
         <div className="flex items-center justify-between gap-4">

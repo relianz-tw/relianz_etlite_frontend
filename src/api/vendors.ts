@@ -19,6 +19,14 @@ export function createVendor(body: Omit<CreateVendorBody, 'companyUuid'>): Promi
   });
 }
 
+/** 開通固定名稱為「其他」的預設廠商；後端自行填入名稱等欄位，前端只需帶旗標 */
+export function initDefaultOtherVendor(): Promise<VendorDto> {
+  return apiFetch<VendorDto>('/ael/vendors', {
+    method: 'POST',
+    body: JSON.stringify({ companyUuid: COMPANY_UUID, initDefaultOther: true }),
+  });
+}
+
 export function updateVendor(body: Omit<UpdateVendorBody, 'companyUuid'>): Promise<VendorDto> {
   return apiFetch<VendorDto>('/ael/vendors', {
     method: 'PATCH',

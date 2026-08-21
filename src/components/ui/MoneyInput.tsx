@@ -38,12 +38,10 @@ export default function MoneyInput({
     onChange?.(num === 0 ? 0 : sign * num);
   };
 
-  const handleToggleSign = () => {
-    if (value !== 0) {
-      onChange?.(-value);
-    } else {
-      setZeroSign(prev => (prev === 1 ? -1 : 1));
-    }
+  const handleSetSign = (nextSign: 1 | -1) => {
+    if (nextSign === sign) return;
+    if (value !== 0) onChange?.(-value);
+    else setZeroSign(nextSign);
   };
 
   // 游標點入時全選現有數字（含預設值 0），避免點擊後直接輸入時遊標落在字元前方，
@@ -55,19 +53,39 @@ export default function MoneyInput({
   return (
     <div className={cn('flex items-center gap-1.5', widthClassName)}>
       {allowSign && (
-        <button
-          type="button"
-          onClick={handleToggleSign}
-          disabled={disabled || readOnly}
-          aria-label="切換正負"
+        <div
           className={cn(
-            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-cream text-neutral-mid transition-colors',
-            'hover:bg-surface-warm hover:text-neutral-dark',
-            (disabled || readOnly) && 'cursor-not-allowed opacity-50 hover:bg-surface-cream hover:text-neutral-mid',
+            'flex h-7 shrink-0 items-center gap-0.5 rounded-md bg-surface-cream p-0.5',
+            (disabled || readOnly) && 'cursor-not-allowed opacity-50',
           )}
         >
-          {sign === -1 ? <Minus size={14} /> : <Plus size={14} />}
-        </button>
+          <button
+            type="button"
+            onClick={() => handleSetSign(1)}
+            disabled={disabled || readOnly}
+            aria-label="設為正值"
+            aria-pressed={sign === 1}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-[4px] transition-colors',
+              sign === 1 ? 'bg-brand-blue text-white' : 'text-neutral-mid hover:bg-surface-warm hover:text-neutral-dark',
+            )}
+          >
+            <Plus size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSetSign(-1)}
+            disabled={disabled || readOnly}
+            aria-label="設為負值"
+            aria-pressed={sign === -1}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-[4px] transition-colors',
+              sign === -1 ? 'bg-brand-blue text-white' : 'text-neutral-mid hover:bg-surface-warm hover:text-neutral-dark',
+            )}
+          >
+            <Minus size={14} />
+          </button>
+        </div>
       )}
       <div
         className={cn(

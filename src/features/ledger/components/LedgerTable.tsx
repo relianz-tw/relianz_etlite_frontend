@@ -141,7 +141,7 @@ function BatchUpdateRow({
           </span>
           <div className="flex items-center gap-2">
             <div className="w-48">
-              <SubjectNameSelect value={batchCategory} onChange={onBatchCategoryChange} placeholder="變更費用類別" />
+              <SubjectNameSelect value={batchCategory} onChange={onBatchCategoryChange} placeholder="變更費用類別" scope="purchase" />
             </div>
             <Button size="sm" variant="primary" disabled={selectedCount === 0 || !batchCategory} onClick={onApply}>
               變更
@@ -440,6 +440,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                         value={locked ? row.category : categoryOverrides[row.id] ?? row.category}
                         onChange={v => setCategoryOverrides(o => ({ ...o, [row.id]: v }))}
                         disabled={locked}
+                        scope="purchase"
                       />
                     </div>
                   </td>

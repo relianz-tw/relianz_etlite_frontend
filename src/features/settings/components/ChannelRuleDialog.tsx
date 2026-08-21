@@ -3,7 +3,6 @@
 import Button from '@/components/ui/Button';
 import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
-import MoneyInput from '@/components/ui/MoneyInput';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
@@ -31,7 +30,6 @@ function emptyForm(accounts: BankAccountRecord[]): Omit<ChannelRuleRecord, 'id'>
     receivingAccountUuid: accounts[0]?.id ?? '',
     remark: '',
     isActive: true,
-    balance: 0,
   };
 }
 
@@ -110,14 +108,6 @@ export default function ChannelRuleDialog({ open, onClose, onSubmit, initial, ac
         </div>
 
         {error && <p className="-mt-2 text-xs text-semantic-error">{error}</p>}
-
-        {/* 新增管道時後端無法指定期初餘額（僅結算時自動異動），故僅編輯既有管道時開放調整 */}
-        {initial && (
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-sm font-semibold text-neutral-dark">當前餘額</label>
-            <MoneyInput widthClassName="w-40" value={form.balance} onChange={value => setForm(f => ({ ...f, balance: value }))} />
-          </div>
-        )}
 
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>

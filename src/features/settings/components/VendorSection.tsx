@@ -1,12 +1,12 @@
 'use client';
 
-import { createVendor, listVendors, updateVendor } from '@/api/vendors';
+import { createVendor, initDefaultOtherVendor, listVendors, updateVendor } from '@/api/vendors';
 import type { UpdateVendorBody, VendorDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { CirclePlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { VendorRecord } from '../data';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 import VendorDialog from './VendorDialog';
@@ -60,12 +60,26 @@ export default function VendorSection() {
   const [actionError, setActionError] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [pendingDeactivate, setPendingDeactivate] = useState<VendorRecord | null>(null);
+  // 整個 mount 週期只嘗試自動開通一次「其他」廠商，避免開通失敗時反覆重試造成無限迴圈
+  const initOtherAttempted = useRef(false);
 
   const loadVendors = () => {
     setLoading(true);
     setLoadError('');
     listVendors()
-      .then(list => setVendors(list.map(toVendorRecord)))
+      .then(async list => {
+        // 清單完全沒有「其他」時自動開通一筆；失敗不影響既有清單顯示，錯誤走 actionError
+        if (!initOtherAttempted.current && !list.some(v => v.name === '其他')) {
+          initOtherAttempted.current = true;
+          try {
+            await initDefaultOtherVendor();
+            list = await listVendors();
+          } catch (err) {
+            setActionError(getFriendlyErrorMessage(err));
+          }
+        }
+        setVendors(list.map(toVendorRecord));
+      })
       .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   };
@@ -170,7 +184,9 @@ export default function VendorSection() {
                 </tr>
               </thead>
               <tbody>
-                {vendors.map((vendor, i) => (
+                {vendors.map((vendor, i) => {
+                  const isOtherVendor = vendor.name === '其他';
+                  return (
                   <tr
                     key={vendor.id}
                     className={`border-b border-neutral-blue-gray/20 last:border-0 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
@@ -196,11 +212,16 @@ export default function VendorSection() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
+                        <Button size="sm" variant="ghost" disabled={isOtherVendor} onClick={() => openEdit(vendor)}>
                           編輯
                         </Button>
                         {vendor.isActive ? (
-                          <Button size="sm" variant="danger" disabled={savingId === vendor.id} onClick={() => setPendingDeactivate(vendor)}>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={isOtherVendor || savingId === vendor.id}
+                            onClick={() => setPendingDeactivate(vendor)}
+                          >
                             停用
                           </Button>
                         ) : (
@@ -211,13 +232,16 @@ export default function VendorSection() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <div className="flex flex-col gap-2.5 nav:hidden">
-            {vendors.map(vendor => (
+            {vendors.map(vendor => {
+              const isOtherVendor = vendor.name === '其他';
+              return (
               <div key={vendor.id} className="flex flex-col gap-1.5 rounded-lg border border-neutral-blue-gray/30 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -235,11 +259,16 @@ export default function VendorSection() {
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
+                    <Button size="sm" variant="ghost" disabled={isOtherVendor} onClick={() => openEdit(vendor)}>
                       編輯
                     </Button>
                     {vendor.isActive ? (
-                      <Button size="sm" variant="danger" disabled={savingId === vendor.id} onClick={() => setPendingDeactivate(vendor)}>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={isOtherVendor || savingId === vendor.id}
+                        onClick={() => setPendingDeactivate(vendor)}
+                      >
                         停用
                       </Button>
                     ) : (
@@ -255,7 +284,8 @@ export default function VendorSection() {
                   {vendor.bankName ? `${vendor.bankName} ${vendor.bankBranch}（${vendor.bankAccountNumber}）` : '尚未填寫銀行資訊'}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

@@ -19,6 +19,7 @@ import type {
   EntryDetailSettleEventDto,
 } from '@/api/types';
 import Button from '@/components/ui/Button';
+import JournalCard from '@/components/ui/JournalCard';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft } from 'lucide-react';
@@ -32,11 +33,11 @@ import AllowanceCreateDialog from './components/AllowanceCreateDialog';
 import SettlementEditDialog from './components/SettlementEditDialog';
 import SettlementReverseConfirmModal from './components/SettlementReverseConfirmModal';
 import TransactionAllowanceListCard from './components/TransactionAllowanceListCard';
-import TransactionJournalCard from './components/TransactionJournalCard';
 import TransactionMetaCard from './components/TransactionMetaCard';
 import TransactionOriginCard from './components/TransactionOriginCard';
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import VoucherUpload from './components/VoucherUpload';
+import { useSettleEventOrigins } from './settleEventOrigins';
 import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, resolveExpenseCategory, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
 import type { TransactionFormState, TransactionMode } from './types';
 
@@ -61,8 +62,8 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     return null;
   }
   if (side === 'purchase') {
-    // 進項：賣家統編、名稱皆為必填
-    if (!form.sellerTaxId.trim()) return '請輸入賣家統一編號';
+    // 進項：廠商必須指定（至少選「其他」）；賣家名稱隨廠商選擇帶入為必填，統編僅「其他」以外的廠商需要（其他無真實統編，可自由輸入非必填）
+    if (!form.sellerVendorUuid) return '請選擇廠商';
     if (!form.sellerName.trim()) return '請輸入賣家名稱';
   } else {
     // 銷項：買家統編、名稱皆為選填，但填了其中一項就需要一併填另一項
@@ -181,6 +182,10 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
 
   // 沖帳紀錄操作：恢復確認、編輯金額（僅手動沖帳）共用同一組送出中／錯誤狀態
   const [reverseTarget, setReverseTarget] = useState<EntryDetailSettleEventDto | null>(null);
+  // 恢復確認彈窗開啟時，懶載入此沖帳事件關聯的業務原單憑證清單（見 useSettleEventOrigins 說明）
+  const { origins: reverseOrigins, loading: reverseOriginsLoading, error: reverseOriginsError } = useSettleEventOrigins(
+    reverseTarget?.settleEventUuid ?? null,
+  );
   const [editTarget, setEditTarget] = useState<EntryDetailSettleEventDto | null>(null);
   const [reverseSubmitting, setReverseSubmitting] = useState(false);
   const [reverseError, setReverseError] = useState('');
@@ -416,7 +421,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 />
               )}
               {mode === 'edit' && entryDetail && (
-                <TransactionJournalCard lines={dailyLines} onRetry={reloadDetail} />
+                <JournalCard lines={dailyLines} onRetry={reloadDetail} />
               )}
               {/* 折讓單本身不能再被折讓，故僅原單顯示此卡片；常駐顯示（無折讓紀錄時卡片內顯示「尚無折讓紀錄」），
                   讓使用者能在交易詳細頁直接發現並開立折讓單；僅 invoice.ourInvoiceType 落在 1~7 範圍才顯示 */}
@@ -480,6 +485,9 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           <SettlementReverseConfirmModal
             open={reverseTarget !== null}
             event={reverseTarget}
+            origins={reverseOrigins}
+            originsLoading={reverseOriginsLoading}
+            originsError={reverseOriginsError}
             submitting={reverseSubmitting}
             submitError={reverseError}
             onClose={() => setReverseTarget(null)}

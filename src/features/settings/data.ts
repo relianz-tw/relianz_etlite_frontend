@@ -134,8 +134,6 @@ export interface ChannelRuleRecord {
   receivingAccountUuid: string;
   remark: string;
   isActive: boolean;
-  /** 當前餘額（銷項匯總沖帳超沖/少沖記餘額時異動） */
-  balance: number;
 }
 
 export const SETTLEMENT_STYLE = {

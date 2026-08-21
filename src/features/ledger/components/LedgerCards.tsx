@@ -260,7 +260,7 @@ function PurchaseCard({
       <span className="font-mono text-lg font-semibold tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</span>
       {!selectionMode && (
         <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
-          <SubjectNameSelect value={locked ? row.category : categoryValue} onChange={onCategorySelect} disabled={locked} />
+          <SubjectNameSelect value={locked ? row.category : categoryValue} onChange={onCategorySelect} disabled={locked} scope="purchase" />
           <span className="flex h-10 items-center truncate px-1 text-sm text-neutral-mid" title={row.project || '未指定專案'}>
             {row.project || '未指定專案'}
           </span>
@@ -374,7 +374,7 @@ export default function LedgerCards(props: LedgerCardsProps) {
 
       {selectionMode && props.side === 'purchase' && (
         <div className="flex flex-col gap-2 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
-          <SubjectNameSelect value={batchCategory} onChange={setBatchCategory} placeholder="變更費用類別" />
+          <SubjectNameSelect value={batchCategory} onChange={setBatchCategory} placeholder="變更費用類別" scope="purchase" />
           <Button
             variant="primary"
             size="md"

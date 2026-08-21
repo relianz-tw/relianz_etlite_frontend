@@ -108,7 +108,7 @@ export type UpdateBankAccountBody = Pick<
 
 /**
  * 公司基本設定 DTO，對應 basic.html 內嵌 OpenAPI 規格（/ael/basic/companySetting）。
- * buyReconciliationMethod／sellReconciliationMethod 等對帳方式欄位本次不接 UI，僅保留型別完整性。
+ * buyReconciliationMethod／sellReconciliationMethod：0 為手動對帳，1 為自動對帳（發票開立/上傳即收付款）。
  */
 export interface BasicSettingDto {
   acUuid: string;
@@ -145,11 +145,17 @@ export interface UpdateBasicSettingBody {
   contactPhone?: string;
   contactEmail?: string;
   nhiInsuranceCode?: string;
+  /** 0：手動對帳，1：發票開立即收款 */
+  sellReconciliationMethod?: number;
+  /** 0：手動對帳，1：發票上傳即付款 */
+  buyReconciliationMethod?: number;
 }
 
 /**
- * 官方費用科目 DTO（/ael/subject/official/list/latest），帶出最新一版科目清單，不需帶 year 參數。
+ * 官方費用科目 DTO（/ael/subject/official/list/latest、/ael/subject/official/list/filter）。
  * debitCreditType／remark 目前皆為 null，本次介面不使用。
+ * type／calculationType／industryBitmask／isBank／buyOrSell 標 optional：/latest 端點的回應
+ * 目前不含這些欄位，只有 /filter 確定會回。
  */
 export interface OfficialSubjectDto {
   id: number;
@@ -158,6 +164,16 @@ export interface OfficialSubjectDto {
   name: string;
   debitCreditType: string | null;
   remark: string | null;
+  /** 0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表 */
+  type?: number;
+  /** 0:一般科目型欄位，1:合計型科目欄位，2:棄置科目 */
+  calculationType?: number;
+  /** 買賣業:1,勞務業:2,製造業:4 */
+  industryBitmask?: number;
+  /** 銀行項目專用科目嗎 */
+  isBank?: boolean;
+  /** 進項:2，銷項:3 */
+  buyOrSell?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,6 +186,17 @@ export interface SubjectUsageDto {
   useCount: number;
   createTime: string;
   updateTime: string;
+}
+
+/**
+ * 會計科目目前餘額（沖帳中心「沖帳對象分配」用，供現金／股東往來／其他應付款／暫付款等固定科目顯示餘額）。
+ * 後端尚未提供對應端點，此型別與 subjects.ts 的 listSubjectBalances() 先行預留，供介面顯示與日後串接。
+ * 以 subjectCode 而非 officialAccountingSubjectId 為鍵：id 隨年度版本變動（見 OfficialSubjectDto），
+ * 用 id 當鍵換版當天就會對不上。
+ */
+export interface SubjectBalanceDto {
+  subjectCode: string;
+  balance: number;
 }
 
 /**
@@ -980,6 +1007,8 @@ export interface EntryInvoiceDetailDto {
 export interface EntryDetailEntryDto {
   /** 交易編號 */
   orderCode: string;
+  /** 0進項／1進折／2銷項／3銷折 */
+  entryType: number;
   /** 交易發生日（ISO 字串） */
   transactionDate: string | null;
   /** 交易對象名稱 */
@@ -1047,8 +1076,32 @@ export interface EntryDetailSettleEventDto {
   createdAt: string;
 }
 
+/** GET /ael/ledger/settle/event 回應；依沖帳事件反查關聯交易 uuid，只回 uuid 陣列，
+ *  不含憑證欄位——顯示憑證明細需再逐筆打 fetchEntryDetail（見 settleEventOrigins.ts） */
+export interface SettleEventRelationsResult {
+  settleEventUuid: string;
+  /** 0 手動／1 即沖／2 匯總／4 銀行提匯等 */
+  reconMethod: number;
+  /** 0 銷項／1 進項 */
+  side: number;
+  /** 付款／收款日，YYYYMMDD */
+  paymentDate: string;
+  settleAmount: number;
+  cashAmount: number;
+  isReverse: boolean;
+  bankAccountUuid: string | null;
+  /** 主結算交易 uuid */
+  mainSettlementLedgerUuid: string;
+  /** 業務原單交易 uuid */
+  originLedgerUuids: string[];
+  /** 手續費交易 uuid */
+  feeLedgerUuids: string[];
+  /** 其他減項交易 uuid */
+  deductionLedgerUuids: string[];
+}
+
 /** GET /ael/ledger/entries/detail 回應；僅型別化 invoice 區塊與沖帳相關子集
- *  （entry／settlements 其餘欄位如 direction／entryType／status 等本次不使用）。
+ *  （entry／settlements 其餘欄位如 direction／status 等本次不使用）。
  *  invoice 沒有關聯發票的交易（如未開立發票的應收帳款）會是 null */
 export interface EntryDetailResult {
   entry: EntryDetailEntryDto;
@@ -1107,4 +1160,90 @@ export interface DailyDetailResult {
   ledgerUuid: string;
   settleEventUuids: string[];
   lines: DailyDetailLineDto[];
+}
+
+/** POST /ael/bankAccounts/transactions body */
+export interface BankTransactionsBody {
+  companyUuid: string;
+  bankAccountUuid: string;
+  /** 起時間 YYYYMMDD */
+  dateFrom: string;
+  /** 迄時間 YYYYMMDD */
+  dateTo: string;
+  /** 一頁資料筆數 */
+  limit: number;
+  page: number;
+}
+
+/** 銀行帳戶相關的單筆沖帳事件 */
+export interface BankSettleEventDto {
+  /** 沖帳事件uuid */
+  settleEventUuid: string;
+  /** 0手動／1即沖／2匯總／4銀行提匯等 */
+  reconMethod: number;
+  /** 0銷項／1進項 */
+  side: number;
+  /** YYYYMMDD */
+  paymentDate: string;
+  /** 實際沖帳金額 */
+  settleAmount: number;
+  cashAmount: number;
+  /** 0存入／1付出 */
+  cashDirection: number;
+  /** 是交易恢復嗎 */
+  isReverse: boolean;
+  /** 交易原單uuid */
+  mainSettlementLedgerUuid: string;
+  /** 交易關聯單uuid */
+  originLedgerUuids: string[];
+  primaryOriginLedgerUuid: string;
+  /** 有發票嗎 */
+  hasInvoice: boolean;
+  /** 廠商名稱 */
+  counterpartyName: string;
+  /** 銷售管道名稱 */
+  paymentChannelName: string;
+  /** 備註；counterpartyName 為空字串時的顯示備援 */
+  memo: string | null;
+  createdAt: string;
+}
+
+/** POST /ael/bankAccounts/transactions 回應 data */
+export interface BankTransactionsResult {
+  bankAccountUuid: string;
+  items: BankSettleEventDto[];
+  /** 全部資料筆數 */
+  total: number;
+  limit: number;
+  page: number;
+}
+
+/** POST /ael/bankAccounts/cashMovements body：建立一筆銀行直接提／匯款 */
+export interface CashMovementBody {
+  companyUuid: string;
+  bankAccountUuid: string;
+  /** 0 匯入／1 提出 */
+  cashDirection: number;
+  amount: number;
+  /** YYYYMMDD */
+  paymentDate: string;
+  /** 科目id */
+  officialAccountingSubjectId: number;
+  memo: string;
+}
+
+/** POST /ael/bankAccounts/cashMovements 回應 data */
+export interface CashMovementResult {
+  /** 交易uuid */
+  ledgerEntryUuid: string;
+  /** 交易編號 */
+  orderCode: string;
+  /** 沖帳事件uuid */
+  settleEventUuid: string;
+  bankAccountUuid: string;
+  /** 0匯入／1提出 */
+  cashDirection: number;
+  amount: number;
+  /** YYYYMMDD */
+  paymentDate: string;
 }

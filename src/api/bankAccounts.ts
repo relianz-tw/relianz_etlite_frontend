@@ -4,7 +4,15 @@
  */
 import { buildQuery, apiFetch } from './client';
 import { COMPANY_UUID } from './config';
-import type { BankAccountDto, CreateBankAccountBody, UpdateBankAccountBody } from './types';
+import type {
+  BankAccountDto,
+  BankTransactionsBody,
+  BankTransactionsResult,
+  CashMovementBody,
+  CashMovementResult,
+  CreateBankAccountBody,
+  UpdateBankAccountBody,
+} from './types';
 
 export function listBankAccounts(): Promise<BankAccountDto[]> {
   return apiFetch<BankAccountDto[]>(`/ael/bankAccounts${buildQuery({ companyUuid: COMPANY_UUID })}`);
@@ -20,6 +28,22 @@ export function createBankAccount(body: Omit<CreateBankAccountBody, 'companyUuid
 export function updateBankAccount(body: Omit<UpdateBankAccountBody, 'companyUuid'>): Promise<BankAccountDto> {
   return apiFetch<BankAccountDto>('/ael/bankAccounts', {
     method: 'PATCH',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 拿取銀行帳戶相關沖帳事件列表；進一步瀏覽明細請搭配 fetchEntryDetail／fetchDailyDetail（@/api/ledger） */
+export function fetchBankTransactions(body: Omit<BankTransactionsBody, 'companyUuid'>): Promise<BankTransactionsResult> {
+  return apiFetch<BankTransactionsResult>('/ael/bankAccounts/transactions', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
+}
+
+/** 建立一筆銀行直接提／匯款的交易紀錄 */
+export function createCashMovement(body: Omit<CashMovementBody, 'companyUuid'>): Promise<CashMovementResult> {
+  return apiFetch<CashMovementResult>('/ael/bankAccounts/cashMovements', {
+    method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });
 }
