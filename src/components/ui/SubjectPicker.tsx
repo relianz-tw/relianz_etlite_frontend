@@ -28,8 +28,10 @@ interface SubjectPickerProps {
   onChange: (value: SubjectOption) => void;
   disabled?: boolean;
   placeholder?: string;
-  /** 科目語境，決定「基礎」頁籤的篩選參數；預設 general（僅排除合計型／棄置科目，不分進銷項） */
+  /** 科目語境，決定「建議」頁籤的篩選參數；預設 general（僅排除合計型／棄置科目，不分進銷項） */
   scope?: SubjectScope;
+  /** 手機全螢幕殼的標題文字；預設「選擇會計科目」 */
+  title?: string;
 }
 
 /**
@@ -44,6 +46,7 @@ export default function SubjectPicker({
   disabled,
   placeholder = '請選擇科目',
   scope = 'general',
+  title = '選擇會計科目',
 }: SubjectPickerProps) {
   const isDesktop = useIsNavDesktop();
 
@@ -151,6 +154,14 @@ export default function SubjectPicker({
     () => ({ frequent: frequentOptions.length, basic: basic.length, all: all.length }),
     [frequentOptions, basic, all],
   );
+
+  // value 若無 subjectCode（折讓帶入原單、編輯反查失敗時的退回值），退回以名稱在完整科目表
+  // 反查代碼，讓清單仍能正確反白（比照 SubjectSelect 的名稱 fallback）
+  const selectedCode = useMemo(() => {
+    if (!value) return undefined;
+    if (value.subjectCode) return value.subjectCode;
+    return all.find((s) => s.name === value.name)?.subjectCode;
+  }, [value, all]);
 
   function resetPanelState() {
     setQuery('');
@@ -266,7 +277,7 @@ export default function SubjectPicker({
     searching,
     matchCount: matchedAll.length,
     options: visibleOptions,
-    selectedCode: value?.subjectCode,
+    selectedCode,
     armedCode,
     onRowClick: handleRowClick,
     listRef,
@@ -306,7 +317,7 @@ export default function SubjectPicker({
               <div role="dialog" aria-modal="true" aria-labelledby="subject-picker-title" className="fixed inset-0 z-[90] flex flex-col bg-white">
                 <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-blue-gray/30 px-4">
                   <span id="subject-picker-title" className="font-notoSerif text-base font-semibold text-neutral-dark">
-                    選擇會計科目
+                    {title}
                   </span>
                   <button type="button" onClick={closePanel} className="min-h-11 px-2 text-sm text-neutral-mid hover:text-neutral-dark">
                     取消

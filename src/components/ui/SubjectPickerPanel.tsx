@@ -12,7 +12,7 @@ const TAB_ORDER: SubjectPickerTab[] = ['frequent', 'basic', 'all'];
 
 const TAB_LABEL: Record<SubjectPickerTab, string> = {
   frequent: '常用',
-  basic: '基礎',
+  basic: '建議',
   all: '全部',
 };
 
@@ -146,85 +146,90 @@ export default function SubjectPickerPanel({
         </div>
       )}
 
+      {/* 清單與 AI 區塊共用同一個捲動容器：AI 區塊展開時內容變高，若各自獨立捲動，
+          AI 區塊會被 Popover 的 overflow-hidden 直接切邊。桌機平常仍維持 max-h-80（320px）
+          的清單高度上限，但 AI 展開時解除此上限，改讓兩者一起在可用高度內捲動 */}
       <div
         ref={listRef}
-        className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${fullScreen ? '' : 'max-h-80 py-1'}`}
+        className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${!fullScreen && !aiOpen ? 'max-h-80' : ''}`}
       >
-        {loading && <p className="px-3 py-2 text-sm text-neutral-mid">載入中...</p>}
-        {!loading && error && <p className="px-3 py-2 text-sm text-semantic-error">{error}</p>}
+        <div className={fullScreen ? '' : 'py-1'}>
+          {loading && <p className="px-3 py-2 text-sm text-neutral-mid">載入中...</p>}
+          {!loading && error && <p className="px-3 py-2 text-sm text-semantic-error">{error}</p>}
 
-        {!loading && !error && (
-          <>
-            {options.map((s) => {
-              const selected = selectedCode === s.subjectCode;
-              const armed = armedCode === s.subjectCode;
-              return (
-                <button
-                  key={s.subjectCode}
-                  type="button"
-                  onClick={() => onRowClick(s)}
-                  className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                    fullScreen ? 'min-h-12 text-base nav:min-h-0 nav:text-sm' : ''
-                  } ${selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'}`}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
-                    <span className="truncate">{s.name}</span>
-                  </span>
-                  {armed && (
-                    <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
-                  )}
-                  {!armed && selected && <Check size={14} className="shrink-0" />}
-                </button>
-              );
-            })}
+          {!loading && !error && (
+            <>
+              {options.map((s) => {
+                const selected = selectedCode === s.subjectCode;
+                const armed = armedCode === s.subjectCode;
+                return (
+                  <button
+                    key={s.subjectCode}
+                    type="button"
+                    onClick={() => onRowClick(s)}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                      fullScreen ? 'min-h-12 text-base nav:min-h-0 nav:text-sm' : ''
+                    } ${selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'}`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="w-16 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
+                      <span className="truncate">{s.name}</span>
+                    </span>
+                    {armed && (
+                      <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
+                    )}
+                    {!armed && selected && <Check size={14} className="shrink-0" />}
+                  </button>
+                );
+              })}
 
-            {isEmpty && (
-              <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-                <SearchX size={20} className="text-neutral-blue-gray" />
-                <p className="text-sm font-semibold text-neutral-dark">
-                  {searching ? `找不到「${query.trim()}」` : '此分類沒有可選科目'}
-                </p>
-                <p className="text-xs leading-relaxed text-neutral-mid">
-                  {searching ? '完整科目表中沒有相符的科目，換個關鍵字，或讓 AI 依交易內容判斷。' : '切換到其他分類，或讓 AI 依交易內容判斷。'}
-                </p>
-                <div className="mt-2">
-                  <Button type="button" variant="primary" size="sm" icon={Sparkles} onClick={onOpenAi}>
-                    讓 AI 判斷
-                  </Button>
+              {isEmpty && (
+                <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+                  <SearchX size={20} className="text-neutral-blue-gray" />
+                  <p className="text-sm font-semibold text-neutral-dark">
+                    {searching ? `找不到「${query.trim()}」` : '此分類沒有可選科目'}
+                  </p>
+                  <p className="text-xs leading-relaxed text-neutral-mid">
+                    {searching ? '完整科目表中沒有相符的科目，換個關鍵字，或讓 AI 依交易內容判斷。' : '切換到其他分類，或讓 AI 依交易內容判斷。'}
+                  </p>
+                  <div className="mt-2">
+                    <Button type="button" variant="primary" size="sm" icon={Sparkles} onClick={onOpenAi}>
+                      讓 AI 判斷
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
+              )}
+            </>
+          )}
+        </div>
+
+        {!aiOpen && (
+          <button
+            type="button"
+            onClick={onOpenAi}
+            className={`flex w-full items-center gap-2 border-t border-brand-tan/30 bg-surface-warm px-3 py-4 text-left text-sm text-semantic-warm-dark transition-colors hover:bg-brand-tan/20 ${
+              fullScreen ? 'min-h-16 pb-[calc(16px+env(safe-area-inset-bottom))]' : ''
+            }`}
+          >
+            <Sparkles size={16} className="shrink-0 text-brand-tan-dark" />
+            <span className="flex-1">不確定用哪個科目？描述這筆交易，讓 AI 幫你選</span>
+            <ChevronRight size={16} className="ml-auto shrink-0" />
+          </button>
+        )}
+
+        {aiOpen && (
+          <SubjectAiAssistant
+            input={aiInput}
+            onInputChange={onAiInputChange}
+            phase={aiPhase}
+            suggestions={aiSuggestions}
+            error={aiError}
+            onSubmit={onAiSubmit}
+            onCollapse={onAiCollapse}
+            onPick={onAiPick}
+          />
         )}
       </div>
-
-      {!aiOpen && (
-        <button
-          type="button"
-          onClick={onOpenAi}
-          className={`flex w-full shrink-0 items-center gap-2 border-t border-brand-tan/30 bg-surface-warm px-3 py-2.5 text-left text-xs text-semantic-warm-dark transition-colors hover:bg-brand-tan/20 ${
-            fullScreen ? 'min-h-12 pb-[calc(10px+env(safe-area-inset-bottom))]' : ''
-          }`}
-        >
-          <Sparkles size={14} className="shrink-0 text-brand-tan-dark" />
-          <span className="flex-1">不確定用哪個科目？描述這筆交易，讓 AI 幫你選</span>
-          <ChevronRight size={14} className="ml-auto shrink-0" />
-        </button>
-      )}
-
-      {aiOpen && (
-        <SubjectAiAssistant
-          input={aiInput}
-          onInputChange={onAiInputChange}
-          phase={aiPhase}
-          suggestions={aiSuggestions}
-          error={aiError}
-          onSubmit={onAiSubmit}
-          onCollapse={onAiCollapse}
-          onPick={onAiPick}
-        />
-      )}
     </div>
   );
 }

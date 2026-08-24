@@ -11,7 +11,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
-import SubjectSelect from '@/components/ui/SubjectSelect';
+import SubjectPicker from '@/components/ui/SubjectPicker';
 import TextInput from '@/components/ui/TextInput';
 import Textarea from '@/components/ui/Textarea';
 import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog';
@@ -682,11 +682,12 @@ export default function TransactionMetaCard({
 
         <div className="flex flex-col gap-4 border-t border-neutral-blue-gray/20 pt-4">
           <Field label={side === 'purchase' ? '費用類別' : '收入科目'} required={mode === 'create'}>
-            <SubjectSelect
+            <SubjectPicker
               value={form.expenseCategory}
               onChange={s => onChange({ expenseCategory: s })}
               disabled={readOnly}
               scope={side === 'purchase' ? 'purchase' : 'sales'}
+              title={side === 'purchase' ? '選擇費用類別' : '選擇收入科目'}
             />
           </Field>
 

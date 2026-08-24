@@ -494,17 +494,19 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 面板（桌機為 Popover，手機為全螢幕頁，兩者共用同一套內部排版）：
   1. 搜尋列：放大鏡圖示 + input（text-base，nav 斷點以上 text-sm，防 iOS 自動放大）+
      有輸入時右側「清除」
-  2. 分頁列（底線式，樣式同 Tab Bar (Underline)）：常用／基礎／全部，各自右側附小字灰色計數；
+  2. 分頁列（底線式，樣式同 Tab Bar (Underline)）：常用／建議／全部，各自右側附小字灰色計數；
      **有輸入搜尋字時整列隱藏**，搜尋範圍自動視為「全部」
   3. 分類說明列：bg-surface-cream、text-xs、text-neutral-mid，一行文字說明目前分頁的排序／篩選依據
   4. 搜尋範圍提示列（僅搜尋時顯示）：bg-brand-blue/5、text-brand-blue、text-xs，
      顯示「搜尋範圍為完整科目表，找到 N 筆符合「關鍵字」」
   5. 科目清單：可捲動，桌機 max-h-80（320px）；每列代碼（font-mono、tabular-nums）+ 名稱，
      選中列 bg-brand-blue/10 + 右側 Check 圖示；一律扁平列表，不做主／子科目分組或說明文字
-     （官方科目 API 目前無父子階層與 remark 資料）
+     （官方科目 API 目前無父子階層與 remark 資料）。AI 區塊展開時，清單與 AI 區塊合併為
+     同一個捲動容器並解除 max-h-80 上限，避免 AI 區塊內容（文字框、範例、建議卡）
+     超出 Popover 可用高度時被邊界切掉
   6. 空狀態（搜尋無結果）：置中圖示 + 標題「找不到「關鍵字」」+ 說明 + 主要按鈕「讓 AI 判斷」
-  7. 底部固定 AI 入口列：bg-surface-warm、border-t border-brand-tan/30，
-     文字「不確定用哪個科目？描述這筆交易，讓 AI 幫你選」，點擊展開 AI 區塊
+  7. 底部固定 AI 入口列：bg-surface-warm、border-t border-brand-tan/30、py-4（較清單列更高，
+     凸顯 AI 輔助入口），文字「不確定用哪個科目？描述這筆交易，讓 AI 幫你選」，點擊展開 AI 區塊
 
 AI 區塊（暖色面，展開於面板底部）：
   bg-surface-warm、border-t border-brand-tan/30、p-3
