@@ -47,11 +47,16 @@ export default function MoneyInput({
     else setZeroSign(nextSign);
   };
 
-  // 游標點入時全選現有數字（含預設值 0），避免點擊後直接輸入時遊標落在字元前方，
-  // 導致新輸入的數字插入在既有數字之前而非取代（例如顯示 0 時輸入 800 變成 8000）
+  // 游標點入時全選現有數字，方便直接輸入覆寫既有金額
   const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
     e.target.select();
   };
+
+  // 尚未輸入（0）時輸入框留空、改以灰色 placeholder 顯示 0，
+  // 避免使用者點入後得先刪掉既有的 0 才能輸入
+  // 唯讀／停用欄位多為計算結果（如總金額、折讓總額），0 是有意義的結果值，仍以實色顯示
+  const isEmptyZero = value === 0 && !disabled && !readOnly;
+  const display = isEmptyZero ? '' : Math.abs(value).toLocaleString('en-US');
 
   return (
     <div className={cn('flex items-center gap-1.5', widthClassName)}>
@@ -106,10 +111,11 @@ export default function MoneyInput({
           inputMode="numeric"
           disabled={disabled}
           readOnly={readOnly}
-          value={Math.abs(value).toLocaleString('en-US')}
+          value={display}
           onChange={handleChange}
           onFocus={handleFocus}
-          className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none disabled:text-neutral-mid nav:text-sm"
+          placeholder="0"
+          className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
         />
       </div>
     </div>
