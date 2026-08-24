@@ -2,9 +2,10 @@
  * POST /ael/invoice/identification/one 辨識結果 → 新增交易表單欄位對照。
  * 集中放在此檔，方便日後調整欄位對應規則。
  *
- * 覆蓋策略：一律只填「目前為空白」的欄位，使用者已手動填寫的內容不會被覆蓋（見交易頁計畫文件）。
+ * 覆蓋策略：辨識結果一律覆蓋對應欄位（dto 該欄位有值就寫），包含使用者已手動填寫的內容；
+ * 重新上傳憑證照片時可直接用新的辨識結果取代舊資料。
  */
-import type { OfficialSubjectDto, VendorDto, InvoiceIdentificationDto } from '@/api/types';
+import type { OfficialSubjectDto, VendorDto, InvoiceIdentificationDto, InvoiceBookDto } from '@/api/types';
 import type { Side } from '../types';
 import { VOUCHER_TYPES } from './data';
 import type { TransactionFormState } from './types';
@@ -42,38 +43,33 @@ function resolveSubjectCandidate(dto: InvoiceIdentificationDto, subjects: Offici
 }
 
 export function applyIdentification(
-  form: TransactionFormState,
   side: Side,
   dto: InvoiceIdentificationDto,
   subjects: OfficialSubjectDto[],
   vendors: VendorDto[],
+  invoiceBooks: InvoiceBookDto[],
 ): ApplyIdentificationResult {
   const patch: Partial<TransactionFormState> = {};
   let aiPickedSubject = false;
 
-  if (form.issueDate === undefined) {
-    const date = parseRocDate(dto);
-    if (date) patch.issueDate = date;
-  }
+  const date = parseRocDate(dto);
+  if (date) patch.issueDate = date;
 
-  if (form.salesAmount === 0 && dto.subtotal != null) patch.salesAmount = dto.subtotal;
-  if (form.taxAmount === 0 && dto.tax != null) patch.taxAmount = dto.tax;
-  if (form.exemptSalesAmount === 0 && dto.tax_free_amount != null) patch.exemptSalesAmount = dto.tax_free_amount;
-  if (form.others === 0 && dto.others != null) patch.others = dto.others;
-  if (form.note === '' && dto.summary) patch.note = dto.summary;
+  if (dto.subtotal != null) patch.salesAmount = dto.subtotal;
+  if (dto.tax != null) patch.taxAmount = dto.tax;
+  if (dto.tax_free_amount != null) patch.exemptSalesAmount = dto.tax_free_amount;
+  if (dto.others != null) patch.others = dto.others;
+  if (dto.summary) patch.summary = dto.summary;
 
-  if (form.expenseCategory === null) {
-    const subject = resolveSubjectCandidate(dto, subjects);
-    if (subject) {
-      patch.expenseCategory = { id: subject.id, subjectCode: subject.subjectCode, name: subject.name };
-      aiPickedSubject = true;
-    }
+  const subject = resolveSubjectCandidate(dto, subjects);
+  if (subject) {
+    patch.expenseCategory = { id: subject.id, subjectCode: subject.subjectCode, name: subject.name };
+    aiPickedSubject = true;
   }
 
   if (side === 'purchase') {
-    // 憑證種類：僅在使用者尚未動過（仍是預設值「一般發票」）時才依辨識結果覆蓋
-    let voucherType = form.voucherType;
-    if (voucherType === VOUCHER_TYPES[0] && dto.gui_type != null) {
+    let voucherType = VOUCHER_TYPES[0];
+    if (dto.gui_type != null) {
       const mapped = guiTypeToVoucherType(dto.gui_type);
       if (mapped) {
         voucherType = mapped;
@@ -82,41 +78,47 @@ export function applyIdentification(
     }
 
     if (voucherType === VOUCHER_TYPES[0]) {
-      if (form.invoiceTrack === '' && dto.gui_alphabetic_letter) patch.invoiceTrack = dto.gui_alphabetic_letter;
-      if (form.invoiceSerial === '' && dto.gui_number) patch.invoiceSerial = dto.gui_number;
-    } else if (form.invoiceNumber === '' && dto.gui_number) {
+      if (dto.gui_alphabetic_letter) patch.invoiceTrack = dto.gui_alphabetic_letter;
+      if (dto.gui_number) patch.invoiceSerial = dto.gui_number;
+    } else if (dto.gui_number) {
       patch.invoiceNumber = dto.gui_number;
     }
 
-    // 廠商相關三欄一組判斷，避免半套資料造成「已選廠商但名稱是使用者手動填的」這種不一致狀態；
-    // 三欄皆空白才視為可由辨識結果帶入
-    const sellerBlank = form.sellerVendorUuid === '' && form.sellerName.trim() === '' && form.sellerTaxId.trim() === '';
-    if (sellerBlank) {
-      if (dto.seller_tax_id) {
-        const matched = vendors.find(v => v.taxId === dto.seller_tax_id);
-        if (matched) {
-          patch.sellerVendorUuid = matched.uuid;
-          patch.sellerName = matched.name;
-          patch.sellerTaxId = matched.taxId;
+    if (dto.seller_tax_id) {
+      const matched = vendors.find(v => v.taxId === dto.seller_tax_id);
+      if (matched) {
+        patch.sellerVendorUuid = matched.uuid;
+        patch.sellerName = matched.name;
+        patch.sellerTaxId = matched.taxId;
+      } else {
+        // 清單中查無相符廠商：選「其他」，統編／名稱改用辨識結果（賣家名稱欄位需搭配放開編輯，見 TransactionMetaCard）
+        const other = vendors.find(v => v.name === '其他');
+        if (other) {
+          patch.sellerVendorUuid = other.uuid;
+          patch.sellerName = dto.seller_name ?? '';
+          patch.sellerTaxId = dto.seller_tax_id;
         } else {
-          // 清單中查無相符廠商：選「其他」，統編／名稱改用辨識結果（賣家名稱欄位需搭配放開編輯，見 TransactionMetaCard）
-          const other = vendors.find(v => v.name === '其他');
-          if (other) {
-            patch.sellerVendorUuid = other.uuid;
-            patch.sellerName = dto.seller_name ?? '';
-            patch.sellerTaxId = dto.seller_tax_id;
-          } else {
-            patch.sellerName = dto.seller_name ?? '';
-            patch.sellerTaxId = dto.seller_tax_id;
-          }
+          patch.sellerName = dto.seller_name ?? '';
+          patch.sellerTaxId = dto.seller_tax_id;
         }
-      } else if (dto.seller_name) {
-        patch.sellerName = dto.seller_name;
       }
+    } else if (dto.seller_name) {
+      patch.sellerName = dto.seller_name;
     }
   } else {
-    if (form.buyerTaxId === '' && dto.buyer_tax_id) patch.buyerTaxId = dto.buyer_tax_id;
-    if (form.buyerName === '' && dto.buyer_name) patch.buyerName = dto.buyer_name;
+    if (dto.buyer_tax_id) patch.buyerTaxId = dto.buyer_tax_id;
+    if (dto.buyer_name) patch.buyerName = dto.buyer_name;
+
+    // 銷項字軌比對發票簿：命中即自動選入對應發票簿，流水號帶該簿目前配發號碼，與手動選發票簿行為一致
+    if (dto.gui_alphabetic_letter) {
+      const book = invoiceBooks.find(b => b.aphabeticLetter === dto.gui_alphabetic_letter);
+      if (book) {
+        patch.invoiceBookUuid = book.invoiceBookId;
+        patch.invoiceBookPart = book.part;
+        patch.invoiceTrack = book.aphabeticLetter;
+        patch.invoiceSerial = book.currentNum;
+      }
+    }
   }
 
   return { patch, aiPickedSubject };

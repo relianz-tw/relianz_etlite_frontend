@@ -1090,6 +1090,8 @@ export interface EntryInvoiceDetailDto {
   /** 憑證圖片網址，無圖時為空字串 */
   invoicePicUrl: string;
   remark: string;
+  /** 摘要，對應建立交易 body 的 summary */
+  summary: string;
   buyerTaxIdNumber: string;
   sellerTaxIdNumber: string;
   /** 賣家名稱（進項適用） */

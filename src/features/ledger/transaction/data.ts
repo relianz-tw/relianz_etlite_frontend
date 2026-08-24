@@ -71,6 +71,7 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   importTaxNumber: '',
   others: 0,
   note: '',
+  summary: '',
   voucherFileName: null,
   voucherPreviewUrl: null,
 };
@@ -101,6 +102,7 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
     exemptSalesAmount: invoice.taxFreeAmount,
     taxAmount: invoice.businessTax,
     note: invoice.remark,
+    summary: invoice.summary,
     voucherPreviewUrl: invoice.invoicePicUrl || null,
     isAllowance: invoice.isAllowance,
     declared: invoice.declared === 1,

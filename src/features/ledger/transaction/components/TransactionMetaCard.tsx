@@ -511,6 +511,7 @@ export default function TransactionMetaCard({
                 widthClassName="w-full"
                 value={form.invoiceBookUuid}
                 disabled={invoiceBooksLoading}
+                aiFilled={aiFields.has('invoiceBookUuid')}
                 onValueChange={v => {
                   const book = invoiceBooks.find(b => b.invoiceBookId === v);
                   onChange({
@@ -752,6 +753,18 @@ export default function TransactionMetaCard({
           <Field label="總金額">
             <MoneyInput value={totalAmount} disabled readOnly />
           </Field>
+
+          {!isAllowanceCreate && (
+            <Field label="摘要" required={isCreate}>
+              <TextInput
+                value={form.summary}
+                onChange={e => onChange({ summary: e.target.value })}
+                placeholder="請輸入摘要"
+                disabled={readOnly}
+                aiFilled={aiFields.has('summary')}
+              />
+            </Field>
+          )}
 
           <Field label="備註">
             <Textarea

@@ -10,6 +10,7 @@ import {
   fetchEntryDetail,
   reverseSummarySettle,
 } from '@/api/ledger';
+import { listInvoiceBooks } from '@/api/invoiceBook';
 import { filterOfficialSubjects } from '@/api/subjects';
 import type {
   CreateAllowanceBody,
@@ -25,6 +26,7 @@ import Button from '@/components/ui/Button';
 import JournalCard from '@/components/ui/JournalCard';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
+import { parseInvoicePeriodValue } from '@/lib/invoicePeriod';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -82,6 +84,7 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     }
   }
   if (!form.issueDate) return '請選擇開立日期';
+  if (!form.summary.trim()) return '請輸入摘要';
   if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
   if (side === 'sales' && !form.channel) return '請選擇銷售管道';
   if (side === 'purchase') {
@@ -130,7 +133,8 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
     importTaxNumber: isImport ? form.importTaxNumber || undefined : undefined,
     invoiceDate: formatYmd(form.issueDate)!,
     isReturnGoods: isImport ? false : undefined,
-    memo: form.note || undefined,
+    remark: form.note || undefined,
+    summary: form.summary || undefined,
     netAmount: form.salesAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
     others: isImport ? form.others : undefined,
@@ -155,7 +159,8 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
     counterpartyType: form.buyerTaxId ? 0 : 1,
     datetime: formatYmd(form.issueDate)!,
     invoiceDate: formatYmd(form.issueDate)!,
-    memo: form.note || undefined,
+    remark: form.note || undefined,
+    summary: form.summary || undefined,
     netAmount: form.salesAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
     paymentChannelUuid: form.channel || undefined,
@@ -353,13 +358,27 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
     const requestId = ++identifyRequestIdRef.current;
     setIdentifying(true);
     setIdentifyError('');
-    Promise.all([identifyInvoiceOne({ file, isBuy: side === 'purchase' }), filterOfficialSubjects({}), side === 'purchase' ? listVendors() : Promise.resolve([])])
-      .then(([dto, subjects, vendors]) => {
+    // 銷項才需要撈發票簿清單比對字軌；發票簿載入失敗不擋辨識，退回空清單即可
+    const invoiceBooksPromise =
+      side === 'sales' && !form.isAllowance && form.invoicePeriod
+        ? (() => {
+            const parsed = parseInvoicePeriodValue(form.invoicePeriod);
+            return parsed ? listInvoiceBooks({ year: parsed.rocYear, phase: parsed.phase }).catch(() => ({ count: 0, invoiceBook: [] })) : Promise.resolve({ count: 0, invoiceBook: [] });
+          })()
+        : Promise.resolve({ count: 0, invoiceBook: [] });
+    Promise.all([
+      identifyInvoiceOne({ file, isBuy: side === 'purchase' }),
+      filterOfficialSubjects({ calculationType: 0 }),
+      side === 'purchase' ? listVendors() : Promise.resolve([]),
+      invoiceBooksPromise,
+    ])
+      .then(([dto, subjects, vendors, invoiceBooksResult]) => {
         if (identifyRequestIdRef.current !== requestId) return; // 已重新選檔或切換 side，忽略過時回應
-        const result = applyIdentification(form, side, dto, subjects, vendors);
-        if (result.aiPickedSubject) setAiPickedSubject(true);
+        const result = applyIdentification(side, dto, subjects, vendors, invoiceBooksResult.invoiceBook);
+        setAiPickedSubject(result.aiPickedSubject);
         const filledKeys = Object.keys(result.patch) as (keyof TransactionFormState)[];
-        if (filledKeys.length > 0) setAiFields(prev => new Set([...prev, ...filledKeys]));
+        // 重新上傳一律以本次辨識結果重設提示範圍，而非疊加舊有欄位
+        setAiFields(new Set(filledKeys));
         handleChange(result.patch);
       })
       .catch(err => {

@@ -44,6 +44,8 @@ export interface TransactionFormState {
   /** 進口其他稅費加總，僅憑證種類為「進口稅單」時顯示，對應 API others */
   others: number;
   note: string;
+  /** 摘要，對應 API summary；與備註（remark）是不同欄位，新增非折讓交易時必填 */
+  summary: string;
   voucherFileName: string | null;
   voucherPreviewUrl: string | null;
 }
