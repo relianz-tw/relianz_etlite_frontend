@@ -261,6 +261,46 @@ export interface SubjectIdentifyCandidateDto {
 }
 
 /**
+ * 單張發票 Gemini 結構化辨識候選科目（POST /ael/invoice/identification/one 回應內的
+ * gui_subject_candidates），欄位命名與 SubjectIdentifyCandidateDto 不同，不共用型別。
+ */
+export interface InvoiceIdentificationSubjectCandidateDto {
+  gui_subject_code: string;
+  gui_subject_name: string;
+  reason: string;
+}
+
+/**
+ * 單張發票 Gemini 結構化辨識結果（POST /ael/invoice/identification/one）。
+ * api.md 的 schema 標示多數欄位 required，但同頁回應範例本身就缺漏數個欄位（如
+ * gui_subject_candidates／seller_name／seller_tax_id／others），故全數宣告為 optional/nullable，
+ * 呼叫端一律需自行判斷欄位是否存在。
+ */
+export interface InvoiceIdentificationDto {
+  /** 1~7:一般憑證 8:交通憑證 9:水電瓦斯 10:其他 11:進口 */
+  gui_type?: number | null;
+  gui_alphabetic_letter?: string | null;
+  gui_number?: string | null;
+  /** 民國年 */
+  gui_date_year?: number | null;
+  gui_date_month?: number | null;
+  gui_date_day?: number | null;
+  seller_name?: string | null;
+  seller_tax_id?: string | null;
+  buyer_name?: string | null;
+  buyer_tax_id?: string | null;
+  subtotal?: number | null;
+  tax?: number | null;
+  tax_free_amount?: number | null;
+  others?: number | null;
+  total_amount?: number | null;
+  summary?: string | null;
+  angle?: number | null;
+  document_template?: number | null;
+  gui_subject_candidates?: InvoiceIdentificationSubjectCandidateDto[] | null;
+}
+
+/**
  * 銷售管道規則 DTO，對應 sale.md 內嵌 OpenAPI 規格（/ael/payment/channelRules 群組）。
  * feeRateBps／feeFixedAmount（手續費）本次介面暫不編輯，建立/更新時一律不帶這兩個欄位，留待日後補上。
  */

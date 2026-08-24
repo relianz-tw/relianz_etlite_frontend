@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, Zap } from 'lucide-react';
 import { useState, type ChangeEvent, type FocusEvent } from 'react';
 
 interface MoneyInputProps {
@@ -15,6 +15,8 @@ interface MoneyInputProps {
   allowSign?: boolean;
   /** allowSign 開啟時，value 為 0（尚未輸入）時切換鈕的預設方向；僅影響尚未輸入前的視覺與後續輸入的正負號 */
   negativeByDefault?: boolean;
+  /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
+  aiFilled?: boolean;
 }
 
 export default function MoneyInput({
@@ -26,6 +28,7 @@ export default function MoneyInput({
   readOnly,
   allowSign,
   negativeByDefault,
+  aiFilled,
 }: MoneyInputProps) {
   // value 為 0 時正負號無法從數值本身判斷（0 與 -0 顯示相同），故另外保留一份「目前選定的正負號」，
   // 供使用者尚未輸入數字前先切換方向，之後輸入的數字即套用此方向
@@ -89,12 +92,14 @@ export default function MoneyInput({
       )}
       <div
         className={cn(
-          'flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border-[1.5px] border-neutral-blue-gray/50 px-3 transition-colors',
+          'flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border-[1.5px] px-3 transition-colors',
           'focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/15',
-          disabled ? 'bg-surface-cream' : 'bg-white',
+          aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
+          !aiFilled && (disabled ? 'bg-surface-cream' : 'bg-white'),
           className,
         )}
       >
+        {aiFilled && <Zap aria-hidden="true" size={14} className="shrink-0 fill-semantic-success text-semantic-success" />}
         <span className="shrink-0 text-sm text-neutral-mid">$</span>
         <input
           type="text"

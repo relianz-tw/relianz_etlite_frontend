@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown, CirclePlus } from 'lucide-react';
+import { Check, ChevronDown, CirclePlus, Zap } from 'lucide-react';
 import { Children, isValidElement, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
@@ -17,6 +17,8 @@ interface SelectProps {
   addNewLabel?: string;
   /** 提供時，下拉選單最下方會多一列「新增」，點擊後關閉選單並觸發此callback（不影響已選值） */
   onAddNew?: () => void;
+  /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
+  aiFilled?: boolean;
 }
 
 interface SelectOption {
@@ -55,6 +57,7 @@ export default function Select({
   children,
   addNewLabel,
   onAddNew,
+  aiFilled,
 }: SelectProps) {
   const options = parseOptions(children);
   const [open, setOpen] = useState(false);
@@ -112,9 +115,12 @@ export default function Select({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen(o => !o)}
-        className={`flex h-10 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] border-neutral-blue-gray/50 bg-white px-3 text-sm text-neutral-dark outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15 disabled:cursor-not-allowed disabled:bg-surface-cream disabled:text-neutral-mid ${className}`}
+        className={`flex h-10 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] bg-white px-3 text-sm text-neutral-dark outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15 disabled:cursor-not-allowed disabled:bg-surface-cream disabled:text-neutral-mid ${
+          aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50'
+        } ${className}`}
       >
-        <span className="truncate">{selectedLabel}</span>
+        {aiFilled && <Zap aria-hidden="true" size={14} className="shrink-0 fill-semantic-success text-semantic-success" />}
+        <span className="min-w-0 flex-1 truncate text-left">{selectedLabel}</span>
         <ChevronDown size={15} className={`shrink-0 text-neutral-mid transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open &&

@@ -299,6 +299,28 @@ Drag-over：border #005FA2、background rgba(0, 95, 162, 0.05)（brand-blue/5）
 `src/features/ledger/transaction/components/VoucherUpload.tsx`（憑證照片預覽）、
 `src/features/ledger/transaction/components/PassNumberDialog.tsx`（發票跳號作廢憑證照片，僅前端驗證格式與大小）。
 
+### AI 填入欄位提示（AI-filled Field Indicator）
+
+用途：欄位由 AI／自動辨識（如憑證照片辨識）帶入值、使用者尚未手動修改前，需與一般手動輸入的欄位
+做出視覺區隔，讓使用者能一眼看出「這是 AI 幫你填的，可以檢查」。使用者一旦修改該欄位（包含清空、
+重新選擇），提示立即移除，視覺回復一般欄位樣式——不持久標記已被使用者確認過的內容。
+
+```
+輸入框邊框：1.5px solid #377456（裁切綠，semantic-success，同 Success 語意色，不另創新色）
+輸入框底色：rgba(55, 116, 86, 0.05)（semantic-success/5），與白底一般欄位做出微妙區隔
+圖示：lucide Zap，14px，fill + 色 #377456（semantic-success）
+  位置：輸入框最左側內緣（TextInput／MoneyInput／Select／DatePicker／SubjectPicker），
+    或多行欄位（Textarea）左上內緣；與 placeholder／已填入內容保持 gap，內容不因此位移對齊方式
+  aria-hidden：true（狀態僅為輔助視覺提示，不影響欄位語意）
+Focus 樣式不變：仍套用一般 Focus border／shadow（#005FA2），聚焦後綠框暫時被取代，失焦回復
+移除時機：使用者對該欄位觸發任何 onChange（含清空）即移除，改回一般欄位樣式；不因儲存/送出而移除
+```
+對應元件：`src/components/ui/TextInput.tsx`／`MoneyInput.tsx`／`Select.tsx`／`DatePicker.tsx`／
+`Textarea.tsx` 的 `aiFilled` prop；`SubjectPicker.tsx` 沿用既有 `pickedByAi` 狀態同步套用邊框樣式
+（見上方 Subject Picker 章節「AI 已為你選擇」）。
+首個使用情境：`src/features/ledger/transaction/TransactionFormView.tsx` 上傳憑證照片後呼叫
+POST /ael/invoice/identification/one 自動帶入的表單欄位。
+
 ### Navigation — Sidebar（側邊欄導覽）
 
 全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +

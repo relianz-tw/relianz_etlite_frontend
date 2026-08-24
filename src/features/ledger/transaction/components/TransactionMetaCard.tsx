@@ -55,7 +55,13 @@ interface TransactionMetaCardProps {
   onUpdate?: () => void;
   /** 底部危險按鈕文字，銷項為「作廢」、進項為「刪除」 */
   voidLabel?: string;
+  /** 憑證辨識自動選入費用類別／收入科目時為 true，讓 SubjectPicker 顯示「AI 已為你選擇」提示 */
+  aiPickedSubject?: boolean;
+  /** 憑證辨識自動帶入且使用者尚未修改的欄位名稱集合，對應欄位顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
+  aiFields?: ReadonlySet<keyof TransactionFormState>;
 }
+
+const EMPTY_AI_FIELDS: ReadonlySet<keyof TransactionFormState> = new Set();
 
 const ALLOWANCE_OPTIONS = [
   { value: 'no', label: '否' },
@@ -113,6 +119,8 @@ export default function TransactionMetaCard({
   onVoidOrDelete,
   onUpdate,
   voidLabel,
+  aiPickedSubject = false,
+  aiFields = EMPTY_AI_FIELDS,
 }: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
@@ -261,7 +269,7 @@ export default function TransactionMetaCard({
 
   const issueDateField = (
     <Field label="開立日期" required={isCreate}>
-      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} disabled={readOnly} />
+      <DatePicker value={form.issueDate} onChange={d => onChange({ issueDate: d })} disabled={readOnly} aiFilled={aiFields.has('issueDate')} />
     </Field>
   );
 
@@ -274,6 +282,7 @@ export default function TransactionMetaCard({
         value={form.sellerTaxId}
         maxLength={8}
         disabled={readOnly || (!!form.sellerVendorUuid && !isOtherVendor)}
+        aiFilled={aiFields.has('sellerTaxId')}
         onChange={e => {
           const v = e.target.value.replace(/\D/g, '').slice(0, 8);
           onChange({ sellerTaxId: v, ...(isOtherVendor ? {} : { sellerVendorUuid: '' }) });
@@ -284,12 +293,16 @@ export default function TransactionMetaCard({
 
   const sellerNameField = (
     <Field label="賣家名稱" required={isCreate}>
-      {/* 已選擇既有廠商時名稱由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
+      {/* 已選擇既有廠商（非「其他」）時名稱由廠商資料帶入，鎖定不可編輯，避免與廠商資料不一致 */}
+      {/* 廠商選「其他」無真實名稱，開放自由輸入（比照統編欄位邏輯），此時編輯不影響已選定的「其他」廠商 */}
       <TextInput
         placeholder="請輸入賣家名稱"
         value={form.sellerName}
-        disabled={readOnly || !!form.sellerVendorUuid}
-        onChange={e => onChange({ sellerName: e.target.value, sellerVendorUuid: '' })}
+        disabled={readOnly || (!!form.sellerVendorUuid && !isOtherVendor)}
+        aiFilled={aiFields.has('sellerName')}
+        onChange={e => {
+          onChange({ sellerName: e.target.value, ...(isOtherVendor ? {} : { sellerVendorUuid: '' }) });
+        }}
       />
     </Field>
   );
@@ -307,6 +320,7 @@ export default function TransactionMetaCard({
         widthClassName="w-full"
         value={form.sellerVendorUuid}
         disabled={readOnly}
+        aiFilled={aiFields.has('sellerVendorUuid')}
         onValueChange={v => {
           const vendor = vendors.find(x => x.uuid === v);
           onChange({ sellerVendorUuid: v, ...(vendor ? { sellerName: vendor.name, sellerTaxId: vendor.taxId } : {}) });
@@ -334,6 +348,7 @@ export default function TransactionMetaCard({
         value={form.buyerTaxId}
         maxLength={8}
         disabled={readOnly}
+        aiFilled={aiFields.has('buyerTaxId')}
         onChange={e => {
           const v = e.target.value.replace(/\D/g, '').slice(0, 8);
           onChange({ buyerTaxId: v });
@@ -348,6 +363,7 @@ export default function TransactionMetaCard({
         placeholder="請輸入買家名稱"
         value={form.buyerName}
         disabled={readOnly}
+        aiFilled={aiFields.has('buyerName')}
         onChange={e => onChange({ buyerName: e.target.value })}
       />
     </Field>
@@ -408,11 +424,12 @@ export default function TransactionMetaCard({
         placeholder="請輸入海關代徵營業稅繳納證號碼"
         value={form.importTaxNumber}
         disabled={readOnly}
+        aiFilled={aiFields.has('importTaxNumber')}
         onChange={e => onChange({ importTaxNumber: e.target.value })}
       />
     </Field>,
     <Field key="others" label="其他稅費">
-      <MoneyInput value={form.others} onChange={v => onChange({ others: v })} disabled={readOnly} />
+      <MoneyInput value={form.others} onChange={v => onChange({ others: v })} disabled={readOnly} aiFilled={aiFields.has('others')} />
     </Field>,
   ];
 
@@ -543,7 +560,12 @@ export default function TransactionMetaCard({
     rows = [
       [
         <Field key="voucherType" label="憑證種類">
-          <Select widthClassName="w-full" value={form.voucherType} onValueChange={v => onChange({ voucherType: v })}>
+          <Select
+            widthClassName="w-full"
+            value={form.voucherType}
+            onValueChange={v => onChange({ voucherType: v })}
+            aiFilled={aiFields.has('voucherType')}
+          >
             {VOUCHER_TYPES.map(v => (
               <option key={v} value={v}>
                 {v}
@@ -565,6 +587,7 @@ export default function TransactionMetaCard({
                   placeholder="字軌"
                   maxLength={2}
                   value={form.invoiceTrack}
+                  aiFilled={aiFields.has('invoiceTrack')}
                   onChange={e => onChange({ invoiceTrack: e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase() })}
                 />
                 <TextInput
@@ -572,11 +595,17 @@ export default function TransactionMetaCard({
                   placeholder="流水號"
                   maxLength={8}
                   value={form.invoiceSerial}
+                  aiFilled={aiFields.has('invoiceSerial')}
                   onChange={e => onChange({ invoiceSerial: e.target.value })}
                 />
               </div>
             ) : (
-              <TextInput placeholder="憑證編號" value={form.invoiceNumber} onChange={e => onChange({ invoiceNumber: e.target.value })} />
+              <TextInput
+                placeholder="憑證編號"
+                value={form.invoiceNumber}
+                aiFilled={aiFields.has('invoiceNumber')}
+                onChange={e => onChange({ invoiceNumber: e.target.value })}
+              />
             )}
           </Field>
         ),
@@ -692,6 +721,7 @@ export default function TransactionMetaCard({
               disabled={readOnly}
               scope={side === 'purchase' ? 'purchase' : 'sales'}
               title={side === 'purchase' ? '選擇費用類別' : '選擇收入科目'}
+              aiPicked={aiPickedSubject}
             />
           </Field>
 
@@ -700,17 +730,23 @@ export default function TransactionMetaCard({
               value={form.salesAmount}
               onChange={v => onChange({ salesAmount: v, taxAmount: Math.round(v * 0.05) })}
               disabled={readOnly}
+              aiFilled={aiFields.has('salesAmount')}
             />
           </Field>
 
           {!isAllowanceCreate && (
             <Field label="免稅銷售額">
-              <MoneyInput value={form.exemptSalesAmount} onChange={v => onChange({ exemptSalesAmount: v })} disabled={readOnly} />
+              <MoneyInput
+                value={form.exemptSalesAmount}
+                onChange={v => onChange({ exemptSalesAmount: v })}
+                disabled={readOnly}
+                aiFilled={aiFields.has('exemptSalesAmount')}
+              />
             </Field>
           )}
 
           <Field label="稅額">
-            <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} disabled={readOnly} />
+            <MoneyInput value={form.taxAmount} onChange={v => onChange({ taxAmount: v })} disabled={readOnly} aiFilled={aiFields.has('taxAmount')} />
           </Field>
 
           <Field label="總金額">
@@ -718,7 +754,13 @@ export default function TransactionMetaCard({
           </Field>
 
           <Field label="備註">
-            <Textarea value={form.note} onChange={e => onChange({ note: e.target.value })} placeholder="備註（選填）" disabled={readOnly} />
+            <Textarea
+              value={form.note}
+              onChange={e => onChange({ note: e.target.value })}
+              placeholder="備註（選填）"
+              disabled={readOnly}
+              aiFilled={aiFields.has('note')}
+            />
           </Field>
         </div>
 

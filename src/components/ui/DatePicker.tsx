@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { Calendar } from './Calendar';
@@ -13,6 +13,8 @@ interface DatePickerProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
+  aiFilled?: boolean;
 }
 
 /** Date → 民國年 YYY/MM/DD */
@@ -44,7 +46,7 @@ export function parseRocDate(text: string): Date | undefined {
   return date;
 }
 
-export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false }: DatePickerProps) {
+export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false, aiFilled = false }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputText, setInputText] = useState(formatRocDate(value));
 
@@ -77,12 +79,14 @@ export default function DatePicker({ value, onChange, placeholder = '選擇日�
       <PopoverTrigger asChild>
         <div
           className={cn(
-            'flex h-10 w-full items-center gap-2 rounded-lg border-[1.5px] border-neutral-blue-gray/50 bg-white px-3 transition-colors',
+            'flex h-10 w-full items-center gap-2 rounded-lg border-[1.5px] bg-white px-3 transition-colors',
             'focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/15',
+            aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
             disabled && 'pointer-events-none bg-surface-cream',
             className,
           )}
         >
+          {aiFilled && <Zap aria-hidden="true" size={14} className="shrink-0 fill-semantic-success text-semantic-success" />}
           <input
             type="text"
             inputMode="numeric"

@@ -1,5 +1,6 @@
 'use client';
 
+import { identifyInvoiceOne } from '@/api/invoice';
 import {
   createPayable,
   createPayableAllowance,
@@ -9,6 +10,7 @@ import {
   fetchEntryDetail,
   reverseSummarySettle,
 } from '@/api/ledger';
+import { filterOfficialSubjects } from '@/api/subjects';
 import type {
   CreateAllowanceBody,
   CreatePayableBody,
@@ -18,6 +20,7 @@ import type {
   EntryDetailEntryDto,
   EntryDetailSettleEventDto,
 } from '@/api/types';
+import { listVendors } from '@/api/vendors';
 import Button from '@/components/ui/Button';
 import JournalCard from '@/components/ui/JournalCard';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -25,7 +28,7 @@ import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import VoidConfirmDialog from '../components/VoidConfirmDialog';
 import type { Side } from '../types';
 import { appendReturnQuery, resolveLedgerBackHref } from '../urlState';
@@ -37,6 +40,7 @@ import TransactionMetaCard from './components/TransactionMetaCard';
 import TransactionOriginCard from './components/TransactionOriginCard';
 import TransactionSettlementStatus from './components/TransactionSettlementStatus';
 import VoucherUpload from './components/VoucherUpload';
+import { applyIdentification } from './identification';
 import { useSettleEventOrigins } from './settleEventOrigins';
 import { EMPTY_TRANSACTION_FORM, formatYmd, mapInvoiceDetailToForm, resolveExpenseCategory, VOUCHER_KIND_MAP, VOUCHER_TYPES } from './data';
 import type { TransactionFormState, TransactionMode } from './types';
@@ -174,6 +178,16 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const backHref = resolveLedgerBackHref(returnQuery);
+
+  // 新增畫面上傳憑證照片後自動呼叫 POST /ael/invoice/identification/one 帶入欄位；
+  // 用遞增序號比對忽略過時的回應，比照 SubjectPicker.handleAiSubmit 的既有寫法
+  const [identifying, setIdentifying] = useState(false);
+  const [identifyError, setIdentifyError] = useState('');
+  const [aiPickedSubject, setAiPickedSubject] = useState(false);
+  // 辨識帶入且使用者尚未修改的欄位名稱，供對應輸入框顯示綠框＋閃電提示；使用者透過 handleFieldChange
+  // 編輯任一欄位時，就把該欄位從集合中移除，提示立即消失（見 DESIGN.md AI 填入欄位提示）
+  const [aiFields, setAiFields] = useState<ReadonlySet<keyof TransactionFormState>>(new Set());
+  const identifyRequestIdRef = useRef(0);
 
   // 編輯畫面掛載時向 GET /ael/ledger/entries/detail 取得真實資料；新增畫面不需要，維持 EMPTY_TRANSACTION_FORM
   const [detailLoading, setDetailLoading] = useState(mode === 'edit');
@@ -316,8 +330,47 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   };
 
   const handleChange = (patch: Partial<TransactionFormState>) => setForm(f => ({ ...f, ...patch }));
-  const handleFileChange = (fileName: string, previewUrl: string) =>
+
+  // 傳給 TransactionMetaCard 的 onChange：任何使用者觸發的欄位變更都要把對應欄位從 aiFields 移除，
+  // 讓綠框＋閃電提示消失；辨識帶入結果改由 handleFileChange 直接呼叫 handleChange，不經過此函式，
+  // 避免剛設定好的 aiFields 又被同一個 patch 立刻清掉
+  const handleFieldChange = (patch: Partial<TransactionFormState>) => {
+    const changedKeys = Object.keys(patch) as (keyof TransactionFormState)[];
+    setAiFields(prev => {
+      if (!changedKeys.some(key => prev.has(key))) return prev;
+      const next = new Set(prev);
+      changedKeys.forEach(key => next.delete(key));
+      return next;
+    });
+    handleChange(patch);
+  };
+
+  const handleFileChange = (fileName: string, previewUrl: string, file: File) => {
     handleChange({ voucherFileName: fileName, voucherPreviewUrl: previewUrl });
+    // 編輯畫面的「重新上傳」僅換預覽圖，該畫面本次未串接更新後端，不觸發辨識
+    if (mode !== 'create') return;
+
+    const requestId = ++identifyRequestIdRef.current;
+    setIdentifying(true);
+    setIdentifyError('');
+    Promise.all([identifyInvoiceOne({ file, isBuy: side === 'purchase' }), filterOfficialSubjects({}), side === 'purchase' ? listVendors() : Promise.resolve([])])
+      .then(([dto, subjects, vendors]) => {
+        if (identifyRequestIdRef.current !== requestId) return; // 已重新選檔或切換 side，忽略過時回應
+        const result = applyIdentification(form, side, dto, subjects, vendors);
+        if (result.aiPickedSubject) setAiPickedSubject(true);
+        const filledKeys = Object.keys(result.patch) as (keyof TransactionFormState)[];
+        if (filledKeys.length > 0) setAiFields(prev => new Set([...prev, ...filledKeys]));
+        handleChange(result.patch);
+      })
+      .catch(err => {
+        if (identifyRequestIdRef.current !== requestId) return;
+        // 辨識失敗不阻擋手動填寫，僅顯示提示
+        setIdentifyError(getFriendlyErrorMessage(err, '憑證辨識失敗，請手動輸入'));
+      })
+      .finally(() => {
+        if (identifyRequestIdRef.current === requestId) setIdentifying(false);
+      });
+  };
 
   const handleSideChange = (next: Side) => router.push(appendReturnQuery(`/ledger/new?side=${next}`, returnQuery));
 
@@ -388,7 +441,14 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
         ) : (
           <div className="nav:grid nav:grid-cols-[380px_1fr] nav:items-start nav:gap-8">
             <div className="mb-5 flex flex-col gap-4 nav:sticky nav:top-20 nav:mb-0">
-              <VoucherUpload mode={mode} fileName={form.voucherFileName} previewUrl={form.voucherPreviewUrl} onFileChange={handleFileChange} />
+              <VoucherUpload
+                mode={mode}
+                fileName={form.voucherFileName}
+                previewUrl={form.voucherPreviewUrl}
+                onFileChange={handleFileChange}
+                identifying={identifying}
+                identifyError={identifyError}
+              />
             </div>
 
             <div className="flex flex-col gap-5">
@@ -405,7 +465,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 side={side}
                 mode={mode}
                 form={form}
-                onChange={handleChange}
+                onChange={handleFieldChange}
                 readOnly={mode === 'edit' && !editing}
                 editing={editing}
                 onStartEdit={() => setEditing(true)}
@@ -416,6 +476,8 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 onVoidOrDelete={side === 'sales' ? () => setVoidConfirmOpen(true) : backToLedger}
                 onUpdate={backToLedger}
                 voidLabel={side === 'sales' ? '作廢' : '刪除'}
+                aiPickedSubject={aiPickedSubject}
+                aiFields={aiFields}
               />
               {mode === 'edit' && isAllowance && (
                 <TransactionOriginCard

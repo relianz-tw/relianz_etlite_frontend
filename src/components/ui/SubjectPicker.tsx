@@ -4,7 +4,7 @@ import { filterOfficialSubjects, identifySubject, listSubjectUsage, type Subject
 import type { OfficialSubjectDto } from '@/api/types';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { useIsNavDesktop } from '@/lib/useNavBreakpoint';
-import { ChevronDown, Sparkles } from 'lucide-react';
+import { ChevronDown, Sparkles, Zap } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -32,6 +32,9 @@ interface SubjectPickerProps {
   scope?: SubjectScope;
   /** 手機全螢幕殼的標題文字；預設「選擇會計科目」 */
   title?: string;
+  /** 外部（如憑證辨識）自動帶入 value 時傳入 true，讓元件顯示「AI 已為你選擇」提示；僅由 false→true 觸發一次，
+   * 使用者之後手動改選會透過既有的 commitSelection(fromAi=false) 自動熄滅，不受此 prop 影響 */
+  aiPicked?: boolean;
 }
 
 /**
@@ -47,6 +50,7 @@ export default function SubjectPicker({
   placeholder = '請選擇科目',
   scope = 'general',
   title = '選擇會計科目',
+  aiPicked = false,
 }: SubjectPickerProps) {
   const isDesktop = useIsNavDesktop();
 
@@ -79,6 +83,11 @@ export default function SubjectPicker({
   useEffect(() => {
     setLoaded(false);
   }, [scope]);
+
+  // 外部（憑證辨識）帶入 aiPicked=true 時點亮提示；使用者之後手動選擇會透過 commitSelection(fromAi=false) 自動熄滅
+  useEffect(() => {
+    if (aiPicked) setPickedByAi(true);
+  }, [aiPicked]);
 
   // 開啟面板且尚未載入過時才並行抓三支：搜尋會跨到「全部」，不能等切到該頁籤才抓
   useEffect(() => {
@@ -253,6 +262,9 @@ export default function SubjectPicker({
   }
 
   const triggerLabel = value ? (value.subjectCode ? `${value.subjectCode} ${value.name}` : value.name) : placeholder;
+  // 觸發器綠框＋閃電與下方「AI 已為你選擇」註記使用同一個判斷條件，手動改選後 pickedByAi 會由
+  // commitSelection(fromAi=false) 清為 false，兩處同步移除
+  const showAiFilled = pickedByAi && !!value;
 
   const trigger = (
     <button
@@ -261,9 +273,12 @@ export default function SubjectPicker({
       aria-haspopup={isDesktop ? 'listbox' : 'dialog'}
       aria-expanded={open}
       onClick={!isDesktop ? () => handleOpenChange(!open) : undefined}
-      className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] border-neutral-blue-gray/50 bg-white px-3 text-sm text-neutral-dark outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15 disabled:cursor-not-allowed disabled:bg-surface-cream disabled:text-neutral-mid"
+      className={`flex h-10 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] bg-white px-3 text-sm text-neutral-dark outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15 disabled:cursor-not-allowed disabled:bg-surface-cream disabled:text-neutral-mid ${
+        showAiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50'
+      }`}
     >
-      <span className={`truncate ${!value ? 'text-neutral-mid' : ''}`}>{triggerLabel}</span>
+      {showAiFilled && <Zap aria-hidden="true" size={14} className="shrink-0 fill-semantic-success text-semantic-success" />}
+      <span className={`min-w-0 flex-1 truncate text-left ${!value ? 'text-neutral-mid' : ''}`}>{triggerLabel}</span>
       <ChevronDown size={15} className={`shrink-0 text-neutral-mid transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
   );

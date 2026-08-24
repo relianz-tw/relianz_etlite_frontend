@@ -32,11 +32,14 @@ export function buildQuery(params: Record<string, string | number | undefined>):
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  // body 為 FormData（檔案上傳）時不可手動指定 Content-Type，需讓瀏覽器自動帶上 boundary，
+  // 否則後端收到的 multipart 內容會因缺少 boundary 而無法解析
+  const isFormData = init?.body instanceof FormData;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...init?.headers,
       },
     });

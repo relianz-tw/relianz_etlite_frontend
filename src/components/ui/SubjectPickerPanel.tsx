@@ -172,7 +172,7 @@ export default function SubjectPickerPanel({
                     } ${selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'}`}
                   >
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className="w-16 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
+                      <span className="w-24 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
                       <span className="truncate">{s.name}</span>
                     </span>
                     {armed && (
