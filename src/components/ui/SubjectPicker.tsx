@@ -94,7 +94,7 @@ export default function SubjectPicker({
     if (!open || loaded) return;
     setLoading(true);
     setError('');
-    Promise.all([filterOfficialSubjects(SCOPE_PARAMS[scope]), filterOfficialSubjects({}), listSubjectUsage()])
+    Promise.all([filterOfficialSubjects(SCOPE_PARAMS[scope]), filterOfficialSubjects({ calculationType: 0 }), listSubjectUsage()])
       .then(([basicList, allList, usageList]) => {
         setBasic(basicList);
         setAll(allList);
