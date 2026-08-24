@@ -56,7 +56,7 @@ export interface VendorExistsResult {
 export interface InvoiceBookDto {
   /** 發票簿 uuid；save 端點稱 invoiceId，receivables 端點稱 invoiceBookUuid，list 端點稱 invoiceBookId，三者同義 */
   invoiceBookId: string;
-  /** invoice_type */
+  /** invoice_type，發票種類：1、2 為三聯式（買家統編／名稱必填），其餘為二聯式 */
   part: number;
   name: string;
   aphabeticLetter: string;

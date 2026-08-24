@@ -16,6 +16,8 @@ export interface TransactionFormState {
   invoiceNumber: string;
   /** 新增銷項：選中的發票簿 uuid（GET /ael/invoiceBook 回應的 invoiceBookId），對應 API invoiceBookUuid */
   invoiceBookUuid: string;
+  /** 新增銷項：選中發票簿的 part（發票種類，1、2 為三聯式），未選擇發票簿時為 null；三聯式時買家統編／名稱為必填 */
+  invoiceBookPart: number | null;
   declarePeriod: string;
   issueDate: Date | undefined;
   /** 銷項：選填，但與 buyerName 需一併填寫（填一項則兩項皆必填） */

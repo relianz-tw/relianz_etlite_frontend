@@ -49,6 +49,7 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   // 新增進項若憑證種類非一般發票則改用這個欄位輸入憑證編號；新增銷項的號碼改由 invoiceBookUuid 選定的發票簿帶入
   invoiceNumber: '',
   invoiceBookUuid: '',
+  invoiceBookPart: null,
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
   issueDate: undefined,
   buyerTaxId: '',

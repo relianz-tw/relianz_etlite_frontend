@@ -324,8 +324,11 @@ export default function TransactionMetaCard({
     </Field>
   );
 
+  // 發票簿 part 為 1 或 2 代表三聯式，三聯式發票買家統編／名稱為必填；未選發票簿（如編輯畫面）則不強制
+  const isTriplicateInvoiceBook = form.invoiceBookPart === 1 || form.invoiceBookPart === 2;
+
   const buyerTaxIdField = (
-    <Field label="買家統一編號">
+    <Field label="買家統一編號" required={isTriplicateInvoiceBook}>
       <TextInput
         placeholder="請輸入買家統一編號"
         value={form.buyerTaxId}
@@ -340,7 +343,7 @@ export default function TransactionMetaCard({
   );
 
   const buyerNameField = (
-    <Field label="買家名稱">
+    <Field label="買家名稱" required={isTriplicateInvoiceBook}>
       <TextInput
         placeholder="請輸入買家名稱"
         value={form.buyerName}
@@ -495,6 +498,7 @@ export default function TransactionMetaCard({
                   const book = invoiceBooks.find(b => b.invoiceBookId === v);
                   onChange({
                     invoiceBookUuid: v,
+                    invoiceBookPart: book ? book.part : null,
                     ...(book ? { invoiceTrack: book.aphabeticLetter, invoiceSerial: book.currentNum } : {}),
                   });
                 }}
