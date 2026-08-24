@@ -1,9 +1,9 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { createContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 
 interface ModalProps {
   open: boolean;
@@ -13,7 +13,22 @@ interface ModalProps {
   children: ReactNode;
 }
 
+interface ModalSurface {
+  /** Modal 卡片本身的 DOM 節點，供卡片內覆蓋層（如科目選擇器的左滑面板）用 portal 掛載 */
+  cardRef: RefObject<HTMLDivElement>;
+  /** 是否有卡片內覆蓋層開啟中；開啟時卡片會長高、且點擊遮罩不關閉 Modal，交由覆蓋層自行處理 */
+  overlayOpen: boolean;
+  setOverlayOpen: (v: boolean) => void;
+}
+
+/** 讓 Modal 內部元件（如 SubjectPicker 的 inDialog 模式）取得卡片掛載點與覆蓋層開關狀態 */
+export const ModalSurfaceContext = createContext<ModalSurface | null>(null);
+
 export default function Modal({ open, onClose, title, widthClassName = 'max-w-[480px]', children }: ModalProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const surface = useMemo(() => ({ cardRef, overlayOpen, setOverlayOpen }), [overlayOpen]);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -30,6 +45,11 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
     };
   }, [open, onClose]);
 
+  // 關閉後歸零覆蓋層狀態，避免下次開啟殘留卡片長高／遮罩不可關閉的狀態
+  useEffect(() => {
+    if (!open) setOverlayOpen(false);
+  }, [open]);
+
   if (!open) return null;
 
   return createPortal(
@@ -37,10 +57,19 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
       <div
         className="flex min-h-full items-center justify-center p-4"
         onMouseDown={e => {
+          if (overlayOpen) return;
           if (e.target === e.currentTarget) onClose();
         }}
       >
-        <div role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`w-full ${widthClassName} rounded-lg bg-white p-4 shadow-level1 nav:p-6`}>
+        <div
+          ref={cardRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          className={`relative w-full overflow-hidden ${widthClassName} rounded-lg bg-white p-4 shadow-level1 nav:p-6 ${
+            overlayOpen ? 'min-h-[min(560px,70vh)] transition-[min-height] duration-200' : ''
+          }`}
+        >
           <div className="mb-5 flex items-center justify-between gap-4">
             <h2 id="modal-title" className="font-notoSerif text-lg font-semibold text-neutral-dark">
               {title}
@@ -54,7 +83,7 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
               <X size={18} />
             </button>
           </div>
-          {children}
+          <ModalSurfaceContext.Provider value={surface}>{children}</ModalSurfaceContext.Provider>
         </div>
       </div>
     </div>,

@@ -1,11 +1,11 @@
 'use client';
 
 import type { OfficialSubjectDto } from '@/api/types';
-import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import { AI_EXAMPLE_PROMPTS } from './subjectAiRules';
 import { AlertTriangle, ChevronUp, LoaderCircle, Sparkles } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 export type AiPhase = 'idle' | 'loading' | 'done';
 
@@ -40,6 +40,12 @@ export default function SubjectAiAssistant({
   onCollapse,
   onPick,
 }: SubjectAiAssistantProps) {
+  // AI 有結果（建議卡或錯誤訊息）時自動捲到該區塊，避免使用者以為送出沒有反應
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (phase === 'done') resultRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [phase, suggestions, error]);
+
   return (
     <div className="border-t border-brand-tan/30 bg-surface-warm p-3">
       <div className="flex items-center gap-2">
@@ -96,14 +102,14 @@ export default function SubjectAiAssistant({
       )}
 
       {phase === 'done' && suggestions.length === 0 && error && (
-        <div className="mt-3 flex items-start gap-2 rounded-md border border-semantic-error/30 bg-white p-3 text-xs text-semantic-error">
+        <div ref={resultRef} className="mt-3 flex items-start gap-2 rounded-md border border-semantic-error/30 bg-white p-3 text-xs text-semantic-error">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {phase === 'done' && suggestions.length > 0 && (
-        <div className="mt-3 flex flex-col gap-2">
+        <div ref={resultRef} className="mt-3 flex flex-col gap-2">
           <p className="text-xs leading-relaxed text-neutral-mid">
             {suggestions.length > 1 ? `AI 建議 ${suggestions.length} 個科目，點選即套用：` : 'AI 建議：'}
           </p>
@@ -121,7 +127,6 @@ export default function SubjectAiAssistant({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs tabular-nums text-neutral-mid">{s.subject.subjectCode}</span>
                   <span className="text-sm font-semibold text-neutral-dark">{s.subject.name}</span>
-                  {first && <Badge tone="info" variant="muted">首選</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs leading-relaxed text-neutral-mid">{s.reason}</p>
               </button>

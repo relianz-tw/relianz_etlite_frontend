@@ -24,6 +24,9 @@ const TAB_NOTE: Record<SubjectPickerTab, string> = {
 
 interface SubjectPickerPanelProps {
   fullScreen: boolean;
+  /** AI 入口列／AI 區塊是否固定釘在面板底部（不隨清單捲動）；預設沿用 fullScreen（全螢幕頁本就該釘底）。
+   * Popover 模式維持 false，讓 AI 區塊與清單共用捲動容器，避免展開時被 Popover 邊界切掉（見下方清單容器註解）*/
+  pinnedAi?: boolean;
   query: string;
   onQueryChange: (value: string) => void;
   searchInputRef?: RefObject<HTMLInputElement>;
@@ -59,6 +62,7 @@ interface SubjectPickerPanelProps {
 /** 分頁式科目選擇器的面板內容：搜尋列／分頁列／說明列／清單／空狀態／AI 入口，桌機與手機共用 */
 export default function SubjectPickerPanel({
   fullScreen,
+  pinnedAi = fullScreen,
   query,
   onQueryChange,
   searchInputRef,
@@ -87,6 +91,33 @@ export default function SubjectPickerPanel({
   onAiPick,
 }: SubjectPickerPanelProps) {
   const isEmpty = !loading && !error && options.length === 0;
+
+  const aiEntryButton = (
+    <button
+      type="button"
+      onClick={onOpenAi}
+      className={`flex w-full items-center gap-2 border-t border-brand-tan/30 bg-surface-warm px-3 py-3 text-left text-sm text-semantic-warm-dark transition-colors hover:bg-brand-tan/20 ${
+        fullScreen ? 'min-h-16 pb-[calc(16px+env(safe-area-inset-bottom))]' : ''
+      }`}
+    >
+      <Sparkles size={16} className="shrink-0 text-brand-tan-dark" />
+      <span className="flex-1">不確定用哪個科目？描述這筆交易，讓 AI 幫你選</span>
+      <ChevronRight size={16} className="ml-auto shrink-0" />
+    </button>
+  );
+
+  const aiAssistant = (
+    <SubjectAiAssistant
+      input={aiInput}
+      onInputChange={onAiInputChange}
+      phase={aiPhase}
+      suggestions={aiSuggestions}
+      error={aiError}
+      onSubmit={onAiSubmit}
+      onCollapse={onAiCollapse}
+      onPick={onAiPick}
+    />
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -146,12 +177,14 @@ export default function SubjectPickerPanel({
         </div>
       )}
 
-      {/* 清單與 AI 區塊共用同一個捲動容器：AI 區塊展開時內容變高，若各自獨立捲動，
-          AI 區塊會被 Popover 的 overflow-hidden 直接切邊。桌機平常仍維持 max-h-80（320px）
-          的清單高度上限，但 AI 展開時解除此上限，改讓兩者一起在可用高度內捲動 */}
+      {/* Popover 模式（pinnedAi=false）：清單與 AI 區塊共用同一個捲動容器，AI 區塊展開時內容變高，
+          若各自獨立捲動，AI 區塊會被 Popover 的 overflow-hidden 直接切邊。桌機平常仍維持 max-h-80
+          （320px）的清單高度上限，但 AI 展開時解除此上限，改讓兩者一起在可用高度內捲動。
+          全螢幕頁／Dialog 內面板模式（pinnedAi=true）：AI 入口列與 AI 區塊改釘在面板底部（見下方），
+          不受此處 max-h-80 限制，清單以 flex-1 獨立捲動 */}
       <div
         ref={listRef}
-        className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${!fullScreen && !aiOpen ? 'max-h-80' : ''}`}
+        className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${!pinnedAi && !aiOpen ? 'max-h-80' : ''}`}
       >
         <div className={fullScreen ? '' : 'py-1'}>
           {loading && <p className="px-3 py-2 text-sm text-neutral-mid">載入中...</p>}
@@ -203,33 +236,12 @@ export default function SubjectPickerPanel({
           )}
         </div>
 
-        {!aiOpen && (
-          <button
-            type="button"
-            onClick={onOpenAi}
-            className={`flex w-full items-center gap-2 border-t border-brand-tan/30 bg-surface-warm px-3 py-4 text-left text-sm text-semantic-warm-dark transition-colors hover:bg-brand-tan/20 ${
-              fullScreen ? 'min-h-16 pb-[calc(16px+env(safe-area-inset-bottom))]' : ''
-            }`}
-          >
-            <Sparkles size={16} className="shrink-0 text-brand-tan-dark" />
-            <span className="flex-1">不確定用哪個科目？描述這筆交易，讓 AI 幫你選</span>
-            <ChevronRight size={16} className="ml-auto shrink-0" />
-          </button>
-        )}
-
-        {aiOpen && (
-          <SubjectAiAssistant
-            input={aiInput}
-            onInputChange={onAiInputChange}
-            phase={aiPhase}
-            suggestions={aiSuggestions}
-            error={aiError}
-            onSubmit={onAiSubmit}
-            onCollapse={onAiCollapse}
-            onPick={onAiPick}
-          />
-        )}
+        {!pinnedAi && !aiOpen && aiEntryButton}
+        {!pinnedAi && aiOpen && aiAssistant}
       </div>
+
+      {pinnedAi && !aiOpen && aiEntryButton}
+      {pinnedAi && aiOpen && <div className="max-h-[60%] shrink-0 overflow-y-auto overscroll-contain">{aiAssistant}</div>}
     </div>
   );
 }

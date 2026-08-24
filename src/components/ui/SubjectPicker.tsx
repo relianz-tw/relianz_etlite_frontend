@@ -4,9 +4,10 @@ import { filterOfficialSubjects, identifySubject, listSubjectUsage, type Subject
 import type { OfficialSubjectDto } from '@/api/types';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { useIsNavDesktop } from '@/lib/useNavBreakpoint';
-import { ChevronDown, Sparkles, Zap } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronLeft, Sparkles, Zap } from 'lucide-react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ModalSurfaceContext } from './Modal';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import type { AiPhase, AiSuggestion } from './SubjectAiAssistant';
 import SubjectPickerPanel, { type SubjectPickerTab } from './SubjectPickerPanel';
@@ -32,9 +33,15 @@ interface SubjectPickerProps {
   scope?: SubjectScope;
   /** 手機全螢幕殼的標題文字；預設「選擇會計科目」 */
   title?: string;
+  /** 覆寫 SCOPE_PARAMS[scope] 的 buyOrSell（如銀行新增交易依收支方向動態決定：支出=2／存入=3）；
+   * 未傳入時沿用 scope 對應的固定值 */
+  buyOrSell?: 2 | 3;
   /** 外部（如憑證辨識）自動帶入 value 時傳入 true，讓元件顯示「AI 已為你選擇」提示；僅由 false→true 觸發一次，
    * 使用者之後手動改選會透過既有的 commitSelection(fromAi=false) 自動熄滅，不受此 prop 影響 */
   aiPicked?: boolean;
+  /** 桌機是否改用「Modal 對話框內左滑面板」取代 Popover（需在 Modal 內使用，透過 ModalSurfaceContext 取得掛載點）；
+   * 手機不受影響，仍為全螢幕選擇頁 */
+  inDialog?: boolean;
 }
 
 /**
@@ -51,10 +58,16 @@ export default function SubjectPicker({
   scope = 'general',
   title = '選擇會計科目',
   aiPicked = false,
+  inDialog = false,
+  buyOrSell,
 }: SubjectPickerProps) {
   const isDesktop = useIsNavDesktop();
+  const modalSurface = useContext(ModalSurfaceContext);
+  const useDialogPanel = inDialog && isDesktop && !!modalSurface;
 
   const [open, setOpen] = useState(false);
+  // Dialog 內左滑面板的滑入動畫：掛載後下一輪 frame 才轉為 true，觸發 translate-x 過渡
+  const [entered, setEntered] = useState(false);
   const [tab, setTab] = useState<SubjectPickerTab>('frequent');
   const [query, setQuery] = useState('');
 
@@ -79,22 +92,24 @@ export default function SubjectPicker({
   // 送出後元件可能卸載或再次送出，用遞增序號比對忽略過時的回應
   const aiRequestIdRef = useRef(0);
 
-  // scope 改變時重新抓取，避免快取旗標跨 scope 誤用
+  // scope 或 buyOrSell 覆寫值改變時重新抓取，避免快取旗標跨語境誤用（如銀行新增交易切換支出／存入）
   useEffect(() => {
     setLoaded(false);
-  }, [scope]);
+  }, [scope, buyOrSell]);
 
   // 外部（憑證辨識）帶入 aiPicked=true 時點亮提示；使用者之後手動選擇會透過 commitSelection(fromAi=false) 自動熄滅
   useEffect(() => {
     if (aiPicked) setPickedByAi(true);
   }, [aiPicked]);
 
+  const basicParams: SubjectFilterParams = buyOrSell ? { ...SCOPE_PARAMS[scope], buyOrSell } : SCOPE_PARAMS[scope];
+
   // 開啟面板且尚未載入過時才並行抓三支：搜尋會跨到「全部」，不能等切到該頁籤才抓
   useEffect(() => {
     if (!open || loaded) return;
     setLoading(true);
     setError('');
-    Promise.all([filterOfficialSubjects(SCOPE_PARAMS[scope]), filterOfficialSubjects({ calculationType: 0 }), listSubjectUsage()])
+    Promise.all([filterOfficialSubjects(basicParams), filterOfficialSubjects({ calculationType: 0 }), listSubjectUsage()])
       .then(([basicList, allList, usageList]) => {
         setBasic(basicList);
         setAll(allList);
@@ -103,7 +118,7 @@ export default function SubjectPicker({
       })
       .catch((err) => setError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, loaded, scope]);
+  }, [open, loaded, scope, buyOrSell]);
 
   // 切分頁／改搜尋時清單捲回頂端
   useEffect(() => {
@@ -135,6 +150,25 @@ export default function SubjectPicker({
       document.body.style.overflow = previousOverflow;
     };
   }, [open, isDesktop]);
+
+  // Dialog 面板開合時同步 Modal 卡片的覆蓋層狀態：卡片長高、且遮罩點擊不再直接關閉整個對話框
+  // （改由面板自身的返回鈕／Escape 處理），關閉時歸位讓對話框恢復原本高度與遮罩行為
+  useEffect(() => {
+    if (!useDialogPanel) return;
+    modalSurface?.setOverlayOpen(open);
+    return () => modalSurface?.setOverlayOpen(false);
+  }, [useDialogPanel, open, modalSurface]);
+
+  // Dialog 面板滑入動畫：掛載當下先維持在畫面右側外（translate-x-full），下一個 frame 才轉為
+  // entered 觸發 transition-transform 滑入；關閉不做退場動畫，直接卸載（比照現有 Modal／BottomSheet）
+  useEffect(() => {
+    if (!useDialogPanel || !open) {
+      setEntered(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [useDialogPanel, open]);
 
   const q = query.trim();
   const searching = q.length > 0;
@@ -270,9 +304,9 @@ export default function SubjectPicker({
     <button
       type="button"
       disabled={disabled}
-      aria-haspopup={isDesktop ? 'listbox' : 'dialog'}
+      aria-haspopup={isDesktop && !useDialogPanel ? 'listbox' : 'dialog'}
       aria-expanded={open}
-      onClick={!isDesktop ? () => handleOpenChange(!open) : undefined}
+      onClick={!isDesktop || useDialogPanel ? () => handleOpenChange(!open) : undefined}
       className={`flex h-10 w-full items-center justify-between gap-2 rounded-lg border-[1.5px] bg-white px-3 text-sm text-neutral-dark outline-none transition-colors focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/15 disabled:cursor-not-allowed disabled:bg-surface-cream disabled:text-neutral-mid ${
         showAiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50'
       }`}
@@ -315,9 +349,43 @@ export default function SubjectPicker({
     onAiPick: handleAiPick,
   };
 
+  const dialogCardEl = useDialogPanel ? modalSurface?.cardRef.current ?? null : null;
+
   return (
     <div className="relative">
-      {isDesktop ? (
+      {useDialogPanel ? (
+        <>
+          {trigger}
+          {open &&
+            dialogCardEl &&
+            createPortal(
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="subject-picker-title"
+                className={`absolute inset-0 z-10 flex flex-col rounded-lg bg-white transition-transform duration-200 ${
+                  entered ? 'translate-x-0' : 'translate-x-full'
+                }`}
+              >
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-neutral-blue-gray/30 px-4">
+                  <button
+                    type="button"
+                    onClick={closePanel}
+                    aria-label="返回"
+                    className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center text-neutral-mid hover:text-neutral-dark"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span id="subject-picker-title" className="font-notoSerif text-base font-semibold text-neutral-dark">
+                    {title}
+                  </span>
+                </div>
+                <SubjectPickerPanel {...panelProps} fullScreen={false} pinnedAi searchInputRef={searchInputRef} autoFocusSearch />
+              </div>,
+              dialogCardEl,
+            )}
+        </>
+      ) : isDesktop ? (
         <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>{trigger}</PopoverTrigger>
           <PopoverContent align="start" className="w-[max(var(--radix-popover-trigger-width),320px)] p-0">

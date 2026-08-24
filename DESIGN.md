@@ -540,7 +540,13 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 觸發器：h-10、rounded-lg、border-[1.5px] border-neutral-blue-gray/50，樣式同 Form Inputs／
   現有 SubjectSelect 觸發器
 
-面板（桌機為 Popover，手機為全螢幕頁，兩者共用同一套內部排版）：
+面板呈現模式：
+  - Popover（預設，桌機、非對話框內使用）
+  - Dialog 內左滑面板（桌機，於 Modal 對話框內使用，如銀行新增交易，見下方「Dialog 內左滑面板」）
+  - 全螢幕頁（手機，< nav 1000px，見下方）
+  三者共用同一套內部排版（搜尋／分頁／清單／AI 區塊）。
+
+面板內部排版：
   1. 搜尋列：放大鏡圖示 + input（text-base，nav 斷點以上 text-sm，防 iOS 自動放大）+
      有輸入時右側「清除」
   2. 分頁列（底線式，樣式同 Tab Bar (Underline)）：常用／建議／全部，各自右側附小字灰色計數；
@@ -548,23 +554,35 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
   3. 分類說明列：bg-surface-cream、text-xs、text-neutral-mid，一行文字說明目前分頁的排序／篩選依據
   4. 搜尋範圍提示列（僅搜尋時顯示）：bg-brand-blue/5、text-brand-blue、text-xs，
      顯示「搜尋範圍為完整科目表，找到 N 筆符合「關鍵字」」
-  5. 科目清單：可捲動，桌機 max-h-80（320px）；每列代碼（font-mono、tabular-nums）+ 名稱，
+  5. 科目清單：可捲動；每列代碼（font-mono、tabular-nums）+ 名稱，
      選中列 bg-brand-blue/10 + 右側 Check 圖示；一律扁平列表，不做主／子科目分組或說明文字
-     （官方科目 API 目前無父子階層與 remark 資料）。AI 區塊展開時，清單與 AI 區塊合併為
-     同一個捲動容器並解除 max-h-80 上限，避免 AI 區塊內容（文字框、範例、建議卡）
-     超出 Popover 可用高度時被邊界切掉
+     （官方科目 API 目前無父子階層與 remark 資料）。
+     - Popover 模式：清單高度上限 max-h-80（320px）；AI 區塊展開時，清單與 AI 區塊合併為
+       同一個捲動容器並解除 max-h-80 上限，避免 AI 區塊內容（文字框、範例、建議卡）
+       超出 Popover 可用高度時被邊界切掉
+     - Dialog 內左滑面板／全螢幕頁模式：AI 入口列與 AI 區塊**固定釘在面板底部**（不隨清單捲動），
+       清單以 flex-1 佔滿剩餘高度獨立捲動
   6. 空狀態（搜尋無結果）：置中圖示 + 標題「找不到「關鍵字」」+ 說明 + 主要按鈕「讓 AI 判斷」
-  7. 底部固定 AI 入口列：bg-surface-warm、border-t border-brand-tan/30、py-4（較清單列更高，
-     凸顯 AI 輔助入口），文字「不確定用哪個科目？描述這筆交易，讓 AI 幫你選」，點擊展開 AI 區塊
+  7. 底部 AI 入口列：bg-surface-warm、border-t border-brand-tan/30、py-3，
+     文字「不確定用哪個科目？描述這筆交易，讓 AI 幫你選」，點擊展開 AI 區塊
 
 AI 區塊（暖色面，展開於面板底部）：
   bg-surface-warm、border-t border-brand-tan/30、p-3
   內含：說明文字、textarea（描述交易）、範例 chip（rounded-sm border border-brand-tan/50）、
   送出按鈕（variant="warm"，暖色區維持單一色相，不與城信藍混用）、
-  loading 態（LoaderCircle 動畫 + 說明文字）、建議卡（最多 3 張，首選卡
-  border-[1.5px] border-brand-blue/40 + Badge tone="info" 標示「首選」）
+  loading 態（LoaderCircle 動畫 + 說明文字）、建議卡（最多 3 張，首選卡以
+  border-[1.5px] border-brand-blue/40 做視覺區隔，不額外標示文字徽章）
+  有建議結果或錯誤訊息時，畫面自動捲動至該區塊（scrollIntoView），避免使用者以為送出無反應
   選定後於觸發器下方顯示「AI 已為你選擇」註記列（bg-surface-warm、text-xs）+ 「重新詢問」連結；
   手動從清單改選會清除此註記
+
+Dialog 內左滑面板（桌機，於 Modal 對話框內使用）：
+  面板 absolute inset-0、z-10，覆蓋 Modal 卡片內部（Modal 卡片需 relative overflow-hidden）
+  進場：transition-transform（--transition-base 200ms）由 translate-x-full 滑入 translate-x-0；
+    離場不做動畫（直接卸載，與現有 Modal／Bottom Sheet 一致）
+  Modal 卡片同步以 min-h-[min(560px,70vh)] + transition-[min-height] 長高，容納面板內容
+  頂部標題列：h-14、border-b、左側 ChevronLeft 返回鈕 + 標題文字（font-notoSerif text-base font-semibold）
+  面板開啟期間，點擊 Modal 遮罩不關閉整個對話框（由面板自身的返回／Escape 處理）
 
 手機全螢幕頁（< nav 1000px）：
   fixed inset-0、z-[90]、bg-white，取代 Popover；頂部標題列「選擇會計科目」+ 右側「取消」

@@ -122,7 +122,8 @@ export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTra
           <Label required>收支方向與金額</Label>
           <div className="flex items-center gap-3">
             <div className="w-32 shrink-0">
-              <SegmentedControl options={DIRECTION_OPTIONS} value={form.direction} onChange={v => setForm(f => ({ ...f, direction: v }))} size="sm" />
+              {/* 切換收支方向會改變會計科目「建議」清單的 buyOrSell 篩選，先前選定的科目可能不再適用，故一併清空 */}
+              <SegmentedControl options={DIRECTION_OPTIONS} value={form.direction} onChange={v => setForm(f => ({ ...f, direction: v, subject: null }))} size="sm" />
             </div>
             <MoneyInput value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} widthClassName="flex-1" />
           </div>
@@ -130,7 +131,14 @@ export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTra
 
         <div>
           <Label required>會計科目</Label>
-          <SubjectPicker value={form.subject} onChange={subject => setForm(f => ({ ...f, subject }))} placeholder="請選擇會計科目" scope="bank" />
+          <SubjectPicker
+            value={form.subject}
+            onChange={subject => setForm(f => ({ ...f, subject }))}
+            placeholder="請選擇會計科目"
+            scope="bank"
+            inDialog
+            buyOrSell={form.direction === '1' ? 2 : 3}
+          />
         </div>
 
         {error && <p className="-mt-1 text-xs text-semantic-error">{error}</p>}
