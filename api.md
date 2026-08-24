@@ -12469,11 +12469,11 @@ HTTP Status Code **200**
 
 # 發票本
 
-## POST 新增或更新發票本
+## POST 新增發票本
 
-POST /ael/invoiceBook/save
+POST /ael/invoiceBook
 
-新增或更新發票本
+新增發票本
 
 > Body Parameters
 
@@ -12527,62 +12527,6 @@ HTTP Status Code **200**
 |---|---|---|---|---|---|
 |» success|any|false|none||none|
 |» data|null|false|none||none|
-|» errorCode|any|false|none||none|
-|» message|string|false|none||none|
-
-## POST 發票本跳號
-
-POST /ael/invoiceBook/passNumber
-
-發票本跳號
-
-> Body Parameters
-
-```json
-{
-    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
-    "invoiceBookId": ""
-}
-```
-
-### Params
-
-|Name|Location|Type|Required|Description|
-|---|---|---|---|---|
-|body|body|object| yes |none|
-|» companyUuid|body|string| yes |公司 uuid|
-|» invoiceBookId|body|string| yes |發票本 uuid|
-
-> Response Examples
-
-> 200 Response
-
-```json
-{
-    "success": true,
-    "data": {
-        "invoiceUuid": ""
-    },
-    "errorCode": "0000",
-    "message": "操作成功"
-}
-```
-
-### Responses
-
-|HTTP Status Code |Meaning|Description|Data schema|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
-
-### Responses Data Schema
-
-HTTP Status Code **200**
-
-|Name|Type|Required|Restrictions|Title|description|
-|---|---|---|---|---|---|
-|» success|any|false|none||none|
-|» data|object|false|none||none|
-|»» invoiceUuid|string|true|none||新建跳號／作廢銷項發票 uuid|
 |» errorCode|any|false|none||none|
 |» message|string|false|none||none|
 
@@ -12647,6 +12591,125 @@ HTTP Status Code **200**
 |»»» aphabeticLetter|string|false|none||字軌|
 |»»» startNum|string|false|none||起始發票號|
 |»»» currentNum|string|false|none||當前發票號|
+|» errorCode|any|false|none||none|
+|» message|string|false|none||none|
+
+## PATCH 更新發票本
+
+PATCH /ael/invoiceBook
+
+更新發票本
+
+> Body Parameters
+
+```json
+{
+  "companyUuid": "string",
+  "invoiceBookId": "string",
+  "name": "string",
+  "year": 0,
+  "phase": 0,
+  "aphabeticLetter": "string",
+  "startNum": "string"
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» invoiceBookId|body|string| yes |發票本uuid|
+|» name|body|string| yes |名稱|
+|» year|body|integer| yes |民國年|
+|» phase|body|integer| yes |期別|
+|» aphabeticLetter|body|string| yes |字軌|
+|» startNum|body|string| yes |起始發票號碼|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "data": null,
+  "errorCode": "string",
+  "message": "string"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|null|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+
+## POST 發票本跳號
+
+POST /ael/invoiceBook/passNumber
+
+發票本跳號
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "invoiceBookId": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 uuid|
+|» invoiceBookId|body|string| yes |發票本 uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": {
+        "invoiceUuid": ""
+    },
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|any|false|none||none|
+|» data|object|false|none||none|
+|»» invoiceUuid|string|true|none||新建跳號／作廢銷項發票 uuid|
 |» errorCode|any|false|none||none|
 |» message|string|false|none||none|
 

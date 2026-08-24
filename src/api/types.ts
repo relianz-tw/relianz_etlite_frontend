@@ -72,9 +72,9 @@ export interface InvoiceBookListResult {
 }
 
 /**
- * 新增發票本（POST /ael/invoiceBook/save）。
- * 注意：實測 dev 環境此發票本三支 API 皆用 companyUuid（非 api.md 舊版文件標示的 uuid）。
- * 依最新 api.md，此端點僅支援新增（不含 invoiceId），uuid 由後端產生並於 response 回傳；
+ * 新增發票本（POST /ael/invoiceBook）。
+ * 注意：實測 dev 環境此發票本相關 API 皆用 companyUuid（非 api.md 舊版文件標示的 uuid）。
+ * 回應 data 固定為 null，uuid 由後端產生但不於 response 回傳；
  * 實測確認多次帶相同 name/year/phase/aphabeticLetter/startNum 呼叫會建立多筆，並非依欄位比對更新既有紀錄。
  */
 export interface SaveInvoiceBookBody {
@@ -88,8 +88,8 @@ export interface SaveInvoiceBookBody {
   startNum: string;
 }
 
-/** POST /ael/invoiceBook/save 回應；後端產生的發票本 uuid */
-export interface SaveInvoiceBookResult {
+/** 更新發票本（PATCH /ael/invoiceBook）body；需帶目標發票本 uuid，回應 data 同樣固定為 null */
+export interface UpdateInvoiceBookBody extends SaveInvoiceBookBody {
   invoiceBookId: string;
 }
 
