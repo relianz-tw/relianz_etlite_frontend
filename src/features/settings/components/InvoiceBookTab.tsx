@@ -1,6 +1,6 @@
 'use client';
 
-import { listInvoiceBookPeriods, listInvoiceBooks, saveInvoiceBook } from '@/api/invoiceBook';
+import { listInvoiceBookPeriods, listInvoiceBooks, saveInvoiceBook, updateInvoiceBook } from '@/api/invoiceBook';
 import type { InvoiceBookDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
@@ -10,6 +10,7 @@ import type { InvoicePeriodOption } from '@/lib/invoicePeriod';
 import { CirclePlus, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import InvoiceBookDialog from './InvoiceBookDialog';
+import InvoiceBookEditDialog from './InvoiceBookEditDialog';
 import PrintFormatDialog from './PrintFormatDialog';
 import type { PrintFormatSettings } from './PrintFormatDialog';
 
@@ -25,6 +26,7 @@ export default function InvoiceBookTab() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<InvoiceBookDto | null>(null);
 
   const [printFormat, setPrintFormat] = useState<PrintFormatSettings>(DEFAULT_PRINT_FORMAT);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -72,6 +74,21 @@ export default function InvoiceBookTab() {
     loadBooks();
   };
 
+  // 編輯僅開放改名稱，其餘欄位（年期／字軌／起始號碼）帶回原值一併送出，PATCH 端點皆為必填
+  const handleBookEditSubmit = async (name: string) => {
+    const parsed = parseInvoicePeriodValue(period);
+    if (!parsed || !editingBook) return;
+    await updateInvoiceBook({
+      invoiceBookId: editingBook.invoiceBookId,
+      name,
+      year: parsed.rocYear,
+      phase: parsed.phase,
+      aphabeticLetter: editingBook.aphabeticLetter,
+      startNum: editingBook.startNum,
+    });
+    loadBooks();
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-md border border-neutral-blue-gray/30 bg-white px-4 py-3">
@@ -110,7 +127,12 @@ export default function InvoiceBookTab() {
                 key={book.invoiceBookId}
                 className="w-full rounded-md border border-neutral-blue-gray/30 bg-white p-4 nav:w-[calc(50%-0.375rem)]"
               >
-                <div className="mb-2 font-semibold text-neutral-dark">{book.name}</div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="font-semibold text-neutral-dark">{book.name}</span>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingBook(book)}>
+                    編輯
+                  </Button>
+                </div>
                 <div className="flex flex-col gap-1 text-xs text-neutral-mid">
                   <div>字軌　{book.aphabeticLetter}</div>
                   <div>起號　{book.startNum}</div>
@@ -138,6 +160,12 @@ export default function InvoiceBookTab() {
         onSubmit={handleBookSubmit}
         periods={periods}
         defaultPeriod={period}
+      />
+      <InvoiceBookEditDialog
+        open={!!editingBook}
+        onClose={() => setEditingBook(null)}
+        book={editingBook}
+        onSubmit={handleBookEditSubmit}
       />
       <PrintFormatDialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} value={printFormat} onSubmit={setPrintFormat} />
     </div>
