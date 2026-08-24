@@ -468,6 +468,33 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 ```
 對應元件：`src/components/ui/StepNumber.tsx`。
 
+### Group Chip（沖帳管道／廠商選擇 chip）
+
+用途：沖帳中心「選擇銷售管道／廠商」步驟的桌機橫向 chips（見 Step Number Badge 區塊），第一項固定為
+唯讀總覽「全部管道／全部廠商」，其後為可切換的個別管道／廠商。總覽項需與個別項一眼可辨——不只是選取
+狀態不同，選取前就要能區分——故總覽項獨立為卡片並永久填色，個別項整組包在淺底框容器內，形成兩塊
+背景區隔，取代單純的細分隔線。
+
+```
+「全部」卡片（allGroup，永久填色，不論是否選取，與個別項分開排版）：
+  容器：rounded-md（6px）、border 1px、px-4 py-2.5、flex-col、gap-0.5、shrink-0
+  未選取：border-neutral-blue-gray/30、bg-surface-cream、標籤 font-semibold text-neutral-dark、
+    筆數/金額 text-neutral-mid
+  已選取：border-brand-blue、bg-brand-blue（實心）、標籤 font-semibold text-white、
+    筆數/金額 text-white/80
+
+個別項群組容器：flex-1、flex-wrap、gap-2、rounded-md、border border-neutral-blue-gray/20、
+  bg-surface-off-white、p-2（與卡片白底／全部卡片米杏色形成第三種背景色，兩塊區域一眼可辨）
+
+個別項（白底外框，僅選取時轉色）：
+  容器：rounded-md（6px）、border 1px、bg-white、px-3 py-1.5、flex-col、gap-0.5、shrink-0
+  未選取：border-neutral-blue-gray/30（hover 轉 bg-surface-cream）、
+    標籤 font-normal text-neutral-dark、筆數/金額 text-neutral-mid
+  已選取：border-brand-blue、bg-surface-cream、標籤 font-semibold text-brand-blue、
+    筆數/金額 text-brand-blue
+```
+對應元件：`src/features/reconciliation/components/ReconGroupSidebar.tsx`。
+
 ### Allocation Row（沖帳對象分配列）
 
 用途：一筆實際存入／付出金額需要分配給多個對象（銀行帳戶／會計科目）時，以「主對象自動補足
