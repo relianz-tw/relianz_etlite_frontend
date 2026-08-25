@@ -2418,6 +2418,77 @@ HTTP Status Code **200**
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 
+## POST 建帳後初始化 ac_basic_setting
+
+POST /ael/onboarding/basicSet/create
+
+建帳後初始化 ac_basic_setting
+
+> Body Parameters
+
+```json
+{
+    "uuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
+    "taxIdNumber": "12345678",
+    "companyName": "測試有限公司",
+    "headName": "王小明",
+    "companyAddr": "台北市信義區信義路五段7號",
+    "introduction": "零售與電商服飾",
+    "salesMode": 2
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» uuid|body|string| yes |帳號 uuid（ac_uuid|
+|» taxIdNumber|body|string| yes |統一編號|
+|» companyName|body|string| yes |公司名稱|
+|» headName|body|string| yes |代表人姓名|
+|» companyAddr|body|string| yes |公司地址|
+|» introduction|body|string| yes |公司簡介、業務性質及銷售管道|
+|» salesMode|body|integer| yes |主要銷售模式：0=實體、1=網路、2=都有|
+
+#### Enum
+
+|Name|Value|
+|---|---|
+|» salesMode|0|
+|» salesMode|1|
+|» salesMode|2|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": null,
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||是否成功|
+|» data|null|true|none||成功時為 null|
+|» errorCode|string|true|none||0000 成功；0001 bind；0002 缺欄位；0003 salesMode 非法；0005 DB；0006 查無帳號|
+|» message|string|true|none||訊息|
+
 # 導入流程/付款流程
 
 ## GET 抓取 ET 商品列表
@@ -6429,7 +6500,7 @@ GET /ael/subject/official/list/filter
 |industry|query|string| no |業別，0:買賣業，1:勞務業，2:製造業|
 |value|query|string| no |關鍵字|
 |isBank|query|string| no |0：false，1：true；沒傳不篩|
-|buyOrSell|query|string| no |2：進項， 3：銷項|
+|buyOrSell|query|string| no |2：進項/支出， 3：銷項/存入|
 
 > Response Examples
 
@@ -6510,6 +6581,7 @@ POST /ael/subject/identify
 |---|---|---|---|---|
 |body|body|object| yes |none|
 |» text|body|string| yes |中文描述|
+|» scenario|body|integer| yes |情境，0：銀行總覽，1：進項，2：銷項|
 
 > Response Examples
 
@@ -6564,6 +6636,7 @@ HTTP Status Code **200**
 |»»» subjectCode|string|true|none||科目代碼|
 |»»» name|string|true|none||名稱|
 |»»» reason|string|true|none||理由|
+|»»» type|string|true|none||科目小分類|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» geminiMs|integer|true|none||none|

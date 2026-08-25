@@ -1,6 +1,12 @@
 'use client';
 
-import { filterOfficialSubjects, identifySubject, listSubjectUsage, type SubjectFilterParams } from '@/api/subjects';
+import {
+  filterOfficialSubjects,
+  identifySubject,
+  listSubjectUsage,
+  type SubjectFilterParams,
+  type SubjectIdentifyScenario,
+} from '@/api/subjects';
 import type { OfficialSubjectDto } from '@/api/types';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { useIsNavDesktop } from '@/lib/useNavBreakpoint';
@@ -22,6 +28,15 @@ const SCOPE_PARAMS: Record<SubjectScope, SubjectFilterParams> = {
   sales: { calculationType: 0, buyOrSell: 3 }, // 銷項收入科目
   bank: { calculationType: 0, isBank: 1 }, // 銀行專用科目（股東往來、銀行手續費等）
   general: { calculationType: 0 }, // 不分進銷，僅排除合計型欄位／棄置科目
+};
+
+// AI 科目辨識（/ael/subject/identify）的使用場景參數：0 銀行總覽、1 進項、2 銷項；
+// general 目前無對應呼叫端，暫沿用銀行總覽（0）
+const SCOPE_TO_AI_SCENARIO: Record<SubjectScope, SubjectIdentifyScenario> = {
+  bank: 0,
+  purchase: 1,
+  sales: 2,
+  general: 0,
 };
 
 interface SubjectPickerProps {
@@ -261,13 +276,13 @@ export default function SubjectPicker({
     const requestId = ++aiRequestIdRef.current;
     setAiPhase('loading');
     setAiError('');
-    identifySubject(text)
+    identifySubject(text, SCOPE_TO_AI_SCENARIO[scope])
       .then((candidates) => {
         if (aiRequestIdRef.current !== requestId) return; // 已再次送出或關閉，忽略過時回應
         const suggestions = candidates
           .map((c) => {
             const subject = all.find((s) => s.subjectCode === c.subjectCode);
-            return subject ? { subject, reason: c.reason } : null;
+            return subject ? { subject, reason: c.reason, type: c.type } : null;
           })
           .filter((s): s is AiSuggestion => s !== null)
           .slice(0, 3);

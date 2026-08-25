@@ -1,6 +1,7 @@
 'use client';
 
 import type { OfficialSubjectDto } from '@/api/types';
+import Badge, { type BadgeTone } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import { AI_EXAMPLE_PROMPTS } from './subjectAiRules';
@@ -15,7 +16,16 @@ export const AI_INPUT_MAX_LENGTH = 100;
 export interface AiSuggestion {
   subject: OfficialSubjectDto;
   reason: string;
+  /** 科目分類純文字（如「製造費用」「研究發展費」「費用」），顯示於科目名稱前的標籤 */
+  type: string;
 }
+
+// 後端回傳的科目分類文字 → Badge tone；未知分類一律回退為 neutral
+const TYPE_TONE: Record<string, BadgeTone> = {
+  製造費用: 'info',
+  研究發展費: 'success',
+  費用: 'neutral',
+};
 
 interface SubjectAiAssistantProps {
   input: string;
@@ -126,6 +136,7 @@ export default function SubjectAiAssistant({
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs tabular-nums text-neutral-mid">{s.subject.subjectCode}</span>
+                  <Badge tone={TYPE_TONE[s.type] ?? 'neutral'}>{s.type}</Badge>
                   <span className="text-sm font-semibold text-neutral-dark">{s.subject.name}</span>
                 </div>
                 <p className="mt-0.5 text-xs leading-relaxed text-neutral-mid">{s.reason}</p>

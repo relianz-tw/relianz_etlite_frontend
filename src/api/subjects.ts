@@ -60,6 +60,9 @@ export async function listSubjectBalances(
   return [];
 }
 
+/** AI 辨識科目的使用場景：0 銀行總覽、1 進項、2 銷項 */
+export type SubjectIdentifyScenario = 0 | 1 | 2;
+
 /**
  * 依交易描述請 AI 建議最多 3 個會計科目（/ael/subject/identify）。
  * 描述與會計科目辨識無關或無法辨識時，後端回 400（errorCode 0003），呼叫端需另外處理，
@@ -67,12 +70,13 @@ export async function listSubjectBalances(
  */
 export function identifySubject(
   text: string,
+  scenario: SubjectIdentifyScenario,
 ): Promise<SubjectIdentifyCandidateDto[]> {
   return apiFetch<{ candidates: SubjectIdentifyCandidateDto[] }>(
     "/ael/subject/identify",
     {
       method: "POST",
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, scenario }),
     },
   ).then((res) => res.candidates);
 }

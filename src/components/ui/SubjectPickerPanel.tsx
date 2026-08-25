@@ -177,15 +177,19 @@ export default function SubjectPickerPanel({
         </div>
       )}
 
-      {/* Popover 模式（pinnedAi=false）：清單與 AI 區塊共用同一個捲動容器，AI 區塊展開時內容變高，
-          若各自獨立捲動，AI 區塊會被 Popover 的 overflow-hidden 直接切邊。桌機平常仍維持 max-h-80
-          （320px）的清單高度上限，但 AI 展開時解除此上限，改讓兩者一起在可用高度內捲動。
-          全螢幕頁／Dialog 內面板模式（pinnedAi=true）：AI 入口列與 AI 區塊改釘在面板底部（見下方），
-          不受此處 max-h-80 限制，清單以 flex-1 獨立捲動 */}
+      {/* AI 入口列固定高度、不隨清單捲動，一律渲染在此捲動容器外（見下方），避免用 sticky 撐在捲動
+          容器內導致定位失效。Popover 模式（pinnedAi=false）：AI 區塊「展開」後內容變高，仍與清單共用
+          此捲動容器，若各自獨立捲動，AI 區塊會被 Popover 的 overflow-hidden 直接切邊。桌機平常仍維持
+          max-h-80（320px）的清單高度上限，但 AI 展開時解除此上限，改讓兩者一起在可用高度內捲動。
+          全螢幕頁／Dialog 內面板模式（pinnedAi=true）：AI 區塊展開後改釘在面板底部（見下方），不受此處
+          max-h-80 限制，清單以 flex-1 獨立捲動 */}
       <div
         ref={listRef}
         className={`min-h-0 flex-1 overscroll-contain overflow-y-auto ${!pinnedAi && !aiOpen ? 'max-h-80' : ''}`}
       >
+        {/* Popover 模式 AI 展開時（!pinnedAi && aiOpen）不渲染清單本身，避免使用者得先滑過整份
+            清單才能看到輸入框；pinnedAi 模式清單獨立捲動，不受 AI 展開狀態影響，維持顯示 */}
+        {(pinnedAi || !aiOpen) && (
         <div className={fullScreen ? '' : 'py-1'}>
           {loading && <p className="px-3 py-2 text-sm text-neutral-mid">載入中...</p>}
           {!loading && error && <p className="px-3 py-2 text-sm text-semantic-error">{error}</p>}
@@ -235,12 +239,12 @@ export default function SubjectPickerPanel({
             </>
           )}
         </div>
+        )}
 
-        {!pinnedAi && !aiOpen && <div className="sticky bottom-0">{aiEntryButton}</div>}
         {!pinnedAi && aiOpen && aiAssistant}
       </div>
 
-      {pinnedAi && !aiOpen && aiEntryButton}
+      {!aiOpen && aiEntryButton}
       {pinnedAi && aiOpen && <div className="max-h-[60%] shrink-0 overflow-y-auto overscroll-contain">{aiAssistant}</div>}
     </div>
   );

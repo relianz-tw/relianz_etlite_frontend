@@ -258,6 +258,8 @@ export interface SubjectIdentifyCandidateDto {
   subjectCode: string;
   name: string;
   reason: string;
+  /** 科目分類純文字，如「製造費用」「研究發展費」「費用」，用於前端標籤顯示 */
+  type: string;
 }
 
 /**
