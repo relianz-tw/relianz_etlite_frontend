@@ -236,7 +236,7 @@ export default function SubjectPickerPanel({
           )}
         </div>
 
-        {!pinnedAi && !aiOpen && aiEntryButton}
+        {!pinnedAi && !aiOpen && <div className="sticky bottom-0">{aiEntryButton}</div>}
         {!pinnedAi && aiOpen && aiAssistant}
       </div>
 
