@@ -1,19 +1,23 @@
 'use client';
 
+import type { VatInvoiceFilterBody, VatPeriodSummaryDto } from '@/api/types';
+import { fetchVatInputInvoices, fetchVatOutputInvoices, fetchVatPeriodSummary } from '@/api/vat';
 import Button from '@/components/ui/Button';
-import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
+import { parseRocDate } from '@/components/ui/DatePicker';
 import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import { formatYmd } from '@/features/ledger/transaction/data';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, sortRows } from '@/lib/utils';
 import { Download } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FilterBar from './components/FilterBar';
 import InvoiceCards from './components/InvoiceCards';
 import InvoiceTable from './components/InvoiceTable';
 import SummaryCards from './components/SummaryCards';
 import TaxReportDialog from './components/TaxReportDialog';
-import { FILING_PERIODS, PURCHASE_INVOICES, REPORT_SUMMARY, SALES_INVOICES } from './data';
+import { FILING_PERIODS, mapVatItemsToRows, parseFilingPeriod, REPORT_SUMMARY } from './data';
 import type { AdvancedFilter, SortKey, SortState, TaxInvoiceRow, TaxSide } from './types';
 
 const SIDE_TABS: { value: TaxSide; label: string }[] = [
@@ -21,37 +25,46 @@ const SIDE_TABS: { value: TaxSide; label: string }[] = [
   { value: 'sales', label: '銷項（含折讓）' },
 ];
 
-const TOTAL_PAGES = 20;
-const EMPTY_ADVANCED_FILTER: AdvancedFilter = { status: 'all', minAmount: '', maxAmount: '' };
+const EMPTY_ADVANCED_FILTER: AdvancedFilter = { minAmount: '', maxAmount: '', dateFrom: '', dateTo: '', taxIdNumber: '', companyName: '', isVoid: '' };
 const DEFAULT_SORT: SortState = { key: null, dir: 'none' };
+const DEFAULT_LIMIT = 10;
 const SORT_KEY_FN: Record<SortKey, (row: TaxInvoiceRow) => string | number> = {
   date: row => row.date,
   id: row => row.id,
 };
 
-/** 依關鍵字與進階條件過濾發票列：關鍵字比對發票號碼／往來對象／金額 */
-function filterRows(rows: TaxInvoiceRow[], query: string, advanced: AdvancedFilter): TaxInvoiceRow[] {
-  const keyword = query.trim().toLowerCase();
-  const min = advanced.minAmount ? Number(advanced.minAmount) : undefined;
-  const max = advanced.maxAmount ? Number(advanced.maxAmount) : undefined;
-
-  return rows.filter(row => {
-    if (keyword) {
-      const haystack = `${row.id} ${row.counterparty} ${row.total}`.toLowerCase();
-      if (!haystack.includes(keyword)) return false;
-    }
-    if (min !== undefined && row.total < min) return false;
-    if (max !== undefined && row.total > max) return false;
-    if (advanced.status !== 'all' && row.status !== advanced.status) return false;
-    return true;
-  });
+/** 依簡易搜尋（發票字軌+號碼）與進階條件（金額/日期區間）組成 filter API 的 request body（不含 companyUuid，由 API 層自動補入） */
+function buildFilterBody(
+  period: string,
+  page: number,
+  limit: number,
+  query: string,
+  advanced: AdvancedFilter,
+): Omit<VatInvoiceFilterBody, 'companyUuid'> {
+  const { cmsYear, cmsPhase } = parseFilingPeriod(period);
+  const value = query.trim();
+  return {
+    cmsYear,
+    cmsPhase,
+    page,
+    limit,
+    amountFrom: advanced.minAmount ? Number(advanced.minAmount) : undefined,
+    amountTo: advanced.maxAmount ? Number(advanced.maxAmount) : undefined,
+    dateFrom: formatYmd(parseRocDate(advanced.dateFrom)),
+    dateTo: formatYmd(parseRocDate(advanced.dateTo)),
+    ...(value ? { invoiceNumber: value } : {}),
+    ...(advanced.taxIdNumber.trim() ? { taxIdNumber: advanced.taxIdNumber.trim() } : {}),
+    ...(advanced.companyName.trim() ? { companyName: advanced.companyName.trim() } : {}),
+    ...(advanced.isVoid ? { isVoid: advanced.isVoid === 'true' } : {}),
+  };
 }
 
 export default function BusinessTaxView() {
+  const [period, setPeriod] = useState(FILING_PERIODS[FILING_PERIODS.length - 1].value);
   const [side, setSide] = useState<TaxSide>('sales');
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [limit, setLimit] = useState(DEFAULT_LIMIT);
 
   // 搜尋關鍵字：query 是輸入框當下內容，appliedQuery 是按下「搜尋」後才套用的條件
   const [query, setQuery] = useState('');
@@ -59,6 +72,61 @@ export default function BusinessTaxView() {
   const [advanced, setAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
   const [appliedAdvanced, setAppliedAdvanced] = useState<AdvancedFilter>(EMPTY_ADVANCED_FILTER);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+
+  const [rows, setRows] = useState<TaxInvoiceRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalSales, setTotalSales] = useState(0);
+  const [totalBusinessTax, setTotalBusinessTax] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // 三張統計卡數字：來自 periodSummary API，只依 period 變動，不隨 side／分頁／搜尋重抓
+  const [summary, setSummary] = useState<VatPeriodSummaryDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const { cmsYear, cmsPhase } = parseFilingPeriod(period);
+    fetchVatPeriodSummary({ cmsYear, cmsPhase })
+      .then(result => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        // 統計卡查詢失敗僅影響頂部卡片顯示，不影響下方列表，故不特別呈現錯誤訊息
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [period]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    const body = buildFilterBody(period, page, limit, appliedQuery, appliedAdvanced);
+    const request = side === 'sales' ? fetchVatOutputInvoices(body) : fetchVatInputInvoices(body);
+
+    request
+      .then(result => {
+        if (cancelled) return;
+        setRows(mapVatItemsToRows(result.items));
+        setTotal(result.total);
+        setTotalSales(result.totalSales);
+        setTotalBusinessTax(result.totalBusinessTax);
+        setTotalAmount(result.totalAmount);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setError(getFriendlyErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [period, side, page, limit, appliedQuery, appliedAdvanced]);
 
   const handleSearch = () => {
     setAppliedQuery(query);
@@ -84,12 +152,20 @@ export default function BusinessTaxView() {
   const handleSideChange = (v: TaxSide) => {
     setSide(v);
     setSort(DEFAULT_SORT);
+    setPage(1);
+  };
+  const handlePeriodChange = (v: string) => {
+    setPeriod(v);
+    setPage(1);
+  };
+  const handleLimitChange = (v: number) => {
+    setLimit(v);
+    setPage(1);
   };
 
-  const rawRows = side === 'sales' ? SALES_INVOICES : PURCHASE_INVOICES;
-  const filteredRows = filterRows(rawRows, appliedQuery, appliedAdvanced);
-  const rows = sort.key ? sortRows(filteredRows, SORT_KEY_FN[sort.key], sort.dir) : filteredRows;
-  const totalAmount = fmtCurrency(rows.reduce((sum, r) => sum + r.total, 0));
+  // 排序僅對目前這頁的資料進行（API 未提供排序），與帳簿列表行為一致
+  const sortedRows = sort.key ? sortRows(rows, SORT_KEY_FN[sort.key], sort.dir) : rows;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -100,7 +176,7 @@ export default function BusinessTaxView() {
         </div>
 
         <div className="mb-5 w-64">
-          <Select widthClassName="w-full">
+          <Select widthClassName="w-full" value={period} onValueChange={handlePeriodChange}>
             {FILING_PERIODS.map(p => (
               <option key={p.value} value={p.value}>
                 {p.label}
@@ -110,7 +186,7 @@ export default function BusinessTaxView() {
         </div>
 
         <div className="mb-5">
-          <SummaryCards />
+          <SummaryCards summary={summary} />
         </div>
 
         <div className="mb-5">
@@ -129,32 +205,44 @@ export default function BusinessTaxView() {
           <SegmentedControl options={SIDE_TABS} value={side} onChange={handleSideChange} size="md" />
         </div>
 
-        <InvoiceTable side={side} rows={rows} totalCount={rows.length} totalAmount={totalAmount} sort={sort} onSortToggle={handleSortToggle} />
-        <InvoiceCards
-          side={side}
-          rows={rows}
-          totalCount={rows.length}
-          totalAmount={totalAmount}
-          sort={sort}
-          onSortFieldChange={handleSortFieldChange}
-          onSortDirToggle={handleSortDirToggle}
-        />
+        {loading ? (
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+        ) : error ? (
+          <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{error}</div>
+        ) : (
+          <>
+            <InvoiceTable
+              side={side}
+              rows={sortedRows}
+              totalCount={total}
+              totalSales={fmtCurrency(totalSales)}
+              totalBusinessTax={fmtCurrency(totalBusinessTax)}
+              totalAmount={fmtCurrency(totalAmount)}
+              limit={limit}
+              onLimitChange={handleLimitChange}
+              sort={sort}
+              onSortToggle={handleSortToggle}
+            />
+            <InvoiceCards
+              side={side}
+              rows={sortedRows}
+              totalCount={total}
+              totalAmount={fmtCurrency(totalAmount)}
+              sort={sort}
+              onSortFieldChange={handleSortFieldChange}
+              onSortDirToggle={handleSortDirToggle}
+            />
+          </>
+        )}
 
         <Pagination
           page={page}
-          totalPages={TOTAL_PAGES}
+          totalPages={totalPages}
           onPageChange={setPage}
           rightSlot={
-            <>
-              <Button variant="ghost" icon={Download} onClick={() => setExportDialogOpen(true)}>
-                匯出總表
-              </Button>
-              <ExportRangeDialog
-                open={exportDialogOpen}
-                onClose={() => setExportDialogOpen(false)}
-                onExport={() => setExportDialogOpen(false)}
-              />
-            </>
+            <Button variant="ghost" icon={Download} disabled title="後端尚未提供匯出總表資料，暫停用">
+              匯出總表
+            </Button>
           }
         />
       </div>

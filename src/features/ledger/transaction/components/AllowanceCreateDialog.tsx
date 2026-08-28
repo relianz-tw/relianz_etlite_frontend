@@ -55,7 +55,14 @@ function AllowanceCreateDialogContent({
 }: Omit<AllowanceCreateDialogProps, 'open'>) {
   const [issueDate, setIssueDate] = useState<Date | undefined>(new Date());
   const [subject, setSubject] = useState<SubjectOption | null>(
-    entry.officialAccountingSubjectId ? { id: entry.officialAccountingSubjectId, subjectCode: '', name: entry.subjectName } : null,
+    entry.officialAccountingSubjectId
+      ? {
+          id: entry.officialAccountingSubjectId,
+          subjectCode: '',
+          name: entry.subjectName,
+          companyAccountingSubjectUuid: entry.companyAccountingSubjectUuid,
+        }
+      : null,
   );
   const [netAmount, setNetAmount] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
@@ -87,6 +94,7 @@ function AllowanceCreateDialogContent({
       taxAmount,
       totalAmount,
       officialAccountingSubjectId: subject.id,
+      companyAccountingSubjectUuid: subject.companyAccountingSubjectUuid,
       memo: memo || undefined,
     };
     try {

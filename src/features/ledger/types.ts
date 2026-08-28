@@ -4,14 +4,16 @@ export type Side = 'sales' | 'purchase';
 export type SalesSubTab = 'receivable' | 'received';
 export type PurchaseSubTab = 'payable' | 'paid';
 
-/** 帳簿總覽頂部 KPI 卡片數字，來自 filter API 回傳的彙總欄位（非前端計算） */
+/**
+ * 帳簿總覽頂部 KPI 卡片數字，來自 summary API 回傳的彙總欄位（非前端計算）。
+ * primary／collected 分別來自兩支不同端點（同一 side 底下的主端點／已收已付端點），
+ * 口徑不同（transaction_date／entry_date），非同一份資料的兩個切分，見 useLedgerSummary 說明。
+ */
 export interface LedgerTotals {
-  /** 銷項：已開立發票金額（issuedVoucherAmount）／進項：已收取憑證金額（receivedVoucherAmount） */
+  /** 銷項：receivables/summary 的 issuedVoucherAmount／進項：payables/summary 的 receivedVoucherAmount */
   primary: number;
-  /** 銷項：已入帳金額（collectedAmount）／進項：已付款金額（paidAmount） */
-  settled: number;
-  /** 銷項：應收帳款（receivableAmount）／進項：應付金額（payableAmount） */
-  outstanding: number;
+  /** 銷項：receivables/collected/summary 的 issuedVoucherAmount／進項：payables/paid/summary 的 receivedVoucherAmount */
+  collected: number;
 }
 
 /** 表格可排序欄位：counterparty 對應銷項 counterparty／進項 party（買受人/賣家名稱/交易敘述） */

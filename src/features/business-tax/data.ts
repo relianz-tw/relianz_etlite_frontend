@@ -1,3 +1,5 @@
+import type { VatInvoiceItemDto } from '@/api/types';
+import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
 import type { FilingPeriod, ReportSummary, TaxInvoiceRow } from './types';
 
@@ -11,60 +13,40 @@ export const FILING_PERIODS: FilingPeriod[] = [
   { value: '115-11', label: '115 年 11 - 12 月份' },
 ];
 
-// 三張統計卡總額（對齊設計稿數字：銷項發票總額 - 進項發票總額 = 預估營業稅金額）
-export const SALES_INVOICE_TOTAL = 999462582;
-export const PURCHASE_INVOICE_TOTAL = 850000000;
-export const ESTIMATED_TAX_TOTAL = SALES_INVOICE_TOTAL - PURCHASE_INVOICE_TOTAL;
+/** 期別下拉 value（`${民國年}-${期別}`）→ 查詢用的 cmsYear／cmsPhase；格式不符時退回 FILING_PERIODS 第一筆 */
+export function parseFilingPeriod(value: string): { cmsYear: number; cmsPhase: number } {
+  const match = /^(\d+)-(\d+)$/.exec(value);
+  if (!match) {
+    const [year, phase] = FILING_PERIODS[0].value.split('-');
+    return { cmsYear: Number(year), cmsPhase: Number(phase) };
+  }
+  return { cmsYear: Number(match[1]), cmsPhase: Number(match[2]) };
+}
+
+/**
+ * POST /ael/vat/{input,output}/filter 一批項目 → 表格 TaxInvoiceRow[]。
+ * invoiceDate 為民國年 YYYMMDD（如 '1150322'），與 parseRocDate 接受的格式一致，直接複用；
+ * counterparty 優先取交易對象名稱，查無時退回發票上的公司名稱。
+ */
+export function mapVatItemsToRows(items: VatInvoiceItemDto[]): TaxInvoiceRow[] {
+  return items.map(item => ({
+    uuid: item.invoiceUuid,
+    ledgerUuid: item.ledgerUuid,
+    id: item.voucherNumber,
+    date: formatRocDate(parseRocDate(item.invoiceDate)),
+    untaxed: item.sales,
+    tax: item.businessTax,
+    total: item.amount,
+    counterparty: item.counterpartyName ?? item.companyName,
+    isAllowance: item.isDebit === 1,
+    isVoid: item.isVoid,
+    declared: item.declared,
+  }));
+}
 
 const TREND_END_DATE = '2026/03/27'; // 對齊帳簿假資料的最新交易日期
 export const TAX_TREND = generateDailyTrend(1, 16500000, 0.85, TREND_END_DATE);
 export const PURCHASE_TREND = generateDailyTrend(2, 14000000, 0.8, TREND_END_DATE);
-
-const SALES_SPLIT_CHILDREN = [
-  { id: 'S26XH743195003', untaxed: 476, tax: 24, total: 500, date: '115/03/26' },
-  { id: 'S26XH743195002', untaxed: 1905, tax: 95, total: 2000, date: '115/03/29' },
-  { id: '應稅銷售額', label: '應稅銷售額', untaxed: 7143, tax: 357, total: 7500 },
-];
-
-export const SALES_INVOICES: TaxInvoiceRow[] = [
-  { id: 'UA40435900', date: '115/03/22', untaxed: 952000000, tax: 47600000, total: 999600000, counterparty: '友信創新股份有限公司', status: 'pending' },
-  { id: 'UA40435901', date: '115/03/23', untaxed: 6476, tax: 324, total: 6800, counterparty: '台積開發股份有限公司', status: 'voided' },
-  { id: 'UA40435902', date: '115/03/25', untaxed: 952000000, tax: 47600000, total: 999600000, counterparty: '我的另一間公司', status: 'pending' },
-  {
-    id: 'UA40435903',
-    date: '115/03/26',
-    untaxed: 9524,
-    tax: 476,
-    total: 10000,
-    counterparty: '名子很長很長很長很長股份有限公司',
-    status: 'pending',
-    children: SALES_SPLIT_CHILDREN,
-  },
-  { id: 'UA40435904', date: '115/03/27', untaxed: 121905, tax: 6095, total: 128000, counterparty: '長榮海運股份有限公司', status: 'voided' },
-];
-
-const PURCHASE_SPLIT_CHILDREN = [
-  { id: 'S30XH900001', untaxed: 2857, tax: 143, total: 3000, date: '115/03/25' },
-  { id: 'S30XH900002', untaxed: 4762, tax: 238, total: 5000, date: '115/03/26' },
-  { id: '進項可扣抵金額', label: '進項可扣抵金額', untaxed: 1905, tax: 95, total: 2000 },
-];
-
-export const PURCHASE_INVOICES: TaxInvoiceRow[] = [
-  { id: 'UA50112200', date: '115/03/21', untaxed: 800000000, tax: 40000000, total: 840000000, counterparty: '全球供應鏈股份有限公司', status: 'pending' },
-  { id: 'UA50112201', date: '115/03/22', untaxed: 4762, tax: 238, total: 5000, counterparty: '文具行', status: 'voided' },
-  { id: 'UA50112202', date: '115/03/24', untaxed: 45238000, tax: 2261900, total: 47499900, counterparty: '泰山材料有限公司', status: 'pending' },
-  {
-    id: 'UA50112203',
-    date: '115/03/25',
-    untaxed: 9524,
-    tax: 476,
-    total: 10000,
-    counterparty: '名子很長很長很長很長股份有限公司',
-    status: 'pending',
-    children: PURCHASE_SPLIT_CHILDREN,
-  },
-  { id: 'UA50112204', date: '115/03/27', untaxed: 65714, tax: 3286, total: 69000, counterparty: '大山營造工程行', status: 'pending' },
-];
 
 // 「轉出本期營業稅申報檔」報表對話框內容（示範用固定假資料）
 export const REPORT_SUMMARY: ReportSummary = {

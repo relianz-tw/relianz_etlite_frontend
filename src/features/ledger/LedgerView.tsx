@@ -2,9 +2,9 @@
 
 import { listChannelRules } from '@/api/channelRules';
 import { fetchPayables, fetchPayablesPaid, fetchReceivables, fetchReceivablesCollected } from '@/api/ledger';
-import type { PayablesFilterBody } from '@/api/types';
+import type { PayablesFilterBody, ReceivablesFilterBody } from '@/api/types';
 import Button from '@/components/ui/Button';
-import { parseRocDate } from '@/components/ui/DatePicker';
+import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -13,14 +13,14 @@ import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, sortRows } from '@/lib/utils';
 import { Download } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import FilterBar from './components/FilterBar';
 import LedgerCards from './components/LedgerCards';
 import LedgerTable from './components/LedgerTable';
 import SummaryCards from './components/SummaryCards';
 import { mapPayableItemsToRows, mapReceivableItemsToRows } from './data';
 import { formatYmd } from './transaction/data';
-import type { AdvancedFilter, LedgerTotals, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
+import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
 import { buildLedgerQueryString, defaultSubTabForSide, DEFAULT_SORT, parseLedgerFilters } from './urlState';
 import type { LedgerFilterState } from './urlState';
 
@@ -40,9 +40,17 @@ const SORT_KEY_FN: Record<SortKey, (row: SalesRow | PurchaseRow) => string | num
 /**
  * 依簡易搜尋（交易編號/發票號碼 → filterType 0/1）與進階條件（金額/日期區間）組成 filter API 的 request body
  * （不含 companyUuid，由 API 層自動補入）。四支 filter 端點（payables/receivables 的 filter 與 paid/collected）
- * body 結構一致，PayablesFilterBody 與 ReceivablesFilterBody 為結構相同型別，故共用同一個組裝函式。
+ * body 結構一致，PayablesFilterBody 與 ReceivablesFilterBody 為結構相同型別，故共用同一個組裝函式；
+ * 回傳型別取兩者交集，讓 channelUuid 依 side 帶出的 paymentChannelUuid／counterpartyUuid 皆合法。
  */
-function buildFilterBody(page: number, quickField: QuickSearchField, query: string, advanced: AdvancedFilter): Omit<PayablesFilterBody, 'companyUuid'> {
+function buildFilterBody(
+  page: number,
+  quickField: QuickSearchField,
+  query: string,
+  advanced: AdvancedFilter,
+  side: Side,
+  channelUuid: string | null,
+): Omit<PayablesFilterBody, 'companyUuid'> & Omit<ReceivablesFilterBody, 'companyUuid'> {
   const value = query.trim();
   return {
     page,
@@ -53,7 +61,16 @@ function buildFilterBody(page: number, quickField: QuickSearchField, query: stri
     dateTo: formatYmd(parseRocDate(advanced.dateTo)),
     // 交易編號/發票號碼須成對傳遞，空值則兩者皆不帶（後端視為不篩）
     ...(value ? { filterType: quickField === 'id' ? 0 : 1, filterValue: value } : {}),
+    // 帳簿總覽「銷售管道／廠商佔比」卡片下鑽篩選；彙總數字（totals）由後端一併套用此條件重算
+    ...(channelUuid ? (side === 'sales' ? { paymentChannelUuid: channelUuid } : { counterpartyUuid: channelUuid }) : {}),
   };
+}
+
+/** 圖表 X 軸的預設區間：今天往前推 62 天，天數對齊既有假趨勢資料的展示長度 */
+function defaultChartRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to.getTime() - 61 * 86400000);
+  return { from: formatRocDate(from), to: formatRocDate(to) };
 }
 
 const SALES_SUB_TABS: { value: SalesSubTab; label: string }[] = [
@@ -83,12 +100,30 @@ export default function LedgerView() {
   const [query, setQuery] = useState(() => filters.query);
   const [advanced, setAdvanced] = useState<AdvancedFilter>(() => filters.advanced);
 
+  // 帳簿總覽卡片 A（趨勢圖）X 軸涵蓋的區間，刻意與列表的日期篩選（filters.advanced）解耦：
+  // 若圖表直接吃 filters.advanced.dateFrom/dateTo，點下某根柱子會把區間縮成該柱涵蓋的範圍，
+  // 圖表重繪只剩一（或少數幾）根柱子、使用者再也回不去。
+  // ⚠️ 不能只靠「起訖是否同一天」判斷是否為使用者手動輸入的區間篩選——週檢視點擊產生的
+  // dateFrom/dateTo 本身就橫跨 7 天（from !== to），與使用者在進階搜尋手動選區間無法區分。
+  // 因此改用 skipChartRangeSyncRef 明確標記「這次 filters.advanced 變動是點擊趨勢圖造成的」，
+  // 該次一律跳過同步；只有使用者透過 FilterBar 手動輸入/清除日期時才會更新圖表區間。
+  const [chartRange, setChartRange] = useState(defaultChartRange);
+  const skipChartRangeSyncRef = useRef(false);
+  useEffect(() => {
+    if (skipChartRangeSyncRef.current) {
+      skipChartRangeSyncRef.current = false;
+      return;
+    }
+    const { dateFrom, dateTo } = filters.advanced;
+    if (dateFrom && dateTo) setChartRange({ from: dateFrom, to: dateTo });
+    else if (!dateFrom && !dateTo) setChartRange(defaultChartRange());
+  }, [filters.advanced]);
+  // 目前列表套用的日期篩選；供卡片 A 標示選取態
+  const selectedRange = filters.advanced.dateFrom && filters.advanced.dateTo ? { from: filters.advanced.dateFrom, to: filters.advanced.dateTo } : null;
+
   // 應付/已付/應收/已收四個子分頁共用同一組載入狀態；四支 filter API 依 side + 子分頁擇一呼叫
   const [rows, setRows] = useState<(SalesRow | PurchaseRow)[]>([]);
   const [total, setTotal] = useState(0);
-  // 頂部 KPI 卡片數字：來自 filter API 回傳的彙總欄位（issuedVoucherAmount 等），非前端計算；
-  // 每次查詢（含重新查詢）進行中維持 null，SummaryCards 顯示 0 佔位，避免顯示上一次查詢殘留的數字
-  const [totals, setTotals] = useState<LedgerTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -119,24 +154,20 @@ export default function LedgerView() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    // 每次重新查詢都清空舊的統計數字，避免卡片在新結果回來前短暫顯示上一次查詢的殘留金額
-    setTotals(null);
-    const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced);
+    const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced, filters.side, filters.channelUuid);
 
     // 折讓單改為掛在原單展開區內顯示（見 LedgerTable/LedgerCards 的 LedgerAllowanceChildren），
     // 故從最上層列表過濾掉；下方「共 N 筆／合計」因此是過濾後的前端筆數，與後端 total 不同（刻意如此），
-    // KPI 卡片（totals）與分頁頁數仍全部使用後端原始數字，不受影響
+    // 分頁頁數仍全部使用後端原始數字，不受影響；頂部三張卡片數字改由 useLedgerSummary 另外抓取，不吃這裡的結果
     const request =
       filters.side === 'purchase'
         ? (filters.subTab === 'payable' ? fetchPayables(body) : fetchPayablesPaid(body)).then(async result => ({
             rows: (await mapPayableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
-            totals: { primary: result.receivedVoucherAmount, settled: result.paidAmount, outstanding: result.payableAmount },
           }))
         : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(async result => ({
             rows: (await mapReceivableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
-            totals: { primary: result.issuedVoucherAmount, settled: result.collectedAmount, outstanding: result.receivableAmount },
           }));
 
     request
@@ -144,7 +175,6 @@ export default function LedgerView() {
         if (cancelled) return;
         setRows(result.rows);
         setTotal(result.total);
-        setTotals(result.totals);
       })
       .catch(err => {
         if (cancelled) return;
@@ -186,7 +216,7 @@ export default function LedgerView() {
     setQuickField('id');
     setQuery('');
     setRows([]);
-    updateFilters({ side: v, subTab: defaultSubTabForSide(v), quickField: 'id', query: '', sort: DEFAULT_SORT, page: 1 });
+    updateFilters({ side: v, subTab: defaultSubTabForSide(v), quickField: 'id', query: '', sort: DEFAULT_SORT, page: 1, channelUuid: null });
   };
   const handleSalesSubTabChange = (v: SalesSubTab) => {
     setRows([]);
@@ -196,6 +226,15 @@ export default function LedgerView() {
     setRows([]);
     updateFilters({ subTab: v, page: 1 });
   };
+  // 卡片 A（趨勢圖）長條點擊：寫回日期區間；再點同一根（range 為 null）代表清除
+  const handleTrendRangeSelect = (range: { from: string; to: string } | null) => {
+    const next: AdvancedFilter = { ...advanced, dateFrom: range?.from ?? '', dateTo: range?.to ?? '' };
+    setAdvanced(next); // 同步進階搜尋輸入框草稿，避免面板顯示與網址不一致
+    skipChartRangeSyncRef.current = true; // 這次 filters.advanced 變動由圖表點擊觸發，圖表區間本身不跟著變
+    updateFilters({ advanced: next, page: 1 });
+  };
+  // 卡片 C（管道／廠商佔比）長條點擊：寫回 channelUuid；再點同一項清除
+  const handleChannelSelect = (uuid: string | null) => updateFilters({ channelUuid: uuid, page: 1 });
 
   // 排序僅對目前這頁的資料進行（API 未提供排序），桌機表格與手機卡片共用同一份已排序資料
   const sortKeyFn = filters.sort.key ? SORT_KEY_FN[filters.sort.key] : null;
@@ -212,7 +251,14 @@ export default function LedgerView() {
         </div>
 
         <div className="mb-5">
-          <SummaryCards side={filters.side} totals={totals} />
+          <SummaryCards
+            side={filters.side}
+            chartRange={chartRange}
+            selectedRange={selectedRange}
+            channelUuid={filters.channelUuid}
+            onRangeSelect={handleTrendRangeSelect}
+            onChannelSelect={handleChannelSelect}
+          />
         </div>
 
         <div className="mb-5">

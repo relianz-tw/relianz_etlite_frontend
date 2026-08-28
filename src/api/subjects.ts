@@ -11,12 +11,15 @@ import type {
   SubjectUsageDto,
 } from "./types";
 
+/** 常用科目使用情境（/ael/subject/usage）：0 進項（應付／進折）、1 銷項（應收／銷折）、2 銀行提匯 */
+export type SubjectUsageScenario = 0 | 1 | 2;
+
 /** 最新版官方費用科目清單；value 為搜尋值（目前由前端過濾，暫傳空字串） */
 export function listOfficialSubjects(
   value = "",
 ): Promise<OfficialSubjectDto[]> {
   return apiFetch<OfficialSubjectDto[]>(
-    `/ael/subject/official/list/latest${buildQuery({ value })}`,
+    `/ael/subject/official/list/latest${buildQuery({ companyUuid: COMPANY_UUID, value })}`,
   );
 }
 
@@ -27,6 +30,8 @@ export interface SubjectFilterParams {
   value?: string;
   isBank?: 0 | 1;
   buyOrSell?: 2 | 3;
+  /** 是固定資產折舊與減損科目嗎；0 false、1 true，不傳則不篩 */
+  isFixedAssetDepreciationImpairment?: 0 | 1;
 }
 
 /** 進階篩選官方科目清單（/ael/subject/official/list/filter），供各畫面依語境（進項／銷項／銀行等）取子集 */
@@ -34,14 +39,14 @@ export function filterOfficialSubjects(
   params: SubjectFilterParams = {},
 ): Promise<OfficialSubjectDto[]> {
   return apiFetch<OfficialSubjectDto[]>(
-    `/ael/subject/official/list/filter${buildQuery({ ...params })}`,
+    `/ael/subject/official/list/filter${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`,
   );
 }
 
-/** 使用者常用科目（已依 rank 由高到低排序） */
-export function listSubjectUsage(value = ""): Promise<SubjectUsageDto[]> {
+/** 使用者常用科目（已依 rank 由高到低排序）；scenario 為後端必填參數，見 SubjectUsageScenario */
+export function listSubjectUsage(scenario: SubjectUsageScenario, value = ""): Promise<SubjectUsageDto[]> {
   return apiFetch<SubjectUsageDto[]>(
-    `/ael/subject/usage${buildQuery({ acUuid: COMPANY_UUID, value })}`,
+    `/ael/subject/usage${buildQuery({ acUuid: COMPANY_UUID, scenario, value })}`,
   );
 }
 

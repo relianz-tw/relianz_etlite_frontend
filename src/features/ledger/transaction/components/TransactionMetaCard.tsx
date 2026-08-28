@@ -59,6 +59,9 @@ interface TransactionMetaCardProps {
   aiPickedSubject?: boolean;
   /** 憑證辨識自動帶入且使用者尚未修改的欄位名稱集合，對應欄位顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
   aiFields?: ReadonlySet<keyof TransactionFormState>;
+  /** 標題列右側自訂內容，優先於「修改交易資訊」按鈕顯示；供純檢視情境（如營業稅中心憑證細節）
+   *  改放「前往交易頁編輯」等導向連結使用 */
+  headerAction?: ReactNode;
 }
 
 const EMPTY_AI_FIELDS: ReadonlySet<keyof TransactionFormState> = new Set();
@@ -121,6 +124,7 @@ export default function TransactionMetaCard({
   voidLabel,
   aiPickedSubject = false,
   aiFields = EMPTY_AI_FIELDS,
+  headerAction,
 }: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
@@ -558,13 +562,20 @@ export default function TransactionMetaCard({
       [projectField],
     ];
   } else if (mode === 'create' && side === 'purchase') {
+    const isGeneralInvoice = form.voucherType === VOUCHER_TYPES[0];
     rows = [
       [
         <Field key="voucherType" label="憑證種類">
           <Select
             widthClassName="w-full"
             value={form.voucherType}
-            onValueChange={v => onChange({ voucherType: v })}
+            onValueChange={v =>
+              onChange({
+                voucherType: v,
+                // 離開一般發票時重置固定資產相關欄位，避免其他憑證種類殘留此語境
+                ...(v !== VOUCHER_TYPES[0] ? { isFixedAsset: false, usefulLifeYears: 0 } : {}),
+              })
+            }
             aiFilled={aiFields.has('voucherType')}
           >
             {VOUCHER_TYPES.map(v => (
@@ -621,6 +632,30 @@ export default function TransactionMetaCard({
     if (form.voucherType === VOUCHER_TYPES[3]) {
       rows.push(importFields);
     }
+    // 是否為固定資產僅一般發票可選，選「是」時多開使用年限欄位、費用類別改篩固定資產折舊與減損科目
+    if (isGeneralInvoice) {
+      rows.push([
+        <Field key="isFixedAsset" label="是否為固定資產？">
+          <SegmentedControl
+            options={[...ALLOWANCE_OPTIONS]}
+            value={form.isFixedAsset ? 'yes' : 'no'}
+            // 新舊科目清單不交集，切換時清空已選費用類別避免殘留誤送
+            onChange={v => onChange({ isFixedAsset: v === 'yes', expenseCategory: null })}
+          />
+        </Field>,
+        form.isFixedAsset ? (
+          <Field key="usefulLifeYears" label="使用年限" required helper="請輸入固定資產耐用年數，單位為年">
+            <TextInput
+              widthClassName="w-24"
+              placeholder="年"
+              inputMode="numeric"
+              value={form.usefulLifeYears ? String(form.usefulLifeYears) : ''}
+              onChange={e => onChange({ usefulLifeYears: Number(e.target.value.replace(/\D/g, '')) || 0 })}
+            />
+          </Field>
+        ) : undefined,
+      ]);
+    }
   } else if (mode === 'edit' && side === 'sales') {
     // 銷項交易的賣家一律是本公司，賣家統編／名稱無須再顯示（僅買家資訊有意義）
     rows = [
@@ -667,11 +702,14 @@ export default function TransactionMetaCard({
       />
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-base font-semibold text-neutral-dark">交易資訊</h2>
-        {mode === 'edit' && !editing && (
-          <Button variant="primary" size="sm" onClick={onStartEdit}>
-            修改交易資訊
-          </Button>
-        )}
+        {headerAction
+          ? headerAction
+          : mode === 'edit' &&
+            !editing && (
+              <Button variant="primary" size="sm" onClick={onStartEdit}>
+                修改交易資訊
+              </Button>
+            )}
       </div>
       <div className="flex flex-col gap-4">
         {mode === 'edit' && (
@@ -723,6 +761,7 @@ export default function TransactionMetaCard({
               scope={side === 'purchase' ? 'purchase' : 'sales'}
               title={side === 'purchase' ? '選擇費用類別' : '選擇收入科目'}
               aiPicked={aiPickedSubject}
+              isFixedAssetDepreciationImpairment={side === 'purchase' && form.isFixedAsset ? 1 : undefined}
             />
           </Field>
 

@@ -13,21 +13,33 @@ interface TransactionAllowanceListCardProps {
   returnQuery?: string;
   entry: EntryDetailEntryDto;
   allowances: EntryDetailAllowanceDto[];
-  onCreate: () => void;
+  /** 未傳時視為純檢視情境（如營業稅中心憑證細節），不顯示「開立折讓單」按鈕 */
+  onCreate?: () => void;
+  /** 折讓單連結的基底路徑，預設帳簿交易細節頁 */
+  basePath?: string;
 }
 
 /** 原單交易細節頁的「折讓紀錄」區塊：常駐顯示（折讓單本身不會渲染此卡片，由呼叫端排除），
  *  逐筆列出已開立的折讓單並可點擊前往細節頁；標題列右側提供「開立折讓單」入口。 */
-export default function TransactionAllowanceListCard({ side, returnQuery, entry, allowances, onCreate }: TransactionAllowanceListCardProps) {
+export default function TransactionAllowanceListCard({
+  side,
+  returnQuery,
+  entry,
+  allowances,
+  onCreate,
+  basePath = '/ledger',
+}: TransactionAllowanceListCardProps) {
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-neutral-dark">折讓紀錄（{allowances.length}）</h2>
         {/* entry.remainingAmount 是「未沖金額」（沖帳/收付款進度），不是可折讓額度：交易已沖帳完畢
             （remainingAmount＝0）仍可能需要開立折讓單，故不可用它來 disable 這顆按鈕 */}
-        <Button variant="outline" size="sm" icon={Plus} onClick={onCreate}>
-          開立折讓單
-        </Button>
+        {onCreate && (
+          <Button variant="outline" size="sm" icon={Plus} onClick={onCreate}>
+            開立折讓單
+          </Button>
+        )}
       </div>
       {allowances.length === 0 ? (
         <p className="text-sm text-neutral-mid">尚無折讓紀錄</p>
@@ -36,7 +48,7 @@ export default function TransactionAllowanceListCard({ side, returnQuery, entry,
           {allowances.map(allowance => (
             <Link
               key={allowance.ledgerUuid}
-              href={appendReturnQuery(`/ledger/${allowance.ledgerUuid}?side=${side}`, returnQuery)}
+              href={appendReturnQuery(`${basePath}/${allowance.ledgerUuid}?side=${side}`, returnQuery)}
               className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0"
             >
               <div className="flex items-center justify-between text-sm">

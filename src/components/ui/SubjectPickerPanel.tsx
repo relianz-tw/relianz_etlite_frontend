@@ -1,6 +1,6 @@
 'use client';
 
-import type { OfficialSubjectDto } from '@/api/types';
+import type { OfficialSubjectDto, SubjectChildDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import { Check, ChevronRight, Info, Search, SearchX, Sparkles, X } from 'lucide-react';
 import type { RefObject } from 'react';
@@ -40,8 +40,12 @@ interface SubjectPickerPanelProps {
 
   options: OfficialSubjectDto[];
   selectedCode?: string;
+  /** 選中子科目時的 uuid（見 OfficialSubjectDto.children）；有值時母科目列不反白，改由對應子科目列反白 */
+  selectedCompanyAccountingSubjectUuid?: string;
+  /** 待確認列的 key：母科目為 subjectCode、子科目為 uuid，兩者鍵空間不重疊可共用同一個狀態 */
   armedCode: string | null;
   onRowClick: (subject: OfficialSubjectDto) => void;
+  onChildRowClick: (subject: OfficialSubjectDto, child: SubjectChildDto) => void;
   listRef?: RefObject<HTMLDivElement>;
 
   loading: boolean;
@@ -74,8 +78,10 @@ export default function SubjectPickerPanel({
   matchCount,
   options,
   selectedCode,
+  selectedCompanyAccountingSubjectUuid,
   armedCode,
   onRowClick,
+  onChildRowClick,
   listRef,
   loading,
   error,
@@ -197,26 +203,51 @@ export default function SubjectPickerPanel({
           {!loading && !error && (
             <>
               {options.map((s) => {
-                const selected = selectedCode === s.subjectCode;
+                const selected = selectedCode === s.subjectCode && !selectedCompanyAccountingSubjectUuid;
                 const armed = armedCode === s.subjectCode;
                 return (
-                  <button
-                    key={s.subjectCode}
-                    type="button"
-                    onClick={() => onRowClick(s)}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                      fullScreen ? 'min-h-12 text-base nav:min-h-0 nav:text-sm' : ''
-                    } ${selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'}`}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="w-24 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
-                      <span className="truncate">{s.name}</span>
-                    </span>
-                    {armed && (
-                      <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
-                    )}
-                    {!armed && selected && <Check size={14} className="shrink-0" />}
-                  </button>
+                  <div key={s.subjectCode}>
+                    <button
+                      type="button"
+                      onClick={() => onRowClick(s)}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                        fullScreen ? 'min-h-12 text-base nav:min-h-0 nav:text-sm' : ''
+                      } ${selected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-dark hover:bg-surface-cream'}`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="w-24 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
+                        <span className="truncate">{s.name}</span>
+                      </span>
+                      {armed && (
+                        <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
+                      )}
+                      {!armed && selected && <Check size={14} className="shrink-0" />}
+                    </button>
+                    {/* 子科目：縮排＋較淡的副標題樣式，永遠展開顯示於母科目下方，各自可獨立點選（見 DESIGN.md Subject Picker） */}
+                    {s.children?.map((child) => {
+                      const childSelected = selectedCompanyAccountingSubjectUuid === child.uuid;
+                      const childArmed = armedCode === child.uuid;
+                      return (
+                        <button
+                          key={child.uuid}
+                          type="button"
+                          onClick={() => onChildRowClick(s, child)}
+                          className={`flex w-full items-center justify-between gap-2 py-1.5 pl-11 pr-3 text-left text-xs transition-colors ${
+                            fullScreen ? 'min-h-10 nav:min-h-0' : ''
+                          } ${childSelected ? 'bg-brand-blue/10 font-semibold text-brand-blue' : 'text-neutral-mid hover:bg-surface-cream'}`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="w-20 shrink-0 whitespace-nowrap font-mono tabular-nums text-neutral-mid/80">{child.subjectCode}</span>
+                            <span className="truncate">{child.name}</span>
+                          </span>
+                          {childArmed && (
+                            <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
+                          )}
+                          {!childArmed && childSelected && <Check size={13} className="shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
 

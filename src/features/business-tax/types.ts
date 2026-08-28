@@ -1,7 +1,6 @@
 import type { SortDir } from '@/lib/utils';
 
 export type TaxSide = 'sales' | 'purchase';
-export type InvoiceStatus = 'pending' | 'voided';
 
 /** 表格可排序欄位 */
 export type SortKey = 'date' | 'id';
@@ -11,31 +10,38 @@ export interface SortState {
   dir: SortDir;
 }
 
-/** 進階搜尋條件：金額區間 + 狀態 */
+/**
+ * 進階搜尋條件：金額區間 + 開立日期區間（ROC 'YYY/MM/DD' 草稿字串，送 API 前需轉為西元 YYYYMMDD）+
+ * 統一編號 / 公司名稱（模糊比對，進項比對賣方、銷項比對買方）+ 是否已作廢。
+ * isVoid 沿用其餘欄位「草稿字串」慣例：'' 不篩、'true' 已作廢、'false' 未作廢。
+ */
 export interface AdvancedFilter {
-  status: 'all' | InvoiceStatus;
   minAmount: string;
   maxAmount: string;
-}
-
-export interface TaxSubRow {
-  id: string;
-  label?: string;
-  untaxed: number;
-  tax: number;
-  total: number;
-  date?: string;
+  dateFrom: string;
+  dateTo: string;
+  taxIdNumber: string;
+  companyName: string;
+  isVoid: '' | 'true' | 'false';
 }
 
 export interface TaxInvoiceRow {
+  /** 發票 uuid（invoiceUuid） */
+  uuid: string;
+  /** 交易 uuid，供導向憑證細節內頁（/business-tax/{ledgerUuid}）使用 */
+  ledgerUuid: string;
   id: string;
   date: string;
   untaxed: number;
   tax: number;
   total: number;
   counterparty: string;
-  status: InvoiceStatus;
-  children?: TaxSubRow[];
+  /** isDebit === 1，折讓 */
+  isAllowance: boolean;
+  /** 作廢狀態 */
+  isVoid: boolean;
+  /** 申報狀態 */
+  declared: boolean;
 }
 
 export interface FilingPeriod {

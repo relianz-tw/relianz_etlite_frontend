@@ -8,7 +8,7 @@ import TextInput from '@/components/ui/TextInput';
 import NewTransactionDialog from '@/components/NewTransactionDialog';
 import { ChevronDown, ChevronUp, Plus, Search, X } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AdvancedFilter, QuickSearchField, Side } from '../types';
 import { withReturnParam } from '../urlState';
 
@@ -76,6 +76,18 @@ export default function FilterBar({
   const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [periodFrom, setPeriodFrom] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[0]);
   const [periodTo, setPeriodTo] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[1]);
+
+  // 掛載時若網址尚無日期篩選（如首次進入頁面），把畫面上顯示的「本月」預設區間實際套用到查詢；
+  // 否則畫面顯示本月、但列表/圖表仍抓全部區間，彼此不同步（帳簿總覽圖表依 filters.advanced 同步區間）
+  useEffect(() => {
+    if (!advanced.dateFrom && !advanced.dateTo) {
+      const next = { ...advanced, dateFrom: formatRocDate(periodFrom), dateTo: formatRocDate(periodTo) };
+      onAdvancedChange(next);
+      onAdvancedApply(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handlePeriodTypeChange = (type: PeriodType) => {
     setPeriodType(type);
     const [start, end] = getPeriodRange(type, new Date());

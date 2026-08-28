@@ -101,6 +101,7 @@ export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTra
         cashDirection: Number(form.direction),
         amount: form.amount,
         officialAccountingSubjectId: form.subject.id,
+        companyAccountingSubjectUuid: form.subject.companyAccountingSubjectUuid,
         memo: form.memo.trim(),
       });
       onClose();

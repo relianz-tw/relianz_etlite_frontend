@@ -1,42 +1,35 @@
 'use client';
 
+import type { VatPeriodSummaryDto } from '@/api/types';
 import StatCard from '@/components/ui/StatCard';
-import TrendChart from '@/components/ui/TrendChart';
 import { fmtCurrency } from '@/lib/utils';
-import { ESTIMATED_TAX_TOTAL, PURCHASE_INVOICE_TOTAL, SALES_INVOICE_TOTAL, TAX_TREND } from '../data';
 
-// 桌機版卡片有足夠寬度，趨勢圖預設顯示「日」；手機版僅顯示第一張卡（比照帳簿），趨勢圖顯示「週」
-function buildCards(chartDefaultView: 'day' | 'week') {
+/** summary 為 null 時（查詢進行中）三張卡皆顯示 $0 佔位，避免殘留上一次查詢的數字 */
+function buildCards(summary: VatPeriodSummaryDto | null) {
   return [
-    {
-      label: '本期銷項發票金額',
-      value: fmtCurrency(SALES_INVOICE_TOTAL),
-      chart: <TrendChart data={TAX_TREND} defaultView={chartDefaultView} />,
-      detailHref: '/business-tax/trend',
-    },
-    { label: '本期進項發票金額', value: fmtCurrency(PURCHASE_INVOICE_TOTAL), valueClassName: 'text-semantic-success', caption: '銷售額 / 1.05' },
+    { label: '本期銷項發票金額', value: fmtCurrency(summary?.outputInvoiceAmountTotal ?? 0) },
+    { label: '本期進項發票金額', value: fmtCurrency(summary?.inputInvoiceAmountTotal ?? 0), valueClassName: 'text-semantic-success' },
     {
       label: '本期預估營業稅金額',
-      value: fmtCurrency(ESTIMATED_TAX_TOTAL),
+      value: fmtCurrency(summary?.businessTaxTotal ?? 0),
       valueClassName: 'text-semantic-error',
-      caption: '銷項營業稅額 - 進項營業稅額 = 預估營業稅額',
+      caption: '銷項稅額 − 進項稅額（後端計算）',
     },
   ];
 }
 
-export default function SummaryCards() {
-  const desktopCards = buildCards('day');
-  const mobileCards = buildCards('week');
+export default function SummaryCards({ summary }: { summary: VatPeriodSummaryDto | null }) {
+  const cards = buildCards(summary);
 
   return (
     <>
       <div className="hidden gap-3 nav:flex">
-        {desktopCards.map(c => (
+        {cards.map(c => (
           <StatCard key={c.label} {...c} />
         ))}
       </div>
       <div className="nav:hidden">
-        <StatCard {...mobileCards[0]} />
+        <StatCard {...cards[0]} />
       </div>
     </>
   );

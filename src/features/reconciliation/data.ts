@@ -26,6 +26,8 @@ export interface ReconGroupOption {
   name: string;
   /** 該銷售管道／廠商的當前餘額（GET channelRules／vendors 回應新增欄位） */
   balance: number;
+  /** 銷售管道設定的收款帳戶 uuid（GET channelRules 回應欄位），用於沖帳預設主對象；廠商無對應銀行帳戶 uuid，恆為 undefined */
+  receivingAccountUuid?: string;
 }
 
 export interface ReconGroup {
@@ -47,7 +49,7 @@ export interface ReconSubGroup {
 }
 
 /** 匯總沖帳候選交易的統一內部形狀：銷項/進項經正規化後共用同一套分組邏輯，不需各自實作一份 */
-interface ReconCandidate {
+export interface ReconCandidate {
   uuid: string;
   orderCode: string;
   amount: number;

@@ -1,4 +1,3 @@
-import { listOfficialSubjects } from '@/api/subjects';
 import type { LedgerEntryInvoiceDto, PayableListItemDto, ReceivableListItemDto } from '@/api/types';
 import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
@@ -31,51 +30,41 @@ function issueDateFrom(invoice: LedgerEntryInvoiceDto | null, entryDate: string 
 
 /**
  * /ael/ledger/payables/filter 一批項目 → 表格 PurchaseRow[]。
- * officialAccountingSubjectId 向 /ael/subject/official/list/latest 查詢最新科目清單反查名稱；
- * 查無對應科目時，退回以編號顯示。專案欄位 API 未提供，故留空。
+ * category 直接採用 item.subjectName（該筆交易選了子科目時，後端已優先回傳子科目名稱）。
+ * 專案欄位 API 未提供，故留空。
  * source 標為 'invoice'：費用類別／專案下拉可就地編輯（表格既有編輯皆僅存本地狀態，未串接更新 API）。
  * uuid 帶入真實 uuid 供交易明細頁查詢使用。
  */
 export async function mapPayableItemsToRows(items: PayableListItemDto[]): Promise<PurchaseRow[]> {
-  const dated = items.map(item => {
+  return items.map(item => {
     const date = issueDateFrom(item.invoice, item.entryDate, item.createdAt);
-    return { item, rocDate: formatRocDate(date) };
+    return {
+      id: item.orderCode,
+      uuid: item.ledgerUuid,
+      amount: item.totalAmount,
+      party: item.counterpartyName,
+      date: formatRocDate(date),
+      category: item.subjectName,
+      project: '',
+      source: 'invoice' as const,
+      counterpartyUuid: item.counterpartyUuid,
+      voucherNumber: voucherNumberFromInvoice(item.invoice),
+      settledAmount: item.settledAmount,
+      remainingAmount: item.remainingAmount,
+      settlementStatus: item.settlementStatus,
+      isAllowance: item.isAllowance ?? false,
+      allowanceCount: item.allowanceCount ?? 0,
+    };
   });
-
-  const subjectList = await listOfficialSubjects();
-  const subjectNameById = new Map<number, string>();
-  subjectList.forEach(subject => subjectNameById.set(subject.id, subject.name));
-
-  return dated.map(({ item, rocDate }) => ({
-    id: item.orderCode,
-    uuid: item.ledgerUuid,
-    amount: item.totalAmount,
-    party: item.counterpartyName,
-    date: rocDate,
-    category: subjectNameById.get(item.officialAccountingSubjectId) ?? `科目 #${item.officialAccountingSubjectId}`,
-    project: '',
-    source: 'invoice',
-    counterpartyUuid: item.counterpartyUuid,
-    voucherNumber: voucherNumberFromInvoice(item.invoice),
-    settledAmount: item.settledAmount,
-    remainingAmount: item.remainingAmount,
-    settlementStatus: item.settlementStatus,
-    isAllowance: item.isAllowance ?? false,
-    allowanceCount: item.allowanceCount ?? 0,
-  }));
 }
 
 /**
  * /ael/ledger/receivables/filter 一批項目 → 表格 SalesRow[]。
- * officialAccountingSubjectId 向 /ael/subject/official/list/latest 查詢最新科目清單反查收入科目名稱；
- * 查無對應科目時，退回以編號顯示。uuid 帶入真實應收帳款 uuid 供手動入帳沖帳與交易明細頁查詢使用。
+ * category 直接採用 item.subjectName（該筆交易選了子科目時，後端已優先回傳子科目名稱）。
+ * uuid 帶入真實應收帳款 uuid 供手動入帳沖帳與交易明細頁查詢使用。
  * 銷售管道名稱由呼叫端另外以 paymentChannelUuid 反查（見 LedgerView 的 channelNameByUuid）。
  */
 export async function mapReceivableItemsToRows(items: ReceivableListItemDto[]): Promise<SalesRow[]> {
-  const subjectList = await listOfficialSubjects();
-  const subjectNameById = new Map<number, string>();
-  subjectList.forEach(subject => subjectNameById.set(subject.id, subject.name));
-
   return items.map(item => {
     const date = issueDateFrom(item.invoice, item.entryDate, item.createdAt);
     return {
@@ -84,7 +73,7 @@ export async function mapReceivableItemsToRows(items: ReceivableListItemDto[]): 
       amount: item.totalAmount,
       counterparty: item.counterpartyName,
       date: formatRocDate(date),
-      category: subjectNameById.get(item.officialAccountingSubjectId) ?? `科目 #${item.officialAccountingSubjectId}`,
+      category: item.subjectName,
       paymentChannelUuid: item.paymentChannelUuid,
       voucherNumber: voucherNumberFromInvoice(item.invoice),
       voided: false,

@@ -16,6 +16,8 @@ interface TransactionOriginCardProps {
   loading: boolean;
   error: string;
   entry: EntryDetailEntryDto | null;
+  /** 「前往原始交易」連結的基底路徑，預設帳簿交易細節頁 */
+  basePath?: string;
 }
 
 interface DetailRow {
@@ -25,7 +27,15 @@ interface DetailRow {
 
 /** 折讓單交易細節頁的「原始交易憑證」區塊：僅 isAllowance 為 true 時顯示，預設收合，
  *  收合互動比照 TransactionSettlementStatus 既有的 button + Chevron 樣式。 */
-export default function TransactionOriginCard({ side, originLedgerUuid, returnQuery, loading, error, entry }: TransactionOriginCardProps) {
+export default function TransactionOriginCard({
+  side,
+  originLedgerUuid,
+  returnQuery,
+  loading,
+  error,
+  entry,
+  basePath = '/ledger',
+}: TransactionOriginCardProps) {
   const [open, setOpen] = useState(false);
 
   const rows: DetailRow[] = entry
@@ -69,7 +79,7 @@ export default function TransactionOriginCard({ side, originLedgerUuid, returnQu
                 ))}
               </div>
               <Link
-                href={appendReturnQuery(`/ledger/${originLedgerUuid}?side=${side}`, returnQuery)}
+                href={appendReturnQuery(`${basePath}/${originLedgerUuid}?side=${side}`, returnQuery)}
                 className="mt-3 inline-block text-sm font-semibold text-brand-blue hover:underline"
               >
                 前往原始交易

@@ -5,6 +5,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import DatePicker from '@/components/ui/DatePicker';
 import StepNumber from '@/components/ui/StepNumber';
+import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { X } from 'lucide-react';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
@@ -48,11 +49,20 @@ interface ReconPoolPanelProps {
   onFeeChange: (value: number) => void;
   /** 逐筆沖帳尚未勾選任何交易時停用金額欄位，避免送出跟勾選狀態不一致的金額 */
   amountDisabled?: boolean;
-  /** 額外金額（otherDeductions）：可無限新增，與手續費同樣可正可負，從對帳單/沖帳金額中加總計入 */
+  /** 額外金額（otherDeductions）：可無限新增，與銀行手續費同樣為減項，從對帳單/沖帳金額中加總計入 */
   otherDeductions: ReconOtherDeductionRow[];
   onAddOtherDeduction: () => void;
   onRemoveOtherDeduction: (id: string) => void;
   onChangeOtherDeduction: (id: string, patch: Partial<Omit<ReconOtherDeductionRow, 'id'>>) => void;
+
+  /** 電商平台處理費：僅應收（side='receivable'）顯示；金額非 0 時強制須選滿等值的應付憑證才能送出（見 ReconciliationView 驗證） */
+  platformFeeAmount: number;
+  platformFeeSubject: SubjectOption | null;
+  platformFeeVoucherCount: number;
+  platformFeeVoucherTotal: number;
+  onPlatformFeeAmountChange: (value: number) => void;
+  onPlatformFeeSubjectChange: (value: SubjectOption) => void;
+  onOpenVoucherPicker: () => void;
   /** 付款／收款日：沖帳執行 API 必填欄位 */
   paymentDate: Date | undefined;
   onPaymentDateChange: (date: Date | undefined) => void;
@@ -85,8 +95,8 @@ interface ReconPoolPanelProps {
  * 沖帳金額面板：置於右欄（約 340px 寬），與左側交易清單同時在首屏出現，操作順序由左至右——
  * 先在清單勾選交易，再到本面板確認/輸入金額，不需上下捲動切換（見 ReconciliationView 版面說明）。
  * 逐筆沖帳／匯總沖帳共用同一份 UI，差異僅在標頭是否顯示已選筆數與已選交易區塊（逐筆沖帳才顯示）。
- * 金額欄位一律為「總金額」；手續費與每筆額外金額皆可正可負（預設負值，即減項），兩者與沖帳金額加總即為實際
- * 存入/付出金額（對應 API 的 depositAmount／paymentAmount）。使用餘額（僅正值，下方小字顯示目前餘額）不計入
+ * 金額欄位一律為「總金額」；銀行手續費、電商平台處理費（僅應收）與每筆額外金額皆為固定減項（輸入值恆為負），
+ * 三者與沖帳金額加總即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。使用餘額（僅正值，下方小字顯示目前餘額）不計入
  * 這個加總——它不是實際入帳/出帳的錢，只計入沖帳金額本身（見 ReconciliationView 的 settleAmount）。
  * 欄位固定上下堆疊（label 在上、輸入框在下 w-full）：本卡片寬度固定在 340px 左右的窄欄，不隨桌機斷點跟著
  * 加寬，若沿用左右並排寫法會被擠壓變形。
@@ -114,6 +124,13 @@ export default function ReconPoolPanel({
   onAddOtherDeduction,
   onRemoveOtherDeduction,
   onChangeOtherDeduction,
+  platformFeeAmount,
+  platformFeeSubject,
+  platformFeeVoucherCount,
+  platformFeeVoucherTotal,
+  onPlatformFeeAmountChange,
+  onPlatformFeeSubjectChange,
+  onOpenVoucherPicker,
   paymentDate,
   onPaymentDateChange,
   showActionArea,
@@ -135,7 +152,7 @@ export default function ReconPoolPanel({
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   // 使用餘額不是實際入帳/出帳的錢，不計入實際存入/付出金額，只計入沖帳金額（見 ReconciliationView 的 settleAmount）
-  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal;
+  const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
   const isDepositNegative = depositAmount < 0;
   const dateLabel = side === 'payable' ? '付款日' : '收款日';
   const balanceKindLabel = side === 'payable' ? '進項支出餘額' : '銷項收入餘額';
@@ -226,18 +243,46 @@ export default function ReconPoolPanel({
         )}
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm text-neutral-dark">手續費</span>
-          <MoneyInput value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault disabled={amountDisabled} />
+          <span className="text-sm text-neutral-dark">銀行手續費</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-lg text-neutral-mid">−</span>
+            <MoneyInput value={feeAmount} onChange={onFeeChange} negativeByDefault disabled={amountDisabled} />
+          </div>
         </div>
 
-        <OtherDeductionsEditor
-          rows={otherDeductions}
-          onAdd={onAddOtherDeduction}
-          onRemove={onRemoveOtherDeduction}
-          onChange={onChangeOtherDeduction}
-          allowSign
-          disabled={amountDisabled}
-        />
+        {side === 'receivable' && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm text-neutral-dark">電商平台處理費</span>
+            <SubjectSelect value={platformFeeSubject} onChange={onPlatformFeeSubjectChange} placeholder="請選擇科目" disabled={amountDisabled} />
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg text-neutral-mid">−</span>
+              <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} negativeByDefault disabled={amountDisabled} />
+            </div>
+            {platformFeeAmount !== 0 &&
+              (platformFeeVoucherTotal === Math.abs(platformFeeAmount) ? (
+                <p className="flex items-center justify-between text-xs text-semantic-success">
+                  <span>
+                    已選 {platformFeeVoucherCount} 筆憑證 · {fmtCurrency(platformFeeVoucherTotal)}
+                  </span>
+                  <button type="button" onClick={onOpenVoucherPicker} className="font-semibold text-brand-blue hover:underline">
+                    重新選擇
+                  </button>
+                </p>
+              ) : (
+                <p className="flex items-center justify-between text-xs text-semantic-error">
+                  <span>
+                    {platformFeeVoucherCount > 0 ? '憑證金額不等值，' : '尚未選擇憑證，'}
+                    差額 {fmtCurrency(Math.abs(Math.abs(platformFeeAmount) - platformFeeVoucherTotal))}
+                  </span>
+                  <button type="button" onClick={onOpenVoucherPicker} className="font-semibold text-brand-blue hover:underline">
+                    選擇憑證
+                  </button>
+                </p>
+              ))}
+          </div>
+        )}
+
+        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} disabled={amountDisabled} />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">
@@ -246,7 +291,7 @@ export default function ReconPoolPanel({
           {fmtCurrency(depositAmount)}
         </span>
       </div>
-      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額</p>}
+      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認銀行手續費與額外金額</p>}
 
       {showActionArea && (
         <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">

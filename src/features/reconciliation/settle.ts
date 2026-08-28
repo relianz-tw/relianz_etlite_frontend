@@ -7,14 +7,19 @@
  * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
-import type { SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
+import type { SettleChannel, SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
 import type { ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import type { ReconSettleResult, ReconSide } from './types';
 
 function toOtherDeductions(rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
   if (rows.length === 0) return undefined;
   // UI 帶號（負）→ API 正值（扣減金額語意），此處反號
-  return rows.map(r => ({ name: r.name, amount: -r.amount, officialAccountingSubjectId: r.subject!.id! }));
+  return rows.map(r => ({
+    name: r.name,
+    amount: -r.amount,
+    officialAccountingSubjectId: r.subject!.id!,
+    companyAccountingSubjectUuid: r.subject!.companyAccountingSubjectUuid,
+  }));
 }
 
 interface PreviewParams {
@@ -41,7 +46,7 @@ interface PreviewParams {
  * ledgerUuids 與 isDefault=false，僅針對勾選的原單試算（見 api.md settle/preview）。
  */
 export async function previewSettle(params: PreviewParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: -params.feeAmount };
+  const allocations: SettleSummaryFee = { name: '銀行手續費', feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
   const isDefault = params.isDefault ?? true;
   const ledgerUuids = params.ledgerUuids ?? [];
@@ -100,7 +105,8 @@ interface SummaryParams {
   balanceUsed: number;
   /** YYYYMMDD */
   paymentDate: string;
-  bankAccountUuid: string;
+  /** 收付款管道（見 targets.ts 的 buildSettleChannels） */
+  channels: SettleChannel[];
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
 }
@@ -114,7 +120,7 @@ interface SummaryParams {
  * 見 ReconciliationView 的 depositAmount 計算）。
  */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '匯總手續費', feeAmount: -params.feeAmount };
+  const allocations: SettleSummaryFee = { name: '銀行手續費', feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   if (params.side === 'receivable') {
@@ -123,7 +129,7 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       settleAmount: params.settleAmount,
       depositAmount: params.actualAmount,
       paymentDate: params.paymentDate,
-      bankAccountUuid: params.bankAccountUuid,
+      depositChannels: params.channels,
       balanceUsed: params.balanceUsed,
       allocations,
       otherDeductions,
@@ -147,7 +153,7 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     settleAmount: params.settleAmount,
     paymentAmount: params.actualAmount,
     paymentDate: params.paymentDate,
-    bankAccountUuid: params.bankAccountUuid,
+    paymentChannels: params.channels,
     balanceUsed: params.balanceUsed,
     allocations,
     otherDeductions,
@@ -176,7 +182,8 @@ interface SingleSettleParams {
   balanceUsed: number;
   /** YYYYMMDD */
   paymentDate: string;
-  bankAccountUuid: string;
+  /** 收付款管道（見 targets.ts 的 buildSettleChannels） */
+  channels: SettleChannel[];
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
 }
@@ -189,7 +196,7 @@ interface SingleSettleParams {
  * 手動沖帳 API 沒有 balanceBefore／balanceAfter 的概念（不影響管道／廠商餘額），對應欄位留空。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '手續費', feeAmount: -params.feeAmount }] : [];
+  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '銀行手續費', feeAmount: -params.feeAmount }] : [];
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   const res =
@@ -197,7 +204,7 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
       ? await settleReceivable({
           ledgerUuid: params.ledgerUuid,
           paymentDate: params.paymentDate,
-          bankAccountUuid: params.bankAccountUuid,
+          depositChannels: params.channels,
           settleAmount: params.settleAmount,
           depositAmount: params.actualAmount,
           balanceUsed: params.balanceUsed,
@@ -208,7 +215,7 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
       : await settlePayable({
           ledgerUuid: params.ledgerUuid,
           paymentDate: params.paymentDate,
-          bankAccountUuid: params.bankAccountUuid,
+          paymentChannels: params.channels,
           settleAmount: params.settleAmount,
           paymentAmount: params.actualAmount,
           balanceUsed: params.balanceUsed,

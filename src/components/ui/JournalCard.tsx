@@ -155,14 +155,14 @@ export default function JournalCard({ lines, defaultOpen = false }: JournalCardP
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 text-sm font-semibold text-neutral-dark"
       >
-        日記帳（{lines.length}）
+        會計分錄（{lines.length}）
         {open ? <ChevronUp size={16} className="text-neutral-mid" /> : <ChevronDown size={16} className="text-neutral-mid" />}
       </button>
 
       {open && (
         <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
           {lines.length === 0 ? (
-            <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">尚無日記帳分錄</div>
+            <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">尚無會計分錄</div>
           ) : (
             <>
               {/* 桌面版：表格 */}

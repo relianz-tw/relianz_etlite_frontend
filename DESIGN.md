@@ -407,9 +407,10 @@ Font: Noto Sans TC 12px, font-weight 600
 ```
 
 色彩語意（與本文件「2. Color Palette & Roles」對應，優先於視覺草稿）：
-- 成功／正面／已完成／開業 → success
-- 錯誤／停業 → error
-- 進行中狀態／復業 → info
+- 成功／正面／已完成／開業／已申報 → success
+- 錯誤／停業／已作廢 → error
+- 進行中狀態／復業／單據類型標示（如折讓） → info
+- 待處理／未完成／未申報 → neutral
 
 ### Sortable Table Header
 
@@ -430,6 +431,20 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 ```
 
 對應元件：`src/features/ledger/components/LedgerTable.tsx`、`src/features/business-tax/components/InvoiceTable.tsx` 的 `SortHeader`。
+
+### Voided Row（作廢／失效列）
+
+用於列表中已作廢／已失效的資料列（如營業稅中心的作廢發票）。資料仍需可見（不隱藏），
+但必須在掃視時就與有效資料區隔。
+
+```
+文字色：全列由 #3A3830（權威灰）降為 #797C80（neutral-mid）
+金額欄：加 line-through，刪除線色同文字色
+狀態標示：搭配 Badge tone="error" 標明「已作廢」
+底色：不另加底色，斑馬紋照常（靠字色與刪除線區隔，符合「扁平但有層次」原則）
+```
+
+對應元件：`src/features/business-tax/components/InvoiceTable.tsx`、`InvoiceCards.tsx`。
 
 ### Tab Bar (Underline)
 
@@ -534,7 +549,8 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 用途：科目數量較多、使用者不熟悉科目代碼的情境（如銀行新增交易），在既有的單層搜尋下拉之外，
 提供「常用／基礎／全部」三個分頁瀏覽，並附一個 AI 輔助入口（描述交易文字，呼叫 POST /ael/subject/identify
 取得建議科目，內容與科目辨識無關或無法辨識時後端回 400）。與帳簿、折讓、沖帳中心等頁面仍在用的單層
-`SubjectSelect` 並存，不互相取代。
+`SubjectSelect` 並存，不互相取代；下方「子科目永遠展開、縮排顯示」規格兩者共用（`SubjectSelect` 的
+單層清單／常用分區內，逐列比照套用）。
 
 ```
 觸發器：h-10、rounded-lg、border-[1.5px] border-neutral-blue-gray/50，樣式同 Form Inputs／
@@ -555,8 +571,12 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
   4. 搜尋範圍提示列（僅搜尋時顯示）：bg-brand-blue/5、text-brand-blue、text-xs，
      顯示「搜尋範圍為完整科目表，找到 N 筆符合「關鍵字」」
   5. 科目清單：可捲動；每列代碼（font-mono、tabular-nums）+ 名稱，
-     選中列 bg-brand-blue/10 + 右側 Check 圖示；一律扁平列表，不做主／子科目分組或說明文字
-     （官方科目 API 目前無父子階層與 remark 資料）。
+     選中列 bg-brand-blue/10 + 右側 Check 圖示。
+     母／子科目階層（官方科目 API 的 children，見 OfficialSubjectDto）：子科目永遠展開顯示在母科目列
+     正下方，不做收合／展開互動；子科目列縮排（pl-11，較母科目 px-3 多一層），文字降一階
+     （text-xs、代碼 text-neutral-mid/80），視覺上像母科目的副標題清單。母科目本身仍可單獨選取
+     （不指定子科目）；選中子科目時，母科目列不反白，改由該子科目列反白。
+     手機兩段式確認（armedCode）母／子科目共用同一組狀態，key 分別為 subjectCode／子科目 uuid。
      - Popover 模式：清單高度上限 max-h-80（320px）；AI 區塊展開時，清單與 AI 區塊合併為
        同一個捲動容器並解除 max-h-80 上限，避免 AI 區塊內容（文字框、範例、建議卡）
        超出 Popover 可用高度時被邊界切掉
@@ -760,6 +780,8 @@ Background:  溫暖米   #F0EBE5
 White:                #FFFFFF
 ```
 
+> 圖表／資料視覺化的序列配色順序見 §11.3，不要在圖表元件內另外挑色。
+
 ### Example Prompts
 - "Build a hero section: white background. Heading 72px Baskerville Semibold + Noto Serif TC, line-height 1.10, color #3A3830. Primary CTA: #005FA2 background, white text, 6px radius, 12px 28px padding. Secondary CTA: outlined #005FA2."
 - "Create a success toast: #377456 left border, #F5F3F2 background, Noto Sans TC 15px, icon + message layout."
@@ -772,3 +794,86 @@ White:                #FFFFFF
 4. **Info / teal** → 友善綠 `#5CABA3`
 5. **Muted / disabled** → 親切藍 `#9AA7B9` or 專業灰 `#797C80`
 6. **Dark backgrounds** → 城信藍 `#005FA2` or 權威灰 `#3A3830`
+
+---
+
+## 11. Data Visualization（資料視覺化 / 圖表）
+
+### 11.1 範圍與函式庫
+一律使用 [Recharts](https://recharts.org/)。圖表元件（含色票、tooltip、共用型別）只能放在 `src/components/ui/charts/`；
+頁面與 feature 層一律透過該資料夾匯出的元件使用圖表，**不得**直接 `import` `recharts`，避免每個頁面自訂一套視覺風格。
+既有手刻 `TrendChart` / `TrendDetailView`（`src/components/ui/`）為過渡期遺留元件，維持既有頁面使用，
+但**不再新增**手刻圖表——新圖表一律走本章節與 Recharts。
+
+### 11.2 圖表類型選用準則
+| 資料型態 | 圖表類型 |
+|---|---|
+| 時間序列（如逐日/逐週金額） | 垂直長條圖 |
+| 組成比例（分類數不限，第六名以後併入「其他」，見 §11.3 配色上限） | Donut（甜甜圈圖），扇形外一律搭配含金額的文字圖例（§11.8） |
+| 純排名／數值比較，不具「佔整體比例」語意 | 橫向長條圖（依數值排序） |
+
+**禁用**：3D 效果、漸層填色、圖表本體陰影、雙 Y 軸；甜甜圈圖分類上限見 §11.3。
+
+### 11.3 序列配色順序
+單一圖表最多 **5 個彩色類別 + 1 個「其他／未指定」**，超過必須把第六名以後彙總進「其他」（不得因此改配色邏輯或圖表類型）。
+配色依下列固定順序指派，不得自由挑色：
+
+| 順位 | Token | Hex | 說明 |
+|---|---|---|---|
+| 1 | `brand-blue` | `#005FA2` | 主序列，永遠是第一段 |
+| 2 | `brand-blue-light` | `#3380B8` | 同色系延伸，維持藍為主調 |
+| 3 | `semantic-info` | `#5CA8A3` | 藍綠過渡，色相相鄰不衝突 |
+| 4 | `brand-tan` | `#BE9F86` | 唯一暖色 accent，第四順位才出場 |
+| 5 | `brand-tan-dark` | `#A88B74` | 暖色同色系延伸 |
+| — | `neutral-blue-gray` `#9AA7B9` | 固定保留給「其他」／「未指定」，不參與輪替 |
+
+順序刻意先用完藍系再進暖色，符合 §9「Don't mix too many accent colors — pick blue OR tan per component」的精神——
+多序列圖表是唯一必須破例混用藍棕兩色系的場景，故以固定順序取代自由選色。
+
+### 11.4 語意色使用規則
+`semantic-success` (`#377456`) 與 `semantic-error` (`#DD6B5F`) **只**用於「已完成 vs 未完成」這類語意二分
+（如：已入帳/未入帳、已付款/應付款），**不得**作為一般類別區分色使用。語意配對與 §11.3 的類別序列互斥，
+同一張圖不可混用兩套配色邏輯。
+
+### 11.5 尺寸與版面
+- 卡片內迷你圖：高度 **160px**
+- 詳情頁完整圖：高度 **224px**
+- 桌機三卡並列採 12 欄 grid：時間序列圖 6 欄／組成圖（Donut）3 欄 × 2，欄距 12px
+- 手機（< `nav` 斷點）單欄堆疊，維持與桌機一致的邏輯順序（時間序列 → 組成 → 排名）
+- 圖表容器（含其 grid/flex 父層）必須明確設定 `min-w-0`，避免 SVG 內容撐爆容器而非隨容器縮小
+
+### 11.6 軸線／格線／標籤
+- 只畫水平格線：`stroke` 用 `surface-cream`、`strokeDasharray="3 3"`
+- 不畫座標軸線本身：`axisLine={false}` `tickLine={false}`
+- 軸文字：11px、`neutral-mid`
+- 金額一律透過既有 `fmtCurrency`（`src/lib/utils.ts`）格式化，不得另寫格式化邏輯
+- 刻度密度：類別數量多時（如逐日 60+ 點）改用 `interval="preserveStartEnd"`，避免刻度重疊
+
+### 11.7 Tooltip 規格
+浮動元素，屬於 §6「Floating menus, dropdowns only」的陰影例外：
+- 白底、1px 邊框 `neutral-blue-gray` 30% 透明度、圓角 6px、`shadow-level1`、內距 12px
+- 標題：11px、`neutral-mid`
+- 數值：13px、`font-mono tabular-nums`、`neutral-dark`
+
+### 11.8 圖例規格
+- 色點：10px 圓形
+- 圖例文字**必須包含金額**，不可只顯示分類名稱
+- 圖例本身即為互動入口（見 11.9），非純裝飾
+
+### 11.9 互動與選取狀態
+- 可點擊圖表必須提供可見的選取狀態：選中項維持原色，未選中項降至 **30% 不透明度**
+- 必須提供明確的清除方式（再次點擊已選取項、或卡片層級的清除入口）
+- 圖表上的任何點擊操作，其結果**必須等同於某個 URL query 的變更**，確保頁面狀態可分享、可透過瀏覽器上一頁還原
+
+### 11.10 空狀態／載入狀態
+- 無資料：置中顯示 13px `neutral-mid` 文字，不畫空的座標軸或外框
+- 載入中：與圖表等高的 `surface-cream` 純色佔位塊；不使用 skeleton 動畫或 spinner（維持專案克制的視覺調性）
+
+### 11.11 無障礙與觸控
+- SVG 圖形元素（長條、扇形）本身無法透過 Tab 鍵取得焦點：可互動圖表**必須另外提供可 Tab 到、可用 Enter 觸發的等效入口**（通常是圖例或排名列表的 `<button>`）
+- 點擊熱區至少 44×44px；圖表本身做不到時（如逐日長條過窄），改以圖表整體區域（如 X 軸 band）或圖例作為主要互動入口
+- 圖表容器加 `role="img"` 與 `aria-label` 簡述資料內容
+
+### 11.12 動畫
+所有圖表預設 `isAnimationActive={false}`。多數圖表會隨篩選條件頻繁重新取資料，
+每次都重播進場動畫會顯得雜亂且不符合專案克制的視覺調性；如確有需要，先更新本節再實作。

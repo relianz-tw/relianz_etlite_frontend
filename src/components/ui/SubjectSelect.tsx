@@ -4,18 +4,22 @@ import {
   filterOfficialSubjects,
   listSubjectUsage,
   type SubjectFilterParams,
+  type SubjectUsageScenario,
 } from "@/api/subjects";
-import type { OfficialSubjectDto } from "@/api/types";
+import type { OfficialSubjectDto, SubjectChildDto } from "@/api/types";
 import { getFriendlyErrorMessage } from "@/lib/errors";
 import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
 export interface SubjectOption {
-  /** 官方科目 id（送出 API 時對應 officialAccountingSubjectId）；SubjectNameSelect 純字串情境無此值 */
+  /** 官方科目 id（送出 API 時對應 officialAccountingSubjectId）；SubjectNameSelect 純字串情境無此值。
+   * 選到子科目時此欄位仍為「父科目」id，子科目另見 companyAccountingSubjectUuid */
   id?: number;
   subjectCode: string;
   name: string;
+  /** 公司自訂子科目 uuid；選到子科目時才有值，送出 API 時對應 companyAccountingSubjectUuid（選填） */
+  companyAccountingSubjectUuid?: string;
 }
 
 /** 科目下拉的語境：決定打 /ael/subject/official/list/filter 時帶哪些參數 */
@@ -26,6 +30,15 @@ const SCOPE_PARAMS: Record<SubjectScope, SubjectFilterParams> = {
   sales: { calculationType: 0, buyOrSell: 3 }, // 銷項收入科目
   bank: { calculationType: 0, isBank: 1 }, // 銀行專用科目（股東往來、銀行手續費等）
   general: { calculationType: 0 }, // 不分進銷，僅排除合計型欄位／棄置科目
+};
+
+// /ael/subject/usage 的 scenario 為後端必填參數（0進項／1銷項／2銀行提匯），無「不分」選項；
+// general 情境（如額外扣款科目）沒有對應語意，退而求其次採用進項（0）
+const SCOPE_TO_USAGE_SCENARIO: Record<SubjectScope, SubjectUsageScenario> = {
+  purchase: 0,
+  sales: 1,
+  bank: 2,
+  general: 0,
 };
 
 interface SubjectSelectProps {
@@ -65,7 +78,7 @@ export default function SubjectSelect({
     setError("");
     Promise.all([
       filterOfficialSubjects(SCOPE_PARAMS[scope]),
-      listSubjectUsage(),
+      listSubjectUsage(SCOPE_TO_USAGE_SCENARIO[scope]),
     ])
       .then(([officialList, usageList]) => {
         setOfficial(officialList);
@@ -98,13 +111,17 @@ export default function SubjectSelect({
       : value.name
     : placeholder;
 
-  // value 若無 subjectCode（例如 SubjectNameSelect 只有名稱可比對），退回以名稱比對選中項
+  // value 若無 subjectCode（例如 SubjectNameSelect 只有名稱可比對），退回以名稱比對選中項；
+  // value 若帶 companyAccountingSubjectUuid 代表選中的是子科目，母科目列不反白（見 isChildSelected）
   const isSelected = (s: OfficialSubjectDto) =>
-    value
+    value && !value.companyAccountingSubjectUuid
       ? value.subjectCode
         ? value.subjectCode === s.subjectCode
         : value.name === s.name
       : false;
+
+  const isChildSelected = (child: SubjectChildDto) =>
+    !!value && value.companyAccountingSubjectUuid === child.uuid;
 
   const handleSelect = (s: SubjectOption) => {
     onChange(s);
@@ -168,10 +185,11 @@ export default function SubjectSelect({
                     常用科目
                   </p>
                   {frequentOptions.map((s) => (
-                    <SubjectRow
+                    <SubjectRowGroup
                       key={`freq-${s.subjectCode}`}
                       subject={s}
                       selected={isSelected(s)}
+                      isChildSelected={isChildSelected}
                       frequent
                       onSelect={handleSelect}
                     />
@@ -188,10 +206,11 @@ export default function SubjectSelect({
                 </p>
               )}
               {allOptions.map((s) => (
-                <SubjectRow
+                <SubjectRowGroup
                   key={s.subjectCode}
                   subject={s}
                   selected={isSelected(s)}
+                  isChildSelected={isChildSelected}
                   onSelect={handleSelect}
                 />
               ))}
@@ -234,19 +253,73 @@ export function SubjectNameSelect({
   );
 }
 
-interface SubjectRowProps {
+interface SubjectRowGroupProps {
   subject: OfficialSubjectDto;
   selected: boolean;
+  isChildSelected: (child: SubjectChildDto) => boolean;
   frequent?: boolean;
   onSelect: (s: SubjectOption) => void;
 }
 
-function SubjectRow({
+/** 母科目列 + 子科目列（縮排、副標題樣式，永遠展開）；母科目本身仍可單獨選取，見 DESIGN.md Subject Picker */
+function SubjectRowGroup({
   subject,
   selected,
+  isChildSelected,
   frequent,
   onSelect,
-}: SubjectRowProps) {
+}: SubjectRowGroupProps) {
+  return (
+    <>
+      <button
+        type="button"
+        role="option"
+        aria-selected={selected}
+        onClick={() =>
+          onSelect({
+            id: subject.id,
+            subjectCode: subject.subjectCode,
+            name: subject.name,
+          })
+        }
+        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+          selected
+            ? "bg-brand-blue/10 font-semibold text-brand-blue"
+            : "text-neutral-dark hover:bg-surface-cream"
+        }`}
+      >
+        <span className="flex min-w-0 items-center gap-1.5 truncate">
+          {frequent && (
+            <Star size={13} className="shrink-0 fill-brand-tan text-brand-tan" />
+          )}
+          <span className="truncate">
+            {subject.subjectCode} {subject.name}
+          </span>
+        </span>
+        {selected && <Check size={14} className="shrink-0" />}
+      </button>
+      {subject.children?.map((child) => (
+        <ChildSubjectRow
+          key={child.uuid}
+          parent={subject}
+          child={child}
+          selected={isChildSelected(child)}
+          onSelect={onSelect}
+        />
+      ))}
+    </>
+  );
+}
+
+interface ChildSubjectRowProps {
+  parent: OfficialSubjectDto;
+  child: SubjectChildDto;
+  selected: boolean;
+  onSelect: (s: SubjectOption) => void;
+}
+
+/** 子科目列：縮排＋較淡的副標題樣式，選中時送出父科目 id + 子科目 uuid（companyAccountingSubjectUuid） */
+function ChildSubjectRow({ parent, child, selected, onSelect }: ChildSubjectRowProps) {
   return (
     <button
       type="button"
@@ -254,26 +327,22 @@ function SubjectRow({
       aria-selected={selected}
       onClick={() =>
         onSelect({
-          id: subject.id,
-          subjectCode: subject.subjectCode,
-          name: subject.name,
+          id: parent.id,
+          subjectCode: child.subjectCode,
+          name: child.name,
+          companyAccountingSubjectUuid: child.uuid,
         })
       }
-      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+      className={`flex w-full items-center justify-between gap-2 py-1.5 pl-8 pr-3 text-left text-xs transition-colors ${
         selected
           ? "bg-brand-blue/10 font-semibold text-brand-blue"
-          : "text-neutral-dark hover:bg-surface-cream"
+          : "text-neutral-mid hover:bg-surface-cream"
       }`}
     >
-      <span className="flex min-w-0 items-center gap-1.5 truncate">
-        {frequent && (
-          <Star size={13} className="shrink-0 fill-brand-tan text-brand-tan" />
-        )}
-        <span className="truncate">
-          {subject.subjectCode} {subject.name}
-        </span>
+      <span className="truncate">
+        {child.subjectCode} {child.name}
       </span>
-      {selected && <Check size={14} className="shrink-0" />}
+      {selected && <Check size={13} className="shrink-0" />}
     </button>
   );
 }

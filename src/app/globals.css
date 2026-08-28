@@ -123,3 +123,11 @@ body {
 .no-spinner {
   -moz-appearance: textfield;
 }
+
+/* Recharts 會在 <svg> 根節點與點擊後的作用中圖形（如 <g class="recharts-zIndex-layer_*">）
+   加上 tabindex 供其內建鍵盤導覽用，但本專案未使用該功能，點擊長條/扇形時瀏覽器仍會顯示
+   預設 focus 外框；圖表的鍵盤可及入口另由圖例/排名列表的 <button> 提供（DESIGN.md §11.11），
+   故移除圖表內部所有元素的外框不影響無障礙性 */
+.recharts-wrapper :focus {
+  outline: none;
+}

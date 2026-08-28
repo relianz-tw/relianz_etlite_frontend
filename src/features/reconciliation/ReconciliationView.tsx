@@ -8,6 +8,7 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
+import type { SubjectOption } from '@/components/ui/SubjectSelect';
 import TabBar from '@/components/ui/TabBar';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
@@ -15,6 +16,7 @@ import { subMonths } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
+import ReconAmountFilter from './components/ReconAmountFilter';
 import ReconConfirmSummaryModal from './components/ReconConfirmSummaryModal';
 import ReconDateFilter from './components/ReconDateFilter';
 import ReconGroupSidebar from './components/ReconGroupSidebar';
@@ -23,6 +25,7 @@ import ReconPoolPanel, { type ReconOtherDeductionRow } from './components/ReconP
 import ReconPoolSummary from './components/ReconPoolSummary';
 import ReconSettleResultModal from './components/ReconSettleResultModal';
 import ReconTxnList, { getSelectableUuids } from './components/ReconTxnList';
+import ReconVoucherPickerDialog from './components/ReconVoucherPickerDialog';
 import {
   ALL_GROUP_KEY,
   buildReconGroups,
@@ -37,7 +40,7 @@ import {
 } from './data';
 import type { ReconGroup, ReconGroupOption } from './data';
 import { previewSettle, submitSettle, submitSingleSettle } from './settle';
-import { validateAllocationRows } from './targets';
+import { buildSettleChannels, validateAllocationRows } from './targets';
 import type { ReconAllocationInfo, ReconMode, ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 import { useReconTargets } from './useReconTargets';
 
@@ -125,6 +128,12 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 額外金額（otherDeductions）：id 以遞增計數器產生（不可用 Date.now()/Math.random()）
   const [otherDeductions, setOtherDeductions] = useState<ReconOtherDeductionRow[]>([]);
   const otherDeductionIdRef = useRef(0);
+  // 電商平台處理費（僅應收）：金額非 0 時強制須選滿等值的應付憑證作為佐證，見 validateAmountInputs；
+  // 選中的憑證目前無法送給沖帳 API（otherDeductions 沒有可帶關聯應付單的欄位），僅供前端驗證用
+  const [platformFeeAmount, setPlatformFeeAmount] = useState(0);
+  const [platformFeeSubject, setPlatformFeeSubject] = useState<SubjectOption | null>(null);
+  const [platformFeeVouchers, setPlatformFeeVouchers] = useState<ReconTxnRef[]>([]);
+  const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(() => new Date());
   const [previewResult, setPreviewResult] = useState<ReconSettleResult | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -138,8 +147,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 目前展開中的交易 uuid（就地展開看大約資訊，一次僅展開一列）
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null);
 
-  // 沖帳對象分配：主對象（確認沖帳時實際入帳／出帳的目標）＋可選的分出列，見 useReconTargets 說明
-  const reconTargets = useReconTargets(side);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   // 沖帳執行結果（正規化後統一形狀）：成功後開結果 modal 顯示摘要與各原單明細，逐筆／匯總沖帳共用
@@ -155,6 +162,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 「不限日期」：預設開啟，一次撈出全部未結清交易（仍受後端限制，僅能查今年與去年），日期篩選收合於
   // ReconDateFilter 彈出層，使用者需點開才會看到期間選擇器（見該元件說明）
   const [unlimitedDate, setUnlimitedDate] = useState(true);
+  // 金額篩選：空字串代表不限，收合於 ReconAmountFilter 彈出層（見該元件說明），套用方式比照日期篩選
+  const [amountRange, setAmountRange] = useState<{ amountFrom: string; amountTo: string }>({ amountFrom: '', amountTo: '' });
 
   // 依 side 惰性載入並快取：切換回已載入過的一側不重新打 API；執行沖帳成功、套用新日期區間或切換「不限日期」後
   // 會清空快取觸發重新拉取。一律不帶 paymentChannelUuid／counterpartyUuid（抓全部分組），settled 固定帶 false（僅顯示未結清）
@@ -164,16 +173,20 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setDataLoading(true);
     setDataError('');
     const dateQuery = unlimitedDate ? {} : dateRange;
+    const amountQuery = {
+      ...(amountRange.amountFrom ? { amountFrom: amountRange.amountFrom } : {}),
+      ...(amountRange.amountTo ? { amountTo: amountRange.amountTo } : {}),
+    };
     const task =
       side === 'receivable'
-        ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateQuery, settled: 'false' })]).then(([channelList, groups]) => {
+        ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateQuery, ...amountQuery, settled: 'false' })]).then(([channelList, groups]) => {
             const activeChannels = channelList.filter(c => c.isActive);
-            const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance }));
+            const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance, receivingAccountUuid: c.receivingAccountUuid }));
             const nameByUuid = new Map(channelList.map(c => [c.channelUuid, c.channelName]));
             const candidates = receivableGroupsToCandidates(groups);
             if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })
-        : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateQuery, settled: 'false' })]).then(([vendorList, groups]) => {
+        : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateQuery, ...amountQuery, settled: 'false' })]).then(([vendorList, groups]) => {
             const activeVendors = vendorList.filter(v => v.isActive);
             const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name, balance: v.balance }));
             const nameByUuid = new Map(vendorList.map(v => [v.uuid, v.name]));
@@ -190,7 +203,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     return () => {
       cancelled = true;
     };
-  }, [side, receivableData, payableData, dateRange, unlimitedDate]);
+  }, [side, receivableData, payableData, dateRange, unlimitedDate, amountRange]);
 
   // 套用新查詢區間：關閉「不限日期」改回依區間篩選，兩側快取都失效，重置選取的群組與輸入，避免殘留舊區間的沖帳輸入誤送
   const handleApplyDateRange = (dateFrom: string, dateTo: string) => {
@@ -205,6 +218,15 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 切換「不限日期」：與套用新區間一樣需清空快取重抓，並重置選取的群組與輸入
   const handleToggleUnlimitedDate = () => {
     setUnlimitedDate(prev => !prev);
+    setReceivableData(null);
+    setPayableData(null);
+    setSelectedGroupKey(ALL_GROUP_KEY);
+    resetInputs();
+  };
+
+  // 套用新金額區間：與套用新日期區間一樣需清空快取重抓，並重置選取的群組與輸入
+  const handleApplyAmountRange = (amountFrom: string, amountTo: string) => {
+    setAmountRange({ amountFrom, amountTo });
     setReceivableData(null);
     setPayableData(null);
     setSelectedGroupKey(ALL_GROUP_KEY);
@@ -226,6 +248,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   };
 
   const groupOptions = sideData?.groupOptions ?? [];
+
+  // 沖帳對象分配：主對象（確認沖帳時實際入帳／出帳的目標）＋可選的分出列，見 useReconTargets 說明。
+  // 第一優先：目前選定銷售管道設定的收款帳戶（channelRules.receivingAccountUuid）若命中啟用中銀行帳戶，
+  // 優先做為預設主對象；查無或應付側（廠商無對應銀行帳戶 uuid 可比對）則退回 isDefaultPaymentAccount／
+  // isDefaultReceivingAccount，仍找不到再退回第一個銀行帳戶（見 targets.ts pickDefaultTargetKey）
+  const preferredBankAccountUuid = side === 'receivable' ? groupOptions.find(o => o.uuid === selectedGroupKey)?.receivingAccountUuid : undefined;
+  const reconTargets = useReconTargets(side, preferredBankAccountUuid);
 
   // 「全部管道」為唯讀總覽項，永遠列在最前面，不參與 buildReconGroups 的管道比對邏輯
   const groups = useMemo(() => {
@@ -293,7 +322,16 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   // 使用餘額不是實際入帳/出帳的錢（僅為系統內部既有餘額，用來沖抵帳款），故不計入實際存入/付出金額，
   // 只會計入下方的 settleAmount（實測驗證過：depositAmount 若加上 balanceUsed 會被後端拒絕）
-  const depositAmount = statementAmount + feeAmount + otherDeductionsTotal;
+  const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
+  // 送出沖帳 API 的額外金額：應收側電商平台處理費非 0 時併入 otherDeductions 陣列一起送出（settle.ts 的
+  // toOtherDeductions 統一處理科目／反號），otherDeductions 狀態本身維持只給 OtherDeductionsEditor 使用
+  const submitOtherDeductions: ReconOtherDeductionRow[] = useMemo(
+    () =>
+      side === 'receivable' && platformFeeAmount !== 0
+        ? [...otherDeductions, { id: 'PLATFORM_FEE', subject: platformFeeSubject, name: '電商平台處理費', amount: platformFeeAmount }]
+        : otherDeductions,
+    [side, otherDeductions, platformFeeAmount, platformFeeSubject],
+  );
   // 真正的沖帳金額須把使用餘額併進去（使用餘額也是實際拿去沖銷帳款的錢，只是來源不是本次存入/付出），
   // 不能只送使用者輸入框裡的原始金額，否則沖帳結果會少算這筆餘額，被後端判定少沖
   const settleAmount = statementAmount + balanceUsed;
@@ -317,6 +355,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setStatementAmount(0);
     setFeeAmount(0);
     setOtherDeductions([]);
+    setPlatformFeeAmount(0);
+    setPlatformFeeSubject(null);
+    setPlatformFeeVouchers([]);
     setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
@@ -327,8 +368,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setSettleResultOpen(false);
     setSelectedUuids(new Set());
     setSheetOpen(false);
-    // 分出列比照 otherDeductions，屬本次沖帳輸入的一部分，切換群組／區間時一併清空；主對象維持不動
-    // （側切換時另有 useReconTargets 內的 effect 重新套用預設帳戶）
+    // 分出列比照 otherDeductions，屬本次沖帳輸入的一部分，切換群組／區間時一併清空；主對象由 useReconTargets
+    // 內的 effect 依 preferredBankAccountUuid（此處為切換後的 selectedGroupKey 對應值）自動重新套用預設
     reconTargets.resetAllocationRows();
   };
 
@@ -379,6 +420,15 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     clearComputedState();
   };
 
+  const handlePlatformFeeAmountChange = (value: number) => {
+    setPlatformFeeAmount(value);
+    clearComputedState();
+  };
+  const handlePlatformFeeSubjectChange = (value: SubjectOption) => {
+    setPlatformFeeSubject(value);
+    clearComputedState();
+  };
+
   // 清除全部已勾選交易與試算結果；金額與使用餘額是使用者對整批交易的輸入，維持不歸零（通常會先勾好多筆再統一輸入金額）
   const handleClearSelection = () => {
     setSelectedUuids(new Set());
@@ -415,8 +465,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 需選收/付款日、分出對象需填完整且加總不可超過實際存入/付出金額
   const validateAmountInputs = (): string => {
     if (statementAmount <= 0) return `請先輸入${mode === 'perTxn' ? '沖帳' : '對帳單'}金額`;
-    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認手續費與額外金額`;
+    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認銀行手續費與額外金額`;
     if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
+    if (side === 'receivable' && platformFeeAmount !== 0) {
+      if (!platformFeeSubject?.id) return '請選擇電商平台處理費的會計科目';
+      const voucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
+      if (voucherTotal !== Math.abs(platformFeeAmount)) return '電商平台處理費須選擇等值的應付憑證才能沖帳';
+    }
     if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
     const allocationError = validateAllocationRows(depositAmount, reconTargets.allocationRows, side);
@@ -483,7 +538,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         actualAmount: depositAmount,
         balanceUsed,
         feeAmount,
-        otherDeductions,
+        otherDeductions: submitOtherDeductions,
       });
       setPreviewResult(result);
       setAllocationInfoByUuid(buildAllocationInfo(result.allocations.map(a => a.ledgerUuid)));
@@ -504,6 +559,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setStatementAmount(0);
     setFeeAmount(0);
     setOtherDeductions([]);
+    setPlatformFeeAmount(0);
+    setPlatformFeeSubject(null);
+    setPlatformFeeVouchers([]);
     setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
@@ -513,10 +571,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setSettleResultOpen(true);
   };
 
-  // 沖帳 API 目前只有單一必填的 bankAccountUuid，尚未支援多對象分配（見 targets.ts 與計畫說明）；
-  // 主對象若選銀行帳戶則解析出其 uuid，選會計科目則無值可送
-  const primaryTarget = reconTargets.options.find(o => o.key === reconTargets.primaryTargetKey);
-  const primaryBankAccountUuid = primaryTarget?.kind === 'bankAccount' ? (primaryTarget.bankAccountUuid ?? '') : '';
+  // 送給沖帳 API 的收付款管道：主對象自動補足金額 + 分出列，見 targets.ts 的 buildSettleChannels
+  const settleChannels = buildSettleChannels(reconTargets.options, reconTargets.primaryTargetKey, reconTargets.allocationRows, depositAmount);
 
   const requireSubmitReady = (): boolean => {
     if (!selectedGroupKey) return false;
@@ -526,12 +582,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       setSubmitError('請先選擇主對象');
       return false;
     }
-    if (!primaryBankAccountUuid) {
-      setSubmitError('沖帳對象目前僅支援銀行帳戶，請將主對象改選為銀行帳戶');
-      return false;
-    }
-    if (reconTargets.allocationRows.length > 0) {
-      setSubmitError('分配給多個對象的功能尚未開放（後端尚未支援多對象沖帳），請先移除分出的對象');
+    if (settleChannels.length === 0) {
+      setSubmitError('請選擇收款／付款方式並填寫金額');
       return false;
     }
     if (!paymentDate) {
@@ -555,9 +607,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
-        bankAccountUuid: primaryBankAccountUuid,
+        channels: settleChannels,
         feeAmount,
-        otherDeductions,
+        otherDeductions: submitOtherDeductions,
       });
       finalizeSettle(result);
     } catch (err) {
@@ -580,9 +632,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         actualAmount: depositAmount,
         balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
-        bankAccountUuid: primaryBankAccountUuid,
+        channels: settleChannels,
         feeAmount,
-        otherDeductions,
+        otherDeductions: submitOtherDeductions,
       });
       finalizeSettle(result);
     } catch (err) {
@@ -595,26 +647,16 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 確認彈窗的送出：逐筆沖帳勾 1 筆走手動沖帳 API，其餘（勾多筆／匯總沖帳）走 summary API
   const handleConfirmSettle = () => (isSingleSelection ? handleConfirmSingleSettle() : handleConfirmSummarySettle());
 
-  // 沖帳 API 目前只有單一必填的 bankAccountUuid，尚未支援多對象；有分出列，或主對象選了會計科目而非銀行帳戶時
-  // 直接擋下「確認沖帳」並提示原因，而非讓使用者填完整份表單、看過預覽彈窗後才在送出當下失敗。
-  // 後端支援多對象後，這段與 requireSubmitReady 對應的兩個檢查應一併移除。
-  const allocationBlockedReason = reconTargets.allocationRows.length > 0
-    ? '分配給多個對象的功能尚未開放（後端尚未支援多對象沖帳），請先移除分出的對象'
-    : reconTargets.primaryTargetKey && !primaryBankAccountUuid
-      ? '沖帳對象目前僅支援銀行帳戶，請將主對象改選為銀行帳戶'
-      : '';
-
   const actionLabel = previewLoading ? '計算中…' : '確認沖帳';
   const actionDisabled =
-    (mode === 'perTxn'
+    mode === 'perTxn'
       ? previewLoading || statementAmount <= 0 || selectedUuids.size === 0 || (selectedUuids.size > 1 && !canSettle)
-      : previewLoading || statementAmount <= 0) || allocationBlockedReason !== '';
-  // 逐筆沖帳勾多筆但尚未選定明確管道／廠商時，提示原因而非讓使用者按下去才失敗；分配區塊的暫時性限制優先顯示
+      : previewLoading || statementAmount <= 0;
+  // 逐筆沖帳勾多筆但尚未選定明確管道／廠商時，提示原因而非讓使用者按下去才失敗
   const actionHint =
-    allocationBlockedReason ||
-    (mode === 'perTxn' && selectedUuids.size > 1 && !canSettle
+    mode === 'perTxn' && selectedUuids.size > 1 && !canSettle
       ? `多筆沖帳需先於上方選擇單一${side === 'receivable' ? '銷售管道' : '廠商'}才能送出`
-      : undefined);
+      : undefined;
   // 逐筆沖帳一律以「已勾選至少 1 筆」決定是否顯示動作區，不隨管道是否明確增減掛載／卸載——
   // 否則勾選第一筆交易時這塊區域才出現，會把下方交易清單往下推，使接續快速勾選的第二、三筆點擊座標對不準（實測會漏勾）
   const showActionArea = mode === 'perTxn' ? selectedUuids.size > 0 : canSettle;
@@ -648,6 +690,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     onAddOtherDeduction: handleAddOtherDeduction,
     onRemoveOtherDeduction: handleRemoveOtherDeduction,
     onChangeOtherDeduction: handleChangeOtherDeduction,
+    platformFeeAmount,
+    platformFeeSubject,
+    platformFeeVoucherCount: platformFeeVouchers.length,
+    platformFeeVoucherTotal: platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0),
+    onPlatformFeeAmountChange: handlePlatformFeeAmountChange,
+    onPlatformFeeSubjectChange: handlePlatformFeeSubjectChange,
+    onOpenVoucherPicker: () => setVoucherPickerOpen(true),
     paymentDate,
     onPaymentDateChange: date => {
       setPaymentDate(date);
@@ -672,7 +721,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   // 行動版底部固定操作條摘要：逐筆沖帳顯示已選筆數／金額，匯總沖帳顯示手續費／實際存入(付出)金額；
   // 兩種模式按下按鈕都只是開啟 BottomSheet，真正送出仍是面板內既有的「確認沖帳」按鈕（見 handleOpenConfirm）
-  const mobileSummaryLabel = mode === 'perTxn' ? `已選 ${selectedUuids.size} 筆` : `手續費 ${fmtCurrency(feeAmount)} · 實際${side === 'payable' ? '付出' : '存入'}`;
+  const mobileSummaryLabel = mode === 'perTxn' ? `已選 ${selectedUuids.size} 筆` : `銀行手續費 ${fmtCurrency(feeAmount)} · 實際${side === 'payable' ? '付出' : '存入'}`;
   const mobileSummaryValue = mode === 'perTxn' ? fmtCurrency(selectedAmount) : fmtCurrency(depositAmount);
   const mobileActionLabel = mode === 'perTxn' ? '確認金額' : `確認沖帳 · ${selectableUuids.length} 筆`;
 
@@ -693,7 +742,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
             極窄螢幕（< 340px）兩者加總可能超出可視寬度，容許 flex-wrap 換行而非硬擠成一排 */}
         <div className="mb-5 flex flex-row flex-wrap items-center justify-between gap-2 border-b border-neutral-blue-gray/30">
           <TabBar options={MODE_OPTIONS} value={mode} onChange={handleModeChange} />
-          <div className="pb-2">
+          <div className="flex flex-wrap items-center gap-2 pb-2">
             <ReconDateFilter
               dateFrom={dateRange.dateFrom}
               dateTo={dateRange.dateTo}
@@ -703,6 +752,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
               onApply={handleApplyDateRange}
               onToggleUnlimitedDate={handleToggleUnlimitedDate}
             />
+            <ReconAmountFilter amountFrom={amountRange.amountFrom} amountTo={amountRange.amountTo} onApply={handleApplyAmountRange} />
           </div>
         </div>
 
@@ -856,6 +906,17 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         result={settleResult}
         allocationInfoByUuid={allocationInfoByUuid}
         onClose={() => setSettleResultOpen(false)}
+      />
+
+      <ReconVoucherPickerDialog
+        open={voucherPickerOpen}
+        onClose={() => setVoucherPickerOpen(false)}
+        targetAmount={Math.abs(platformFeeAmount)}
+        selected={platformFeeVouchers}
+        onConfirm={rows => {
+          setPlatformFeeVouchers(rows);
+          clearComputedState();
+        }}
       />
     </div>
   );

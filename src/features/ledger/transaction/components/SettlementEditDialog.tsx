@@ -164,13 +164,20 @@ function SettlementEditDialogContent({
     }
     const allocations: SettleSummaryFee[] = fee > 0 ? [{ name: '手續費', feeAmount: fee }] : [];
     const otherDeductionsBody =
-      otherDeductions.length > 0 ? otherDeductions.map(r => ({ name: r.name, amount: r.amount, officialAccountingSubjectId: r.subject!.id! })) : undefined;
+      otherDeductions.length > 0
+        ? otherDeductions.map(r => ({
+            name: r.name,
+            amount: r.amount,
+            officialAccountingSubjectId: r.subject!.id!,
+            companyAccountingSubjectUuid: r.subject!.companyAccountingSubjectUuid,
+          }))
+        : undefined;
     try {
       if (isSales) {
         await settleReceivable({
           ledgerUuid,
           paymentDate: formattedDate!,
-          bankAccountUuid,
+          depositChannels: [{ isBankAccount: true, bankAccountUuid, amount: depositAmount }],
           settleAmount: amount,
           depositAmount,
           // 本對話框僅供編輯既有單筆沖帳金額，無「使用餘額」欄位，固定不使用餘額
@@ -183,7 +190,7 @@ function SettlementEditDialogContent({
         await settlePayable({
           ledgerUuid,
           paymentDate: formattedDate!,
-          bankAccountUuid,
+          paymentChannels: [{ isBankAccount: true, bankAccountUuid, amount: depositAmount }],
           settleAmount: amount,
           paymentAmount: depositAmount,
           balanceUsed: 0,

@@ -1,60 +1,48 @@
 'use client';
 
-import StatCard from '@/components/ui/StatCard';
-import TrendChart from '@/components/ui/TrendChart';
-import { fmtCurrency } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
-import { PURCHASE_DAILY, SALES_DAILY } from '../data';
-import type { LedgerTotals, Side } from '../types';
+import { useLedgerSummary } from '../useLedgerSummary';
+import type { Side } from '../types';
 import { withReturnParam } from '../urlState';
+import ChannelShareCard from './summary/ChannelShareCard';
+import SettlementCard from './summary/SettlementCard';
+import TrendCard from './summary/TrendCard';
 
-// 桌面版卡片有足夠寬度，趨勢圖預設顯示「日」；手機版卡片較窄，預設顯示「週」避免 62 根柱子擠爆
-// 趨勢圖（SALES_DAILY／PURCHASE_DAILY）目前無對應後端 API，暫維持既有假資料，僅頂部 KPI 數字改為真實彙總值
-function buildCards(side: Side, totals: LedgerTotals | null, chartDefaultView: 'day' | 'week', searchParams: ReturnType<typeof useSearchParams>) {
-  const dailyData = side === 'sales' ? SALES_DAILY : PURCHASE_DAILY;
-  const chart = <TrendChart data={dailyData} defaultView={chartDefaultView} />;
-  const primary = totals?.primary ?? 0;
-  const settled = totals?.settled ?? 0;
-  const outstanding = totals?.outstanding ?? 0;
-
-  return side === 'sales'
-    ? [
-        {
-          label: '已開立發票金額',
-          value: fmtCurrency(primary),
-          chart,
-          detailHref: withReturnParam('/ledger/trend?side=sales', searchParams),
-        },
-        { label: '已入帳金額', value: fmtCurrency(settled), valueClassName: 'text-semantic-success', caption: '平均收款週期 7 天' },
-        { label: '應收帳款', value: fmtCurrency(outstanding), valueClassName: 'text-semantic-error', caption: '平均收款週期 7 天' },
-      ]
-    : [
-        {
-          label: '已收取憑證金額',
-          value: fmtCurrency(primary),
-          chart,
-          detailHref: withReturnParam('/ledger/trend?side=purchase', searchParams),
-        },
-        { label: '已付款金額', value: fmtCurrency(settled), valueClassName: 'text-semantic-success', caption: '平均付款週期 7 天' },
-        { label: '應付金額', value: fmtCurrency(outstanding), valueClassName: 'text-semantic-error', caption: '平均付款週期 7 天' },
-      ];
+interface SummaryCardsProps {
+  side: Side;
+  /** 圖表 X 軸涵蓋的區間（ROC YYY/MM/DD），與列表日期篩選解耦，見 LedgerView 的 chartRange 註解 */
+  chartRange: { from: string; to: string };
+  /** 目前列表套用的日期篩選；用來標示卡片 A 的選取態，無篩選時為 null */
+  selectedRange: { from: string; to: string } | null;
+  channelUuid: string | null;
+  onRangeSelect: (range: { from: string; to: string } | null) => void;
+  onChannelSelect: (uuid: string | null) => void;
 }
 
-export default function SummaryCards({ side, totals }: { side: Side; totals: LedgerTotals | null }) {
+/**
+ * 桌機三卡並列（12 欄 grid：6/3/3），手機單欄堆疊（DESIGN.md §11.5）。
+ * 三張卡的數字（趨勢大數字／入帳狀況／管道佔比）皆由 useLedgerSummary 統一抓取一次，僅隨
+ * side + chartRange 變動，不吃列表子分頁／篩選；入帳狀況卡本身不可點擊篩選，不需要 onSubTabSelect。
+ */
+export default function SummaryCards({ side, chartRange, selectedRange, channelUuid, onRangeSelect, onChannelSelect }: SummaryCardsProps) {
   const searchParams = useSearchParams();
-  const desktopCards = buildCards(side, totals, 'day', searchParams);
-  const mobileCards = buildCards(side, totals, 'week', searchParams);
+  const { dailyAmounts, shares, totals, loading } = useLedgerSummary(side, chartRange);
+  const detailHref = withReturnParam(`/ledger/trend?side=${side}`, searchParams);
 
   return (
-    <>
-      <div className="hidden gap-3 nav:flex">
-        {desktopCards.map(c => (
-          <StatCard key={c.label} {...c} />
-        ))}
-      </div>
-      <div className="nav:hidden">
-        <StatCard {...mobileCards[0]} />
-      </div>
-    </>
+    <div className="grid grid-cols-1 gap-3 nav:grid-cols-12">
+      <TrendCard
+        side={side}
+        range={chartRange}
+        selectedRange={selectedRange}
+        dailyAmounts={dailyAmounts}
+        primaryAmount={totals?.primary ?? 0}
+        loading={loading}
+        onRangeSelect={onRangeSelect}
+        detailHref={detailHref}
+      />
+      <SettlementCard side={side} totals={totals} loading={loading} />
+      <ChannelShareCard side={side} shares={shares} loading={loading} selectedUuid={channelUuid} onSelect={onChannelSelect} />
+    </div>
   );
 }

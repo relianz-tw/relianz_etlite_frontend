@@ -34,8 +34,11 @@ export interface UseReconTargetsResult {
  *
  * 唯一的後端接線點：科目餘額目前恆為 stub（listSubjectBalances 一律回空陣列，見 api/subjects.ts），
  * 後端提供端點後只需把該函式換成真正的 API 呼叫，此 hook 與呼叫端都不用改。
+ *
+ * @param preferredBankAccountUuid 預設主對象的第一優先候選（目前選定銷售管道的收款帳戶 uuid），
+ * 由 ReconciliationView 依 selectedGroupKey 算出；變動時（含側邊欄切換管道）會重新套用預設，見下方 effect
  */
-export function useReconTargets(side: ReconSide): UseReconTargetsResult {
+export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: string): UseReconTargetsResult {
   const [accounts, setAccounts] = useState<BankAccountDto[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountsError, setAccountsError] = useState('');
@@ -95,12 +98,12 @@ export function useReconTargets(side: ReconSide): UseReconTargetsResult {
     return built.map(t => (t.kind === 'subject' ? { ...t, balance: subjectBalances.find(b => b.subjectCode === t.subjectCode)?.balance } : t));
   }, [accounts, officialSubjects, side, subjectBalances]);
 
-  // 應付找預設付款帳戶、應收找預設收款帳戶；side 切換或帳戶載入完成時重新套用
-  // （沿用原本 bankAccountUuid 的重置行為，見 ReconciliationView 舊版的 [side, accounts] effect）
+  // 優先套用 preferredBankAccountUuid（見 pickDefaultTargetKey），查無則應付找預設付款帳戶、應收找預設收款帳戶；
+  // side／帳戶載入完成／preferredBankAccountUuid 任一變動（含側邊欄切換銷售管道）都會重新套用預設
   useEffect(() => {
     if (accounts.length === 0) return;
-    setPrimaryTargetKey(pickDefaultTargetKey(accounts, side));
-  }, [side, accounts]);
+    setPrimaryTargetKey(pickDefaultTargetKey(accounts, side, preferredBankAccountUuid));
+  }, [side, accounts, preferredBankAccountUuid]);
 
   const addAllocationRow = () => {
     rowIdRef.current += 1;

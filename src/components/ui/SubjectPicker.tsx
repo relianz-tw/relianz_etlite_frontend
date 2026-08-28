@@ -6,8 +6,9 @@ import {
   listSubjectUsage,
   type SubjectFilterParams,
   type SubjectIdentifyScenario,
+  type SubjectUsageScenario,
 } from '@/api/subjects';
-import type { OfficialSubjectDto } from '@/api/types';
+import type { OfficialSubjectDto, SubjectChildDto } from '@/api/types';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { useIsNavDesktop } from '@/lib/useNavBreakpoint';
 import { ChevronDown, ChevronLeft, Sparkles, Zap } from 'lucide-react';
@@ -39,6 +40,15 @@ const SCOPE_TO_AI_SCENARIO: Record<SubjectScope, SubjectIdentifyScenario> = {
   general: 0,
 };
 
+// /ael/subject/usage 的 scenario 為後端必填參數（0進項／1銷項／2銀行提匯，與上面 AI 辨識的
+// scenario 數值定義不同，不可共用），無「不分」選項；general 情境退而求其次採用進項（0）
+const SCOPE_TO_USAGE_SCENARIO: Record<SubjectScope, SubjectUsageScenario> = {
+  purchase: 0,
+  sales: 1,
+  bank: 2,
+  general: 0,
+};
+
 interface SubjectPickerProps {
   value: SubjectOption | null;
   onChange: (value: SubjectOption) => void;
@@ -51,6 +61,9 @@ interface SubjectPickerProps {
   /** 覆寫 SCOPE_PARAMS[scope] 的 buyOrSell（如銀行新增交易依收支方向動態決定：支出=2／存入=3）；
    * 未傳入時沿用 scope 對應的固定值 */
   buyOrSell?: 2 | 3;
+  /** 覆寫科目篩選，僅帶固定資產折舊與減損科目（如進項一般發票勾選「是否為固定資產」時）；
+   * 未傳入時不加此篩選條件，維持 scope 對應的既有清單 */
+  isFixedAssetDepreciationImpairment?: 0 | 1;
   /** 外部（如憑證辨識）自動帶入 value 時傳入 true，讓元件顯示「AI 已為你選擇」提示；僅由 false→true 觸發一次，
    * 使用者之後手動改選會透過既有的 commitSelection(fromAi=false) 自動熄滅，不受此 prop 影響 */
   aiPicked?: boolean;
@@ -75,6 +88,7 @@ export default function SubjectPicker({
   aiPicked = false,
   inDialog = false,
   buyOrSell,
+  isFixedAssetDepreciationImpairment,
 }: SubjectPickerProps) {
   const isDesktop = useIsNavDesktop();
   const modalSurface = useContext(ModalSurfaceContext);
@@ -107,24 +121,33 @@ export default function SubjectPicker({
   // 送出後元件可能卸載或再次送出，用遞增序號比對忽略過時的回應
   const aiRequestIdRef = useRef(0);
 
-  // scope 或 buyOrSell 覆寫值改變時重新抓取，避免快取旗標跨語境誤用（如銀行新增交易切換支出／存入）
+  // scope 或 buyOrSell／isFixedAssetDepreciationImpairment 覆寫值改變時重新抓取，避免快取旗標
+  // 跨語境誤用（如銀行新增交易切換支出／存入、進項一般發票切換是否為固定資產）
   useEffect(() => {
     setLoaded(false);
-  }, [scope, buyOrSell]);
+  }, [scope, buyOrSell, isFixedAssetDepreciationImpairment]);
 
   // 外部（憑證辨識）帶入 aiPicked=true 時點亮提示；使用者之後手動選擇會透過 commitSelection(fromAi=false) 自動熄滅
   useEffect(() => {
     if (aiPicked) setPickedByAi(true);
   }, [aiPicked]);
 
-  const basicParams: SubjectFilterParams = buyOrSell ? { ...SCOPE_PARAMS[scope], buyOrSell } : SCOPE_PARAMS[scope];
+  const basicParams: SubjectFilterParams = {
+    ...SCOPE_PARAMS[scope],
+    ...(buyOrSell ? { buyOrSell } : {}),
+    ...(isFixedAssetDepreciationImpairment !== undefined ? { isFixedAssetDepreciationImpairment } : {}),
+  };
 
   // 開啟面板且尚未載入過時才並行抓三支：搜尋會跨到「全部」，不能等切到該頁籤才抓
   useEffect(() => {
     if (!open || loaded) return;
     setLoading(true);
     setError('');
-    Promise.all([filterOfficialSubjects(basicParams), filterOfficialSubjects({ calculationType: 0 }), listSubjectUsage()])
+    Promise.all([
+      filterOfficialSubjects(basicParams),
+      filterOfficialSubjects({ calculationType: 0 }),
+      listSubjectUsage(SCOPE_TO_USAGE_SCENARIO[scope]),
+    ])
       .then(([basicList, allList, usageList]) => {
         setBasic(basicList);
         setAll(allList);
@@ -133,7 +156,7 @@ export default function SubjectPicker({
       })
       .catch((err) => setError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, loaded, scope, buyOrSell]);
+  }, [open, loaded, scope, buyOrSell, isFixedAssetDepreciationImpairment]);
 
   // 切分頁／改搜尋時清單捲回頂端
   useEffect(() => {
@@ -221,6 +244,9 @@ export default function SubjectPicker({
     return all.find((s) => s.name === value.name)?.subjectCode;
   }, [value, all]);
 
+  // value 帶 companyAccountingSubjectUuid 代表選中的是子科目，供子科目列反白判斷（見 selectedCode 邏輯）
+  const selectedCompanyAccountingSubjectUuid = value?.companyAccountingSubjectUuid;
+
   function resetPanelState() {
     setQuery('');
     setArmedCode(null);
@@ -261,6 +287,13 @@ export default function SubjectPicker({
     closePanel();
   }
 
+  // 選定子科目：officialAccountingSubjectId 仍送父科目 id（subject.id），另帶 companyAccountingSubjectUuid
+  function commitChildSelection(subject: OfficialSubjectDto, child: SubjectChildDto, fromAi: boolean) {
+    onChange({ id: subject.id, subjectCode: child.subjectCode, name: child.name, companyAccountingSubjectUuid: child.uuid });
+    setPickedByAi(fromAi);
+    closePanel();
+  }
+
   function handleRowClick(subject: OfficialSubjectDto) {
     // 手機採兩段式確認：第一次點只標記待確認，再點一次（或點「確認」）才真正選定
     if (!isDesktop && armedCode !== subject.subjectCode) {
@@ -268,6 +301,14 @@ export default function SubjectPicker({
       return;
     }
     commitSelection(subject, false);
+  }
+
+  function handleChildRowClick(subject: OfficialSubjectDto, child: SubjectChildDto) {
+    if (!isDesktop && armedCode !== child.uuid) {
+      setArmedCode(child.uuid);
+      return;
+    }
+    commitChildSelection(subject, child, false);
   }
 
   function handleAiSubmit() {
@@ -342,8 +383,10 @@ export default function SubjectPicker({
     matchCount: matchedAll.length,
     options: visibleOptions,
     selectedCode,
+    selectedCompanyAccountingSubjectUuid,
     armedCode,
     onRowClick: handleRowClick,
+    onChildRowClick: handleChildRowClick,
     listRef,
     loading,
     error,

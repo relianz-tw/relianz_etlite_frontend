@@ -65,6 +65,9 @@ export interface NewBankTransactionInput {
   amount: number;
   /** YYYYMMDD */
   paymentDate: string;
+  /** 恆為父科目 id；選到子科目時另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳 */
+  companyAccountingSubjectUuid?: string;
   memo: string;
 }

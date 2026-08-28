@@ -220,16 +220,38 @@ export interface OfficialSubjectDto {
   remark: string | null;
   /** 0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表 */
   type?: number;
-  /** 0:一般科目型欄位，1:合計型科目欄位，2:棄置科目 */
+  /** 0:一般科目型欄位，1:合計型科目欄位，2:棄置科目，3:期初開帳設定科目，4:期末結帳設定科目 */
   calculationType?: number;
   /** 買賣業:1,勞務業:2,製造業:4 */
   industryBitmask?: number;
   /** 銀行項目專用科目嗎 */
   isBank?: boolean;
+  /** 是固定資產折舊與減損科目嗎 */
+  is_fixed_asset_depreciation_impairment?: boolean;
   /** 進項:2，銷項:3 */
   buyOrSell?: number;
   createdAt: string;
   updatedAt: string;
+  /** 該官方科目下的公司自訂子科目；僅 /ael/subject/official/list/filter 會回傳，/list/latest 不含此欄位 */
+  children?: SubjectChildDto[];
+}
+
+/**
+ * 官方科目下的公司自訂子科目（隨 OfficialSubjectDto.children 一併回傳，非獨立端點）。
+ * 選用子科目時，送出交易 API 需同時帶父科目 officialAccountingSubjectId 與此處 uuid
+ * （對應 companyAccountingSubjectUuid），見各 Create/Settle body 的欄位註解。
+ */
+export interface SubjectChildDto {
+  uuid: string;
+  /** 子科目會計項目代號 */
+  subjectCode: string;
+  name: string;
+  /** 銀行帳戶uuid；子科目非銀行帳戶時為空字串 */
+  bankAccountUuid: string;
+  debitCreditType: string | null;
+  type?: number;
+  calculationType?: number;
+  buyOrSell?: number;
 }
 
 /** 使用者常用科目 DTO（/ael/subject/usage），依 rank 由小到大排序即為常用程度排名 */
@@ -374,8 +396,10 @@ export interface CreatePayableBody {
   memo?: string;
   /** 未稅 */
   netAmount: number;
-  /** 官方科目 id（進貨／費用科目） */
+  /** 官方科目 id（進貨／費用科目）；選到子科目時仍傳父科目 id，子科目另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳（見 OfficialSubjectDto.children） */
+  companyAccountingSubjectUuid?: string;
   /** 進口專用：其他零總稅費加總 */
   others?: number;
   /** 發票備註 */
@@ -415,8 +439,10 @@ export interface CreateReceivableBody {
   isReturnGoods?: boolean;
   memo?: string;
   netAmount: number;
-  /** 官方科目 id（收入科目） */
+  /** 官方科目 id（收入科目）；選到子科目時仍傳父科目 id，子科目另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳（見 OfficialSubjectDto.children） */
+  companyAccountingSubjectUuid?: string;
   /** 進口專用其他稅費加總（銷項通常 0） */
   others?: number;
   /** 銷售管道 uuid；選填，須屬該公司且啟用 */
@@ -446,8 +472,10 @@ export interface CreateAllowanceBody {
   netAmount: number;
   /** 稅額 */
   taxAmount: number;
-  /** 科目 id */
+  /** 科目 id；選到子科目時仍傳父科目 id，子科目另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳（見 OfficialSubjectDto.children） */
+  companyAccountingSubjectUuid?: string;
   /** 備註；選填 */
   memo?: string;
 }
@@ -518,6 +546,8 @@ export interface PayablesFilterBody {
   limit: number;
   /** 頁碼 */
   page: number;
+  /** 廠商 uuid；帶入時僅回傳該廠商的交易與彙總數字（帳簿總覽「廠商佔比」卡片下鑽用） */
+  counterpartyUuid?: string;
 }
 
 /** 進項應付交易列表單筆項目 */
@@ -558,7 +588,12 @@ export interface PayableListItemDto {
   settledAmount: number;
   remainingAmount: number;
   settlementStatus: number;
+  /** 費用科目官方科目 id；恆為父科目 id */
   officialAccountingSubjectId: number;
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
+  subjectName: string;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
@@ -603,6 +638,8 @@ export interface ReceivablesFilterBody {
   limit: number;
   /** 頁碼 */
   page: number;
+  /** 銷售管道 uuid；帶入時僅回傳該管道的交易與彙總數字（帳簿總覽「銷售管道佔比」卡片下鑽用） */
+  paymentChannelUuid?: string;
 }
 
 /** 銷項應收交易列表單筆項目 */
@@ -627,7 +664,12 @@ export interface ReceivableListItemDto {
   settledAmount: number;
   remainingAmount: number;
   settlementStatus: number;
+  /** 收入科目官方科目 id；恆為父科目 id */
   officialAccountingSubjectId: number;
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
+  subjectName: string;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
@@ -653,6 +695,69 @@ export interface ReceivablesFilterResult {
   receivableAmount: number;
 }
 
+/**
+ * 帳簿總覽彙總 body，供 POST /ael/ledger/receivables/summary（應收）與
+ * /ael/ledger/receivables/collected/summary（已收）共用，兩者 body/response 形狀相同，
+ * 差異僅在 dateFrom/dateTo 口徑（應收＝transaction_date、已收＝entry_date，由後端依端點決定）。
+ * 與 ReceivablesFilterBody 條件一致（僅少 limit/page），確保圖表與下方列表口徑相同。
+ */
+export type ReceivablesSummaryBody = Omit<ReceivablesFilterBody, 'limit' | 'page'>;
+
+/** 帳簿總覽「已開立發票金額」趨勢圖單日資料點 */
+export interface LedgerDailyAmount {
+  /** 西元 YYYYMMDD；口徑為憑證開立日（invoice.date），非收款日 */
+  date: string;
+  issuedAmount: number;
+}
+
+/** 帳簿總覽「銷售管道佔比」單一管道資料 */
+export interface LedgerChannelShare {
+  /** 未指定銷售管道時為 null */
+  paymentChannelUuid: string | null;
+  channelName: string;
+  amount: number;
+}
+
+/** POST /ael/ledger/receivables/summary、/ael/ledger/receivables/collected/summary 共用回應形狀 */
+export interface ReceivablesSummaryResult {
+  /** 與 ReceivablesFilterResult 同名欄位同口徑，供帳簿總覽「入帳狀況」卡片使用 */
+  issuedVoucherAmount: number;
+  collectedAmount: number;
+  receivableAmount: number;
+  /** 區間內逐日金額；缺漏的日期代表當日無交易，前端補 0 */
+  dailyAmounts: LedgerDailyAmount[];
+  /** 依銷售管道分組金額；未排序、未取 Top N，由前端處理 */
+  channelShares: LedgerChannelShare[];
+}
+
+/**
+ * 帳簿總覽彙總 body，供 POST /ael/ledger/payables/summary（應付）與
+ * /ael/ledger/payables/paid/summary（已付）共用，兩者 body/response 形狀相同，
+ * 差異僅在 dateFrom/dateTo 口徑（應付＝transaction_date、已付＝entry_date，由後端依端點決定）。
+ * 與 PayablesFilterBody 條件一致（僅少 limit/page）。
+ */
+export type PayablesSummaryBody = Omit<PayablesFilterBody, 'limit' | 'page'>;
+
+/** 帳簿總覽「廠商佔比」單一廠商資料 */
+export interface LedgerVendorShare {
+  /** 未指定廠商時為 null */
+  counterpartyUuid: string | null;
+  counterpartyName: string;
+  amount: number;
+}
+
+/** POST /ael/ledger/payables/summary、/ael/ledger/payables/paid/summary 共用回應形狀 */
+export interface PayablesSummaryResult {
+  /** 與 PayablesFilterResult 同名欄位同口徑，供帳簿總覽「入帳狀況」卡片使用 */
+  receivedVoucherAmount: number;
+  paidAmount: number;
+  payableAmount: number;
+  /** 區間內逐日金額；缺漏的日期代表當日無交易，前端補 0 */
+  dailyAmounts: LedgerDailyAmount[];
+  /** 依廠商分組金額；未排序、未取 Top N，由前端處理 */
+  vendorShares: LedgerVendorShare[];
+}
+
 /** GET /ael/ledger/reconciliation/{payables,receivables} 共用 query 參數 */
 export interface ReconciliationQuery {
   /** 日期起，YYYYMMDD */
@@ -661,6 +766,10 @@ export interface ReconciliationQuery {
   dateTo?: string;
   /** 'true'=已結清、'false'=未結清、省略=全部 */
   settled?: string;
+  /** 金額下限 */
+  amountFrom?: string;
+  /** 金額上限 */
+  amountTo?: string;
 }
 
 /** 對帳中心項目關聯發票資訊；GET /ael/ledger/reconciliation/{payables,receivables} 各筆項目皆附帶此欄位 */
@@ -703,7 +812,12 @@ export interface ReconPayableItemDto {
   settledAmount: number;
   remainingAmount: number;
   settlementStatus: number;
+  /** 費用科目官方科目 id；恆為父科目 id */
   officialAccountingSubjectId: number;
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
+  subjectName: string;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   createdAt: string;
   invoice: ReconInvoiceDto;
 }
@@ -738,7 +852,12 @@ export interface ReconReceivableItemDto {
   settledAmount: number;
   remainingAmount: number;
   settlementStatus: number;
+  /** 收入科目官方科目 id；恆為父科目 id */
   officialAccountingSubjectId: number;
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
+  subjectName: string;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   createdAt: string;
   invoice: ReconInvoiceDto;
 }
@@ -787,8 +906,8 @@ export interface SettleReceivableBody {
   ledgerUuid: string;
   /** 交易收款日，YYYYMMDD */
   paymentDate: string;
-  /** 銀行帳戶 uuid */
-  bankAccountUuid: string;
+  /** 收款管道 */
+  depositChannels: SettleChannel[];
   /** 沖帳金額 */
   settleAmount: number;
   /** 實際存入 */
@@ -810,8 +929,8 @@ export interface SettlePayableBody {
   ledgerUuid: string;
   /** 交易付款日，YYYYMMDD */
   paymentDate: string;
-  /** 銀行帳戶 uuid */
-  bankAccountUuid: string;
+  /** 付款管道 */
+  paymentChannels: SettleChannel[];
   /** 沖帳金額 */
   settleAmount: number;
   /** 實際付款 */
@@ -824,6 +943,20 @@ export interface SettlePayableBody {
   allocations: SettleSummaryFee[];
   /** 沖帳其他減項物件 */
   otherDeductions?: SettleSummaryOtherDeduction[];
+}
+
+/**
+ * 收付款管道：isBankAccount=true 時 bankAccountUuid 必填，false 時 officialAccountingSubjectId 必填。
+ * 各管道 amount 加總＝實際存入／付出金額，四支沖帳 API（手動／匯總 × 銷項／進項）共用同一結構。
+ */
+export interface SettleChannel {
+  isBankAccount: boolean;
+  bankAccountUuid?: string;
+  officialAccountingSubjectId?: number;
+  /** 公司自訂子科目 uuid；選填，僅 !isBankAccount 且選到子科目時傳，officialAccountingSubjectId 仍為父科目 id */
+  companyAccountingSubjectUuid?: string;
+  /** 該管道沖帳金額 */
+  amount: number;
 }
 
 /** 匯總沖帳手續費物件（單一物件，非陣列），銷項／進項共用同一結構 */
@@ -840,8 +973,10 @@ export interface SettleSummaryOtherDeduction {
   name: string;
   /** 沖帳金額 */
   amount: number;
-  /** 科目 id */
+  /** 科目 id；選到子科目時仍傳父科目 id，子科目另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳（見 OfficialSubjectDto.children） */
+  companyAccountingSubjectUuid?: string;
 }
 
 /**
@@ -1001,8 +1136,8 @@ export interface SettleReceivableSummaryBody {
   depositAmount: number;
   /** 收款日 YYYYMMDD */
   paymentDate: string;
-  /** 存入銀行帳戶 uuid */
-  bankAccountUuid: string;
+  /** 收款管道 */
+  depositChannels: SettleChannel[];
   /** 備註（選填） */
   memo?: string;
   /** 使用餘額 */
@@ -1021,8 +1156,8 @@ export interface SettlePayableSummaryBody {
   paymentAmount: number;
   /** 付款日 YYYYMMDD */
   paymentDate: string;
-  /** 付款銀行帳戶 uuid */
-  bankAccountUuid: string;
+  /** 付款管道 */
+  paymentChannels: SettleChannel[];
   memo?: string;
   /** 使用餘額 */
   balanceUsed: number;
@@ -1036,8 +1171,6 @@ interface SettleSummaryResultBase {
   affectedCount: number;
   /** 各原單沖帳結果；實測欄位名稱與 preview 一致為 ledgerAllocations，非 api.md 範例所示的 allocations */
   ledgerAllocations: SettleLedgerAllocation[];
-  /** 付款／收款戶頭 */
-  bankAccountUuid: string;
   /** 付款／收款日 YYYYMMDD */
   paymentDate: string;
   /** 匯總沖帳總額 */
@@ -1060,6 +1193,8 @@ interface SettleSummaryResultBase {
 export interface SettleReceivableSummaryResult extends SettleSummaryResultBase {
   counterpartyUuid?: string;
   paymentChannelUuid: string;
+  /** 收款管道 */
+  depositChannels: SettleChannel[];
   /** 實際銀行存入 */
   depositAmount: number;
   actualDepositAmount: number;
@@ -1069,6 +1204,8 @@ export interface SettleReceivableSummaryResult extends SettleSummaryResultBase {
 export interface SettlePayableSummaryResult extends SettleSummaryResultBase {
   counterpartyUuid: string;
   paymentChannelUuid?: string;
+  /** 付款管道 */
+  paymentChannels: SettleChannel[];
   /** 實際銀行付出 */
   paymentAmount: number;
   actualPaymentAmount: number;
@@ -1126,7 +1263,7 @@ export interface EntryDetailEntryDto {
   netAmount: number;
   /** 稅額 */
   taxAmount: number;
-  /** 科目名稱 */
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
   subjectName: string;
   /** 已沖金額（元） */
   settledAmount: number;
@@ -1134,8 +1271,10 @@ export interface EntryDetailEntryDto {
   remainingAmount: number;
   /** 0平衡 1超沖 2少沖 */
   settlementStatus: number;
-  /** 費用類別／收入科目官方科目 id，對應 /ael/subject/official/list/latest 的 id */
+  /** 費用類別／收入科目官方科目 id，對應 /ael/subject/official/list/latest 的 id；恆為父科目 id */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   /** 銷售管道 uuid；未指定時為 null */
   paymentChannelUuid: string | null;
 }
@@ -1241,8 +1380,10 @@ export interface DailyDetailLineDto {
   voucherType: string;
   /** 民國日期 YYYMMDD，例 '1150807' */
   rocDate: string;
-  /** 會計科目名稱 */
+  /** 會計科目名稱；若該筆分錄選了子科目，此欄位優先回傳子科目名稱 */
   subjectName: string;
+  /** 公司自訂子科目 uuid；該筆分錄未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
   /** 對方科目/對象代碼（目前多為空） */
   counterpartyCode: string;
   summary: string;
@@ -1338,8 +1479,10 @@ export interface CashMovementBody {
   amount: number;
   /** YYYYMMDD */
   paymentDate: string;
-  /** 科目id */
+  /** 科目id；選到子科目時仍傳父科目 id，子科目另見 companyAccountingSubjectUuid */
   officialAccountingSubjectId: number;
+  /** 公司自訂子科目 uuid；選填，僅選到子科目時傳（見 OfficialSubjectDto.children） */
+  companyAccountingSubjectUuid?: string;
   memo: string;
 }
 
@@ -1357,4 +1500,123 @@ export interface CashMovementResult {
   amount: number;
   /** YYYYMMDD */
   paymentDate: string;
+}
+
+/**
+ * 營業稅中心：指定期別進／銷項發票列表（POST /ael/vat/input/filter、/ael/vat/output/filter）body。
+ * 兩支端點 body 結構完全相同，共用同一型別。
+ */
+export interface VatInvoiceFilterBody {
+  companyUuid: string;
+  /** 民國年 */
+  cmsYear: number;
+  /** 期別 1/3/5/7/9/11 */
+  cmsPhase: number;
+  /** 選填；字軌+號碼模糊比對 */
+  invoiceNumber?: string;
+  /** 選填；金額下限，比對 invoice amount */
+  amountFrom?: number;
+  /** 選填；金額上限，比對 invoice amount */
+  amountTo?: number;
+  /** 選填；起日，西元 YYYYMMDD */
+  dateFrom?: string;
+  /** 選填；迄日，西元 YYYYMMDD */
+  dateTo?: string;
+  /** 選填；統一編號，進項比對賣方、銷項比對買方 */
+  taxIdNumber?: string;
+  /** 選填；公司名稱模糊比對，進項比對賣方、銷項比對買方 */
+  companyName?: string;
+  /** 選填；true＝作廢、false＝非作廢，省略＝不篩 */
+  isVoid?: boolean;
+  /** 選填；預設 10 */
+  limit?: number;
+  /** 選填；預設 1 */
+  page?: number;
+}
+
+/** 營業稅中心進／銷項發票列表單筆項目；兩支端點回應結構相同，共用同一型別 */
+export interface VatInvoiceItemDto {
+  invoiceUuid: string;
+  /** 發票字軌 */
+  invoiceTrack: string;
+  /** 發票號碼 */
+  invoiceNumber: string;
+  /** 發票字軌+發票號碼 */
+  voucherNumber: string;
+  /** 民國年 YYYMMDD */
+  invoiceDate: string;
+  /** 未稅銷售額 */
+  sales: number;
+  /** 稅額 */
+  businessTax: number;
+  /** 總額 */
+  amount: number;
+  /** 免稅銷售額 */
+  taxFreeAmount: number;
+  /** 0一般／1折讓 */
+  isDebit: number;
+  /** 2進項／3銷項 */
+  buyOrSell: number;
+  ourInvoiceType: number;
+  /** 公司名稱 */
+  companyName: string;
+  /** 買方統編 */
+  buyerTaxIdNumber: string;
+  /** 賣方統編 */
+  sellerTaxIdNumber: string;
+  /** 交易uuid */
+  ledgerUuid: string;
+  /** 交易編號 */
+  orderCode: string;
+  /** 0:進項交易，1:進折交易，2:銷項交易，3:銷折交易 */
+  entryType: number;
+  /** 0:業務原單 1:沖帳結算付款帳 */
+  entryKind: number;
+  /** 0:收入(銷項)，1:支出(進項)，2:應收(銷項)，3:應付(進項)，4:其他 */
+  direction: number | null;
+  /** 廠商名稱 */
+  counterpartyName: string | null;
+  /** 科目id；恆為父科目 id */
+  officialAccountingSubjectId: number;
+  /** 科目名稱；若該筆交易選了子科目，此欄位優先回傳子科目名稱 */
+  subjectName: string;
+  /** 公司自訂子科目 uuid；該筆交易未選子科目時為 undefined */
+  companyAccountingSubjectUuid?: string;
+  /** 作廢狀態 */
+  isVoid: boolean;
+  /** 申報狀態 */
+  declared: boolean;
+}
+
+/**
+ * 營業稅中心進／銷項發票列表回應（data 內容）。totalSales／totalBusinessTax／totalAmount
+ * 為篩選後不分頁的合計（折讓以負值計入），前端不得自行加總，一律直接顯示此三個欄位。
+ */
+export interface VatInvoiceFilterResult {
+  items: VatInvoiceItemDto[];
+  /** 總筆數 */
+  total: number;
+  /** 一頁資料筆數 */
+  limit: number;
+  page: number;
+  /** 篩選後不分頁；折讓以負值計入 */
+  totalSales: number;
+  /** 篩選後不分頁；折讓以負值計入 */
+  totalBusinessTax: number;
+  /** 篩選後不分頁；折讓以負值計入 */
+  totalAmount: number;
+}
+
+/** 營業稅中心：計算本期銷／進發票金額與應納營業稅（GET /ael/vat/periodSummary）回應 data */
+export interface VatPeriodSummaryDto {
+  /** 民國年 */
+  cmsYear: number;
+  /** 期別 */
+  cmsPhase: number;
+  /** 銷項非作廢 amount 合計；折讓以負值計入 */
+  outputInvoiceAmountTotal: number;
+  /** 進項非作廢 amount 合計；折讓以負值計入 */
+  inputInvoiceAmountTotal: number;
+  /** 銷項稅合計 − 進項稅合計；可為負 */
+  businessTaxTotal: number;
 }

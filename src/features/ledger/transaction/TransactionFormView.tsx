@@ -91,6 +91,7 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
     const invoiceNum = form.voucherType === VOUCHER_TYPES[0] ? form.invoiceSerial : form.invoiceNumber;
     if (!isImport && !invoiceNum.trim()) return '請輸入發票號碼';
+    if (form.isFixedAsset && form.usefulLifeYears <= 0) return '請輸入固定資產使用年限';
   } else if (!form.invoiceBookUuid) {
     return '請選擇發票簿';
   }
@@ -106,6 +107,7 @@ function buildAllowanceBody(form: TransactionFormState): Omit<CreateAllowanceBod
     taxAmount: form.taxAmount,
     totalAmount: form.salesAmount + form.taxAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
+    companyAccountingSubjectUuid: form.expenseCategory!.companyAccountingSubjectUuid,
     memo: form.note || undefined,
   };
 }
@@ -120,6 +122,8 @@ function buildPayableInvoice(form: TransactionFormState): Pick<CreatePayableBody
 
 function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, 'companyUuid'> {
   const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
+  // TODO: form.isFixedAsset / form.usefulLifeYears 尚無對應 API 欄位，待後端於 CreatePayableBody
+  // 開放「是否為固定資產」「使用年限」欄位後再補入此 payload
   return {
     ...buildPayableInvoice(form),
     counterpartyName: form.sellerName,
@@ -137,6 +141,7 @@ function buildPayableBody(form: TransactionFormState): Omit<CreatePayableBody, '
     summary: form.summary || undefined,
     netAmount: form.salesAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
+    companyAccountingSubjectUuid: form.expenseCategory!.companyAccountingSubjectUuid,
     others: isImport ? form.others : undefined,
     taxAmount: form.taxAmount,
     taxFreeAmount: form.exemptSalesAmount,
@@ -163,6 +168,7 @@ function buildReceivableBody(form: TransactionFormState): Omit<CreateReceivableB
     summary: form.summary || undefined,
     netAmount: form.salesAmount,
     officialAccountingSubjectId: form.expenseCategory!.id!,
+    companyAccountingSubjectUuid: form.expenseCategory!.companyAccountingSubjectUuid,
     paymentChannelUuid: form.channel || undefined,
     taxAmount: form.taxAmount,
     taxFreeAmount: form.exemptSalesAmount,
@@ -239,7 +245,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
       .then(async ([result, daily]) => {
         if (cancelled) return;
         // 費用類別／收入科目來自 entry.officialAccountingSubjectId，比照帳簿列表反查科目名稱的方式處理
-        const expenseCategory = await resolveExpenseCategory(result.entry.officialAccountingSubjectId);
+        const expenseCategory = await resolveExpenseCategory(result.entry);
         if (cancelled) return;
         // 是否為折讓：優先看頂層 isAllowance，api.md 200 範例 JSON 未含此欄位時退回 invoice.isAllowance
         const allowanceFlag = result.isAllowance ?? result.invoice?.isAllowance ?? false;

@@ -3,12 +3,15 @@
 import Badge from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
 import { fmtCurrency } from '@/lib/utils';
-import { Ban, ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleCheck } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
 import type { SortKey, SortState, TaxInvoiceRow, TaxSide } from '../types';
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
-const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
+const tdBase = 'whitespace-nowrap px-4 py-3.5 text-sm';
+const tdClass = `${tdBase} text-neutral-dark`;
+// 作廢列：文字降階為 neutral-mid，金額另加刪除線（見 DESIGN.md「Voided Row」）
+const tdVoidClass = `${tdBase} text-neutral-mid`;
 
 /** 可排序表頭：三態循環 none → asc → desc → none；active 時文字與圖示轉城信藍（見 DESIGN.md「Sortable Table Header」） */
 function SortHeader({ label, sortKey, sort, onToggle }: { label: string; sortKey: SortKey; sort: SortState; onToggle: (key: SortKey) => void }) {
@@ -26,67 +29,45 @@ function SortHeader({ label, sortKey, sort, onToggle }: { label: string; sortKey
   );
 }
 
-function ExpandToggle({ hasChildren, expanded, onToggle }: { hasChildren: boolean; expanded: boolean; onToggle: () => void }) {
-  if (!hasChildren) return null;
-  return (
-    <button type="button" onClick={onToggle} className="text-neutral-mid">
-      {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-    </button>
-  );
-}
-
-function StatusBadge({ status }: { status: TaxInvoiceRow['status'] }) {
-  if (status === 'voided') {
-    return (
-      <Badge tone="neutral" className="gap-1">
-        <Ban size={12} />
-        已作廢
-      </Badge>
-    );
-  }
-  return (
-    <Badge tone="info" className="gap-1">
-      <CircleCheck size={12} />
-      待申報
-    </Badge>
-  );
-}
-
 export default function InvoiceTable({
   side,
   rows,
   totalCount,
+  totalSales,
+  totalBusinessTax,
   totalAmount,
+  limit,
+  onLimitChange,
   sort,
   onSortToggle,
 }: {
   side: TaxSide;
   rows: TaxInvoiceRow[];
   totalCount: number;
+  totalSales: string;
+  totalBusinessTax: string;
   totalAmount: string;
+  limit: number;
+  onLimitChange: (limit: number) => void;
   sort: SortState;
   onSortToggle: (key: SortKey) => void;
 }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }));
   const counterpartyLabel = side === 'sales' ? '買受人' : '賣方';
 
   return (
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
         <colgroup>
-          <col className="w-8" />
-          <col className="w-[110px]" />
-          <col className="w-[140px]" />
-          <col className="w-[140px]" />
-          <col className="w-[140px]" />
-          <col className="w-[140px]" />
+          <col className="w-[100px]" />
+          <col className="w-[200px]" />
+          <col className="w-[120px]" />
+          <col className="w-[120px]" />
+          <col className="w-[130px]" />
           <col />
           <col className="w-[110px]" />
         </colgroup>
         <thead className="bg-surface-off-white">
           <tr className="border-b border-neutral-blue-gray/40">
-            <th className={thClass} />
             <th className={thClass}>
               <SortHeader label="開立日期" sortKey="date" sort={sort} onToggle={onSortToggle} />
             </th>
@@ -97,57 +78,55 @@ export default function InvoiceTable({
             <th className={`${thClass} text-right`}>營業稅額</th>
             <th className={`${thClass} text-right`}>總金額</th>
             <th className={thClass}>{counterpartyLabel}</th>
-            <th className={thClass}>狀態</th>
+            <th className={thClass}>申報狀態</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
-            <Fragment key={row.id}>
+          {rows.map((row, i) => {
+            const cell = row.isVoid ? tdVoidClass : tdClass;
+            const amountStrike = row.isVoid ? 'line-through' : '';
+            return (
               <tr
-                className={`border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${
-                  row.status === 'voided' ? 'opacity-60' : i % 2 === 1 ? 'bg-surface-warm/30' : ''
-                }`}
+                key={row.uuid}
+                className={`border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
               >
-                <td className={tdClass}>
-                  <ExpandToggle hasChildren={!!row.children} expanded={!!expanded[row.id]} onToggle={() => toggleExpand(row.id)} />
+                <td className={`${cell} font-mono`}>{row.date}</td>
+                <td className={`${cell} font-mono text-[13px] font-semibold`}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Link
+                      href={`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`}
+                      className={`hover:text-brand-blue hover:underline ${amountStrike}`}
+                    >
+                      {row.id}
+                    </Link>
+                    {row.isAllowance && <Badge tone="info">折讓</Badge>}
+                    {row.isVoid && <Badge tone="error">已作廢</Badge>}
+                  </div>
                 </td>
-                <td className={`${tdClass} font-mono`}>{row.date}</td>
-                <td className={`${tdClass} font-mono text-[13px] font-semibold`}>{row.id}</td>
-                <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.untaxed)}</td>
-                <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.tax)}</td>
-                <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(row.total)}</td>
-                <td className={`${tdClass} truncate`} title={row.counterparty}>{row.counterparty}</td>
-                <td className={tdClass}>
-                  <StatusBadge status={row.status} />
+                <td className={`${cell} text-right font-mono tabular-nums ${amountStrike}`}>{fmtCurrency(row.untaxed)}</td>
+                <td className={`${cell} text-right font-mono tabular-nums ${amountStrike}`}>{fmtCurrency(row.tax)}</td>
+                <td className={`${cell} text-right font-mono font-semibold tabular-nums ${amountStrike}`}>{fmtCurrency(row.total)}</td>
+                <td className={`${cell} truncate`} title={row.counterparty}>{row.counterparty}</td>
+                <td className={cell}>
+                  <Badge tone={row.declared ? 'success' : 'neutral'}>{row.declared ? '已申報' : '未申報'}</Badge>
                 </td>
               </tr>
-              {expanded[row.id] &&
-                row.children?.map(child => (
-                  <tr key={child.id} className="border-b border-neutral-blue-gray/20 bg-surface-off-white/60 last:border-0">
-                    <td className={tdClass} />
-                    <td className={`${tdClass} font-mono text-[13px] text-neutral-mid`}>{child.date ?? ''}</td>
-                    <td className={`${tdClass} pl-2 font-mono text-[13px] text-neutral-mid`}>{child.label ?? child.id}</td>
-                    <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.untaxed)}</td>
-                    <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.tax)}</td>
-                    <td className={`${tdClass} text-right font-mono text-neutral-mid tabular-nums`}>{fmtCurrency(child.total)}</td>
-                    <td className={tdClass} colSpan={2} />
-                  </tr>
-                ))}
-            </Fragment>
-          ))}
+            );
+          })}
         </tbody>
         <tfoot>
           <tr className="border-t border-neutral-blue-gray/40 bg-surface-off-white">
-            <td colSpan={3} className={`${tdClass} text-neutral-mid`}>
+            <td className={`${tdClass} text-neutral-mid`}>
               目前顯示 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
             </td>
-            <td colSpan={2} className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>
-              {totalAmount}
-            </td>
-            <td colSpan={3} className={tdClass}>
+            <td className={tdClass} />
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalSales}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalBusinessTax}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalAmount}</td>
+            <td className={tdClass}>
               <div className="flex items-center justify-end gap-2 text-sm text-neutral-mid">
                 每頁顯示：
-                <Select widthClassName="w-20" defaultValue="10">
+                <Select widthClassName="w-20" value={String(limit)} onValueChange={v => onLimitChange(Number(v))}>
                   <option value="10">10</option>
                   <option value="25">25</option>
                   <option value="50">50</option>
@@ -155,6 +134,7 @@ export default function InvoiceTable({
                 筆
               </div>
             </td>
+            <td className={tdClass} />
           </tr>
         </tfoot>
       </table>

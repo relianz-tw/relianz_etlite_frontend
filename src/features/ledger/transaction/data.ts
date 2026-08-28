@@ -1,5 +1,5 @@
 import { listOfficialSubjects } from '@/api/subjects';
-import type { EntryInvoiceDetailDto } from '@/api/types';
+import type { EntryDetailEntryDto, EntryInvoiceDetailDto } from '@/api/types';
 import type { SubjectOption } from '@/components/ui/SubjectSelect';
 import type { Side } from '../types';
 import type { TransactionFormState } from './types';
@@ -48,6 +48,8 @@ export const EMPTY_TRANSACTION_FORM: TransactionFormState = {
   invoiceSerial: '',
   // 新增進項若憑證種類非一般發票則改用這個欄位輸入憑證編號；新增銷項的號碼改由 invoiceBookUuid 選定的發票簿帶入
   invoiceNumber: '',
+  isFixedAsset: false,
+  usefulLifeYears: 0,
   invoiceBookUuid: '',
   invoiceBookPart: null,
   declarePeriod: DECLARE_PERIOD_OPTIONS[0],
@@ -114,13 +116,19 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
 }
 
 /**
- * entry.officialAccountingSubjectId → SubjectOption，比照帳簿列表 mapPayableItemsToRows 向
- * /ael/subject/official/list/latest 反查科目的方式；查無對應科目時退回以編號顯示。
+ * entry → SubjectOption：名稱優先採用 entry.subjectName（若該筆交易選了子科目，後端已優先回傳子科目名稱），
+ * subjectCode 仍向 /ael/subject/official/list/latest 反查父科目代碼（該端點不含子科目資料，故子科目情境
+ * subjectCode 會退回父科目代碼，僅影響觸發器顯示格式，不影響送出值）；companyAccountingSubjectUuid 直接透傳。
  */
-export async function resolveExpenseCategory(subjectId: number): Promise<SubjectOption> {
+export async function resolveExpenseCategory(
+  entry: Pick<EntryDetailEntryDto, 'officialAccountingSubjectId' | 'subjectName' | 'companyAccountingSubjectUuid'>,
+): Promise<SubjectOption> {
   const subjectList = await listOfficialSubjects();
-  const subject = subjectList.find(s => s.id === subjectId);
-  return subject
-    ? { id: subject.id, subjectCode: subject.subjectCode, name: subject.name }
-    : { id: subjectId, subjectCode: '', name: `科目 #${subjectId}` };
+  const subject = subjectList.find(s => s.id === entry.officialAccountingSubjectId);
+  return {
+    id: entry.officialAccountingSubjectId,
+    subjectCode: subject?.subjectCode ?? '',
+    name: entry.subjectName || subject?.name || `科目 #${entry.officialAccountingSubjectId}`,
+    companyAccountingSubjectUuid: entry.companyAccountingSubjectUuid,
+  };
 }

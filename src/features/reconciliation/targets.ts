@@ -2,7 +2,7 @@
  * 沖帳對象分配：型別定義與純函式（選項組裝、預設值、試算、驗證）。
  * 不含任何 React／API 呼叫，資料載入邏輯見 useReconTargets.ts。
  */
-import type { BankAccountDto, OfficialSubjectDto } from '@/api/types';
+import type { BankAccountDto, OfficialSubjectDto, SettleChannel } from '@/api/types';
 import { fmtCurrency } from '@/lib/utils';
 import type { ReconSide } from './types';
 
@@ -81,9 +81,16 @@ export function buildTargets(accounts: BankAccountDto[], officialSubjects: Offic
   return [...bankTargets, ...subjectTargets];
 }
 
-/** 依 side 選出預設主對象：應付找 isDefaultPaymentAccount，應收找 isDefaultReceivingAccount，找不到退回第一個銀行帳戶 */
-export function pickDefaultTargetKey(accounts: BankAccountDto[], side: ReconSide): string {
+/**
+ * 依 side 選出預設主對象：第一優先比對 preferredBankAccountUuid（銷售管道設定的收款帳戶，見
+ * ReconciliationView 的 preferredBankAccountUuid），命中啟用中銀行帳戶即採用；查無（含應付側，
+ * 廠商無對應銀行帳戶 uuid 可比對）則退回 side 對應的預設帳戶旗標（應付找 isDefaultPaymentAccount，
+ * 應收找 isDefaultReceivingAccount），仍找不到再退回第一個銀行帳戶。
+ */
+export function pickDefaultTargetKey(accounts: BankAccountDto[], side: ReconSide, preferredBankAccountUuid?: string): string {
   if (accounts.length === 0) return '';
+  const preferred = preferredBankAccountUuid ? accounts.find(a => a.bankAccountUuid === preferredBankAccountUuid) : undefined;
+  if (preferred) return `bank:${preferred.bankAccountUuid}`;
   const defaultAccount = side === 'payable' ? accounts.find(a => a.isDefaultPaymentAccount) : accounts.find(a => a.isDefaultReceivingAccount);
   return `bank:${(defaultAccount ?? accounts[0]).bankAccountUuid}`;
 }
@@ -125,4 +132,28 @@ export function validateAllocationRows(depositAmount: number, rows: ReconAllocat
     return `分出金額加總（${fmtCurrency(splitTotal)}）不可超過實際${directionLabel}金額（${fmtCurrency(depositAmount)}）`;
   }
   return '';
+}
+
+/**
+ * 依主對象與分出列組出送給沖帳 API 的收付款管道陣列（見 SettleChannel）：主對象金額為
+ * depositAmount 扣除所有分出列後自動補足（見 computeAllocation），金額 <= 0（全部分出去或未選主對象）
+ * 時不放入該管道；分出列金額 <= 0 同樣略過。找不到對應 option 的 key 直接忽略——
+ * 呼叫端應先以 primaryTargetKey 是否有值、及本函式回傳是否為空陣列擋下送出（見 ReconciliationView）。
+ */
+export function buildSettleChannels(options: ReconTarget[], primaryTargetKey: string, rows: ReconAllocationRow[], depositAmount: number): SettleChannel[] {
+  const toChannel = (target: ReconTarget | undefined, amount: number): SettleChannel | null => {
+    if (!target || amount <= 0) return null;
+    return target.kind === 'bankAccount'
+      ? { isBankAccount: true, bankAccountUuid: target.bankAccountUuid, amount }
+      : { isBankAccount: false, officialAccountingSubjectId: target.officialAccountingSubjectId, amount };
+  };
+
+  const { primaryAmount } = computeAllocation(depositAmount, rows);
+  const primaryTarget = options.find(o => o.key === primaryTargetKey);
+  const channels = [
+    toChannel(primaryTarget, primaryAmount),
+    ...rows.map(r => toChannel(options.find(o => o.key === r.targetKey), r.amount)),
+  ].filter((c): c is SettleChannel => c !== null);
+
+  return channels;
 }

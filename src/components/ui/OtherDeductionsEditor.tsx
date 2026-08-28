@@ -23,8 +23,6 @@ interface OtherDeductionsEditorProps {
   onAdd: () => void;
   onRemove: (id: string) => void;
   onChange: (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) => void;
-  /** 開啟後每列金額改用 MoneyInput 的正負切換鈕，取代原本寫死的 − 字元；預設 false 維持原行為 */
-  allowSign?: boolean;
   /** 停用整個編輯器（新增按鈕與既有列的科目／名稱／金額／編輯／刪除皆不可操作），用於呼叫端尚未滿足前置條件時 */
   disabled?: boolean;
 }
@@ -36,8 +34,9 @@ interface OtherDeductionsEditorProps {
  * 避免窄容器下欄位擠壓換行、行與行之間欄位錯位而顯得凌亂。
  * 新增的列預設展開為編輯卡片；科目／項目名稱／金額都填妥後按「確認」收合為單行顯示（label 在上、金額輸入框在下，
  * 與同容器內的「手續費」欄位同一種格式），收合後金額仍可直接編輯，另提供編輯（展開回卡片改科目／名稱）與刪除操作。
+ * 所有項目在業務上一律是減項，金額輸入固定只能為負（純文字「−」字元 + MoneyInput negativeByDefault），不提供正負切換。
  */
-export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, allowSign = false, disabled = false }: OtherDeductionsEditorProps) {
+export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, disabled = false }: OtherDeductionsEditorProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(row => {
@@ -70,7 +69,10 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                   </button>
                 </div>
               </div>
-              <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} allowSign={allowSign} negativeByDefault disabled={disabled} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg text-neutral-mid">−</span>
+                <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} negativeByDefault disabled={disabled} />
+              </div>
             </div>
           );
         }
@@ -106,12 +108,11 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
               <div className="w-full shrink-0 nav:w-auto">
                 <Label required>金額</Label>
                 <div className="flex items-center gap-1.5">
-                  {!allowSign && <span className="text-lg text-neutral-mid">−</span>}
+                  <span className="text-lg text-neutral-mid">−</span>
                   <MoneyInput
-                    widthClassName={cn('w-full', allowSign ? 'nav:w-36' : 'nav:w-28')}
+                    widthClassName={cn('w-full', 'nav:w-36')}
                     value={row.amount}
                     onChange={value => onChange(row.id, { amount: value })}
-                    allowSign={allowSign}
                     negativeByDefault
                     disabled={disabled}
                   />

@@ -3381,6 +3381,7 @@ GET /ael/subject/official/list/latest
 |Name|Location|Type|Required|Description|
 |---|---|---|---|---|
 |value|query|string| no |篩選值|
+|companyUuid|query|string| no |公司uuid|
 
 > Response Examples
 
@@ -6344,14 +6345,24 @@ HTTP Status Code **200**
 |»» subjectCode|string|true|none||會計項目代號|
 |»» name|string|true|none||項目中文名稱|
 |»» debitCreditType|string|true|none||借方或貸方|
-|»» remark|string|true|none||備註|
+|»» desc|string|true|none||敘述|
 |»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
-|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目，3: 期初開帳設定科目，4:期末結帳設定科目|
 |»» industryBitmask|integer|true|none||買賣業:1,勞務業:2,製造業:4|
 |»» isBank|boolean|true|none||銀行項目專用科目嗎|
+|»» is_fixed_asset_depreciation_impairment|boolean|true|none||是固定資產折舊與減損科目嗎|
 |»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |»» createdAt|string|true|none||none|
 |»» updatedAt|string|true|none||none|
+|»» children|[object]|true|none||none|
+|»»» uuid|string|true|none||none|
+|»»» subjectCode|string|true|none||子科目會計項目代號|
+|»»» name|string|true|none||科目名稱|
+|»»» bankAccountUuid|string|true|none||銀行帳戶uuid|
+|»»» debitCreditType|string|true|none||借方或貸方|
+|»»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
+|»»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
@@ -6366,8 +6377,9 @@ GET /ael/subject/usage
 
 |Name|Location|Type|Required|Description|
 |---|---|---|---|---|
-|acUuid|query|string| no |公司uuid|
+|acUuid|query|string| yes |公司uuid|
 |value|query|string| no |篩選值|
+|scenario|query|string| yes |使用情境：0進項（應付／進折）／1銷項（應收／銷折）／2銀行提匯|
 
 > Response Examples
 
@@ -6439,6 +6451,7 @@ HTTP Status Code **200**
 |»» acUuid|string|true|none||none|
 |»» createTime|string|true|none||none|
 |»» rank|integer|true|none||none|
+|»» scenario|integer|true|none||使用情境：0進項（應付／進折）／1銷項（應收／銷折）／2銀行提匯|
 |»» subjectName|string|true|none||none|
 |»» updateTime|string|true|none||none|
 |»» useCount|integer|true|none||none|
@@ -6457,7 +6470,8 @@ POST /ael/subject/usage
 ```json
 {
     "acUuid": "5e0572c3-3859-4dd6-81cb-64ad30ad6221",
-    "officialSubjectId": 8
+    "officialSubjectId": 8,
+    "scenario": 1
 }
 ```
 
@@ -6468,6 +6482,7 @@ POST /ael/subject/usage
 |body|body|object| yes |none|
 |» acUuid|body|string| yes |公司uuid|
 |» officialSubjectId|body|integer| yes |官方會計科目id|
+|» scenario|body|integer| yes |使用情境：0進項（應付／進折）／1銷項（應收／銷折）／2銀行提匯|
 
 > Response Examples
 
@@ -6496,11 +6511,13 @@ GET /ael/subject/official/list/filter
 |Name|Location|Type|Required|Description|
 |---|---|---|---|---|
 |type|query|string| no |0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
-|calculationType|query|string| no |0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|companyUuid|query|string| no |公司uuid|
+|calculationType|query|string| no |0:一般科目型欄位，1:合計型科目欄位，2:棄置科目，3: 期初開帳設定科目，4:期末結帳設定科目|
 |industry|query|string| no |業別，0:買賣業，1:勞務業，2:製造業|
 |value|query|string| no |關鍵字|
-|isBank|query|string| no |0：false，1：true；沒傳不篩|
+|isBank|query|string| no |銀行項目專用科目嗎，0：false，1：true；沒傳不篩|
 |buyOrSell|query|string| no |2：進項/支出， 3：銷項/存入|
+|isFixedAssetDepreciationImpairment|query|string| no |是固定資產折舊與減損科目嗎，0：false，1：true；沒傳不篩|
 
 > Response Examples
 
@@ -6520,9 +6537,22 @@ GET /ael/subject/official/list/filter
       "calculationType": 0,
       "industryBitmask": 0,
       "isBank": true,
+      "is_fixed_asset_depreciation_impairment": true,
       "buyOrSell": 0,
       "createdAt": "string",
-      "updatedAt": "string"
+      "updatedAt": "string",
+      "children": [
+        {
+          "uuid": "string",
+          "subjectCode": "string",
+          "name": "string",
+          "bankAccountUuid": "string",
+          "debitCreditType": "string",
+          "type": 0,
+          "calculationType": 0,
+          "buyOrSell": 0
+        }
+      ]
     }
   ],
   "errorCode": "string",
@@ -6551,12 +6581,22 @@ HTTP Status Code **200**
 |»» debitCreditType|string|true|none||借方或貸方|
 |»» remark|string|true|none||備註|
 |»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
-|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目，3: 期初開帳設定科目，4:期末結帳設定科目|
 |»» industryBitmask|integer|true|none||買賣業:1,勞務業:2,製造業:4|
 |»» isBank|boolean|true|none||銀行項目專用科目嗎|
+|»» is_fixed_asset_depreciation_impairment|boolean|true|none||是固定資產折舊與減損科目嗎|
 |»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |»» createdAt|string|true|none||none|
 |»» updatedAt|string|true|none||none|
+|»» children|[object]|true|none||子科目|
+|»»» uuid|string|true|none||none|
+|»»» subjectCode|string|true|none||子科目會計項目代號|
+|»»» name|string|true|none||科目名稱|
+|»»» bankAccountUuid|string|true|none||銀行帳戶uuid|
+|»»» debitCreditType|string|true|none||借方或貸方|
+|»»» type|integer|true|none||0:收入,1:成本,2:損益表,3:營業成本,4:製造費用,5:研究發展費,6:其他費用,7:費用,8:非營業收入,9:營業外損失及費用,10:流動資產,11:非流動資產,12:流動負債,13:非流動負債,14:權益,15:資產負債表|
+|»»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目|
+|»»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
@@ -6571,7 +6611,9 @@ POST /ael/subject/identify
 
 ```json
 {
-    "text": "."
+    "text": "辦公室租金與管理費",
+    "scenario": 1,
+    "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746"
 }
 ```
 
@@ -6580,6 +6622,7 @@ POST /ael/subject/identify
 |Name|Location|Type|Required|Description|
 |---|---|---|---|---|
 |body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
 |» text|body|string| yes |中文描述|
 |» scenario|body|integer| yes |情境，0：銀行總覽，1：進項，2：銷項|
 
@@ -6691,6 +6734,7 @@ GET /ael/ledger/code
 POST /ael/ledger/payables
 
 建立進項應付交易紀錄
+officialAccountingSubjectId 或 companyAccountingSubjectUuid（二擇一為主）；傳 uuid 時後端自動填父公版 id；兩者都傳時父 id 須一致，否則錯誤。
 
 > Body Parameters
 
@@ -6734,6 +6778,7 @@ POST /ael/ledger/payables
 |» counterpartyName|body|string| yes |交易對象名稱|
 |» counterpartyType|body|integer| yes |0:廠商B2B，1:個人B2C|
 |» officialAccountingSubjectId|body|integer| yes |官方科目 id（進貨／費用科目）|
+|» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |» counterpartyUuid|body|string| no |廠商 uuid；僅 counterpartyType=0 可帶，選填|
 |» memo|body|string| no |備註；選填|
 |» invoiceNum|body|string| no |完整號碼；統一發票可為「字軌+號碼」；voucherKind≠4 時必填|
@@ -6859,6 +6904,7 @@ POST /ael/ledger/receivables
 |» counterpartyName|body|string| yes |交易對象名稱|
 |» counterpartyType|body|integer| yes |0:廠商B2B，1:個人B2C|
 |» officialAccountingSubjectId|body|integer| yes |官方科目 id（收入科目）|
+|» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |» paymentChannelUuid|body|string| no |銷售管道 uuid；選填，須屬該公司且啟用|
 |» counterpartyUuid|body|string| no |廠商 uuid；僅 counterpartyType=0 可帶，選填|
 |» memo|body|string| no |備註；選填|
@@ -7363,8 +7409,9 @@ HTTP Status Code **200**
 |»»» settledAmount|integer|true|none||none|
 |»»» remainingAmount|integer|true|none||none|
 |»»» settlementStatus|integer|true|none||none|
-|»»» officialAccountingSubjectId|integer|true|none||none|
-|»»» subjectName|string|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||官方科目 id|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid,選填|
+|»»» subjectName|string|true|none||科目名稱(若有子科目優先顯示子科目名)|
 |»»» memo|string¦null|true|none||none|
 |»»» createdAt|string|true|none||none|
 |»»» invoice|object|true|none||none|
@@ -7389,6 +7436,98 @@ HTTP Status Code **200**
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
+
+## POST 應付帳款總覽（圓餅圖）
+
+POST /ael/ledger/payables/summary
+
+應付帳款總覽（圓餅圖）
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "b3848b3d-2f54-4d39-9af2-386550c35808",
+    "dateFrom": "20260801",
+    "dateTo": "20260831",
+    "amountFrom": 1000,
+    "amountTo": 500000,
+    "filterType": 0,
+    "filterValue": "",
+    "counterpartyUuid": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 UUID（必填）|
+|» dateFrom|body|string| no |西元 YYYYMMDD；應付＝transaction_date、已付＝entry_date|
+|» dateTo|body|string| no |西元 YYYYMMDD；應付＝transaction_date、已付＝entry_date|
+|» amountFrom|body|number| no |金額下限（total_amount）|
+|» amountTo|body|number| no |金額上限（total_amount）|
+|» filterType|body|integer| no |0 交易編號／1 發票號碼；須與 filterValue 成對|
+|» filterValue|body|string| no |篩選值；須與 filterType 成對|
+|» counterpartyUuid|body|string| no |選填；帶入時僅該廠商|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "errorCode": "0000",
+    "message": "操作成功",
+    "data": {
+        "receivedVoucherAmount": 88000,
+        "paidAmount": 20000,
+        "payableAmount": 68000,
+        "dailyAmounts": [
+            {
+                "date": "20260108",
+                "issuedAmount": 88000
+            }
+        ],
+        "vendorShares": [
+            {
+                "counterpartyUuid": "",
+                "counterpartyName": "某某供應商",
+                "amount": 88000
+            }
+        ]
+    }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» receivedVoucherAmount|number|true|none||這批應付原單的憑證金額|
+|»» paidAmount|number|true|none||這批尚未結清單上已沖掉的金額（部分收款）|
+|»» payableAmount|number|true|none||這批還剩多少待付金額|
+|»» dailyAmounts|[object]|true|none||有交易之日期才回傳；不補 0；issuedAmount＝當日憑證金額|
+|»»» date|string|true|none||西元 YYYYMMDD|
+|»»» issuedAmount|number|true|none||當日已收憑證金額|
+|»» vendorShares|[object]|true|none||依廠商分組；不排序、不取 Top N|
+|»»» counterpartyUuid|string¦null|false|none||未指定廠商時為 null|
+|»»» counterpartyName|string|true|none||廠商名稱|
+|»»» amount|number|true|none||金額|
 
 ## POST 應收帳款列表篩選
 
@@ -7861,8 +8000,9 @@ HTTP Status Code **200**
 |»»» settledAmount|integer|true|none||none|
 |»»» remainingAmount|integer|true|none||none|
 |»»» settlementStatus|integer|true|none||none|
-|»»» officialAccountingSubjectId|integer|true|none||none|
-|»»» subjectName|string|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||官方科目 id|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid,選填|
+|»»» subjectName|string|true|none||科目名稱(若有子科目優先顯示子科目名)|
 |»»» memo|null|true|none||none|
 |»»» createdAt|string|true|none||none|
 |»»» invoice|object|true|none||none|
@@ -7887,6 +8027,107 @@ HTTP Status Code **200**
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
+
+## POST 應收帳款總覽（圓餅圖）
+
+POST /ael/ledger/receivables/summary
+
+應收帳款總覽（圓餅圖）
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "b3848b3d-2f54-4d39-9af2-386550c35808",
+    "dateFrom": "20260801",
+    "dateTo": "20260831",
+    "amountFrom": 1000,
+    "amountTo": 500000,
+    "filterType": 0,
+    "filterValue": "",
+    "paymentChannelUuid": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 UUID（必填）|
+|» dateFrom|body|string| no |西元 YYYYMMDD；應收＝transaction_date、已收＝entry_date|
+|» dateTo|body|string| no |西元 YYYYMMDD；應收＝transaction_date、已收＝entry_date|
+|» amountFrom|body|number| no |金額下限（total_amount）|
+|» amountTo|body|number| no |金額上限（total_amount）|
+|» filterType|body|integer| no |0 交易編號／1 發票號碼；須與 filterValue 成對|
+|» filterValue|body|string| no |篩選值；須與 filterType 成對|
+|» paymentChannelUuid|body|string| no |選填；帶入時僅該銷售管道|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "errorCode": "0000",
+    "message": "操作成功",
+    "data": {
+        "issuedVoucherAmount": 125000,
+        "collectedAmount": 30000,
+        "receivableAmount": 95000,
+        "dailyAmounts": [
+            {
+                "date": "20260105",
+                "issuedAmount": 45000
+            },
+            {
+                "date": "20260112",
+                "issuedAmount": 80000
+            }
+        ],
+        "channelShares": [
+            {
+                "paymentChannelUuid": "",
+                "channelName": "蝦皮",
+                "amount": 80000
+            },
+            {
+                "paymentChannelUuid": null,
+                "channelName": "",
+                "amount": 45000
+            }
+        ]
+    }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» issuedVoucherAmount|number|true|none||這批應收原單的憑證金額|
+|»» collectedAmount|number|true|none||這批尚未結清單上已沖掉的金額（部分收款）|
+|»» receivableAmount|number|true|none||這批還剩多少待收金額|
+|»» dailyAmounts|[object]|true|none||有交易之日期才回傳；不補 0|
+|»»» date|string|true|none||西元 YYYYMMDD|
+|»»» issuedAmount|number|true|none||當日已開立／已收憑證金額|
+|»» channelShares|[object]|true|none||依銷售管道分組；不排序、不取 Top N|
+|»»» paymentChannelUuid|string¦null|false|none||未指定管道時為 null|
+|»»» channelName|string|true|none||銷售管道名稱|
+|»»» amount|number|true|none||金額|
 
 ## POST 已付款列表篩選
 
@@ -7939,6 +8180,98 @@ POST /ael/ledger/payables/paid/filter
 
 ### Responses Data Schema
 
+## POST 已付款帳款總覽（圓餅圖）
+
+POST /ael/ledger/payables/paid/summary
+
+已付款帳款總覽（圓餅圖）
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "b3848b3d-2f54-4d39-9af2-386550c35808",
+    "dateFrom": "20260801",
+    "dateTo": "20260831",
+    "amountFrom": 1000,
+    "amountTo": 500000,
+    "filterType": 0,
+    "filterValue": "",
+    "counterpartyUuid": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 UUID（必填）|
+|» dateFrom|body|string| no |西元 YYYYMMDD；應付＝transaction_date、已付＝entry_date|
+|» dateTo|body|string| no |西元 YYYYMMDD；應付＝transaction_date、已付＝entry_date|
+|» amountFrom|body|number| no |金額下限（total_amount）|
+|» amountTo|body|number| no |金額上限（total_amount）|
+|» filterType|body|integer| no |0 交易編號／1 發票號碼；須與 filterValue 成對|
+|» filterValue|body|string| no |篩選值；須與 filterType 成對|
+|» counterpartyUuid|body|string| no |選填；帶入時僅該廠商|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "errorCode": "0000",
+    "message": "操作成功",
+    "data": {
+        "receivedVoucherAmount": 88000,
+        "paidAmount": 20000,
+        "payableAmount": 68000,
+        "dailyAmounts": [
+            {
+                "date": "20260108",
+                "issuedAmount": 88000
+            }
+        ],
+        "vendorShares": [
+            {
+                "counterpartyUuid": "",
+                "counterpartyName": "某某供應商",
+                "amount": 88000
+            }
+        ]
+    }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» receivedVoucherAmount|number|true|none||這批已付原單的憑證金額|
+|»» paidAmount|number|true|none||這批已結清單上已沖掉的金額|
+|»» payableAmount|number|true|none||這批還剩多少待付金額|
+|»» dailyAmounts|[object]|true|none||有交易之日期才回傳；不補 0；issuedAmount＝當日憑證金額|
+|»»» date|string|true|none||西元 YYYYMMDD|
+|»»» issuedAmount|number|true|none||當日已收憑證金額|
+|»» vendorShares|[object]|true|none||依廠商分組；不排序、不取 Top N|
+|»»» counterpartyUuid|string¦null|false|none||未指定廠商時為 null|
+|»»» counterpartyName|string|true|none||廠商名稱|
+|»»» amount|number|true|none||金額|
+
 ## POST 已收款列表篩選
 
 POST /ael/ledger/receivables/collected/filter
@@ -7989,6 +8322,107 @@ POST /ael/ledger/receivables/collected/filter
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
 
 ### Responses Data Schema
+
+## POST 已收款帳款總覽（圓餅圖）
+
+POST /ael/ledger/receivables/collected/summary
+
+已收款帳款總覽（圓餅圖）
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "b3848b3d-2f54-4d39-9af2-386550c35808",
+    "dateFrom": "20260801",
+    "dateTo": "20260831",
+    "amountFrom": 1000,
+    "amountTo": 500000,
+    "filterType": 0,
+    "filterValue": "",
+    "paymentChannelUuid": ""
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司 UUID（必填）|
+|» dateFrom|body|string| no |西元 YYYYMMDD；應收＝transaction_date、已收＝entry_date|
+|» dateTo|body|string| no |西元 YYYYMMDD；應收＝transaction_date、已收＝entry_date|
+|» amountFrom|body|number| no |金額下限（total_amount）|
+|» amountTo|body|number| no |金額上限（total_amount）|
+|» filterType|body|integer| no |0 交易編號／1 發票號碼；須與 filterValue 成對|
+|» filterValue|body|string| no |篩選值；須與 filterType 成對|
+|» paymentChannelUuid|body|string| no |選填；帶入時僅該銷售管道|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "errorCode": "0000",
+    "message": "操作成功",
+    "data": {
+        "issuedVoucherAmount": 125000,
+        "collectedAmount": 30000,
+        "receivableAmount": 95000,
+        "dailyAmounts": [
+            {
+                "date": "20260105",
+                "issuedAmount": 45000
+            },
+            {
+                "date": "20260112",
+                "issuedAmount": 80000
+            }
+        ],
+        "channelShares": [
+            {
+                "paymentChannelUuid": "",
+                "channelName": "蝦皮",
+                "amount": 80000
+            },
+            {
+                "paymentChannelUuid": null,
+                "channelName": "",
+                "amount": 45000
+            }
+        ]
+    }
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» issuedVoucherAmount|number|true|none||這批已收原單的憑證金額|
+|»» collectedAmount|number|true|none||這批已結清單上已沖掉的金額|
+|»» receivableAmount|number|true|none||這批還剩多少待收金額|
+|»» dailyAmounts|[object]|true|none||有交易之日期才回傳；不補 0|
+|»»» date|string|true|none||西元 YYYYMMDD|
+|»»» issuedAmount|number|true|none||當日已開立／已收憑證金額|
+|»» channelShares|[object]|true|none||依銷售管道分組；不排序、不取 Top N|
+|»»» paymentChannelUuid|string¦null|false|none||未指定管道時為 null|
+|»»» channelName|string|true|none||銷售管道名稱|
+|»»» amount|number|true|none||金額|
 
 ## GET 查看交易細節
 
@@ -8152,7 +8586,8 @@ HTTP Status Code **200**
 |»» entryKind|integer|true|none||固定 0（業務原單）|
 |»» status|integer|true|none||0作廢 1已確認 2草稿|
 |»» officialAccountingSubjectId|integer|true|none||官方科目 id|
-|»» subjectName|string|true|none||科目名稱|
+|»» companyAccountingSubjectUuid|string|true|none||子科目uuid,選填|
+|»» subjectName|string|true|none||科目名稱(若有子科目優先顯示子科目名)|
 |»» createdAt|string|true|none||none|
 |»» updatedAt|string|true|none||none|
 |»» settledAmount|integer|true|none||已沖金額（元）＝relations.settlement_amount 合計|
@@ -8284,6 +8719,7 @@ POST /ael/ledger/payables/allowance
 |» netAmount|body|integer| yes |未稅|
 |» taxAmount|body|integer| yes |稅額|
 |» officialAccountingSubjectId|body|integer| yes |科目id|
+|» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |» memo|body|string| no |備註|
 
 > Response Examples
@@ -8394,6 +8830,7 @@ POST /ael/ledger/receivables/allowance
 |» netAmount|body|integer| yes |未稅|
 |» taxAmount|body|integer| yes |稅額|
 |» officialAccountingSubjectId|body|integer| yes |科目id|
+|» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |» memo|body|string| no |備註|
 
 > Response Examples
@@ -8672,6 +9109,108 @@ HTTP Status Code **200**
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
 
+## POST 其他交易AI 建議分錄
+
+POST /ael/ledger/other/suggest
+
+其他交易AI 建議分錄
+
+> Body Parameters
+
+```json
+{
+    "companyUuid": "b3848b3d-2f54-4d39-9af2-386550c35808",
+    "text": "115年8月13號公司股東彭先生幫公司付了新辦公室的押金20000，另外還付了30000的租金及仲介費5000"
+}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|body|body|object| yes |none|
+|» companyUuid|body|string| yes |公司uuid|
+|» text|body|string| yes |300字以內|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "transactionDate": "20260813",
+    "memo": "",
+    "lines": [
+      {
+        "debitCredit": 1,
+        "officialAccountingSubjectId": 123,
+        "subjectCode": "1413",
+        "name": "存出保證金",
+        "amount": 20000,
+        "summary": "辦公室押金"
+      },
+      {
+        "debitCredit": 1,
+        "officialAccountingSubjectId": 789,
+        "subjectCode": "6201",
+        "name": "租金支出",
+        "amount": 35000,
+        "summary": "租金及仲介費"
+      },
+      {
+        "debitCredit": 2,
+        "officialAccountingSubjectId": 456,
+        "subjectCode": "1101",
+        "name": "現金",
+        "amount": 55000,
+        "summary": "股東代付"
+      }
+    ]
+  },
+  "errorCode": "0000",
+  "message": "操作成功",
+  "geminiMs": 2100,
+  "totalMs": 2350
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|object|true|none||none|
+|»» transactionDate|string|true|none||YYYYMMDD，推不出可為空字串|
+|»» memo|string|true|none||none|
+|»» lines|[object]|true|none||none|
+|»»» debitCredit|integer|true|none||1借／2貸|
+|»»» officialAccountingSubjectId|integer|true|none||科目id|
+|»»» subjectCode|string|true|none||科目代號|
+|»»» name|string|true|none||科目名稱|
+|»»» amount|integer|true|none||金額|
+|»»» summary|string|true|none||摘要|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» geminiMs|integer|true|none||none|
+|» totalMs|integer|true|none||none|
+
+#### Enum
+
+|Name|Value|
+|---|---|
+|debitCredit|1|
+|debitCredit|2|
+
 # 帳簿/沖帳
 
 ## POST 手動沖帳進項應付帳款
@@ -8687,7 +9226,18 @@ POST /ael/ledger/payables/settle
     "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
     "ledgerUuid": "59cca9cc-c794-48fd-96df-7bfabc28a58f",
     "paymentDate": "20260803",
-    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "paymentChannels": [
+        {
+            "isBankAccount": true,
+            "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+            "amount": 1000
+        },
+        {
+            "isBankAccount": false,
+            "officialAccountingSubjectId": 53,
+            "amount": 50
+        }
+    ],
     "settleAmount": 1100,
     "paymentAmount": 1050,
     "memo": "測試手續費跟雜費",
@@ -8713,7 +9263,12 @@ POST /ael/ledger/payables/settle
 |» companyUuid|body|string| yes |公司uuid|
 |» ledgerUuid|body|string| yes |應付帳款uuid|
 |» paymentDate|body|string| yes |交易付款日，YYYYMMDD|
-|» bankAccountUuid|body|string| yes |銀行帳戶uuid|
+|» paymentChannels|body|[object]| yes |付款管道物件|
+|»» isBankAccount|body|boolean| yes |是銀行帳號嗎|
+|»» bankAccountUuid|body|string| yes |銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|body|integer| yes |科目id（如果isBankAccount=false這個必填）|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
+|»» amount|body|integer| yes |該管道沖帳金額|
 |» settleAmount|body|integer| yes |沖帳金額|
 |» paymentAmount|body|integer| yes |實際付款|
 |» balanceUsed|body|integer| yes |使用餘額|
@@ -8723,6 +9278,7 @@ POST /ael/ledger/payables/settle
 |»» name|body|string| yes |none|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» amount|body|integer| yes |沖帳金額|
 |»» name|body|string| yes |沖帳項目名稱|
 
@@ -8735,7 +9291,18 @@ POST /ael/ledger/payables/settle
     "data": {
         "payableLedgerUuid": "59cca9cc-c794-48fd-96df-7bfabc28a58f",
         "paymentDate": "20260803",
-        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+        "paymentChannels": [
+            {
+                "isBankAccount": true,
+                "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+                "amount": 500
+            },
+            {
+                "isBankAccount": false,
+                "officialAccountingSubjectId": 53,
+                "amount": 250
+            }
+        ],
         "settleAmount": 1100,
         "paymentAmount": 1050,
         "allocations": [
@@ -8807,7 +9374,18 @@ POST /ael/ledger/receivables/settle
     "companyUuid": "e716954c-cd28-4cff-a7bc-d15d89285746",
     "ledgerUuid": "",
     "paymentDate": "20260803",
-    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "depositChannels": [
+        {
+            "isBankAccount": true,
+            "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+            "amount": 800
+        },
+        {
+            "isBankAccount": false,
+            "officialAccountingSubjectId": 53,
+            "amount": 100
+        }
+    ],
     "settleAmount": 1000,
     "depositAmount": 900,
     "memo": "",
@@ -8833,7 +9411,12 @@ POST /ael/ledger/receivables/settle
 |» companyUuid|body|string| yes |公司uuid|
 |» ledgerUuid|body|string| yes |應收帳款uuid|
 |» paymentDate|body|string| yes |交易收款日，YYYYMMDD|
-|» bankAccountUuid|body|string| yes |銀行帳戶uuid|
+|» depositChannels|body|[object]| yes |收款管道物件|
+|»» isBankAccount|body|boolean| yes |是銀行帳號嗎|
+|»» bankAccountUuid|body|string| yes |銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|body|integer| yes |科目id（如果isBankAccount=false這個必填）|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
+|»» amount|body|integer| yes |該管道沖帳金額|
 |» settleAmount|body|integer| yes |沖帳金額|
 |» depositAmount|body|integer| yes |實際存入|
 |» balanceUsed|body|integer| yes |使用餘額|
@@ -8843,6 +9426,7 @@ POST /ael/ledger/receivables/settle
 |»» name|body|string| yes |none|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» amount|body|integer| yes |沖帳金額|
 |»» name|body|string| yes |沖帳項目名稱|
 
@@ -8932,6 +9516,7 @@ POST /ael/ledger/reconciliation/payables/settle/preview
 |»» name|body|string| yes |沖帳項目名稱|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» name|body|string| yes |沖帳項目名稱|
 |»» amount|body|integer| yes |沖帳金額|
 
@@ -9080,7 +9665,18 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
     "settleAmount": 800,
     "paymentAmount": 750,
     "paymentDate": "20260805",
-    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "paymentChannels": [
+        {
+            "isBankAccount": true,
+            "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+            "amount": 500
+        },
+        {
+            "isBankAccount": false,
+            "officialAccountingSubjectId": 53,
+            "amount": 250
+        }
+    ],
     "allocations": {
         "feeAmount": 30,
         "name": "匯總手續費"
@@ -9105,7 +9701,12 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
 |» settleAmount|body|integer| yes |本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆|
 |» paymentAmount|body|integer| yes |進項實際付出|
 |» paymentDate|body|string| yes |付款／收款日 YYYYMMDD,必填|
-|» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
+|» paymentChannels|body|[object]| yes |付款管道物件|
+|»» isBankAccount|body|boolean| yes |是銀行帳號嗎|
+|»» bankAccountUuid|body|string| yes |銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|body|integer| yes |科目id（如果isBankAccount=false這個必填）|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
+|»» amount|body|integer| yes |該管道沖帳金額|
 |» memo|body|string| no |備註（選填）|
 |» balanceUsed|body|integer| yes |使用餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
@@ -9113,6 +9714,7 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
 |»» name|body|string| yes |沖帳項目名稱|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» name|body|string| yes |沖帳項目名稱|
 |»» amount|body|integer| yes |沖帳金額|
 
@@ -9217,7 +9819,18 @@ isBalance=true的話，paymentAmount要放實際沖完整的那幾筆金額總�
             }
         ],
         "paymentDate": "20260805",
-        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2"
+        "paymentChannels": [
+            {
+                "isBankAccount": true,
+                "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+                "amount": 500
+            },
+            {
+                "isBankAccount": false,
+                "officialAccountingSubjectId": 53,
+                "amount": 250
+            }
+        ]
     },
     "errorCode": "0000",
     "message": "操作成功",
@@ -9238,7 +9851,11 @@ HTTP Status Code **200**
 |Name|Type|Required|Restrictions|Title|description|
 |---|---|---|---|---|---|
 |» paymentDate|string|true|none||付款日 YYYYMMDD|
-|» bankAccountUuid|string|true|none||付款戶頭|
+|» paymentChannels|[object]|true|none||付款管道物件|
+|»» isBankAccount|boolean|true|none||是銀行帳號嗎|
+|»» bankAccountUuid|string|true|none||銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|integer|true|none||科目id（如果isBankAccount=false這個必填）|
+|»» amount|integer|true|none||該管道沖帳金額|
 |» counterpartyUuid|string|false|none||廠商 uuid|
 |» settleAmount|integer|true|none||匯總沖帳總額|
 |» appliedSettleAmount|integer|true|none||實際沖到原單的合計|
@@ -9311,6 +9928,7 @@ POST /ael/ledger/reconciliation/receivables/settle/preview
 |»» name|body|string| yes |沖帳項目名稱|
 |» otherDeductions|body|[object]| yes |none|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» name|body|string| yes |沖帳項目名稱|
 |»» amount|body|integer| yes |沖帳金額|
 
@@ -9479,7 +10097,18 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
     "settleAmount": 30300,
     "depositAmount": 30000,
     "paymentDate": "20260805",
-    "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+    "depositChannels": [
+        {
+            "isBankAccount": true,
+            "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+            "amount": 25000
+        },
+        {
+            "isBankAccount": false,
+            "officialAccountingSubjectId": 53,
+            "amount": 5000
+        }
+    ],
     "memo": "匯總應收測試",
     "allocations": {
         "feeAmount": 200,
@@ -9505,7 +10134,12 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
 |» settleAmount|body|integer| yes |本次匯總沖帳總額（元）|
 |» depositAmount|body|integer| yes |銷項實際存入|
 |» paymentDate|body|string| yes |付款／收款日 YYYYMMDD,必填|
-|» bankAccountUuid|body|string| yes |銀行帳戶 uuid,必填|
+|» depositChannels|body|[object]| yes |收款管道物件|
+|»» isBankAccount|body|boolean| yes |是銀行帳號嗎|
+|»» bankAccountUuid|body|string| yes |銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|body|integer| yes |科目id（如果isBankAccount=false這個必填）|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
+|»» amount|body|integer| yes |該管道沖帳金額|
 |» memo|body|string| no |備註（選填）|
 |» balanceUsed|body|integer| yes |使用餘額|
 |» allocations|body|object| yes |沖帳手續費物件|
@@ -9513,6 +10147,7 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
 |»» name|body|string| yes |沖帳項目名稱|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
+|»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |»» name|body|string| yes |沖帳項目名稱|
 |»» amount|body|integer| yes |沖帳金額|
 
@@ -9531,7 +10166,18 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
         "affectedCount": 2,
         "totalBeforeRemaining": 18000,
         "paymentDate": "20260804",
-        "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+        "depositChannels": [
+            {
+                "isBankAccount": true,
+                "bankAccountUuid": "6a0bc0cc-3fb8-4b2f-a02a-c7af65a25dd2",
+                "amount": 25000
+            },
+            {
+                "isBankAccount": false,
+                "officialAccountingSubjectId": 53,
+                "amount": 5000
+            }
+        ],
         "allocations": [
             {
                 "ledgerUuid": "cccccccc-3333-3333-3333-333333333333",
@@ -9577,7 +10223,11 @@ HTTP Status Code **200**
 |Name|Type|Required|Restrictions|Title|description|
 |---|---|---|---|---|---|
 |» paymentDate|string|true|none||付款日 YYYYMMDD|
-|» bankAccountUuid|string|true|none||付款戶頭|
+|» depositChannels|[object]|true|none||收款管道物件|
+|»» isBankAccount|boolean|true|none||是銀行帳號嗎|
+|»» bankAccountUuid|string|true|none||銀行帳號uuid（如果isBankAccount=true這個必填）|
+|»» officialAccountingSubjectId|integer|true|none||科目id（如果isBankAccount=false這個必填）|
+|»» amount|integer|true|none||該管道沖帳金額|
 |» paymentChannelUuid|string|true|none||銷售管道 uuid|
 |» settleAmount|integer|true|none||匯總沖帳總額|
 |» appliedSettleAmount|integer|true|none||實際沖到原單的合計|
@@ -9807,6 +10457,8 @@ GET /ael/ledger/reconciliation/payables
 |year|query|string| no |西元年|
 |dateFrom|query|string| no |日期起，	YYYYMMDD|
 |dateTo|query|string| no |日期迄，	YYYYMMDD|
+|amountFrom|query|string| no |金額下限|
+|amountTo|query|string| no |金額上限|
 |counterpartyUuid|query|string| no |廠商uuid|
 |settled|query|string| no |true=已結清、false=未結清、省略=全部|
 
@@ -9920,7 +10572,8 @@ HTTP Status Code **200**
 |»»» settledAmount|integer|false|none||none|
 |»»» remainingAmount|integer|false|none||none|
 |»»» settlementStatus|integer|false|none||none|
-|»»» officialAccountingSubjectId|integer|false|none||none|
+|»»» officialAccountingSubjectId|integer|false|none||官方科目id|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» createdAt|string|false|none||none|
 |»»» invoice|[object]|true|none||none|
 |»»»» uuid|string|true|none||發票uuid|
@@ -9955,6 +10608,8 @@ GET /ael/ledger/reconciliation/receivables
 |year|query|string| no |西元年|
 |dateFrom|query|string| no |日期起，	YYYYMMDD|
 |dateTo|query|string| no |日期迄，	YYYYMMDD|
+|amountFrom|query|string| no |金額下限|
+|amountTo|query|string| no |金額上限|
 |paymentChannelUuid|query|string| no |銷售管道uuid|
 |settled|query|string| no |true=已結清、false=未結清、省略=全部|
 
@@ -10524,7 +11179,8 @@ HTTP Status Code **200**
 |»»» settledAmount|integer|true|none||none|
 |»»» remainingAmount|integer|true|none||none|
 |»»» settlementStatus|integer|true|none||none|
-|»»» officialAccountingSubjectId|integer|true|none||none|
+|»»» officialAccountingSubjectId|integer|true|none||官方科目id|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» createdAt|string|true|none||none|
 |»»» invoice|object|true|none||none|
 |»»»» uuid|string|true|none||none|
@@ -10980,7 +11636,8 @@ HTTP Status Code **200**
 |»»» seq|string|true|none||序號（目前固定空字串）|
 |»»» voucherType|string|true|none||傳票類型|
 |»»» rocDate|string|true|none||民國日期 YYYMMDD|
-|»»» subjectName|string|true|none||會計科目名稱|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid,選填|
+|»»» subjectName|string|true|none||會計科目名稱(若有子科目優先顯示子科目名)|
 |»»» counterpartyCode|string|true|none||對方科目／對象代碼（目前多為空|
 |»»» summary|string|true|none||摘要|
 |»»» debitCredit|string|true|none||借貸別：1=借、2=貸|
@@ -11753,6 +12410,7 @@ POST /ael/bankAccounts/cashMovements
 |» amount|body|integer| yes |金額|
 |» paymentDate|body|string| yes |YYYYMMDD|
 |» officialAccountingSubjectId|body|integer| yes |科目id|
+|» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
 |» memo|body|string| yes |備註|
 
 > Response Examples
@@ -12233,6 +12891,9 @@ POST /ael/vat/input/filter
 |» amountTo|body|number| no |選填；金額上限，比對 invoice amount|
 |» dateFrom|body|string| no |選填；起日，西元 YYYYMMDD|
 |» dateTo|body|string| no |選填；迄日，西元 YYYYMMDD|
+|» taxIdNumber|body|string| yes |進項＝賣家統編，銷項＝買家統編|
+|» companyName|body|string| yes |進項＝賣家名稱，銷項＝買家名稱|
+|» isVoid|body|boolean| yes |true＝作廢；false＝非作廢|
 |» limit|body|integer| no |選填；預設 10|
 |» page|body|integer| no |選填；預設 1|
 
@@ -12281,7 +12942,10 @@ POST /ael/vat/input/filter
         "direction": 0,
         "counterpartyName": "string",
         "officialAccountingSubjectId": 0,
-        "subjectName": "string"
+        "companyAccountingSubjectUuid": "string",
+        "subjectName": "string",
+        "isVoid": true,
+        "declared": true
       }
     ],
     "total": 0,
@@ -12333,7 +12997,10 @@ HTTP Status Code **200**
 |»»» direction|integer¦null|false|none||0:收入(銷項)，1:支出(進項)，2:應收(銷項)，3:應付(進項)，4:其他|
 |»»» counterpartyName|string¦null|false|none||廠商名稱|
 |»»» officialAccountingSubjectId|integer|false|none||科目id|
-|»»» subjectName|string|false|none||科目名稱|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
+|»»» subjectName|string|false|none||科目名稱(若有子科目則優先)|
+|»»» isVoid|boolean|true|none||作廢狀態|
+|»»» declared|boolean|true|none||申報狀態|
 |»» total|integer|true|none||總筆數|
 |»» limit|integer|true|none||一頁資料筆數|
 |»» page|integer|true|none||頁碼|
@@ -12377,6 +13044,9 @@ POST /ael/vat/output/filter
 |» amountTo|body|number| no |選填；金額上限，比對 invoice amount|
 |» dateFrom|body|string| no |選填；起日，西元 YYYYMMDD|
 |» dateTo|body|string| no |選填；迄日，西元 YYYYMMDD|
+|» taxIdNumber|body|string| yes |進項＝賣家統編，銷項＝買家統編|
+|» companyName|body|string| yes |進項＝賣家名稱，銷項＝買家名稱|
+|» isVoid|body|boolean| yes |true＝作廢；false＝非作廢|
 |» limit|body|integer| no |選填；預設 10|
 |» page|body|integer| no |選填；預設 1|
 
@@ -12425,7 +13095,10 @@ POST /ael/vat/output/filter
         "direction": 0,
         "counterpartyName": "string",
         "officialAccountingSubjectId": 0,
-        "subjectName": "string"
+        "companyAccountingSubjectUuid": "string",
+        "subjectName": "string",
+        "isVoid": true,
+        "declared": true
       }
     ],
     "total": 0,
@@ -12477,7 +13150,10 @@ HTTP Status Code **200**
 |»»» direction|integer¦null|false|none||0:收入(銷項)，1:支出(進項)，2:應收(銷項)，3:應付(進項)，4:其他|
 |»»» counterpartyName|string¦null|false|none||廠商名稱|
 |»»» officialAccountingSubjectId|integer|false|none||科目id|
-|»»» subjectName|string|false|none||科目名稱|
+|»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
+|»»» subjectName|string|false|none||科目名稱(若有子科目則優先)|
+|»»» isVoid|boolean|true|none||作廢狀態|
+|»»» declared|boolean|true|none||申報狀態|
 |»» total|integer|true|none||總筆數|
 |»» limit|integer|true|none||一頁資料筆數|
 |»» page|integer|true|none||頁碼|
@@ -12786,6 +13462,62 @@ HTTP Status Code **200**
 |» errorCode|any|false|none||none|
 |» message|string|false|none||none|
 
+## GET 顯示可操作紙本發票本期別
+
+GET /ael/invoiceBook/getDate/normal
+
+顯示可操作紙本發票本期別
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "year": 115,
+            "phase": 7,
+            "count": 1
+        },
+        {
+            "year": 115,
+            "phase": 5,
+            "count": 0
+        }
+    ],
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|any|false|none||none|
+|» data|[object]|false|none||依伺服器今天算出的可操作紙本期別|
+|»» year|integer|true|none||民國年|
+|»» phase|integer|true|none||營業稅雙月期別（奇數：1,3,5,7,9,11）|
+|»» count|integer|true|none||該期紙本發票本數|
+|» errorCode|any|false|none||none|
+|» message|string|false|none||none|
+
 ## GET 設定頁顯示發票簿期別
 
 GET /ael/invoiceBook/getDate/forSetting
@@ -12839,6 +13571,66 @@ HTTP Status Code **200**
 |»» year|integer|true|none||none|
 |»» phase|integer|true|none||none|
 |»» count|integer|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+
+# AI統計
+
+## GET 公司 AI 使用統計
+
+GET /ael/ai/usage
+
+公司 AI 使用統計
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|scenario|query|string| no |0進項發票辨識／1銷項發票辨識／2科目辨識銀行／3科目辨識進項創建／4科目辨識銷項創建|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "id": 1,
+            "companyUuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "scenario": 3,
+            "useCount": 12,
+            "createTime": "2026-08-25T08:00:00.000Z",
+            "updateTime": "2026-08-25T09:30:00.000Z"
+        }
+    ],
+    "errorCode": "0000",
+    "message": "操作成功"
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» data|[object]|true|none||none|
+|»» id|integer|true|none||none|
+|»» companyUuid|string|true|none||公司uuid|
+|»» scenario|integer|true|none||0進項發票辨識／1銷項發票辨識／2科目辨識銀行總覽／3科目辨識進項／4科目辨識銷項|
+|»» useCount|integer|true|none||使用次數|
+|»» createTime|string(date-time)|true|none||none|
+|»» updateTime|string(date-time)|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 
