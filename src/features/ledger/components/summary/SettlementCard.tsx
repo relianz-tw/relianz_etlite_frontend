@@ -49,7 +49,9 @@ export default function SettlementCard({ side, totals, loading }: SettlementCard
         <div className="min-h-0 flex-1 rounded-md bg-surface-cream" />
       ) : (
         <>
-          <div className="min-h-0 flex-1">
+          {/* 手機為 grid-cols-1，卡片各自獨立一列，沒有同排卡片撐高度可繼承，故給固定 h-40（同 loading skeleton）
+              避免 DonutChart 的 ResponsiveContainer 量到高度 0 而不渲染；桌機（nav:）維持 flex-1 撐滿同排高度 */}
+          <div className="h-40 nav:h-auto nav:min-h-0 nav:flex-1">
             <DonutChart slices={slices} ariaLabel="入帳狀況甜甜圈圖" />
           </div>
           <div className="mt-3 space-y-1.5">

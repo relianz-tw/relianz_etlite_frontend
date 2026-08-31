@@ -41,7 +41,9 @@ export default function ChannelShareCard({ side, shares, loading, selectedUuid, 
         <div className="min-h-0 flex-1 rounded-md bg-surface-cream" />
       ) : (
         <>
-          <div className="min-h-0 flex-1">
+          {/* 手機為 grid-cols-1，卡片各自獨立一列，沒有同排卡片撐高度可繼承，故給固定 h-40（同 loading skeleton）
+              避免 DonutChart 的 ResponsiveContainer 量到高度 0 而不渲染；桌機（nav:）維持 flex-1 撐滿同排高度 */}
+          <div className="h-40 nav:h-auto nav:min-h-0 nav:flex-1">
             <DonutChart slices={slices} selectedKey={selectedUuid} onSelect={handleSelect} ariaLabel={`${LABEL[side]}甜甜圈圖，可點擊扇形套用篩選`} />
           </div>
           {/* 文字圖例即互動入口（DESIGN.md §11.8/§11.11）：扇形無法 tab focus，<button> 提供鍵盤可及的等效操作 */}
