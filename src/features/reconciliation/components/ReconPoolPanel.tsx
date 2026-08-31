@@ -5,7 +5,6 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import DatePicker from '@/components/ui/DatePicker';
 import StepNumber from '@/components/ui/StepNumber';
-import SubjectSelect, { type SubjectOption } from '@/components/ui/SubjectSelect';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { X } from 'lucide-react';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
@@ -57,11 +56,9 @@ interface ReconPoolPanelProps {
 
   /** 電商平台處理費：僅應收（side='receivable'）顯示；金額非 0 時強制須選滿等值的應付憑證才能送出（見 ReconciliationView 驗證） */
   platformFeeAmount: number;
-  platformFeeSubject: SubjectOption | null;
   platformFeeVoucherCount: number;
   platformFeeVoucherTotal: number;
   onPlatformFeeAmountChange: (value: number) => void;
-  onPlatformFeeSubjectChange: (value: SubjectOption) => void;
   onOpenVoucherPicker: () => void;
   /** 付款／收款日：沖帳執行 API 必填欄位 */
   paymentDate: Date | undefined;
@@ -125,11 +122,9 @@ export default function ReconPoolPanel({
   onRemoveOtherDeduction,
   onChangeOtherDeduction,
   platformFeeAmount,
-  platformFeeSubject,
   platformFeeVoucherCount,
   platformFeeVoucherTotal,
   onPlatformFeeAmountChange,
-  onPlatformFeeSubjectChange,
   onOpenVoucherPicker,
   paymentDate,
   onPaymentDateChange,
@@ -253,7 +248,6 @@ export default function ReconPoolPanel({
         {side === 'receivable' && (
           <div className="flex flex-col gap-1.5">
             <span className="text-sm text-neutral-dark">電商平台處理費</span>
-            <SubjectSelect value={platformFeeSubject} onChange={onPlatformFeeSubjectChange} placeholder="請選擇科目" disabled={amountDisabled} />
             <div className="flex items-center gap-1.5">
               <span className="text-lg text-neutral-mid">−</span>
               <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} negativeByDefault disabled={amountDisabled} />
