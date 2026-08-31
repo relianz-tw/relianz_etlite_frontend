@@ -64,6 +64,9 @@ interface SubjectPickerProps {
   /** 覆寫科目篩選，僅帶固定資產折舊與減損科目（如進項一般發票勾選「是否為固定資產」時）；
    * 未傳入時不加此篩選條件，維持 scope 對應的既有清單 */
   isFixedAssetDepreciationImpairment?: 0 | 1;
+  /** 沖帳區專用篩選（如沖帳中心額外金額科目、手動沖帳編輯）：0 沖帳 Others、1 沖應收、2 沖應付；
+   * 未傳入時不加此篩選條件。「全部」頁籤與搜尋範圍一併套用，避免選到不可用於沖帳的科目 */
+  settle?: 0 | 1 | 2;
   /** 外部（如憑證辨識）自動帶入 value 時傳入 true，讓元件顯示「AI 已為你選擇」提示；僅由 false→true 觸發一次，
    * 使用者之後手動改選會透過既有的 commitSelection(fromAi=false) 自動熄滅，不受此 prop 影響 */
   aiPicked?: boolean;
@@ -89,6 +92,7 @@ export default function SubjectPicker({
   inDialog = false,
   buyOrSell,
   isFixedAssetDepreciationImpairment,
+  settle,
 }: SubjectPickerProps) {
   const isDesktop = useIsNavDesktop();
   const modalSurface = useContext(ModalSurfaceContext);
@@ -121,11 +125,11 @@ export default function SubjectPicker({
   // 送出後元件可能卸載或再次送出，用遞增序號比對忽略過時的回應
   const aiRequestIdRef = useRef(0);
 
-  // scope 或 buyOrSell／isFixedAssetDepreciationImpairment 覆寫值改變時重新抓取，避免快取旗標
-  // 跨語境誤用（如銀行新增交易切換支出／存入、進項一般發票切換是否為固定資產）
+  // scope 或 buyOrSell／isFixedAssetDepreciationImpairment／settle 覆寫值改變時重新抓取，避免快取旗標
+  // 跨語境誤用（如銀行新增交易切換支出／存入、進項一般發票切換是否為固定資產、沖帳中心切換應收／應付）
   useEffect(() => {
     setLoaded(false);
-  }, [scope, buyOrSell, isFixedAssetDepreciationImpairment]);
+  }, [scope, buyOrSell, isFixedAssetDepreciationImpairment, settle]);
 
   // 外部（憑證辨識）帶入 aiPicked=true 時點亮提示；使用者之後手動選擇會透過 commitSelection(fromAi=false) 自動熄滅
   useEffect(() => {
@@ -136,6 +140,7 @@ export default function SubjectPicker({
     ...SCOPE_PARAMS[scope],
     ...(buyOrSell ? { buyOrSell } : {}),
     ...(isFixedAssetDepreciationImpairment !== undefined ? { isFixedAssetDepreciationImpairment } : {}),
+    ...(settle !== undefined ? { settle } : {}),
   };
 
   // 開啟面板且尚未載入過時才並行抓三支：搜尋會跨到「全部」，不能等切到該頁籤才抓
@@ -145,7 +150,7 @@ export default function SubjectPicker({
     setError('');
     Promise.all([
       filterOfficialSubjects(basicParams),
-      filterOfficialSubjects({ calculationType: 0 }),
+      filterOfficialSubjects({ calculationType: 0, ...(settle !== undefined ? { settle } : {}) }),
       listSubjectUsage(SCOPE_TO_USAGE_SCENARIO[scope]),
     ])
       .then(([basicList, allList, usageList]) => {
@@ -156,7 +161,7 @@ export default function SubjectPicker({
       })
       .catch((err) => setError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, loaded, scope, buyOrSell, isFixedAssetDepreciationImpairment]);
+  }, [open, loaded, scope, buyOrSell, isFixedAssetDepreciationImpairment, settle]);
 
   // 切分頁／改搜尋時清單捲回頂端
   useEffect(() => {

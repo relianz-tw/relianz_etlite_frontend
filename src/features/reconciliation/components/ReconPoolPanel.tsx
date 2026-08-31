@@ -276,7 +276,14 @@ export default function ReconPoolPanel({
           </div>
         )}
 
-        <OtherDeductionsEditor rows={otherDeductions} onAdd={onAddOtherDeduction} onRemove={onRemoveOtherDeduction} onChange={onChangeOtherDeduction} disabled={amountDisabled} />
+        <OtherDeductionsEditor
+          rows={otherDeductions}
+          onAdd={onAddOtherDeduction}
+          onRemove={onRemoveOtherDeduction}
+          onChange={onChangeOtherDeduction}
+          disabled={amountDisabled}
+          settle={side === 'receivable' ? 1 : 2}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">

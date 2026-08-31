@@ -32,6 +32,8 @@ export interface SubjectFilterParams {
   buyOrSell?: 2 | 3;
   /** 是固定資產折舊與減損科目嗎；0 false、1 true，不傳則不篩 */
   isFixedAssetDepreciationImpairment?: 0 | 1;
+  /** 沖帳區專用篩選：0 沖帳 Others、1 沖應收、2 沖應付，不傳則不篩 */
+  settle?: 0 | 1 | 2;
 }
 
 /** 進階篩選官方科目清單（/ael/subject/official/list/filter），供各畫面依語境（進項／銷項／銀行等）取子集 */
