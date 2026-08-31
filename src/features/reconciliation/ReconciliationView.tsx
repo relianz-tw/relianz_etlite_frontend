@@ -264,7 +264,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       key: ALL_GROUP_KEY,
       label: getAllGroupLabel(side),
       count: availableCandidates.length,
-      amount: availableCandidates.reduce((sum, c) => sum + c.amount, 0),
+      amount: availableCandidates.reduce((sum, c) => sum + (c.remainingAmount ?? c.amount), 0),
     };
     return [allGroup, ...buildReconGroups(availableCandidates, groupOptions)];
   }, [availableCandidates, groupOptions, side]);

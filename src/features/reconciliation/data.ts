@@ -35,7 +35,7 @@ export interface ReconGroup {
   label: string;
   /** 該群組尚未沖帳（已排除作廢/已沖帳）的交易筆數 */
   count: number;
-  /** 該群組尚未沖帳交易金額加總 */
+  /** 該群組未沖帳金額（remainingAmount）加總，非原始單據總額 */
   amount: number;
   /** 該群組的當前餘額；「全部管道」／前端合成的「其他」無對應實體，故為 undefined */
   balance?: number;
@@ -147,13 +147,13 @@ export function buildReconGroups(candidates: ReconCandidate[], groupOptions: Rec
 
   const groups: ReconGroup[] = sortedOptions.map(opt => {
     const matchRows = candidates.filter(c => c.groupUuid === opt.uuid || (opt.uuid === catchAllKey && isUnclassified(c.groupUuid)));
-    return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + c.amount, 0), balance: opt.balance };
+    return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + (c.remainingAmount ?? c.amount), 0), balance: opt.balance };
   });
 
   // 沒有使用者自建的「其他」管道時，才需要前端合成一個桶收納未分類交易
   if (catchAllKey === OTHER_GROUP_KEY) {
     const otherRows = candidates.filter(c => isUnclassified(c.groupUuid));
-    groups.push({ key: OTHER_GROUP_KEY, label: OTHER_GROUP_LABEL, count: otherRows.length, amount: otherRows.reduce((sum, c) => sum + c.amount, 0) });
+    groups.push({ key: OTHER_GROUP_KEY, label: OTHER_GROUP_LABEL, count: otherRows.length, amount: otherRows.reduce((sum, c) => sum + (c.remainingAmount ?? c.amount), 0) });
   }
   return groups;
 }
