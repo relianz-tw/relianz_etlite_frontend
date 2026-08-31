@@ -83,51 +83,67 @@ export function buildTrendPoints(
 /** 「其他」彙總項的 uuid 值；第五名以後的項目彙總於此，不可用於篩選 */
 export const OTHER_SHARE_KEY = '__other__';
 
+/**
+ * 依 uuid（null 視為同一組）合併多組佔比原始資料並加總金額，供銷售管道佔比合併「應收」＋「已收款」
+ * 兩個口徑（分別對應 receivables/summary 與 receivables/collected/summary）使用。
+ */
+export function mergeShareEntries(
+  ...groups: { uuid: string | null; label: string; value: number }[][]
+): { uuid: string | null; label: string; value: number }[] {
+  const merged = new Map<string, { uuid: string | null; label: string; value: number }>();
+  for (const group of groups) {
+    for (const entry of group) {
+      const key = entry.uuid ?? '__null__';
+      const existing = merged.get(key);
+      if (existing) existing.value += entry.value;
+      else merged.set(key, { ...entry });
+    }
+  }
+  return [...merged.values()];
+}
+
 export interface ChannelShareDatum {
-  /** === OTHER_SHARE_KEY 時為第五名以後彙總；null 代表未指定管道/廠商。兩者皆不可下鑽 */
-  uuid: string | null;
+  /** === OTHER_SHARE_KEY 時為第五名以後或未指定管道/廠商彙總，不可下鑽；其餘皆為實際 uuid */
+  uuid: string;
   label: string;
   value: number;
   color: string;
-  /** false 代表點擊不應觸發篩選（「其他」與「未指定」） */
+  /** false 代表點擊不應觸發篩選（僅「其他」） */
   selectable: boolean;
 }
 
 /**
  * 依金額由大到小取前 topN(=4)，其餘彙總為「其他」並固定套 OTHER_SERIES_COLOR，
  * 上限共 4 彩色類別 + 1 其他＝5 段（甜甜圈圖分類數，DESIGN.md §11.3）。
- * 金額為 0 的項目不列入（避免出現空白扇形）。不足 topN 筆時不產生「其他」列。
- * ⚠️ uuid 為 null（未指定管道/廠商）的項目維持獨立顯示，但標記為不可下鑽——
+ * 金額為 0 的項目不列入（避免出現空白扇形）。
+ * ⚠️ uuid 為 null（未指定管道/廠商）一律併入「其他」，不單獨排進前 4——
  * 後端 filter API 目前只接受實際的管道/廠商 uuid，無法篩選「未指定」這個狀態，
- * 故該項僅顯示金額、處理方式與「其他」相同。
+ * 讓它單獨佔一個扇形沒有實際用途，故直接視同「其他」處理。
  */
 export function buildTopShares(entries: { uuid: string | null; label: string; value: number }[], topN = 4): ChannelShareDatum[] {
-  const sorted = entries
-    .filter(e => e.value > 0)
+  const positive = entries.filter(e => e.value > 0);
+  const unassignedTotal = positive.filter(e => e.uuid === null).reduce((sum, e) => sum + e.value, 0);
+  const named = positive
+    .filter((e): e is { uuid: string; label: string; value: number } => e.uuid !== null)
     .slice()
     .sort((a, b) => b.value - a.value);
-  const top = sorted.slice(0, topN);
-  const rest = sorted.slice(topN);
+  const top = named.slice(0, topN);
+  const rest = named.slice(topN);
 
-  let colorIndex = 0;
-  const result: ChannelShareDatum[] = top.map(e => {
-    const isUnassigned = e.uuid === null;
-    const datum: ChannelShareDatum = {
-      uuid: e.uuid,
-      label: e.label,
-      value: e.value,
-      color: isUnassigned ? OTHER_SERIES_COLOR : CATEGORICAL_SERIES[colorIndex % CATEGORICAL_SERIES.length],
-      selectable: !isUnassigned,
-    };
-    if (!isUnassigned) colorIndex += 1;
-    return datum;
-  });
+  const result: ChannelShareDatum[] = top.map((e, index) => ({
+    uuid: e.uuid,
+    label: e.label,
+    value: e.value,
+    color: CATEGORICAL_SERIES[index % CATEGORICAL_SERIES.length],
+    selectable: true,
+  }));
 
-  if (rest.length > 0) {
+  const otherTotal = rest.reduce((sum, e) => sum + e.value, 0) + unassignedTotal;
+  if (otherTotal > 0) {
     result.push({
       uuid: OTHER_SHARE_KEY,
       label: '其他',
-      value: rest.reduce((sum, e) => sum + e.value, 0),
+      value: otherTotal,
       color: OTHER_SERIES_COLOR,
       selectable: false,
     });

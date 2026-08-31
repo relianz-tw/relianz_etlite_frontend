@@ -19,23 +19,17 @@ interface ChannelShareCardProps {
   shares: ChannelShareDatum[];
   loading: boolean;
   selectedUuid: string | null;
-  /** 點「其他」與「未指定」不觸發（見 ChannelShareDatum.selectable）；再點同一項傳 null 清除 */
+  /** 點「其他」不觸發（見 ChannelShareDatum.selectable）；再點同一項傳 null 清除 */
   onSelect: (uuid: string | null) => void;
 }
 
 const LABEL: Record<Side, string> = { sales: '銷售管道佔比', purchase: '廠商佔比' };
-/** shares 的 uuid 可能為 null（未指定），DonutChart 的 key 需要非 null 字串，故給一個本地 sentinel；
- *  只在這個卡片內部用來對齊 DonutSlice.key ↔ ChannelShareDatum，不會外流到 URL */
-const UNASSIGNED_KEY = '__unassigned__';
 
 export default function ChannelShareCard({ side, shares, loading, selectedUuid, onSelect }: ChannelShareCardProps) {
-  const slices: DonutSlice[] = useMemo(
-    () => shares.map(s => ({ key: s.uuid ?? UNASSIGNED_KEY, label: s.label, value: s.value, color: s.color })),
-    [shares],
-  );
+  const slices: DonutSlice[] = useMemo(() => shares.map(s => ({ key: s.uuid, label: s.label, value: s.value, color: s.color })), [shares]);
 
   const handleSelect = (slice: DonutSlice) => {
-    const share = shares.find(s => (s.uuid ?? UNASSIGNED_KEY) === slice.key);
+    const share = shares.find(s => s.uuid === slice.key);
     if (!share?.selectable) return;
     onSelect(share.uuid === selectedUuid ? null : share.uuid);
   };
@@ -53,14 +47,13 @@ export default function ChannelShareCard({ side, shares, loading, selectedUuid, 
           {/* 文字圖例即互動入口（DESIGN.md §11.8/§11.11）：扇形無法 tab focus，<button> 提供鍵盤可及的等效操作 */}
           <div className="mt-3 space-y-1.5">
             {shares.map(s => {
-              const key = s.uuid ?? UNASSIGNED_KEY;
-              const selected = selectedUuid === key;
+              const selected = selectedUuid === s.uuid;
               return (
                 <button
-                  key={key}
+                  key={s.uuid}
                   type="button"
                   disabled={!s.selectable}
-                  onClick={() => handleSelect({ key, label: s.label, value: s.value, color: s.color })}
+                  onClick={() => handleSelect({ key: s.uuid, label: s.label, value: s.value, color: s.color })}
                   className={`flex w-full items-center justify-between gap-2 rounded-sm px-1 py-1 text-left transition-opacity ${
                     s.selectable ? 'hover:bg-surface-cream' : 'cursor-default'
                   } ${selectedUuid !== null && !selected ? 'opacity-40' : ''}`}
