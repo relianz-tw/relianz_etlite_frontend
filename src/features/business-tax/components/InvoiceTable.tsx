@@ -36,6 +36,9 @@ export default function InvoiceTable({
   totalSales,
   totalBusinessTax,
   totalAmount,
+  pageSales,
+  pageBusinessTax,
+  pageAmount,
   limit,
   onLimitChange,
   sort,
@@ -47,23 +50,29 @@ export default function InvoiceTable({
   totalSales: string;
   totalBusinessTax: string;
   totalAmount: string;
+  pageSales: string;
+  pageBusinessTax: string;
+  pageAmount: string;
   limit: number;
   onLimitChange: (limit: number) => void;
   sort: SortState;
   onSortToggle: (key: SortKey) => void;
 }) {
   const counterpartyLabel = side === 'sales' ? '買受人' : '賣方';
+  // 進項僅顯示可否扣抵；作廢狀態僅在銷項呈現（進項作廢不特別標示，避免刪除線卻無說明文字）
+  const statusLabel = side === 'sales' ? '作廢狀態' : '可否扣抵';
 
   return (
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
       <table className="w-full table-fixed border-collapse">
         <colgroup>
           <col className="w-[100px]" />
-          <col className="w-[200px]" />
+          <col className="w-[180px]" />
           <col className="w-[120px]" />
           <col className="w-[120px]" />
           <col className="w-[130px]" />
           <col />
+          <col className="w-[100px]" />
           <col className="w-[110px]" />
         </colgroup>
         <thead className="bg-surface-off-white">
@@ -79,12 +88,15 @@ export default function InvoiceTable({
             <th className={`${thClass} text-right`}>總金額</th>
             <th className={thClass}>{counterpartyLabel}</th>
             <th className={thClass}>申報狀態</th>
+            <th className={thClass}>{statusLabel}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => {
-            const cell = row.isVoid ? tdVoidClass : tdClass;
-            const amountStrike = row.isVoid ? 'line-through' : '';
+            // 進項不特別呈現作廢視覺，只有銷項作廢列降階＋刪除線
+            const isVoidRow = side === 'sales' && row.isVoid;
+            const cell = isVoidRow ? tdVoidClass : tdClass;
+            const amountStrike = isVoidRow ? 'line-through' : '';
             return (
               <tr
                 key={row.uuid}
@@ -100,7 +112,6 @@ export default function InvoiceTable({
                       {row.id}
                     </Link>
                     {row.isAllowance && <Badge tone="info">折讓</Badge>}
-                    {row.isVoid && <Badge tone="error">已作廢</Badge>}
                   </div>
                 </td>
                 <td className={`${cell} text-right font-mono tabular-nums ${amountStrike}`}>{fmtCurrency(row.untaxed)}</td>
@@ -110,14 +121,31 @@ export default function InvoiceTable({
                 <td className={cell}>
                   <Badge tone={row.declared ? 'success' : 'neutral'}>{row.declared ? '已申報' : '未申報'}</Badge>
                 </td>
+                <td className={cell}>
+                  {side === 'sales' ? (
+                    <Badge tone={row.isVoid ? 'error' : 'neutral'}>{row.isVoid ? '已作廢' : '正常'}</Badge>
+                  ) : (
+                    <Badge tone={row.deductible ? 'success' : 'neutral'}>{row.deductible ? '可扣抵' : '不可扣抵'}</Badge>
+                  )}
+                </td>
               </tr>
             );
           })}
         </tbody>
         <tfoot>
           <tr className="border-t border-neutral-blue-gray/40 bg-surface-off-white">
+            <td className={`${tdClass} text-neutral-mid`}>本頁加總</td>
+            <td className={tdClass} />
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{pageSales}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{pageBusinessTax}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{pageAmount}</td>
+            <td className={tdClass} />
+            <td className={tdClass} />
+            <td className={tdClass} />
+          </tr>
+          <tr className="border-t border-neutral-blue-gray/20 bg-surface-off-white">
             <td className={`${tdClass} text-neutral-mid`}>
-              目前顯示 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
+              全部加總 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
             </td>
             <td className={tdClass} />
             <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalSales}</td>
@@ -134,6 +162,7 @@ export default function InvoiceTable({
                 筆
               </div>
             </td>
+            <td className={tdClass} />
             <td className={tdClass} />
           </tr>
         </tfoot>

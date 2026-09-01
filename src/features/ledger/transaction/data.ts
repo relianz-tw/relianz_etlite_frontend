@@ -108,6 +108,8 @@ export function mapInvoiceDetailToForm(side: Side, invoice: EntryInvoiceDetailDt
     voucherPreviewUrl: invoice.invoicePicUrl || null,
     isAllowance: invoice.isAllowance,
     declared: invoice.declared === 1,
+    deductible: invoice.deductible !== 2,
+    unreportedReason: invoice.unreportedReason,
   };
   // sellerTaxId／companyName 為 invoice 通用欄位，銷項／進項皆有回傳，故不分 side 一併帶入
   return side === 'sales'

@@ -42,6 +42,8 @@ export interface TaxInvoiceRow {
   isVoid: boolean;
   /** 申報狀態 */
   declared: boolean;
+  /** 可扣抵狀態（僅進項使用） */
+  deductible: boolean;
 }
 
 export interface FilingPeriod {

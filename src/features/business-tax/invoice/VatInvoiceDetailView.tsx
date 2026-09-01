@@ -127,7 +127,16 @@ export default function VatInvoiceDetailView({ side, ledgerUuid, isVoid }: VatIn
             </div>
 
             <div className="flex flex-col gap-5">
-              {entryDetail && <InvoiceDeclareStatusCard declarePeriod={form.declarePeriod} declared={form.declared} isVoid={isVoid} />}
+              {entryDetail && (
+                <InvoiceDeclareStatusCard
+                  declarePeriod={form.declarePeriod}
+                  declared={form.declared}
+                  isVoid={isVoid}
+                  side={side}
+                  deductible={form.deductible}
+                  unreportedReason={form.unreportedReason}
+                />
+              )}
 
               <TransactionMetaCard
                 side={side}

@@ -1,7 +1,8 @@
 'use client';
 
 import Badge from '@/components/ui/Badge';
-import { Ban, CalendarDays, Scale } from 'lucide-react';
+import type { Side } from '@/features/ledger/types';
+import { Ban, CalendarDays, Percent, Scale } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface StatusRow {
@@ -15,11 +16,25 @@ interface InvoiceDeclareStatusCardProps {
   declarePeriod: string;
   declared: boolean;
   isVoid: boolean;
+  side: Side;
+  /** 可否扣抵（進項適用） */
+  deductible: boolean;
+  /** 不可扣抵原因；deductible 為 false 時才顯示 */
+  unreportedReason: string;
 }
 
 /** 營業稅中心憑證細節頁的「申報狀態」卡片：取代帳簿交易細節頁的沖帳狀態卡，
- *  版型比照 TransactionSettlementStatus 上半部（icon/label 左、值右），無可展開區塊。 */
-export default function InvoiceDeclareStatusCard({ declarePeriod, declared, isVoid }: InvoiceDeclareStatusCardProps) {
+ *  版型比照 TransactionSettlementStatus 上半部（icon/label 左、值右），無可展開區塊。
+ *  進項第三列改顯示「可否扣抵」（取代「是否作廢」，因進項作廢已在列表頁改為不特別呈現）；
+ *  銷項維持「是否作廢」。 */
+export default function InvoiceDeclareStatusCard({
+  declarePeriod,
+  declared,
+  isVoid,
+  side,
+  deductible,
+  unreportedReason,
+}: InvoiceDeclareStatusCardProps) {
   const rows: StatusRow[] = [
     { icon: CalendarDays, label: '申報期別', value: declarePeriod || '—' },
     {
@@ -31,16 +46,27 @@ export default function InvoiceDeclareStatusCard({ declarePeriod, declared, isVo
         </Badge>
       ),
     },
-    {
-      icon: Ban,
-      label: '是否作廢',
-      value: (
-        <Badge tone={isVoid ? 'error' : 'success'} variant="muted">
-          {isVoid ? '已作廢' : '無'}
-        </Badge>
-      ),
-    },
+    side === 'purchase'
+      ? {
+          icon: Percent,
+          label: '可否扣抵',
+          value: (
+            <Badge tone={deductible ? 'success' : 'error'} variant="muted">
+              {deductible ? '可扣抵' : '不可扣抵'}
+            </Badge>
+          ),
+        }
+      : {
+          icon: Ban,
+          label: '是否作廢',
+          value: (
+            <Badge tone={isVoid ? 'error' : 'success'} variant="muted">
+              {isVoid ? '已作廢' : '無'}
+            </Badge>
+          ),
+        },
   ];
+  const showUnreportedReason = side === 'purchase' && !deductible && !!unreportedReason;
 
   return (
     <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-4">
@@ -54,6 +80,12 @@ export default function InvoiceDeclareStatusCard({ declarePeriod, declared, isVo
             <span className="font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
           </div>
         ))}
+        {showUnreportedReason && (
+          <div className="flex items-start justify-between gap-3 border-t border-neutral-blue-gray/20 pt-2.5 text-sm">
+            <span className="text-neutral-mid">不可扣抵原因</span>
+            <span className="text-right text-neutral-dark">{unreportedReason}</span>
+          </div>
+        )}
       </div>
     </div>
   );

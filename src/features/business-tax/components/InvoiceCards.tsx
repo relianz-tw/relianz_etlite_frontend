@@ -37,10 +37,11 @@ function MobileSortControl({
   );
 }
 
-// 作廢卡片：號碼與金額降階為 neutral-mid + 刪除線（見 DESIGN.md「Voided Row」）
-function InvoiceCard({ row, onClick }: { row: TaxInvoiceRow; onClick: () => void }) {
-  const idClass = `font-mono text-[15px] font-semibold ${row.isVoid ? 'text-neutral-mid line-through' : 'text-neutral-dark'}`;
-  const totalClass = `font-mono text-lg font-semibold tabular-nums ${row.isVoid ? 'text-neutral-mid line-through' : 'text-neutral-dark'}`;
+// 作廢卡片：號碼與金額降階為 neutral-mid + 刪除線（見 DESIGN.md「Voided Row」），僅銷項呈現作廢視覺
+function InvoiceCard({ side, row, onClick }: { side: TaxSide; row: TaxInvoiceRow; onClick: () => void }) {
+  const isVoidRow = side === 'sales' && row.isVoid;
+  const idClass = `font-mono text-[15px] font-semibold ${isVoidRow ? 'text-neutral-mid line-through' : 'text-neutral-dark'}`;
+  const totalClass = `font-mono text-lg font-semibold tabular-nums ${isVoidRow ? 'text-neutral-mid line-through' : 'text-neutral-dark'}`;
 
   return (
     <div
@@ -51,12 +52,16 @@ function InvoiceCard({ row, onClick }: { row: TaxInvoiceRow; onClick: () => void
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={idClass}>{row.id}</span>
           {row.isAllowance && <Badge tone="info">折讓</Badge>}
-          {row.isVoid && <Badge tone="error">已作廢</Badge>}
         </div>
         <span className="whitespace-nowrap font-mono text-xs text-neutral-mid">{row.date}</span>
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1.5">
         <Badge tone={row.declared ? 'success' : 'neutral'}>{row.declared ? '已申報' : '未申報'}</Badge>
+        {side === 'sales' ? (
+          <Badge tone={row.isVoid ? 'error' : 'neutral'}>{row.isVoid ? '已作廢' : '正常'}</Badge>
+        ) : (
+          <Badge tone={row.deductible ? 'success' : 'neutral'}>{row.deductible ? '可扣抵' : '不可扣抵'}</Badge>
+        )}
       </div>
       <div className="truncate text-[13px] text-neutral-mid" title={row.counterparty}>{row.counterparty}</div>
       <span className={totalClass}>{fmtCurrency(row.total)}</span>
@@ -73,6 +78,7 @@ export default function InvoiceCards({
   rows,
   totalCount,
   totalAmount,
+  pageAmount,
   sort,
   onSortFieldChange,
   onSortDirToggle,
@@ -81,6 +87,7 @@ export default function InvoiceCards({
   rows: TaxInvoiceRow[];
   totalCount: number;
   totalAmount: string;
+  pageAmount: string;
   sort: SortState;
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
@@ -93,10 +100,15 @@ export default function InvoiceCards({
     <div className="flex flex-col gap-2.5 nav:hidden">
       <div className="sticky top-16 z-40 flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-blue-gray/30 bg-white p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="whitespace-nowrap text-sm text-neutral-mid">
-            目前顯示 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆{' '}
-            <span className="font-mono font-semibold tabular-nums text-neutral-dark">{totalAmount}</span>
-          </span>
+          <div className="flex flex-col gap-0.5 text-sm text-neutral-mid">
+            <span className="whitespace-nowrap">
+              本頁加總 <span className="font-mono font-semibold tabular-nums text-neutral-dark">{pageAmount}</span>
+            </span>
+            <span className="whitespace-nowrap">
+              全部加總 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆{' '}
+              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{totalAmount}</span>
+            </span>
+          </div>
           <MobileSortControl sort={sort} onFieldChange={onSortFieldChange} onDirToggle={onSortDirToggle} />
         </div>
         <Button variant="warm" size="sm" icon={Download} disabled title="後端尚未提供匯出總表資料，暫停用">
@@ -105,7 +117,7 @@ export default function InvoiceCards({
       </div>
 
       {rows.map(row => (
-        <InvoiceCard key={row.uuid} row={row} onClick={() => goToInvoice(row)} />
+        <InvoiceCard key={row.uuid} side={side} row={row} onClick={() => goToInvoice(row)} />
       ))}
     </div>
   );

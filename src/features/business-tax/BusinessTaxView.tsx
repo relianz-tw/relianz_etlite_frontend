@@ -21,8 +21,8 @@ import { FILING_PERIODS, mapVatItemsToRows, parseFilingPeriod, REPORT_SUMMARY } 
 import type { AdvancedFilter, SortKey, SortState, TaxInvoiceRow, TaxSide } from './types';
 
 const SIDE_TABS: { value: TaxSide; label: string }[] = [
-  { value: 'purchase', label: '進項（含折讓）' },
-  { value: 'sales', label: '銷項（含折讓）' },
+  { value: 'sales', label: '銷項' },
+  { value: 'purchase', label: '進項' },
 ];
 
 const EMPTY_ADVANCED_FILTER: AdvancedFilter = { minAmount: '', maxAmount: '', dateFrom: '', dateTo: '', taxIdNumber: '', companyName: '', isVoid: '' };
@@ -78,6 +78,9 @@ export default function BusinessTaxView() {
   const [totalSales, setTotalSales] = useState(0);
   const [totalBusinessTax, setTotalBusinessTax] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [pageSales, setPageSales] = useState(0);
+  const [pageBusinessTax, setPageBusinessTax] = useState(0);
+  const [pageAmount, setPageAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -114,6 +117,9 @@ export default function BusinessTaxView() {
         setTotalSales(result.totalSales);
         setTotalBusinessTax(result.totalBusinessTax);
         setTotalAmount(result.totalAmount);
+        setPageSales(result.pageSales);
+        setPageBusinessTax(result.pageBusinessTax);
+        setPageAmount(result.pageAmount);
       })
       .catch(err => {
         if (cancelled) return;
@@ -218,6 +224,9 @@ export default function BusinessTaxView() {
               totalSales={fmtCurrency(totalSales)}
               totalBusinessTax={fmtCurrency(totalBusinessTax)}
               totalAmount={fmtCurrency(totalAmount)}
+              pageSales={fmtCurrency(pageSales)}
+              pageBusinessTax={fmtCurrency(pageBusinessTax)}
+              pageAmount={fmtCurrency(pageAmount)}
               limit={limit}
               onLimitChange={handleLimitChange}
               sort={sort}
@@ -228,6 +237,7 @@ export default function BusinessTaxView() {
               rows={sortedRows}
               totalCount={total}
               totalAmount={fmtCurrency(totalAmount)}
+              pageAmount={fmtCurrency(pageAmount)}
               sort={sort}
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}

@@ -40,7 +40,8 @@ export function mapVatItemsToRows(items: VatInvoiceItemDto[]): TaxInvoiceRow[] {
     counterparty: item.counterpartyName ?? item.companyName,
     isAllowance: item.isDebit === 1,
     isVoid: item.isVoid,
-    declared: item.declared,
+    declared: item.declared === 1,
+    deductible: item.deductible === 1,
   }));
 }
 

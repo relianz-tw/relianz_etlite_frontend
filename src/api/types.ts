@@ -922,6 +922,8 @@ export interface SettleReceivableBody {
   memo: string;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee[];
+  /** 電商平台扣款物件；非應收沖帳中心情境（如手動沖帳編輯）可不傳 */
+  ecommercePlatformFee?: SettleEcommercePlatformFee;
   /** 沖帳其他減項物件 */
   otherDeductions?: SettleSummaryOtherDeduction[];
 }
@@ -969,6 +971,12 @@ export interface SettleSummaryFee {
   name: string;
   /** 手續費 */
   feeAmount: number;
+}
+
+/** 電商平台扣款物件（僅應收沖帳 API 支援）：feeAmount 為正的扣款金額，officialAccountingSubjectId 固定為電商平台扣款科目 */
+export interface SettleEcommercePlatformFee {
+  feeAmount: number;
+  officialAccountingSubjectId: number;
 }
 
 /** 匯總沖帳的額外扣款項（可無限新增），銷項／進項共用同一結構 */
@@ -1059,6 +1067,8 @@ export interface SettleReceivablePreviewBody {
   balanceUsed: number;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
+  /** 電商平台扣款物件；非應收沖帳中心情境（如手動沖帳編輯）可不傳 */
+  ecommercePlatformFee?: SettleEcommercePlatformFee;
   /** 使用者未新增任何額外金額時不傳此參數 */
   otherDeductions?: SettleSummaryOtherDeduction[];
 }
@@ -1148,6 +1158,8 @@ export interface SettleReceivableSummaryBody {
   balanceUsed: number;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
+  /** 電商平台扣款物件；非應收沖帳中心情境（如手動沖帳編輯）可不傳 */
+  ecommercePlatformFee?: SettleEcommercePlatformFee;
   otherDeductions?: SettleSummaryOtherDeduction[];
 }
 
@@ -1247,6 +1259,10 @@ export interface EntryInvoiceDetailDto {
   isAllowance: boolean;
   /** 申報狀態：1 已申報、2 未申報 */
   declared: number;
+  /** 可否扣抵：1 可扣抵、2 不可扣抵（進項適用） */
+  deductible: number;
+  /** 不可扣抵原因；deductible=2 時才有意義 */
+  unreportedReason: string;
   /** 憑證種類代號，值域 1~7；僅此範圍內才顯示折讓紀錄區塊 */
   ourInvoiceType: number;
 }
@@ -1588,13 +1604,16 @@ export interface VatInvoiceItemDto {
   companyAccountingSubjectUuid?: string;
   /** 作廢狀態 */
   isVoid: boolean;
-  /** 申報狀態 */
-  declared: boolean;
+  /** 申報狀態，1=已申報、2=未申報 */
+  declared: number;
+  /** 可扣抵狀態，1=可扣抵、2=不可扣抵 */
+  deductible: number;
 }
 
 /**
  * 營業稅中心進／銷項發票列表回應（data 內容）。totalSales／totalBusinessTax／totalAmount
- * 為篩選後不分頁的合計（折讓以負值計入），前端不得自行加總，一律直接顯示此三個欄位。
+ * 為篩選後不分頁的合計，pageSales／pageBusinessTax／pageAmount 為本頁 items 合計
+ * （皆折讓以負值計入），前端不得自行加總，一律直接顯示這六個欄位。
  */
 export interface VatInvoiceFilterResult {
   items: VatInvoiceItemDto[];
@@ -1609,6 +1628,12 @@ export interface VatInvoiceFilterResult {
   totalBusinessTax: number;
   /** 篩選後不分頁；折讓以負值計入 */
   totalAmount: number;
+  /** 本頁 items 的 sales 合計 */
+  pageSales: number;
+  /** 本頁 items 的 businessTax 合計 */
+  pageBusinessTax: number;
+  /** 本頁 items 的 amount 合計 */
+  pageAmount: number;
 }
 
 /** 營業稅中心：計算本期銷／進發票金額與應納營業稅（GET /ael/vat/periodSummary）回應 data */

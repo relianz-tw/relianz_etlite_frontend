@@ -6789,7 +6789,7 @@ officialAccountingSubjectId 或 companyAccountingSubjectUuid（二擇一為主�
 |» voucherKind|body|integer| yes |進項：0收據 1統一發票 2交通 3水電 4進口|
 |» deductible|body|boolean| no |可否扣抵；選填，未傳當可扣抵|
 |» remark|body|string| no |發票備註|
-|» summary|body|string| no |摘要|
+|» summary|body|string| no |摘要（第一個品項）|
 |» counterpartyTaxId|body|string| no |賣方統編；選填|
 |» isReturnGoods|body|boolean| no |是否退貨（進口等場景）|
 |» importTaxNumber|body|string| no |進口專用：海關代徵營業稅繳納證號碼|
@@ -6916,7 +6916,7 @@ POST /ael/ledger/receivables
 |» voucherKind|body|integer| yes |銷項憑證類型；實務可傳 1（統一發票）|
 |» deductible|body|boolean| no |可否扣抵；選填|
 |» remark|body|string| no |發票備註|
-|» summary|body|string| no |摘要|
+|» summary|body|string| no |摘要（第一個品項）|
 |» counterpartyTaxId|body|string| no |買方統編；選填|
 |» isReturnGoods|body|boolean| no |是否退貨|
 |» importTaxNumber|body|string| no |進口專用欄位（銷項通常不用）|
@@ -10650,21 +10650,18 @@ HTTP Status Code **200**
 |»»» officialAccountingSubjectId|integer|false|none||官方科目id|
 |»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» createdAt|string|false|none||none|
-|»»» invoice|[object]|true|none||none|
-|»»»» uuid|string|true|none||發票uuid|
-|»»»» invoiceTrack|string|true|none||發票字軌|
-|»»»» invoiceNumber|string|true|none||發票號碼|
-|»»»» voucherNumber|string|true|none||發票字軌+發票號碼|
-|»»»» date|string|true|none||YYYMMDD|
-|»»»» buyerName|string|true|none||買方名稱|
-|»»»» sellerName|string|true|none||賣方名稱|
-|»»»» buyerTaxIdNumber|string|true|none||買方統編|
-|»»»» sellerTaxIdNumber|string|true|none||賣方統編|
-|»»»» counterpartyTaxId|string|true|none||廠商統編|
-|»»»» amount|integer|true|none||未稅額|
-|»»»» businessTax|integer|true|none||稅額|
-|»»»» buyOrSell|integer|true|none||2進項,3銷項|
-|»»»» ourInvoiceType|integer|true|none||none|
+|»»» allowanceTotalAmount|integer|true|none||折讓總額（負值）|
+|»»» invoice|object|true|none||none|
+|»»» allowances|[object]|true|none||none|
+|»»»» ledgerUuid|string|true|none||交易uuid|
+|»»»» orderCode|string|true|none||交易編號|
+|»»»» totalAmount|integer|true|none||折讓原單總額|
+|»»»» netAmount|integer|true|none||折讓原單未稅額|
+|»»»» taxAmount|integer|true|none||折讓原單稅額|
+|»»»» direction|integer|true|none||none|
+|»»»» allowanceAmount|integer|true|none||折讓金額（負值）|
+|»»»» transactionDate|string|true|none||交易日期|
+|»»»» createdAt|string|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
@@ -11257,6 +11254,7 @@ HTTP Status Code **200**
 |»»» officialAccountingSubjectId|integer|true|none||官方科目id|
 |»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» createdAt|string|true|none||none|
+|»»» allowanceTotalAmount|integer|true|none||折讓總額（負值）|
 |»»» invoice|object|true|none||none|
 |»»»» uuid|string|true|none||none|
 |»»»» invoiceTrack|string|true|none||none|
@@ -11272,6 +11270,16 @@ HTTP Status Code **200**
 |»»»» sellerTaxIdNumber|string|true|none||none|
 |»»»» buyerName|string|true|none||none|
 |»»»» sellerName|string|true|none||none|
+|»»» allowances|[object]|true|none||none|
+|»»»» ledgerUuid|string|true|none||交易uuid|
+|»»»» orderCode|string|true|none||交易編號|
+|»»»» totalAmount|integer|true|none||折讓原單總額|
+|»»»» netAmount|integer|true|none||折讓原單未稅額|
+|»»»» taxAmount|integer|true|none||折讓原單稅額|
+|»»»» direction|integer|true|none||none|
+|»»»» allowanceAmount|integer|true|none||折讓金額（負值）|
+|»»»» transactionDate|string|true|none||交易日期|
+|»»»» createdAt|string|true|none||none|
 |» errorCode|string|true|none||none|
 |» message|string|true|none||none|
 |» success|boolean|true|none||none|
