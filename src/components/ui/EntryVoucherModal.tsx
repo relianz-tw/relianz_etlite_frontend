@@ -7,6 +7,7 @@ import { fmtCurrency } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { buttonClassName } from './Button';
 import Modal from './Modal';
 import VoucherPreviewCard from './VoucherPreviewCard';
 
@@ -95,16 +96,6 @@ export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, pre
 
   return (
     <Modal open={open} onClose={onClose} title="原始憑證" widthClassName="max-w-[840px]">
-      <Link
-        href={`/ledger/${ledgerUuid}?side=${side}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline"
-      >
-        查看原發票
-        <ExternalLink size={14} />
-      </Link>
-
       {loading ? (
         <p className="text-sm text-neutral-mid">載入中…</p>
       ) : error ? (
@@ -124,6 +115,18 @@ export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, pre
           </div>
         </div>
       )}
+
+      <div className="mt-5 flex justify-end">
+        <Link
+          href={`/ledger/${ledgerUuid}?side=${side}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonClassName('outline', 'sm')}
+        >
+          <ExternalLink size={14} />
+          查看原發票
+        </Link>
+      </div>
     </Modal>
   );
 }

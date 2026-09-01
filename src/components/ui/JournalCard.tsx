@@ -153,7 +153,7 @@ export default function JournalCard({ lines, defaultOpen = false }: JournalCardP
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 text-sm font-semibold text-neutral-dark"
+        className="flex w-full items-center justify-between text-sm font-semibold text-neutral-dark"
       >
         會計分錄（{lines.length}）
         {open ? <ChevronUp size={16} className="text-neutral-mid" /> : <ChevronDown size={16} className="text-neutral-mid" />}
