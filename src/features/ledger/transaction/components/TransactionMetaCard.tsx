@@ -560,7 +560,8 @@ export default function TransactionMetaCard({
           )}
         </Field>,
       ],
-      [buyerTaxIdField, buyerNameField],
+      // 二聯式發票買家統編／名稱非必填，直接不顯示；三聯式才顯示
+      ...(isTriplicateInvoiceBook ? [[buyerTaxIdField, buyerNameField] as [ReactNode, ReactNode?]] : []),
       // 收款日期欄位暫時隱藏（需求方要求），僅保留開立日期
       [issueDateField],
       [channelField, tagField],
@@ -640,7 +641,8 @@ export default function TransactionMetaCard({
     // 銷項交易的賣家一律是本公司，賣家統編／名稱無須再顯示（僅買家資訊有意義）
     rows = [
       [issueDateField, channelField],
-      [buyerTaxIdField, buyerNameField],
+      // 二聯式發票買家統編／名稱非必填，直接不顯示；三聯式才顯示
+      ...(isTriplicateInvoiceBook ? [[buyerTaxIdField, buyerNameField] as [ReactNode, ReactNode?]] : []),
       [tagField, projectField],
     ];
   } else {

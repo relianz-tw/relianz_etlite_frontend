@@ -73,14 +73,11 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     if (!form.sellerName.trim()) return '請輸入賣家名稱';
   } else {
     // 銷項：發票簿 part 為 1 或 2 代表三聯式，三聯式發票買家統編／名稱皆為必填；
-    // 二聯式（或編輯畫面未選發票簿）則為選填，但填了其中一項就需要一併填另一項
+    // 二聯式欄位不顯示，無須驗證
     const isTriplicateInvoiceBook = form.invoiceBookPart === 1 || form.invoiceBookPart === 2;
     if (isTriplicateInvoiceBook) {
       if (!form.buyerTaxId.trim()) return '三聯式發票須輸入買家統一編號';
       if (!form.buyerName.trim()) return '三聯式發票須輸入買家名稱';
-    } else {
-      if (form.buyerTaxId.trim() && !form.buyerName.trim()) return '請輸入買家名稱';
-      if (form.buyerName.trim() && !form.buyerTaxId.trim()) return '請輸入買家統一編號';
     }
   }
   if (!form.issueDate) return '請選擇開立日期';
