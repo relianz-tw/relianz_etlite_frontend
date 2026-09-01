@@ -10,6 +10,7 @@ import {
   fetchEntryDetail,
   reverseSummarySettle,
 } from '@/api/ledger';
+import { listChannelRules } from '@/api/channelRules';
 import { listInvoiceBooks } from '@/api/invoiceBook';
 import { filterOfficialSubjects } from '@/api/subjects';
 import type {
@@ -68,8 +69,7 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
     return null;
   }
   if (side === 'purchase') {
-    // 進項：廠商必須指定（至少選「其他」）；賣家名稱隨廠商選擇帶入為必填，統編僅「其他」以外的廠商需要（其他無真實統編，可自由輸入非必填）
-    if (!form.sellerVendorUuid) return '請選擇廠商';
+    // 進項：廠商非必填，未選擇時送出時會自動帶入「其他」；賣家名稱仍為必填
     if (!form.sellerName.trim()) return '請輸入賣家名稱';
   } else {
     // 銷項：發票簿 part 為 1 或 2 代表三聯式，三聯式發票買家統編／名稱皆為必填；
@@ -86,7 +86,7 @@ function validateForm(side: Side, form: TransactionFormState): string | null {
   if (!form.issueDate) return '請選擇開立日期';
   if (!form.summary.trim()) return '請輸入摘要';
   if (!form.expenseCategory?.id) return side === 'purchase' ? '請選擇費用類別' : '請選擇收入科目';
-  if (side === 'sales' && !form.channel) return '請選擇銷售管道';
+  // 銷售管道非必填，未選擇時送出時會自動帶入「其他」
   if (side === 'purchase') {
     const isImport = form.voucherType === IMPORT_VOUCHER_TYPE;
     const invoiceNum = form.voucherType === VOUCHER_TYPES[0] ? form.invoiceSerial : form.invoiceNumber;
@@ -419,9 +419,21 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           await createReceivableAllowance(buildAllowanceBody(form));
         }
       } else if (side === 'purchase') {
-        await createPayable(buildPayableBody(form));
+        // 廠商未選擇時，依名稱「其他」查得該公司對應 uuid 帶入，而非寫死固定 uuid
+        let sellerVendorUuid = form.sellerVendorUuid;
+        if (!sellerVendorUuid) {
+          const vendors = await listVendors();
+          sellerVendorUuid = vendors.find(v => v.name === '其他')?.uuid ?? '';
+        }
+        await createPayable(buildPayableBody({ ...form, sellerVendorUuid }));
       } else {
-        await createReceivable(buildReceivableBody(form));
+        // 銷售管道未選擇時，依名稱「其他」查得該公司對應 uuid 帶入，而非寫死固定 uuid
+        let channel = form.channel;
+        if (!channel) {
+          const channelRules = await listChannelRules();
+          channel = channelRules.find(c => c.channelName === '其他')?.channelUuid ?? '';
+        }
+        await createReceivable(buildReceivableBody({ ...form, channel }));
       }
       router.push(backHref);
     } catch (err) {

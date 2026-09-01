@@ -317,8 +317,7 @@ export default function TransactionMetaCard({
   const sellerVendorField = (
     <Field
       label="廠商"
-      required={isCreate}
-      helper="選擇既有廠商可自動帶入統編與名稱（帶入後下方欄位鎖定不可編輯）；找不到對應廠商時請選「其他」，並於下方統一編號欄位自由輸入，或點擊「新增」建立新廠商"
+      helper="選擇既有廠商可自動帶入統編與名稱（帶入後下方欄位鎖定不可編輯）；不選擇則預設為「其他」，可於下方統一編號欄位自由輸入，或點擊「新增」建立新廠商"
     >
       <Select
         widthClassName="w-full"
@@ -377,7 +376,7 @@ export default function TransactionMetaCard({
   // （新增送出時不會一併送出，交易明細亦無對應資料可回填），新增與編輯畫面皆停用並標示提示
 
   const channelField = (
-    <Field label="銷售管道" required={isCreate} helper="系統會依照銷售管道設定之付款週期自動入帳；若無對應管道，請選擇「其他」或點擊「新增」建立新管道">
+    <Field label="銷售管道" helper="系統會依照銷售管道設定之付款週期自動入帳；不選擇則預設為「其他」，或點擊「新增」建立新管道">
       <Select
         widthClassName="w-full"
         value={form.channel}
@@ -562,7 +561,6 @@ export default function TransactionMetaCard({
       [projectField],
     ];
   } else if (mode === 'create' && side === 'purchase') {
-    const isGeneralInvoice = form.voucherType === VOUCHER_TYPES[0];
     rows = [
       [
         <Field key="voucherType" label="憑證種類">
@@ -631,30 +629,6 @@ export default function TransactionMetaCard({
     // 進口稅單需另外填寫海關證號與其他稅費，其他憑證種類不顯示
     if (form.voucherType === VOUCHER_TYPES[3]) {
       rows.push(importFields);
-    }
-    // 是否為固定資產僅一般發票可選，選「是」時多開使用年限欄位、費用類別改篩固定資產折舊與減損科目
-    if (isGeneralInvoice) {
-      rows.push([
-        <Field key="isFixedAsset" label="是否為固定資產？">
-          <SegmentedControl
-            options={[...ALLOWANCE_OPTIONS]}
-            value={form.isFixedAsset ? 'yes' : 'no'}
-            // 新舊科目清單不交集，切換時清空已選費用類別避免殘留誤送
-            onChange={v => onChange({ isFixedAsset: v === 'yes', expenseCategory: null })}
-          />
-        </Field>,
-        form.isFixedAsset ? (
-          <Field key="usefulLifeYears" label="使用年限" required helper="請輸入固定資產耐用年數，單位為年">
-            <TextInput
-              widthClassName="w-24"
-              placeholder="年"
-              inputMode="numeric"
-              value={form.usefulLifeYears ? String(form.usefulLifeYears) : ''}
-              onChange={e => onChange({ usefulLifeYears: Number(e.target.value.replace(/\D/g, '')) || 0 })}
-            />
-          </Field>
-        ) : undefined,
-      ]);
     }
   } else if (mode === 'edit' && side === 'sales') {
     // 銷項交易的賣家一律是本公司，賣家統編／名稱無須再顯示（僅買家資訊有意義）
@@ -756,14 +730,34 @@ export default function TransactionMetaCard({
           <Field label={side === 'purchase' ? '費用類別' : '收入科目'} required={mode === 'create'}>
             <SubjectPicker
               value={form.expenseCategory}
-              onChange={s => onChange({ expenseCategory: s })}
+              onChange={s => {
+                // 是否為固定資產改由選定科目本身的 isFixedAssetDepreciationImpairment 自動判斷，非固定資產時歸零使用年限
+                const isFixedAsset = side === 'purchase' && !!s?.isFixedAssetDepreciationImpairment;
+                onChange({ expenseCategory: s, isFixedAsset, ...(isFixedAsset ? {} : { usefulLifeYears: 0 }) });
+              }}
               disabled={readOnly}
               scope={side === 'purchase' ? 'purchase' : 'sales'}
               title={side === 'purchase' ? '選擇費用類別' : '選擇收入科目'}
               aiPicked={aiPickedSubject}
-              isFixedAssetDepreciationImpairment={side === 'purchase' && form.isFixedAsset ? 1 : undefined}
             />
           </Field>
+
+          {/* 是否為固定資產不再手動選擇，改依上方選定科目本身是否為固定資產折舊與減損科目自動判斷；緊接科目欄位下方顯示，避免使用者誤以為沒有跳出 */}
+          {mode === 'create' && side === 'purchase' && form.voucherType === VOUCHER_TYPES[0] && form.isFixedAsset && (
+            <Field label="使用年限" required helper="請輸入固定資產耐用年數，單位為年（正整數）">
+              <TextInput
+                widthClassName="w-24"
+                placeholder="年"
+                inputMode="numeric"
+                value={form.usefulLifeYears ? String(form.usefulLifeYears) : ''}
+                onChange={e => {
+                  // 僅保留數字並去除開頭 0，確保只能輸入正整數
+                  const digits = e.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                  onChange({ usefulLifeYears: digits ? Number(digits) : 0 });
+                }}
+              />
+            </Field>
+          )}
 
           <Field label="銷售額">
             <MoneyInput

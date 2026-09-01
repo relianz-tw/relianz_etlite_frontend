@@ -287,14 +287,26 @@ export default function SubjectPicker({
   }
 
   function commitSelection(subject: OfficialSubjectDto, fromAi: boolean) {
-    onChange({ id: subject.id, subjectCode: subject.subjectCode, name: subject.name });
+    onChange({
+      id: subject.id,
+      subjectCode: subject.subjectCode,
+      name: subject.name,
+      isFixedAssetDepreciationImpairment: subject.isFixedAssetDepreciationImpairment,
+    });
     setPickedByAi(fromAi);
     closePanel();
   }
 
-  // 選定子科目：officialAccountingSubjectId 仍送父科目 id（subject.id），另帶 companyAccountingSubjectUuid
+  // 選定子科目：officialAccountingSubjectId 仍送父科目 id（subject.id），另帶 companyAccountingSubjectUuid；
+  // SubjectChildDto 本身無固定資產旗標，沿用父科目的 isFixedAssetDepreciationImpairment
   function commitChildSelection(subject: OfficialSubjectDto, child: SubjectChildDto, fromAi: boolean) {
-    onChange({ id: subject.id, subjectCode: child.subjectCode, name: child.name, companyAccountingSubjectUuid: child.uuid });
+    onChange({
+      id: subject.id,
+      subjectCode: child.subjectCode,
+      name: child.name,
+      companyAccountingSubjectUuid: child.uuid,
+      isFixedAssetDepreciationImpairment: subject.isFixedAssetDepreciationImpairment,
+    });
     setPickedByAi(fromAi);
     closePanel();
   }

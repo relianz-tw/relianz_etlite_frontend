@@ -20,6 +20,8 @@ export interface SubjectOption {
   name: string;
   /** 公司自訂子科目 uuid；選到子科目時才有值，送出 API 時對應 companyAccountingSubjectUuid（選填） */
   companyAccountingSubjectUuid?: string;
+  /** 是否為固定資產折舊與減損科目，來自 OfficialSubjectDto.isFixedAssetDepreciationImpairment */
+  isFixedAssetDepreciationImpairment?: boolean;
 }
 
 /** 科目下拉的語境：決定打 /ael/subject/official/list/filter 時帶哪些參數 */
