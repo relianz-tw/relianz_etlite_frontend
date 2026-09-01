@@ -331,11 +331,14 @@ export default function TransactionMetaCard({
         onAddNew={() => setNewVendorOpen(true)}
       >
         <option value="" disabled>請選擇廠商</option>
-        {vendors.map(v => (
-          <option key={v.uuid} value={v.uuid}>
-            {v.name}
-          </option>
-        ))}
+        {/* 「其他」不列入可選清單，未選擇時送出表單會自動帶入「其他」；若已選到「其他」（如編輯舊資料）仍保留顯示避免選單空白 */}
+        {vendors
+          .filter(v => v.name !== '其他' || v.uuid === form.sellerVendorUuid)
+          .map(v => (
+            <option key={v.uuid} value={v.uuid}>
+              {v.name}
+            </option>
+          ))}
       </Select>
       {vendorError && <p className="mt-1 text-xs text-semantic-error">{vendorError}</p>}
     </Field>
@@ -385,11 +388,14 @@ export default function TransactionMetaCard({
         onAddNew={() => (hasOtherChannel ? setNewChannelOpen(true) : setInitOtherOpen(true))}
       >
         <option value="" disabled>請選擇銷售管道</option>
-        {channelRules.map(c => (
-          <option key={c.channelUuid} value={c.channelUuid}>
-            {c.channelName}
-          </option>
-        ))}
+        {/* 「其他」不列入可選清單，未選擇時送出表單會自動帶入「其他」；若已選到「其他」（如編輯舊資料）仍保留顯示避免選單空白 */}
+        {channelRules
+          .filter(c => c.channelName !== '其他' || c.channelUuid === form.channel)
+          .map(c => (
+            <option key={c.channelUuid} value={c.channelUuid}>
+              {c.channelName}
+            </option>
+          ))}
       </Select>
       {channelError && <p className="mt-1 text-xs text-semantic-error">{channelError}</p>}
     </Field>
