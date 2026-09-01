@@ -6518,6 +6518,7 @@ GET /ael/subject/official/list/filter
 |isBank|query|string| no |銀行項目專用科目嗎，0：false，1：true；沒傳不篩|
 |buyOrSell|query|string| no |2：進項/支出， 3：銷項/存入|
 |isFixedAssetDepreciationImpairment|query|string| no |是固定資產折舊與減損科目嗎，0：false，1：true；沒傳不篩|
+|settle|query|string| no |沖帳區專用：0:沖帳 Others，1: 沖應收，2: 沖應付 |
 
 > Response Examples
 
@@ -6537,7 +6538,8 @@ GET /ael/subject/official/list/filter
       "calculationType": 0,
       "industryBitmask": 0,
       "isBank": true,
-      "is_fixed_asset_depreciation_impairment": true,
+      "isFixedAssetDepreciationImpairment": true,
+      "settleBitmask": 0,
       "buyOrSell": 0,
       "createdAt": "string",
       "updatedAt": "string",
@@ -6584,7 +6586,8 @@ HTTP Status Code **200**
 |»» calculationType|integer|true|none||0:一般科目型欄位，1:合計型科目欄位，2:棄置科目，3: 期初開帳設定科目，4:期末結帳設定科目|
 |»» industryBitmask|integer|true|none||買賣業:1,勞務業:2,製造業:4|
 |»» isBank|boolean|true|none||銀行項目專用科目嗎|
-|»» is_fixed_asset_depreciation_impairment|boolean|true|none||是固定資產折舊與減損科目嗎|
+|»» isFixedAssetDepreciationImpairment|boolean|true|none||是固定資產折舊與減損科目嗎|
+|»» settleBitmask|integer|true|none||1:沖帳的Otehers科目,2:沖應收帳款,4:沖應付帳款|
 |»» buyOrSell|integer|true|none||進項:2，銷項:3|
 |»» createdAt|string|true|none||none|
 |»» updatedAt|string|true|none||none|
@@ -7555,14 +7558,15 @@ POST /ael/ledger/receivables/filter
 |---|---|---|---|---|
 |body|body|object| yes |none|
 |» companyUuid|body|string| yes |none|
-|» dateFrom|body|string| no |日期起，YYYYMMDD|
-|» dateTo|body|string| no |日期迄，YYYYMMDD|
+|» dateFrom|body|string| no |日期起，YYYYMMDD，交易付款日|
+|» dateTo|body|string| no |日期迄，YYYYMMDD，交易付款日|
 |» amountFrom|body|integer| no |金額下限|
 |» amountTo|body|integer| no |金額上限|
 |» limit|body|integer| yes |一頁筆數|
 |» page|body|integer| yes |頁碼|
 |» filterType|body|integer| no |0 交易編號、1 發票號碼；兩者皆空＝不篩；必須和filterValue一起傳，只傳一邊 → 400|
 |» filterValue|body|string| no |篩選值|
+|» paymentChannelUuid|body|string| yes |選填；帶入時僅該銷售管道|
 
 > Response Examples
 
@@ -8306,6 +8310,7 @@ POST /ael/ledger/receivables/collected/filter
 |» page|body|integer| yes |頁碼|
 |» filterType|body|integer| no |0 交易編號、1 發票號碼；兩者皆空＝不篩；必須和filterValue一起傳，只傳一邊 → 400|
 |» filterValue|body|string| no |篩選值|
+|» paymentChannelUuid|body|string| yes |選填；帶入時僅該銷售管道|
 
 > Response Examples
 
@@ -9424,6 +9429,9 @@ POST /ael/ledger/receivables/settle
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |none|
 |»» name|body|string| yes |none|
+|» ecommercePlatformFee|body|object| yes |電商平台處理費物件|
+|»» feeAmount|body|integer| yes |金額|
+|»» officialAccountingSubjectId|body|integer| yes |科目id|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
 |»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
@@ -9926,6 +9934,9 @@ POST /ael/ledger/reconciliation/receivables/settle/preview
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
 |»» name|body|string| yes |沖帳項目名稱|
+|» ecommercePlatformFee|body|object| yes |電商平台處理費物件|
+|»» feeAmount|body|integer| yes |金額|
+|»» officialAccountingSubjectId|body|integer| yes |科目id|
 |» otherDeductions|body|[object]| yes |none|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
 |»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
@@ -10145,6 +10156,9 @@ isBalance=true的話，depositAmount要放實際沖完整的那幾筆金額總�
 |» allocations|body|object| yes |沖帳手續費物件|
 |»» feeAmount|body|integer| yes |手續費|
 |»» name|body|string| yes |沖帳項目名稱|
+|» ecommercePlatformFee|body|object| yes |電商平台處理費物件|
+|»» feeAmount|body|integer| yes |金額|
+|»» officialAccountingSubjectId|body|integer| yes |科目id|
 |» otherDeductions|body|[object]| yes |沖帳其他減項物件|
 |»» officialAccountingSubjectId|body|integer| yes |科目id|
 |»» companyAccountingSubjectUuid|body|string| yes |子科目uuid,選填|
@@ -10440,6 +10454,67 @@ HTTP Status Code **200**
 |»» originLedgerUuids|[string]|false|none||業務原單交易uuid|
 |»» feeLedgerUuids|[string]|false|none||手續費交易uuid|
 |»» deductionLedgerUuids|[string]|false|none||其他減項交易uuid|
+
+## GET 查詢公司科目餘額
+
+GET /ael/ledger/subjectBalances
+
+查詢公司科目餘額，如未有資料會先初始化
+
+> Body Parameters
+
+```json
+{}
+```
+
+### Params
+
+|Name|Location|Type|Required|Description|
+|---|---|---|---|---|
+|companyUuid|query|string| no |公司uuid|
+|officialAccountingSubjectId|query|string| no |科目id|
+|body|body|object| yes |none|
+
+> Response Examples
+
+> 200 Response
+
+```json
+{
+    "data": {
+        "companyUuid": "d0262e07-94a2-4f13-98bc-2b60e02264d0",
+        "currentBalance": 0,
+        "lastBalanceUpdateDate": null,
+        "name": "同業往來",
+        "officialAccountingSubjectId": 168
+    },
+    "errorCode": "0000",
+    "message": "操作成功",
+    "success": true
+}
+```
+
+### Responses
+
+|HTTP Status Code |Meaning|Description|Data schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|Inline|
+
+### Responses Data Schema
+
+HTTP Status Code **200**
+
+|Name|Type|Required|Restrictions|Title|description|
+|---|---|---|---|---|---|
+|» success|boolean|true|none||none|
+|» errorCode|string|true|none||none|
+|» message|string|true|none||none|
+|» data|object|true|none||none|
+|»» companyUuid|string|true|none||公司uuid|
+|»» officialAccountingSubjectId|integer|true|none||科目id|
+|»» name|string¦null|true|none||名稱|
+|»» currentBalance|integer|true|none||餘額|
+|»» lastBalanceUpdateDate|string¦null|true|none||YYYYMMDD；尚未異動餘額時為 null|
 
 # 帳簿/對帳中心
 
@@ -12945,7 +13020,8 @@ POST /ael/vat/input/filter
         "companyAccountingSubjectUuid": "string",
         "subjectName": "string",
         "isVoid": true,
-        "declared": true
+        "declared": 0,
+        "deductible": 0
       }
     ],
     "total": 0,
@@ -12953,7 +13029,10 @@ POST /ael/vat/input/filter
     "page": 0,
     "totalSales": 0,
     "totalBusinessTax": 0,
-    "totalAmount": 0
+    "totalAmount": 0,
+    "pageSales": 0,
+    "pageBusinessTax": 0,
+    "pageAmount": 0
   }
 }
 ```
@@ -13000,13 +13079,17 @@ HTTP Status Code **200**
 |»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» subjectName|string|false|none||科目名稱(若有子科目則優先)|
 |»»» isVoid|boolean|true|none||作廢狀態|
-|»»» declared|boolean|true|none||申報狀態|
+|»»» declared|integer|true|none||申報狀態，1=已申報,2=未申報|
+|»»» deductible|integer|true|none||可扣抵狀態，1＝可扣抵、2＝不可|
 |»» total|integer|true|none||總筆數|
 |»» limit|integer|true|none||一頁資料筆數|
 |»» page|integer|true|none||頁碼|
 |»» totalSales|integer|true|none||篩選後不分頁；折讓以負值計入|
 |»» totalBusinessTax|integer|true|none||篩選後不分頁；折讓以負值計入|
 |»» totalAmount|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» pageSales|integer|true|none||本頁 items 的 sales 合計|
+|»» pageBusinessTax|integer|true|none||本頁 items 的 businessTax 合計|
+|»» pageAmount|integer|true|none||本頁 items 的 amount 合計|
 
 ## POST 指定期別銷項發票列表
 
@@ -13098,7 +13181,8 @@ POST /ael/vat/output/filter
         "companyAccountingSubjectUuid": "string",
         "subjectName": "string",
         "isVoid": true,
-        "declared": true
+        "declared": 0,
+        "deductible": 0
       }
     ],
     "total": 0,
@@ -13106,7 +13190,10 @@ POST /ael/vat/output/filter
     "page": 0,
     "totalSales": 0,
     "totalBusinessTax": 0,
-    "totalAmount": 0
+    "totalAmount": 0,
+    "pageSales": 0,
+    "pageBusinessTax": 0,
+    "pageAmount": 0
   }
 }
 ```
@@ -13153,13 +13240,17 @@ HTTP Status Code **200**
 |»»» companyAccountingSubjectUuid|string|true|none||子科目uuid|
 |»»» subjectName|string|false|none||科目名稱(若有子科目則優先)|
 |»»» isVoid|boolean|true|none||作廢狀態|
-|»»» declared|boolean|true|none||申報狀態|
+|»»» declared|integer|true|none||申報狀態，1=已申報,2=未申報|
+|»»» deductible|integer|true|none||可扣抵狀態，1＝可扣抵、2＝不可|
 |»» total|integer|true|none||總筆數|
 |»» limit|integer|true|none||一頁資料筆數|
 |»» page|integer|true|none||頁碼|
 |»» totalSales|integer|true|none||篩選後不分頁；折讓以負值計入|
 |»» totalBusinessTax|integer|true|none||篩選後不分頁；折讓以負值計入|
 |»» totalAmount|integer|true|none||篩選後不分頁；折讓以負值計入|
+|»» pageSales|integer|true|none||本頁 items 的 sales 合計|
+|»» pageBusinessTax|integer|true|none||本頁 items 的 businessTax 合計|
+|»» pageAmount|integer|true|none||本頁 items 的 amount 合計|
 
 ## GET 計算本期銷／進發票金額與應納營業稅
 

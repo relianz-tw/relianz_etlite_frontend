@@ -36,22 +36,11 @@ export interface ReconAllocationRow {
 }
 
 /**
- * 固定科目對象：僅 code 與顯示名，id 於執行期以 code 比對 listOfficialSubjects 結果取得。
- * 業主（股東）往來需求：僅應付（進項）出現。官方科目表有兩筆同名——資產側 0201192、負債側 0202192，
- * 應付情境為「錢由股東代墊」應貸記負債，故採負債側 0202192；如與會計實務認定不同，改這裡的 subjectCode 即可。
+ * 組出當前可用的沖帳對象：啟用中的銀行帳戶（含餘額）＋會計科目（含餘額）。
+ * officialSubjects 由呼叫端（useReconTargets）依 side 呼叫 /ael/subject/official/list/filter
+ * 的 settle 參數先篩好，這裡不再依 side 過濾。
  */
-export const FIXED_SUBJECT_TARGETS: { subjectCode: string; name: string; sides: ReconSide[] }[] = [
-  { subjectCode: '0201111', name: '現金', sides: ['receivable', 'payable'] },
-  { subjectCode: '0202192', name: '業主（股東）往來', sides: ['payable'] },
-  { subjectCode: '0202130', name: '其他應付款', sides: ['payable'] },
-  { subjectCode: '0201191', name: '暫付款', sides: ['payable'] },
-];
-
-/**
- * 組出當前 side 可用的沖帳對象：啟用中的銀行帳戶（含餘額）＋該 side 適用的固定科目（依 subjectCode
- * 比對官方科目清單取得 id；查無對應代碼的科目直接不列入選項，避免送出時 officialAccountingSubjectId 缺值）。
- */
-export function buildTargets(accounts: BankAccountDto[], officialSubjects: OfficialSubjectDto[], side: ReconSide): ReconTarget[] {
+export function buildTargets(accounts: BankAccountDto[], officialSubjects: OfficialSubjectDto[]): ReconTarget[] {
   const bankTargets: ReconTarget[] = accounts.map(a => ({
     key: `bank:${a.bankAccountUuid}`,
     kind: 'bankAccount',
@@ -62,21 +51,15 @@ export function buildTargets(accounts: BankAccountDto[], officialSubjects: Offic
     singleUse: true,
   }));
 
-  const subjectTargets: ReconTarget[] = FIXED_SUBJECT_TARGETS.filter(s => s.sides.includes(side))
-    .map((s): ReconTarget | null => {
-      const matched = officialSubjects.find(o => o.subjectCode === s.subjectCode);
-      if (!matched) return null;
-      return {
-        key: `subject:${s.subjectCode}`,
-        kind: 'subject',
-        name: s.name,
-        subLabel: s.subjectCode,
-        officialAccountingSubjectId: matched.id,
-        subjectCode: s.subjectCode,
-        singleUse: true,
-      };
-    })
-    .filter((t): t is ReconTarget => t !== null);
+  const subjectTargets: ReconTarget[] = officialSubjects.map(s => ({
+    key: `subject:${s.subjectCode}`,
+    kind: 'subject',
+    name: s.name,
+    subLabel: s.subjectCode,
+    officialAccountingSubjectId: s.id,
+    subjectCode: s.subjectCode,
+    singleUse: true,
+  }));
 
   return [...bankTargets, ...subjectTargets];
 }

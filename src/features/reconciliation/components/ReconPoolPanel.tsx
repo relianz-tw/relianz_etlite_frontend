@@ -54,7 +54,7 @@ interface ReconPoolPanelProps {
   onRemoveOtherDeduction: (id: string) => void;
   onChangeOtherDeduction: (id: string, patch: Partial<Omit<ReconOtherDeductionRow, 'id'>>) => void;
 
-  /** 電商平台處理費：僅應收（side='receivable'）顯示；金額非 0 時強制須選滿等值的應付憑證才能送出（見 ReconciliationView 驗證） */
+  /** 電商平台扣款：僅應收（side='receivable'）顯示；金額非 0 時強制須選滿等值的應付憑證才能送出（見 ReconciliationView 驗證） */
   platformFeeAmount: number;
   platformFeeVoucherCount: number;
   platformFeeVoucherTotal: number;
@@ -92,7 +92,7 @@ interface ReconPoolPanelProps {
  * 沖帳金額面板：置於右欄（約 340px 寬），與左側交易清單同時在首屏出現，操作順序由左至右——
  * 先在清單勾選交易，再到本面板確認/輸入金額，不需上下捲動切換（見 ReconciliationView 版面說明）。
  * 逐筆沖帳／匯總沖帳共用同一份 UI，差異僅在標頭是否顯示已選筆數與已選交易區塊（逐筆沖帳才顯示）。
- * 金額欄位一律為「總金額」；銀行手續費、電商平台處理費（僅應收）與每筆額外金額皆為固定減項（輸入值恆為負），
+ * 金額欄位一律為「總金額」；銀行手續費、電商平台扣款（僅應收）與每筆額外金額皆為固定減項（輸入值恆為負），
  * 三者與沖帳金額加總即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。使用餘額（僅正值，下方小字顯示目前餘額）不計入
  * 這個加總——它不是實際入帳/出帳的錢，只計入沖帳金額本身（見 ReconciliationView 的 settleAmount）。
  * 欄位固定上下堆疊（label 在上、輸入框在下 w-full）：本卡片寬度固定在 340px 左右的窄欄，不隨桌機斷點跟著
@@ -247,7 +247,7 @@ export default function ReconPoolPanel({
 
         {side === 'receivable' && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm text-neutral-dark">電商平台處理費</span>
+            <span className="text-sm text-neutral-dark">電商平台扣款</span>
             <div className="flex items-center gap-1.5">
               <span className="text-lg text-neutral-mid">−</span>
               <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} negativeByDefault disabled={amountDisabled} />

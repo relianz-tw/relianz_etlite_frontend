@@ -227,7 +227,9 @@ export interface OfficialSubjectDto {
   /** 銀行項目專用科目嗎 */
   isBank?: boolean;
   /** 是固定資產折舊與減損科目嗎 */
-  is_fixed_asset_depreciation_impairment?: boolean;
+  isFixedAssetDepreciationImpairment?: boolean;
+  /** 沖帳區用途：1 沖帳 Others 科目，2 沖應收帳款，4 沖應付帳款；僅 /filter 帶 settle 篩選時確定會回 */
+  settleBitmask?: number;
   /** 進項:2，銷項:3 */
   buyOrSell?: number;
   createdAt: string;
@@ -265,14 +267,16 @@ export interface SubjectUsageDto {
 }
 
 /**
- * 會計科目目前餘額（沖帳中心「沖帳對象分配」用，供現金／股東往來／其他應付款／暫付款等固定科目顯示餘額）。
- * 後端尚未提供對應端點，此型別與 subjects.ts 的 listSubjectBalances() 先行預留，供介面顯示與日後串接。
- * 以 subjectCode 而非 officialAccountingSubjectId 為鍵：id 隨年度版本變動（見 OfficialSubjectDto），
- * 用 id 當鍵換版當天就會對不上。
+ * 公司科目餘額（GET /ael/ledger/subjectBalances），沖帳中心「沖帳對象分配」科目選項用。
+ * 端點為單科目查詢、回傳單一物件，查無資料時後端會先初始化，見 subjects.ts 的 getSubjectBalance()。
  */
 export interface SubjectBalanceDto {
-  subjectCode: string;
-  balance: number;
+  companyUuid: string;
+  officialAccountingSubjectId: number;
+  name: string | null;
+  currentBalance: number;
+  /** YYYYMMDD；尚未異動餘額時為 null */
+  lastBalanceUpdateDate: string | null;
 }
 
 /** AI 依交易描述建議的會計科目（/ael/subject/identify），最多 3 筆，依信心排序 */

@@ -17,7 +17,7 @@ const ALL_VENDOR_KEY = '__ALL__';
 interface ReconVoucherPickerDialogProps {
   open: boolean;
   onClose: () => void;
-  /** 需選滿的目標金額（電商平台處理費輸入金額的絕對值） */
+  /** 需選滿的目標金額（電商平台扣款輸入金額的絕對值） */
   targetAmount: number;
   /** 目前已選的憑證（開啟對話框時帶入，供使用者調整） */
   selected: ReconTxnRef[];
@@ -38,7 +38,7 @@ function toTxnRef(c: ReconCandidate): ReconTxnRef {
 }
 
 /**
- * 電商平台處理費的憑證選擇彈窗：從未結清應付交易（GET /ael/ledger/reconciliation/payables?settled=false，
+ * 電商平台扣款的憑證選擇彈窗：從未結清應付交易（GET /ael/ledger/reconciliation/payables?settled=false，
  * 與沖帳中心同一支 API，一次全撈不分頁）挑選單張或多張，供使用者佐證處理費金額。
  * 目前沖帳 API（otherDeductions）無法帶入關聯的應付單 uuid，故本次選擇結果僅供前端強制驗證「金額須等值」，
  * 尚未送給後端；待後端補上對應欄位後再串接（見 ReconciliationView 的 platformFeeVouchers）。

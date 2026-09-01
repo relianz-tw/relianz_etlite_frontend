@@ -1,11 +1,11 @@
 'use client';
 
 import { listBankAccounts } from '@/api/bankAccounts';
-import { listOfficialSubjects, listSubjectBalances } from '@/api/subjects';
+import { filterOfficialSubjects, listSubjectBalances } from '@/api/subjects';
 import type { BankAccountDto, OfficialSubjectDto, SubjectBalanceDto } from '@/api/types';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildTargets, FIXED_SUBJECT_TARGETS, pickDefaultTargetKey } from './targets';
+import { buildTargets, pickDefaultTargetKey } from './targets';
 import type { ReconAllocationRow, ReconTarget } from './targets';
 import type { ReconSide } from './types';
 
@@ -28,12 +28,12 @@ export interface UseReconTargetsResult {
 }
 
 /**
- * 沖帳對象分配的資料取得與狀態：銀行帳戶＋固定科目清單、科目餘額、主對象與分出列狀態。
+ * 沖帳對象分配的資料取得與狀態：銀行帳戶＋會計科目清單、科目餘額、主對象與分出列狀態。
  * 取代原本 ReconciliationView 內的 accounts／accountsLoading／accountsError／bankAccountUuid
  * 四個 state 與兩個 useEffect（見該檔案原本的沖帳對象載入區塊）。
  *
- * 唯一的後端接線點：科目餘額目前恆為 stub（listSubjectBalances 一律回空陣列，見 api/subjects.ts），
- * 後端提供端點後只需把該函式換成真正的 API 呼叫，此 hook 與呼叫端都不用改。
+ * 科目清單依 side 呼叫 /ael/subject/official/list/filter（settle：應收 1、應付 2），
+ * 科目餘額依清單取到的 id 逐一呼叫 /ael/ledger/subjectBalances（見 api/subjects.ts）。
  *
  * @param preferredBankAccountUuid 預設主對象的第一優先候選（目前選定銷售管道的收款帳戶 uuid），
  * 由 ReconciliationView 依 selectedGroupKey 算出；變動時（含側邊欄切換管道）會重新套用預設，見下方 effect
@@ -67,10 +67,10 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
     };
   }, []);
 
-  // 科目清單載入失敗只讓固定科目選項消失（buildTargets 查無對應 subjectCode 時不列入），不擋銀行帳戶
+  // 科目清單依 side 篩選（settle：應收 1、應付 2），失敗只讓科目選項消失，不擋銀行帳戶
   useEffect(() => {
     let cancelled = false;
-    listOfficialSubjects()
+    filterOfficialSubjects({ calculationType: 0, settle: side === 'receivable' ? 1 : 2 })
       .then(list => {
         if (!cancelled) setOfficialSubjects(list);
       })
@@ -78,12 +78,16 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [side]);
 
-  // 科目餘額純資訊、不參與任何驗證，失敗或尚未提供（目前為 stub）時對應選項餘額維持 undefined，顯示「—」
+  // 科目餘額跟隨科目清單：清單為空不打 API；純資訊、不參與任何驗證，失敗時對應選項餘額維持 undefined，顯示「—」
   useEffect(() => {
+    if (officialSubjects.length === 0) {
+      setSubjectBalances([]);
+      return;
+    }
     let cancelled = false;
-    listSubjectBalances(FIXED_SUBJECT_TARGETS.map(s => s.subjectCode))
+    listSubjectBalances(officialSubjects.map(s => s.id))
       .then(list => {
         if (!cancelled) setSubjectBalances(list);
       })
@@ -91,12 +95,16 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [officialSubjects]);
 
   const options = useMemo(() => {
-    const built = buildTargets(accounts, officialSubjects, side);
-    return built.map(t => (t.kind === 'subject' ? { ...t, balance: subjectBalances.find(b => b.subjectCode === t.subjectCode)?.balance } : t));
-  }, [accounts, officialSubjects, side, subjectBalances]);
+    const built = buildTargets(accounts, officialSubjects);
+    return built.map(t =>
+      t.kind === 'subject'
+        ? { ...t, balance: subjectBalances.find(b => b.officialAccountingSubjectId === t.officialAccountingSubjectId)?.currentBalance }
+        : t,
+    );
+  }, [accounts, officialSubjects, subjectBalances]);
 
   // 優先套用 preferredBankAccountUuid（見 pickDefaultTargetKey），查無則應付找預設付款帳戶、應收找預設收款帳戶；
   // side／帳戶載入完成／preferredBankAccountUuid 任一變動（含側邊欄切換銷售管道）都會重新套用預設
@@ -104,6 +112,12 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
     if (accounts.length === 0) return;
     setPrimaryTargetKey(pickDefaultTargetKey(accounts, side, preferredBankAccountUuid));
   }, [side, accounts, preferredBankAccountUuid]);
+
+  // 應收／應付的科目選項不同，切換 side 時清空分出列，避免殘留另一側才有的科目 key
+  // （送出時 buildSettleChannels 會靜默略過該列，導致金額對不上而非明確報錯）
+  useEffect(() => {
+    setAllocationRows([]);
+  }, [side]);
 
   const addAllocationRow = () => {
     rowIdRef.current += 1;

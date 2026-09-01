@@ -54,8 +54,8 @@ const MODE_OPTIONS: { value: ReconMode; label: string }[] = [
   { value: 'summary', label: '匯總沖帳' },
 ];
 
-// 電商平台處理費固定使用此會計科目，不再讓使用者於下拉選擇
-const PLATFORM_FEE_SUBJECT: SubjectOption = { id: 896, subjectCode: '', name: '電商平台處理費' };
+// 電商平台扣款固定使用此會計科目，不再讓使用者於下拉選擇
+const PLATFORM_FEE_SUBJECT: SubjectOption = { id: 896, subjectCode: '', name: '電商平台扣款' };
 
 interface SideData {
   candidates: ReturnType<typeof receivableGroupsToCandidates>;
@@ -131,7 +131,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 額外金額（otherDeductions）：id 以遞增計數器產生（不可用 Date.now()/Math.random()）
   const [otherDeductions, setOtherDeductions] = useState<ReconOtherDeductionRow[]>([]);
   const otherDeductionIdRef = useRef(0);
-  // 電商平台處理費（僅應收）：金額非 0 時強制須選滿等值的應付憑證作為佐證，見 validateAmountInputs；
+  // 電商平台扣款（僅應收）：金額非 0 時強制須選滿等值的應付憑證作為佐證，見 validateAmountInputs；
   // 選中的憑證目前無法送給沖帳 API（otherDeductions 沒有可帶關聯應付單的欄位），僅供前端驗證用
   const [platformFeeAmount, setPlatformFeeAmount] = useState(0);
   const [platformFeeVouchers, setPlatformFeeVouchers] = useState<ReconTxnRef[]>([]);
@@ -325,12 +325,12 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 使用餘額不是實際入帳/出帳的錢（僅為系統內部既有餘額，用來沖抵帳款），故不計入實際存入/付出金額，
   // 只會計入下方的 settleAmount（實測驗證過：depositAmount 若加上 balanceUsed 會被後端拒絕）
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
-  // 送出沖帳 API 的額外金額：應收側電商平台處理費非 0 時併入 otherDeductions 陣列一起送出（settle.ts 的
+  // 送出沖帳 API 的額外金額：應收側電商平台扣款非 0 時併入 otherDeductions 陣列一起送出（settle.ts 的
   // toOtherDeductions 統一處理科目／反號），otherDeductions 狀態本身維持只給 OtherDeductionsEditor 使用
   const submitOtherDeductions: ReconOtherDeductionRow[] = useMemo(
     () =>
       side === 'receivable' && platformFeeAmount !== 0
-        ? [...otherDeductions, { id: 'PLATFORM_FEE', subject: PLATFORM_FEE_SUBJECT, name: '電商平台處理費', amount: platformFeeAmount }]
+        ? [...otherDeductions, { id: 'PLATFORM_FEE', subject: PLATFORM_FEE_SUBJECT, name: '電商平台扣款', amount: platformFeeAmount }]
         : otherDeductions,
     [side, otherDeductions, platformFeeAmount],
   );
@@ -466,7 +466,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
     if (side === 'receivable' && platformFeeAmount !== 0) {
       const voucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
-      if (voucherTotal !== Math.abs(platformFeeAmount)) return '電商平台處理費須選擇等值的應付憑證才能沖帳';
+      if (voucherTotal !== Math.abs(platformFeeAmount)) return '電商平台扣款須選擇等值的應付憑證才能沖帳';
     }
     if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';

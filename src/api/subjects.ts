@@ -53,18 +53,27 @@ export function listSubjectUsage(scenario: SubjectUsageScenario, value = ""): Pr
 }
 
 /**
- * 固定會計科目的目前餘額（沖帳中心「沖帳對象分配」用）。
- * ⚠️ 後端尚未提供此端點，暫為 stub，一律回空陣列——呼叫端（useReconTargets）取不到的科目
- * balance 維持 undefined，介面顯示「餘額 —」而非誤導的 $0。
- * 期望端點：GET /ael/subject/balances?companyUuid={COMPANY_UUID}&subjectCodes=0201111,0202130,...
- * 期望回應：SubjectBalanceDto[]（只回有查到的代碼，查無者省略而非回 0）。
- * 後端上線後把函式體換成實際 apiFetch 呼叫即可，呼叫端不用改。
+ * 查詢單一官方科目的公司目前餘額（GET /ael/ledger/subjectBalances）。
+ * 若公司尚未有該科目的餘額紀錄，後端會先初始化再回傳。
+ */
+export function getSubjectBalance(
+  officialAccountingSubjectId: number,
+): Promise<SubjectBalanceDto> {
+  return apiFetch<SubjectBalanceDto>(
+    `/ael/ledger/subjectBalances${buildQuery({ companyUuid: COMPANY_UUID, officialAccountingSubjectId })}`,
+  );
+}
+
+/**
+ * 批次取多個科目的餘額（沖帳中心「沖帳對象分配」用）。端點本身只能一次查一個科目，
+ * 這裡以 allSettled 併發查詢，單一科目查詢失敗直接略過——呼叫端（useReconTargets）
+ * 取不到的科目 balance 維持 undefined，介面顯示「餘額 —」而非誤導的 $0。
  */
 export async function listSubjectBalances(
-  subjectCodes: string[],
+  officialAccountingSubjectIds: number[],
 ): Promise<SubjectBalanceDto[]> {
-  void subjectCodes;
-  return [];
+  const results = await Promise.allSettled(officialAccountingSubjectIds.map(getSubjectBalance));
+  return results.filter((r): r is PromiseFulfilledResult<SubjectBalanceDto> => r.status === "fulfilled").map((r) => r.value);
 }
 
 /** AI 辨識科目的使用場景：0 銀行總覽、1 進項、2 銷項 */
