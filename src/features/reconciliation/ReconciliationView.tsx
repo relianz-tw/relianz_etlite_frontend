@@ -8,7 +8,6 @@ import BottomSheet from '@/components/ui/BottomSheet';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
-import type { SubjectOption } from '@/components/ui/SubjectSelect';
 import TabBar from '@/components/ui/TabBar';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
@@ -53,9 +52,6 @@ const MODE_OPTIONS: { value: ReconMode; label: string }[] = [
   { value: 'perTxn', label: '逐筆沖帳' },
   { value: 'summary', label: '匯總沖帳' },
 ];
-
-// 電商平台扣款固定使用此會計科目，不再讓使用者於下拉選擇
-const PLATFORM_FEE_SUBJECT: SubjectOption = { id: 896, subjectCode: '', name: '電商平台扣款' };
 
 interface SideData {
   candidates: ReturnType<typeof receivableGroupsToCandidates>;
@@ -107,9 +103,6 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
  * 隨即顯示於 ReconConfirmSummaryModal（含每筆交易的沖前/沖後剩餘與狀態），使用者僅能取消或直接確認送出，
  * 沒有中途選項——超沖／少沖差額一律直接留在該筆原單（逐筆勾 1 筆）或沖入最後一筆交易（其餘情況）。
  * 執行成功後，清空已快取的候選清單並重新向後端拉取（含最新餘額），讓已沖帳交易與餘額變動自然反映。
- *
- * 使用餘額（balanceUsed）：ReconPoolPanel「使用餘額」欄位，逐筆／匯總沖帳共用同一個輸入框，
- * 使用者輸入後會一併帶入預覽／執行 API 的 balanceUsed 參數，決定該次沖帳要使用多少目前餘額。
  */
 interface ReconciliationViewProps {
   /** 進頁時的初始應收／應付分頁，來自 URL 的 side query 參數；預設應收 */
@@ -124,8 +117,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(ALL_GROUP_KEY);
   // 逐筆沖帳模式勾選的交易 uuid（可複選）；勾 1 筆走手動沖帳 API、勾多筆走 summary API（見上方檔案說明）
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
-  // 本次沖帳使用的餘額（元），對應 ReconPoolPanel「使用餘額」欄位，逐筆／匯總沖帳共用同一個輸入狀態
-  const [balanceUsed, setBalanceUsed] = useState(0);
   const [statementAmount, setStatementAmount] = useState(0);
   const [feeAmount, setFeeAmount] = useState(0);
   // 額外金額（otherDeductions）：id 以遞增計數器產生（不可用 Date.now()/Math.random()）
@@ -183,14 +174,14 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       side === 'receivable'
         ? Promise.all([listChannelRules(), fetchReconciliationReceivables({ ...dateQuery, ...amountQuery, settled: 'false' })]).then(([channelList, groups]) => {
             const activeChannels = channelList.filter(c => c.isActive);
-            const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, balance: c.balance, receivingAccountUuid: c.receivingAccountUuid }));
+            const groupOptions = activeChannels.map(c => ({ uuid: c.channelUuid, name: c.channelName, receivingAccountUuid: c.receivingAccountUuid }));
             const nameByUuid = new Map(channelList.map(c => [c.channelUuid, c.channelName]));
             const candidates = receivableGroupsToCandidates(groups);
             if (!cancelled) setReceivableData({ candidates, groupOptions, nameByUuid });
           })
         : Promise.all([listVendors(), fetchReconciliationPayables({ ...dateQuery, ...amountQuery, settled: 'false' })]).then(([vendorList, groups]) => {
             const activeVendors = vendorList.filter(v => v.isActive);
-            const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name, balance: v.balance }));
+            const groupOptions = activeVendors.map(v => ({ uuid: v.uuid, name: v.name }));
             const nameByUuid = new Map(vendorList.map(v => [v.uuid, v.name]));
             const candidates = payableGroupsToCandidates(groups);
             if (!cancelled) setPayableData({ candidates, groupOptions, nameByUuid });
@@ -322,21 +313,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const isSingleSelection = mode === 'perTxn' && selectedUuids.size === 1;
 
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  // 使用餘額不是實際入帳/出帳的錢（僅為系統內部既有餘額，用來沖抵帳款），故不計入實際存入/付出金額，
-  // 只會計入下方的 settleAmount（實測驗證過：depositAmount 若加上 balanceUsed 會被後端拒絕）
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
-  // 送出沖帳 API 的額外金額：應收側電商平台扣款非 0 時併入 otherDeductions 陣列一起送出（settle.ts 的
-  // toOtherDeductions 統一處理科目／反號），otherDeductions 狀態本身維持只給 OtherDeductionsEditor 使用
-  const submitOtherDeductions: ReconOtherDeductionRow[] = useMemo(
-    () =>
-      side === 'receivable' && platformFeeAmount !== 0
-        ? [...otherDeductions, { id: 'PLATFORM_FEE', subject: PLATFORM_FEE_SUBJECT, name: '電商平台扣款', amount: platformFeeAmount }]
-        : otherDeductions,
-    [side, otherDeductions, platformFeeAmount],
-  );
-  // 真正的沖帳金額須把使用餘額併進去（使用餘額也是實際拿去沖銷帳款的錢，只是來源不是本次存入/付出），
-  // 不能只送使用者輸入框裡的原始金額，否則沖帳結果會少算這筆餘額，被後端判定少沖
-  const settleAmount = statementAmount + balanceUsed;
+  const settleAmount = statementAmount;
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過）；僅用於確認彈窗內提示，不影響是否可送出
@@ -359,7 +337,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setOtherDeductions([]);
     setPlatformFeeAmount(0);
     setPlatformFeeVouchers([]);
-    setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
     setSubmitError('');
@@ -426,7 +403,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     clearComputedState();
   };
 
-  // 清除全部已勾選交易與試算結果；金額與使用餘額是使用者對整批交易的輸入，維持不歸零（通常會先勾好多筆再統一輸入金額）
+  // 清除全部已勾選交易與試算結果；金額是使用者對整批交易的輸入，維持不歸零（通常會先勾好多筆再統一輸入金額）
   const handleClearSelection = () => {
     setSelectedUuids(new Set());
     clearComputedState();
@@ -452,13 +429,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     });
     clearComputedState();
   };
-  // 使用餘額欄位變更：與手續費／額外金額同樣視為影響試算結果的輸入，變更後清除舊試算結果
-  const handleBalanceUsedChange = (value: number) => {
-    setBalanceUsed(value);
-    clearComputedState();
-  };
-
-  // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、使用餘額不可超過目前餘額、
+  // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、
   // 需選收/付款日、分出對象需填完整且加總不可超過實際存入/付出金額
   const validateAmountInputs = (): string => {
     if (statementAmount <= 0) return `請先輸入${mode === 'perTxn' ? '沖帳' : '對帳單'}金額`;
@@ -468,7 +439,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       const voucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
       if (voucherTotal !== Math.abs(platformFeeAmount)) return '電商平台扣款須選擇等值的應付憑證才能沖帳';
     }
-    if (selectedGroup?.balance !== undefined && balanceUsed > selectedGroup.balance) return '使用餘額不可超過目前餘額';
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
     const allocationError = validateAllocationRows(depositAmount, reconTargets.allocationRows, side);
     if (allocationError) return allocationError;
@@ -532,9 +502,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         isDefault: mode !== 'perTxn',
         settleAmount,
         actualAmount: depositAmount,
-        balanceUsed,
         feeAmount,
-        otherDeductions: submitOtherDeductions,
+        otherDeductions,
+        platformFeeAmount,
       });
       setPreviewResult(result);
       setAllocationInfoByUuid(buildAllocationInfo(result.allocations.map(a => a.ledgerUuid)));
@@ -557,7 +527,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setOtherDeductions([]);
     setPlatformFeeAmount(0);
     setPlatformFeeVouchers([]);
-    setBalanceUsed(0);
     setPreviewResult(null);
     setPreviewError('');
     setConfirmSummaryOpen(false);
@@ -600,11 +569,11 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         ledgerUuid: row.uuid,
         settleAmount,
         actualAmount: depositAmount,
-        balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         channels: settleChannels,
         feeAmount,
-        otherDeductions: submitOtherDeductions,
+        otherDeductions,
+        platformFeeAmount,
       });
       finalizeSettle(result);
     } catch (err) {
@@ -625,11 +594,11 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         ledgerUuids: mode === 'perTxn' ? Array.from(selectedUuids) : previewResult.allocations.map(a => a.ledgerUuid),
         settleAmount,
         actualAmount: depositAmount,
-        balanceUsed,
         paymentDate: toYyyymmdd(paymentDate),
         channels: settleChannels,
         feeAmount,
-        otherDeductions: submitOtherDeductions,
+        otherDeductions,
+        platformFeeAmount,
       });
       finalizeSettle(result);
     } catch (err) {
@@ -670,10 +639,6 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     singleSelectedRow,
     selectedAmount,
     onClearSelection: handleClearSelection,
-    balanceLabel: selectedGroupLabel,
-    balance: selectedGroup?.balance,
-    balanceUsed,
-    onBalanceUsedChange: handleBalanceUsedChange,
     amountLabel: mode === 'perTxn' ? '沖帳金額' : '對帳單金額',
     statementAmount,
     feeAmount,

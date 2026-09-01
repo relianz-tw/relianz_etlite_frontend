@@ -264,7 +264,6 @@ function SettlementEditDialogContent({
                 onAdd={handleAddOtherDeduction}
                 onRemove={handleRemoveOtherDeduction}
                 onChange={handleChangeOtherDeduction}
-                settle={isSales ? 1 : 2}
               />
             )}
 

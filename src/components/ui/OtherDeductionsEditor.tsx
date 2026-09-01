@@ -25,9 +25,6 @@ interface OtherDeductionsEditorProps {
   onChange: (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) => void;
   /** 停用整個編輯器（新增按鈕與既有列的科目／名稱／金額／編輯／刪除皆不可操作），用於呼叫端尚未滿足前置條件時 */
   disabled?: boolean;
-  /** 依應收/應付帶入不同的沖帳科目篩選（SubjectPicker 的 settle 參數）：0 沖帳 Others、1 沖應收、2 沖應付；
-   * 未傳入時不篩選，維持完整科目表 */
-  settle?: 0 | 1 | 2;
 }
 
 /**
@@ -40,7 +37,7 @@ interface OtherDeductionsEditorProps {
  * 編輯卡片底部另有「取消」直接移除該筆未確認的項目，不需要額外的刪除圖示。
  * 所有項目在業務上一律是減項，金額輸入固定只能為負（純文字「−」字元 + MoneyInput negativeByDefault），不提供正負切換。
  */
-export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, disabled = false, settle }: OtherDeductionsEditorProps) {
+export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, disabled = false }: OtherDeductionsEditorProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(row => {
@@ -85,7 +82,7 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
           <div key={row.id} className="flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-surface-cream/50 p-3">
             <div>
               <Label required>科目</Label>
-              <SubjectPicker value={row.subject} onChange={s => onChange(row.id, { subject: s })} placeholder="請選擇科目" disabled={disabled} settle={settle} />
+              <SubjectPicker value={row.subject} onChange={s => onChange(row.id, { subject: s })} placeholder="請選擇科目" disabled={disabled} />
             </div>
             <div>
               <Label required>項目名稱</Label>

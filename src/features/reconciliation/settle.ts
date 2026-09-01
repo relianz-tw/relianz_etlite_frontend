@@ -7,9 +7,17 @@
  * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
-import type { SettleChannel, SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
+import type { SettleChannel, SettleEcommercePlatformFee, SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
 import type { ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import type { ReconSettleResult, ReconSide } from './types';
+
+// 電商平台扣款固定使用此會計科目，不再讓使用者於下拉選擇（沖帳中心「額外金額」科目改由使用者自選後，此為僅存的固定科目）
+const PLATFORM_FEE_SUBJECT_ID = 896;
+
+/** 應收側 ecommercePlatformFee 物件：UI 帶號（負）輸入，API 欄位語意為正的金額，故反號；僅應收 API 支援此欄位 */
+function toEcommercePlatformFee(platformFeeAmount: number): SettleEcommercePlatformFee {
+  return { feeAmount: -platformFeeAmount, officialAccountingSubjectId: PLATFORM_FEE_SUBJECT_ID };
+}
 
 function toOtherDeductions(rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
   if (rows.length === 0) return undefined;
@@ -33,10 +41,10 @@ interface PreviewParams {
   settleAmount: number;
   /** 銷項為 depositAmount（實際存入）；進項為 paymentAmount（實際付出） */
   actualAmount: number;
-  /** 本次沖帳使用的餘額（元），對應 ReconPoolPanel「本次抵銷」欄位的使用者輸入值 */
-  balanceUsed: number;
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
+  /** 電商平台扣款金額（UI 帶號輸入，恆為負或 0），僅應收 API 會用到；應付一律忽略 */
+  platformFeeAmount: number;
 }
 
 /**
@@ -58,9 +66,10 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       ledgerUuids,
       settleAmount: params.settleAmount,
       depositAmount: params.actualAmount,
-      balanceUsed: params.balanceUsed,
+      balanceUsed: 0,
       allocations,
       otherDeductions,
+      ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
     });
     return {
       settleAmount: res.settleAmount,
@@ -80,7 +89,7 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     ledgerUuids,
     settleAmount: params.settleAmount,
     paymentAmount: params.actualAmount,
-    balanceUsed: params.balanceUsed,
+    balanceUsed: 0,
     allocations,
     otherDeductions,
   });
@@ -101,23 +110,20 @@ interface SummaryParams {
   ledgerUuids: string[];
   settleAmount: number;
   actualAmount: number;
-  /** 本次沖帳使用的餘額（元） */
-  balanceUsed: number;
   /** YYYYMMDD */
   paymentDate: string;
   /** 收付款管道（見 targets.ts 的 buildSettleChannels） */
   channels: SettleChannel[];
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
+  /** 電商平台扣款金額（UI 帶號輸入，恆為負或 0），僅應收 API 會用到；應付一律忽略 */
+  platformFeeAmount: number;
 }
 
 /**
  * 匯總／多筆沖帳真正執行：依 side 呼叫對應 API，回應正規化為 ReconSettleResult。
- * params.settleAmount 已在 ReconciliationView 併入使用餘額（＝statementAmount + balanceUsed，真正的沖帳總額，
- * 用來跟各原單待沖金額比對）；depositAmount／paymentAmount 帶實際存入/付出金額，即
- * statementAmount + 手續費 + 額外金額，不含 balanceUsed（使用餘額不是實際入帳/出帳的錢，
- * 實測驗證過 depositAmount 若加上 balanceUsed 會被後端拒絕；params.actualAmount 已依此公式算好，
- * 見 ReconciliationView 的 depositAmount 計算）。
+ * depositAmount／paymentAmount 帶實際存入/付出金額，即 statementAmount + 手續費 + 額外金額
+ * （見 ReconciliationView 的 depositAmount 計算）。
  */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
   const allocations: SettleSummaryFee = { name: '銀行手續費', feeAmount: -params.feeAmount };
@@ -130,9 +136,10 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       depositAmount: params.actualAmount,
       paymentDate: params.paymentDate,
       depositChannels: params.channels,
-      balanceUsed: params.balanceUsed,
+      balanceUsed: 0,
       allocations,
       otherDeductions,
+      ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
     });
     return {
       settleAmount: res.settleAmount,
@@ -154,7 +161,7 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     paymentAmount: params.actualAmount,
     paymentDate: params.paymentDate,
     paymentChannels: params.channels,
-    balanceUsed: params.balanceUsed,
+    balanceUsed: 0,
     allocations,
     otherDeductions,
   });
@@ -178,14 +185,14 @@ interface SingleSettleParams {
   settleAmount: number;
   /** 銷項為 depositAmount（實際存入）；進項為 paymentAmount（實際付出） */
   actualAmount: number;
-  /** 本次沖帳使用的餘額（元） */
-  balanceUsed: number;
   /** YYYYMMDD */
   paymentDate: string;
   /** 收付款管道（見 targets.ts 的 buildSettleChannels） */
   channels: SettleChannel[];
   feeAmount: number;
   otherDeductions: ReconOtherDeductionRow[];
+  /** 電商平台扣款金額（UI 帶號輸入，恆為負或 0），僅應收 API 會用到；應付一律忽略 */
+  platformFeeAmount: number;
 }
 
 /**
@@ -207,10 +214,11 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
           depositChannels: params.channels,
           settleAmount: params.settleAmount,
           depositAmount: params.actualAmount,
-          balanceUsed: params.balanceUsed,
+          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions,
+          ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
         })
       : await settlePayable({
           ledgerUuid: params.ledgerUuid,
@@ -218,7 +226,7 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
           paymentChannels: params.channels,
           settleAmount: params.settleAmount,
           paymentAmount: params.actualAmount,
-          balanceUsed: params.balanceUsed,
+          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions,

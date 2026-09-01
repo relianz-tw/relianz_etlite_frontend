@@ -24,8 +24,6 @@ export function parseReconSideParam(value: string | string[] | undefined): Recon
 export interface ReconGroupOption {
   uuid: string;
   name: string;
-  /** 該銷售管道／廠商的當前餘額（GET channelRules／vendors 回應新增欄位） */
-  balance: number;
   /** 銷售管道設定的收款帳戶 uuid（GET channelRules 回應欄位），用於沖帳預設主對象；廠商無對應銀行帳戶 uuid，恆為 undefined */
   receivingAccountUuid?: string;
 }
@@ -37,8 +35,6 @@ export interface ReconGroup {
   count: number;
   /** 該群組未沖帳金額（remainingAmount）加總，非原始單據總額 */
   amount: number;
-  /** 該群組的當前餘額；「全部管道」／前端合成的「其他」無對應實體，故為 undefined */
-  balance?: number;
 }
 
 /** 「其他」內依原始 groupUuid 再分組，讓使用者看清楚為何這些交易落在「其他」 */
@@ -147,7 +143,7 @@ export function buildReconGroups(candidates: ReconCandidate[], groupOptions: Rec
 
   const groups: ReconGroup[] = sortedOptions.map(opt => {
     const matchRows = candidates.filter(c => c.groupUuid === opt.uuid || (opt.uuid === catchAllKey && isUnclassified(c.groupUuid)));
-    return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + (c.remainingAmount ?? c.amount), 0), balance: opt.balance };
+    return { key: opt.uuid, label: opt.name, count: matchRows.length, amount: matchRows.reduce((sum, c) => sum + (c.remainingAmount ?? c.amount), 0) };
   });
 
   // 沒有使用者自建的「其他」管道時，才需要前端合成一個桶收納未分類交易

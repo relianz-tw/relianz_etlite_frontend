@@ -6,7 +6,6 @@ import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/O
 import DatePicker from '@/components/ui/DatePicker';
 import StepNumber from '@/components/ui/StepNumber';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { X } from 'lucide-react';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 import ReconTargetAllocation from './ReconTargetAllocation';
@@ -28,17 +27,6 @@ interface ReconPoolPanelProps {
   /** 已勾選交易的待收(付)金額加總，供多筆勾選時顯示「已選 N 筆 · $X」 */
   selectedAmount?: number;
   onClearSelection: () => void;
-
-  /** 該群組名稱與當前餘額；「全部管道」或前端合成的「其他」無對應實體時 balance 為 undefined，「使用餘額」整塊不顯示 */
-  balanceLabel: string;
-  balance?: number;
-  /**
-   * 本次沖帳使用的餘額（元），為對帳單/沖帳金額下方的固定加項，會一併帶入預覽/執行 API 的 balanceUsed 參數，
-   * 並計入沖帳金額用以沖抵帳款；不是實際入帳/出帳的錢，不影響實際存入/付出金額。有傳入 onBalanceUsedChange
-   * 時此欄位可編輯，由使用者決定要用多少餘額；省略 onBalanceUsedChange 時維持唯讀顯示，供尚未串接的呼叫端相容。
-   */
-  balanceUsed: number;
-  onBalanceUsedChange?: (value: number) => void;
 
   /** 金額欄位標題：匯總沖帳為「對帳單金額」，逐筆沖帳為「沖帳金額」 */
   amountLabel: string;
@@ -93,8 +81,7 @@ interface ReconPoolPanelProps {
  * 先在清單勾選交易，再到本面板確認/輸入金額，不需上下捲動切換（見 ReconciliationView 版面說明）。
  * 逐筆沖帳／匯總沖帳共用同一份 UI，差異僅在標頭是否顯示已選筆數與已選交易區塊（逐筆沖帳才顯示）。
  * 金額欄位一律為「總金額」；銀行手續費、電商平台扣款（僅應收）與每筆額外金額皆為固定減項（輸入值恆為負），
- * 三者與沖帳金額加總即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。使用餘額（僅正值，下方小字顯示目前餘額）不計入
- * 這個加總——它不是實際入帳/出帳的錢，只計入沖帳金額本身（見 ReconciliationView 的 settleAmount）。
+ * 三者與沖帳金額加總即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
  * 欄位固定上下堆疊（label 在上、輸入框在下 w-full）：本卡片寬度固定在 340px 左右的窄欄，不隨桌機斷點跟著
  * 加寬，若沿用左右並排寫法會被擠壓變形。
  */
@@ -107,10 +94,6 @@ export default function ReconPoolPanel({
   singleSelectedRow,
   selectedAmount = 0,
   onClearSelection,
-  balanceLabel,
-  balance,
-  balanceUsed,
-  onBalanceUsedChange,
   amountLabel,
   statementAmount,
   feeAmount,
@@ -146,11 +129,9 @@ export default function ReconPoolPanel({
   hideHeader = false,
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  // 使用餘額不是實際入帳/出帳的錢，不計入實際存入/付出金額，只計入沖帳金額（見 ReconciliationView 的 settleAmount）
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
   const isDepositNegative = depositAmount < 0;
   const dateLabel = side === 'payable' ? '付款日' : '收款日';
-  const balanceKindLabel = side === 'payable' ? '進項支出餘額' : '銷項收入餘額';
 
   return (
     <div className="rounded-lg border-[1.5px] border-brand-blue bg-white p-4">
@@ -168,37 +149,10 @@ export default function ReconPoolPanel({
         </div>
       )}
 
-      {mode === 'perTxn' && (
+      {mode === 'perTxn' && selectedCount === 0 && (
         <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
-          {/* 勾選前後固定使用同一個帶底色的框（不切換成純文字），避免勾選第一筆時框高度變化，
-              把下方交易清單往下推，導致使用者接續快速勾選第二、三筆時點擊座標對不準（實測會漏勾）。 */}
           <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
-            {selectedCount === 0 && <span className="text-neutral-mid">請從左側清單勾選要沖帳的交易</span>}
-            {selectedCount === 1 && singleSelectedRow && (
-              <div className="min-w-0">
-                <p className="truncate font-medium text-neutral-dark">
-                  {singleSelectedRow.date} · {singleSelectedRow.orderCode}
-                </p>
-                <p className="text-xs text-neutral-mid">
-                  {side === 'payable' ? '待付' : '待收'} {fmtCurrency(singleSelectedRow.remainingAmount ?? singleSelectedRow.amount)}
-                </p>
-              </div>
-            )}
-            {selectedCount > 1 && (
-              <span className="font-medium text-neutral-dark">
-                已選 {selectedCount} 筆 · {fmtCurrency(selectedAmount)}
-              </span>
-            )}
-            {selectedCount > 0 && (
-              <button
-                type="button"
-                onClick={onClearSelection}
-                aria-label="清除已選交易"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-neutral-mid transition-colors hover:bg-surface-cream hover:text-semantic-error"
-              >
-                <X size={16} />
-              </button>
-            )}
+            <span className="text-neutral-mid">請從左側清單勾選要沖帳的交易</span>
           </div>
         </div>
       )}
@@ -215,28 +169,6 @@ export default function ReconPoolPanel({
       </div>
 
       <div className="mt-3 flex flex-col gap-3">
-        {balance !== undefined && (
-          <div className="flex flex-col gap-1">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm text-neutral-dark">使用餘額</span>
-              {/* 餘額本身恆為正值，此欄位一律以正值輸入／顯示；是否為加項已由下方說明文字交代，不額外加正號視覺提示 */}
-              <MoneyInput value={balanceUsed} onChange={onBalanceUsedChange} readOnly={!onBalanceUsedChange} />
-            </div>
-            <p className="text-right text-xs text-neutral-mid">
-              目前 {balanceLabel} {balanceKindLabel} {fmtCurrency(balance)}
-              {onBalanceUsedChange && balance > 0 && (
-                <>
-                  {' '}
-                  ·{' '}
-                  <button type="button" onClick={() => onBalanceUsedChange(balance)} className="font-semibold text-brand-blue hover:underline">
-                    全額帶入
-                  </button>
-                </>
-              )}
-            </p>
-          </div>
-        )}
-
         <div className="flex flex-col gap-1.5">
           <span className="text-sm text-neutral-dark">銀行手續費</span>
           <div className="flex items-center gap-1.5">
@@ -282,7 +214,6 @@ export default function ReconPoolPanel({
           onRemove={onRemoveOtherDeduction}
           onChange={onChangeOtherDeduction}
           disabled={amountDisabled}
-          settle={side === 'receivable' ? 1 : 2}
         />
       </div>
 

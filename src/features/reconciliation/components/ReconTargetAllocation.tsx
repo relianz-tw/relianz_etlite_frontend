@@ -113,7 +113,7 @@ export default function ReconTargetAllocation({
         const otherKeys = rows.filter(r => r.id !== row.id).map(r => r.targetKey);
         const takenKeys = new Set([primaryTargetKey, ...otherKeys].filter(Boolean));
         return (
-          <div key={row.id} className="flex flex-col gap-2 rounded-lg border border-neutral-blue-gray/30 bg-white p-3">
+          <div key={row.id} className="flex flex-col gap-2 rounded-lg border border-brand-blue/25 bg-brand-blue/5 p-3">
             <ReconTargetSelect
               options={options}
               value={row.targetKey}
