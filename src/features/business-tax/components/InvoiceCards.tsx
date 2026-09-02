@@ -5,8 +5,10 @@ import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { fmtCurrency } from '@/lib/utils';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-react';
+import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import type { SortKey, SortState, TaxInvoiceRow, TaxSide } from '../types';
+import { withReturnParam } from '../urlState';
 
 const SORT_KEY_LABELS: Record<SortKey, string> = { date: '開立日期', id: '發票號碼' };
 const SORT_KEYS: SortKey[] = ['date', 'id'];
@@ -82,6 +84,7 @@ export default function InvoiceCards({
   sort,
   onSortFieldChange,
   onSortDirToggle,
+  searchParams,
 }: {
   side: TaxSide;
   rows: TaxInvoiceRow[];
@@ -91,10 +94,11 @@ export default function InvoiceCards({
   sort: SortState;
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
+  searchParams: ReadonlyURLSearchParams;
 }) {
   const router = useRouter();
   const goToInvoice = (row: TaxInvoiceRow) =>
-    router.push(`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`);
+    router.push(withReturnParam(`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`, searchParams));
 
   return (
     <div className="flex flex-col gap-2.5 nav:hidden">

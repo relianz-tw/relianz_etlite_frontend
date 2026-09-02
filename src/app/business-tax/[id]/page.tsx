@@ -1,5 +1,6 @@
 import { parseSideParam } from '@/features/ledger/transaction/data';
 import VatInvoiceDetailView from '@/features/business-tax/invoice/VatInvoiceDetailView';
+import { parseReturnQueryParam } from '@/features/business-tax/urlState';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -18,9 +19,10 @@ export default function VatInvoiceDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { side?: string | string[]; void?: string | string[] };
+  searchParams: { side?: string | string[]; void?: string | string[]; from?: string | string[] };
 }) {
   const side = parseSideParam(searchParams.side);
   const isVoid = parseVoidParam(searchParams.void);
-  return <VatInvoiceDetailView side={side} ledgerUuid={params.id} isVoid={isVoid} />;
+  const returnQuery = parseReturnQueryParam(searchParams.from);
+  return <VatInvoiceDetailView side={side} ledgerUuid={params.id} isVoid={isVoid} returnQuery={returnQuery} />;
 }

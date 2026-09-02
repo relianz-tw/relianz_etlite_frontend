@@ -1,11 +1,12 @@
 'use client';
 
 import Badge from '@/components/ui/Badge';
-import Select from '@/components/ui/Select';
 import { fmtCurrency } from '@/lib/utils';
 import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
+import type { ReadonlyURLSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { SortKey, SortState, TaxInvoiceRow, TaxSide } from '../types';
+import { withReturnParam } from '../urlState';
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdBase = 'whitespace-nowrap px-4 py-3.5 text-sm';
@@ -39,10 +40,9 @@ export default function InvoiceTable({
   pageSales,
   pageBusinessTax,
   pageAmount,
-  limit,
-  onLimitChange,
   sort,
   onSortToggle,
+  searchParams,
 }: {
   side: TaxSide;
   rows: TaxInvoiceRow[];
@@ -53,10 +53,9 @@ export default function InvoiceTable({
   pageSales: string;
   pageBusinessTax: string;
   pageAmount: string;
-  limit: number;
-  onLimitChange: (limit: number) => void;
   sort: SortState;
   onSortToggle: (key: SortKey) => void;
+  searchParams: ReadonlyURLSearchParams;
 }) {
   const counterpartyLabel = side === 'sales' ? '買受人' : '賣方';
   // 進項僅顯示可否扣抵；作廢狀態僅在銷項呈現（進項作廢不特別標示，避免刪除線卻無說明文字）
@@ -106,7 +105,7 @@ export default function InvoiceTable({
                 <td className={`${cell} font-mono text-[13px] font-semibold`}>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Link
-                      href={`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`}
+                      href={withReturnParam(`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`, searchParams)}
                       className={`hover:text-brand-blue hover:underline ${amountStrike}`}
                     >
                       {row.id}
@@ -151,17 +150,7 @@ export default function InvoiceTable({
             <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalSales}</td>
             <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalBusinessTax}</td>
             <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalAmount}</td>
-            <td className={tdClass}>
-              <div className="flex items-center justify-end gap-2 text-sm text-neutral-mid">
-                每頁顯示：
-                <Select widthClassName="w-20" value={String(limit)} onValueChange={v => onLimitChange(Number(v))}>
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </Select>
-                筆
-              </div>
-            </td>
+            <td className={tdClass} />
             <td className={tdClass} />
             <td className={tdClass} />
           </tr>

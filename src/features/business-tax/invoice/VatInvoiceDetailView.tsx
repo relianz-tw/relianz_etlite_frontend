@@ -12,6 +12,7 @@ import { EMPTY_TRANSACTION_FORM, mapInvoiceDetailToForm, resolveExpenseCategory 
 import type { TransactionFormState } from '@/features/ledger/transaction/types';
 import type { Side } from '@/features/ledger/types';
 import InvoiceDeclareStatusCard from './components/InvoiceDeclareStatusCard';
+import { resolveBusinessTaxBackHref } from '../urlState';
 import { ChevronLeft, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -20,6 +21,8 @@ interface VatInvoiceDetailViewProps {
   side: Side;
   ledgerUuid: string;
   isVoid: boolean;
+  /** 從列表點入時帶入的查詢字串，供「返回營業稅中心」還原篩選；無則回退 /business-tax */
+  returnQuery?: string;
 }
 
 const SIDE_LABEL: Record<Side, string> = { sales: '銷項', purchase: '進項' };
@@ -27,7 +30,7 @@ const SIDE_LABEL: Record<Side, string> = { sales: '銷項', purchase: '進項' }
 /** 營業稅中心「憑證細節」內頁：與帳簿交易細節頁（TransactionFormView）架構相同，
  *  但收斂為純檢視——不顯示沖帳狀態／日記帳、折讓紀錄唯讀不可新增、交易資訊全唯讀，
  *  需要編輯一律導向 /ledger/{id}。不呼叫 fetchDailyDetail（日記帳不顯示，省去無用請求）。 */
-export default function VatInvoiceDetailView({ side, ledgerUuid, isVoid }: VatInvoiceDetailViewProps) {
+export default function VatInvoiceDetailView({ side, ledgerUuid, isVoid, returnQuery }: VatInvoiceDetailViewProps) {
   const [form, setForm] = useState<TransactionFormState>(EMPTY_TRANSACTION_FORM);
   const [entryDetail, setEntryDetail] = useState<EntryDetailEntryDto | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -109,7 +112,7 @@ export default function VatInvoiceDetailView({ side, ledgerUuid, isVoid }: VatIn
     <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
         <div className="mb-6">
-          <Link href="/business-tax" className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-blue">
+          <Link href={resolveBusinessTaxBackHref(returnQuery)} className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-blue">
             <ChevronLeft size={16} />
             返回營業稅中心
           </Link>
@@ -160,11 +163,12 @@ export default function VatInvoiceDetailView({ side, ledgerUuid, isVoid }: VatIn
                   error={originError}
                   entry={originEntry}
                   basePath="/business-tax"
+                  returnQuery={returnQuery}
                 />
               )}
 
               {!isAllowance && entryDetail && ourInvoiceType !== null && ourInvoiceType >= 1 && ourInvoiceType <= 7 && (
-                <TransactionAllowanceListCard side={side} entry={entryDetail} allowances={allowances} basePath="/business-tax" />
+                <TransactionAllowanceListCard side={side} entry={entryDetail} allowances={allowances} basePath="/business-tax" returnQuery={returnQuery} />
               )}
             </div>
           </div>
