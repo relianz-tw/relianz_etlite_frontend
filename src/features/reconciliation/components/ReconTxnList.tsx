@@ -59,7 +59,7 @@ function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>):
 /** 桌機交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排 */
 function AmountCell({ amount }: { amount: number }) {
   return (
-    <span className="flex w-28 shrink-0 items-center justify-between font-mono tabular-nums text-neutral-dark">
+    <span className="flex w-28 shrink-0 items-baseline justify-end gap-0.5 font-mono tabular-nums text-neutral-dark">
       <span className="text-neutral-mid">$</span>
       <span>{amount.toLocaleString('en-US')}</span>
     </span>

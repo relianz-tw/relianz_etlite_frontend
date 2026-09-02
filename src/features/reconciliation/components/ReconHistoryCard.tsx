@@ -24,15 +24,16 @@ function targetSummary(targetNames: string[]): string {
   return targetNames.length === 0 ? '—' : targetNames.join('、');
 }
 
-/** 桌機列金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，比照 ReconTxnList 的 AmountCell 排版，
- *  讓同一欄內每列的 $ 對齊在同一直排；一律不顯示負號，無金額時顯示 0（比照其他金額欄格式，不特別弱化）。
+/** 桌機列金額欄：$ 與數字貼在一起靠欄位右緣顯示（同一欄每列右緣仍對齊成直排），
+ *  不把 $ 單獨貼在欄位左緣——一列有多個金額欄並排時，$ 離數字太遠會讓版面看起來斷開、不像同一組金額；
+ *  一律不顯示負號，無金額時顯示 0（比照其他金額欄格式，不特別弱化）。
  *  emphasis 用於本列唯一的主要數值欄（沖帳金額），其餘金額欄一律降為附屬字重與淺色，
  *  讓整列的視覺比重集中在沖帳金額，符合「日期與沖帳金額為主要資訊」的版面原則 */
 function DeskAmountCell({ amount, emphasis }: { amount: number; emphasis?: boolean }) {
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-between font-mono tabular-nums',
+        'flex shrink-0 items-baseline justify-end gap-0.5 font-mono tabular-nums',
         emphasis ? 'w-32 text-[15px] font-semibold text-neutral-dark' : 'w-28 text-sm text-neutral-mid',
       )}
     >

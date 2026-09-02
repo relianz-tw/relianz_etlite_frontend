@@ -461,8 +461,9 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
   flex-1 次要文字（管道／帳戶等），truncate + title，ml-3
 
 Amount Cell：
-  $ 固定貼齊欄位左緣，數字貼齊欄位右緣（font-mono tabular-nums），
-  用 justify-between 撐開，讓同一欄內每列的 $ 對齊成同一直排
+  $ 與數字黏在一起（items-baseline gap-0.5，font-mono tabular-nums）靠欄位右緣對齊，
+  同一欄內每列的數字右緣對齊成同一直排；不把 $ 貼在欄位左緣單獨撐開——金額位數不一時
+  $ 與數字中間會留下大小不一的空白，看起來像斷開的兩個東西，即使只有單一金額欄也一樣
 
 主／附屬分層（一列有多個金額欄時必用）：
   一列只能有一個主要數值欄（如沖帳金額），emphasis 樣式為 text-[15px] font-semibold
@@ -481,8 +482,9 @@ Amount Cell：
 分組標頭（依日期／類別分組的清單適用，如沖帳紀錄依收付款日分組）：
   當分組依據（如日期）本身就是這份清單的主軸時，標頭需比列內容更重，不能只是小灰字：
   text-[15px] font-semibold text-neutral-dark，左側加 h-4 w-[3px] rounded-full bg-brand-blue
-  短豎線標記層級，底部加一條 border-neutral-blue-gray/20 細線；分組筆數等次要資訊降為
-  text-xs text-neutral-mid 放在標頭右側
+  短豎線標記層級；不重複顯示筆數等已可從下方列表數出來的次要資訊，保持標頭乾淨。
+  分隔線放在下一組標頭「上方」（border-t + pt-4），標示與上一組的分界，
+  第一組不加線（避免緊貼桌機表頭或頁首造成雙線）
 ```
 
 響應式：僅 ≥ 1300px（沖帳中心專屬斷點，見「8. Responsive Breakpoints」例外）套用此版面，

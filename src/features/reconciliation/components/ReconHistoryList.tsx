@@ -90,12 +90,11 @@ export default function ReconHistoryList({ side, dateFrom, dateTo, unlimitedDate
 
       {groups.map((group, index) => (
         <div key={group.dateKey} className={cn(index > 0 && 'border-t border-neutral-blue-gray/20 pt-4')}>
-          {/* 日期為此清單的主軸，標頭需比列內容更重：加粗放大＋左側城信藍短豎線，右側筆數降為附屬；
+          {/* 日期為此清單的主軸，標頭需比列內容更重：加粗放大＋左側城信藍短豎線；
               分隔線放在日期上方，標示與上一組的分界，而非切在標頭與列表之間 */}
           <div className="mb-2 flex items-center gap-2">
             <span className="h-4 w-[3px] shrink-0 rounded-full bg-brand-blue" />
             <span className="text-[15px] font-semibold text-neutral-dark">{group.label}</span>
-            <span className="text-xs text-neutral-mid">{group.items.length} 筆</span>
           </div>
           <div className="flex flex-col gap-3 min-[1300px]:gap-1">
             {group.items.map(item => (
