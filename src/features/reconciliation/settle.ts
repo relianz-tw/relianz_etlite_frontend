@@ -11,12 +11,9 @@ import type { SettleChannel, SettleEcommercePlatformFee, SettleLedgerAllocation,
 import type { ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import type { ReconSettleResult, ReconSide } from './types';
 
-// 電商平台扣款固定使用此會計科目，不再讓使用者於下拉選擇（沖帳中心「額外金額」科目改由使用者自選後，此為僅存的固定科目）
-const PLATFORM_FEE_SUBJECT_ID = 896;
-
 /** 應收側 ecommercePlatformFee 物件：UI 帶號（負）輸入，API 欄位語意為正的金額，故反號；僅應收 API 支援此欄位 */
 function toEcommercePlatformFee(platformFeeAmount: number): SettleEcommercePlatformFee {
-  return { feeAmount: -platformFeeAmount, officialAccountingSubjectId: PLATFORM_FEE_SUBJECT_ID };
+  return { feeAmount: -platformFeeAmount };
 }
 
 function toOtherDeductions(rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
@@ -54,7 +51,7 @@ interface PreviewParams {
  * ledgerUuids 與 isDefault=false，僅針對勾選的原單試算（見 api.md settle/preview）。
  */
 export async function previewSettle(params: PreviewParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '銀行手續費', feeAmount: -params.feeAmount };
+  const allocations: SettleSummaryFee = { feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
   const isDefault = params.isDefault ?? true;
   const ledgerUuids = params.ledgerUuids ?? [];
@@ -126,7 +123,7 @@ interface SummaryParams {
  * （見 ReconciliationView 的 depositAmount 計算）。
  */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { name: '銀行手續費', feeAmount: -params.feeAmount };
+  const allocations: SettleSummaryFee = { feeAmount: -params.feeAmount };
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   if (params.side === 'receivable') {
@@ -203,7 +200,7 @@ interface SingleSettleParams {
  * 手動沖帳 API 沒有 balanceBefore／balanceAfter 的概念（不影響管道／廠商餘額），對應欄位留空。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ name: '銀行手續費', feeAmount: -params.feeAmount }] : [];
+  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ feeAmount: -params.feeAmount }] : [];
   const otherDeductions = toOtherDeductions(params.otherDeductions);
 
   const res =

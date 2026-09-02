@@ -21,6 +21,7 @@ import type {
   ReconPayableGroupDto,
   ReconReceivableGroupDto,
   ReverseSettleBody,
+  SettleEventListResult,
   SettleEventRelationsResult,
   SettlePayableBody,
   SettlePayablePreviewBody,
@@ -168,6 +169,19 @@ export function fetchDailyDetail(params: { ledgerUuid: string }): Promise<DailyD
 export function fetchSettleEventRelations(params: { settleEventUuid: string }): Promise<SettleEventRelationsResult> {
   return apiFetch<SettleEventRelationsResult>(
     `/ael/ledger/settle/event${buildQuery({ companyUuid: COMPANY_UUID, settleEventUuid: params.settleEventUuid })}`,
+  );
+}
+
+/** 沖帳紀錄列表（GET /ael/ledger/settle/event/list）；已復原事件由後端排除、不計入 total，前端不再過濾 */
+export function fetchSettleEventList(params: {
+  side: 0 | 1;
+  dateFrom?: string;
+  dateTo?: string;
+  page: number;
+  pageSize: number;
+}): Promise<SettleEventListResult> {
+  return apiFetch<SettleEventListResult>(
+    `/ael/ledger/settle/event/list${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`,
   );
 }
 

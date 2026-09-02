@@ -15,6 +15,9 @@ interface ResizableSplitPaneProps {
   /** 固定寬度面板要排在哪一側，預設左側；手機（<nav 斷點）一律 panel 在下、children 在上，
    * 與桌機的閱讀順序（先看 children 內容、panel 提供輸入）保持一致 */
   panelSide?: 'left' | 'right';
+  /** 版面切換斷點：'nav' 用全站唯一斷點（1000px，預設）；'wide' 用於版面資訊密度較高、需晚一點才切手機版
+   * 的頁面（如沖帳中心，1300px，見該頁檔案頂部「響應式斷點例外」說明） */
+  breakpoint?: 'nav' | 'wide';
   className?: string;
 }
 
@@ -32,6 +35,7 @@ export default function ResizableSplitPane({
   minPanelWidth = 160,
   maxPanelWidth = 480,
   panelSide = 'left',
+  breakpoint = 'nav',
   className,
 }: ResizableSplitPaneProps) {
   const [panelWidth, setPanelWidth] = useState(defaultPanelWidth);
@@ -85,7 +89,10 @@ export default function ResizableSplitPane({
   };
 
   const panelEl = (
-    <div className="w-full nav:w-[var(--split-panel-width)] nav:shrink-0" style={{ ['--split-panel-width' as string]: `${panelWidth}px` }}>
+    <div
+      className={cn('w-full', breakpoint === 'wide' ? 'min-[1300px]:w-[var(--split-panel-width)] min-[1300px]:shrink-0' : 'nav:w-[var(--split-panel-width)] nav:shrink-0')}
+      style={{ ['--split-panel-width' as string]: `${panelWidth}px` }}
+    >
       {panel}
     </div>
   );
@@ -97,7 +104,12 @@ export default function ResizableSplitPane({
       tabIndex={0}
       onMouseDown={startDragging}
       onKeyDown={handleKeyDown}
-      className="hidden shrink-0 nav:mx-2 nav:flex nav:w-2 nav:cursor-col-resize nav:items-stretch nav:justify-center nav:self-stretch focus:outline-none"
+      className={cn(
+        'hidden shrink-0 focus:outline-none',
+        breakpoint === 'wide'
+          ? 'min-[1300px]:mx-2 min-[1300px]:flex min-[1300px]:w-2 min-[1300px]:cursor-col-resize min-[1300px]:items-stretch min-[1300px]:justify-center min-[1300px]:self-stretch'
+          : 'nav:mx-2 nav:flex nav:w-2 nav:cursor-col-resize nav:items-stretch nav:justify-center nav:self-stretch',
+      )}
     >
       <div className="w-px bg-neutral-blue-gray/30 transition-colors hover:bg-brand-blue" />
     </div>
@@ -105,7 +117,7 @@ export default function ResizableSplitPane({
   const childrenEl = <div className="min-w-0 flex-1">{children}</div>;
 
   return (
-    <div className={cn('flex flex-col gap-4 nav:flex-row nav:items-start nav:gap-0', className)}>
+    <div className={cn('flex flex-col gap-4', breakpoint === 'wide' ? 'min-[1300px]:flex-row min-[1300px]:items-start min-[1300px]:gap-0' : 'nav:flex-row nav:items-start nav:gap-0', className)}>
       {panelSide === 'left' ? (
         <>
           {panelEl}

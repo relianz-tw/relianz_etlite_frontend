@@ -68,9 +68,9 @@ function AmountCell({ amount }: { amount: number }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col items-start gap-0.5 nav:flex-row nav:items-center nav:justify-between nav:gap-4">
+    <div className="flex flex-col items-start gap-0.5 min-[1300px]:flex-row min-[1300px]:items-center min-[1300px]:justify-between min-[1300px]:gap-4">
       <span className="shrink-0 text-neutral-mid">{label}</span>
-      <span className="break-all text-left font-medium text-neutral-dark nav:truncate nav:text-right" title={value}>
+      <span className="break-all text-left font-medium text-neutral-dark min-[1300px]:truncate min-[1300px]:text-right" title={value}>
         {value}
       </span>
     </div>
@@ -164,8 +164,7 @@ function TxnRow({
   const isNegativeRemaining = remainingAmount < 0;
   // 逐筆沖帳可勾選（複選，勾 1 筆走手動沖帳 API、勾多筆走 summary API，見 ReconciliationView）；匯總沖帳僅唯讀顯示拆帳狀態
   const isSelectable = mode === 'perTxn' && !isNegativeRemaining;
-  const negativeRemainingBadge = mode !== 'summary' && isNegativeRemaining ? { label: '超沖', tone: 'error' as const } : null;
-  const badge = statusBadge ?? negativeRemainingBadge;
+  const badge = statusBadge;
   const { detail, loading: detailLoading, error: detailError } = useLazyEntryDetail(row.uuid, expanded);
   const invoice = detail?.invoice;
   const taxId = invoice ? (side === 'receivable' ? invoice.buyerTaxIdNumber : invoice.sellerTaxIdNumber) : '';
@@ -181,7 +180,7 @@ function TxnRow({
     <div>
       {/* 行動版：精簡列，整列點擊＝勾選（僅 isSelectable 時可點），右側獨立 chevron 展開大約資訊；
           買受人／銷售管道等細節不在列上重複顯示，統一收在展開面板（見下方 InfoRow） */}
-      <div className={cn('flex items-center gap-1 rounded-lg border border-neutral-blue-gray/30 bg-white pr-1 nav:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
+      <div className={cn('flex items-center gap-1 rounded-lg border border-neutral-blue-gray/30 bg-white pr-1 min-[1300px]:hidden', isSelectable && selected && 'border-brand-blue bg-brand-blue/5')}>
         <button
           type="button"
           onClick={isSelectable ? onToggleSelect : undefined}
@@ -193,6 +192,9 @@ function TxnRow({
           <span className="min-w-0 flex-1">
             <span className="block truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
               {row.voucherNumber || '—'}
+            </span>
+            <span className="block truncate text-xs text-neutral-mid" title={row.counterparty}>
+              {row.counterparty || '—'}
             </span>
             <span className="block truncate text-xs text-neutral-mid">
               {row.date || '—'} · {channelLabel(row, channelNameByUuid)}
@@ -215,7 +217,7 @@ function TxnRow({
       {/* 桌機：欄位化列 */}
       <div
         className={cn(
-          'hidden items-center gap-3 rounded-md px-3 py-2 text-sm nav:flex hover:bg-surface-cream',
+          'hidden items-center gap-3 rounded-md px-3 py-2 text-sm min-[1300px]:flex hover:bg-surface-cream',
           isSelectable && selected && 'bg-brand-blue/5 hover:bg-brand-blue/5',
         )}
       >
@@ -286,8 +288,8 @@ function TxnRow({
               </>
             )}
           </div>
-          <div className="flex nav:justify-end">
-            <Button variant="outline" size="sm" icon={FileSearch} onClick={() => setVoucherOpen(true)} className="w-full nav:w-auto">
+          <div className="flex min-[1300px]:justify-end">
+            <Button variant="outline" size="sm" icon={FileSearch} onClick={() => setVoucherOpen(true)} className="w-full min-[1300px]:w-auto">
               查看憑證明細
             </Button>
           </div>
@@ -318,7 +320,7 @@ function TxnRow({
  * 右側 chevron 就地展開大約資訊，展開區另顯示已預覽的本次沖帳額／沖後剩餘（或逐筆沖帳的待付／待收金額），
  * 「查看憑證明細」按鈕開啟與建立折讓單畫面共用的 EntryVoucherModal（見 @/components/ui/EntryVoucherModal），
  * 呈現同一份憑證資料與版面，不離開沖帳流程。
- * 行動版（<1000px）改為精簡列（勾選圓圈／狀態圓圈＋憑證號碼＋日期·管道＋金額），整列點擊＝勾選、
+ * 行動版（<1300px，沖帳中心專用斷點）改為精簡列（勾選圓圈／狀態圓圈＋憑證號碼＋日期·管道＋金額），整列點擊＝勾選、
  * chevron 才展開明細，避免欄位化列在窄螢幕擠成一行難以操作；買受人等次要欄位收進展開面板。
  *
  * 本版已移除清單頂部的搜尋欄與工具列（見 getSelectableUuids）：「全選本管道」與已選筆數／金額改由呼叫端
@@ -345,8 +347,8 @@ export default function ReconTxnList({
   }
 
   return (
-    <div className="flex flex-col gap-2 nav:gap-1">
-      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 nav:flex">
+    <div className="flex flex-col gap-2 min-[1300px]:gap-1">
+      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 min-[1300px]:flex">
         <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && mode === 'perTxn' ? '選取' : ''}</span>
         <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
         <span className={cn(HEADER_CLASS, 'w-48 shrink-0')}>{side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}</span>
@@ -356,9 +358,9 @@ export default function ReconTxnList({
       </div>
 
       {sections.map(section => (
-        <div key={section.key} className="flex flex-col gap-2 nav:gap-1">
+        <div key={section.key} className="flex flex-col gap-2 min-[1300px]:gap-1">
           {showSectionHeaders && section.rows.length > 0 && (
-            <p className="mb-1 mt-3 px-1 text-xs font-semibold text-neutral-mid first:mt-2 nav:px-3">
+            <p className="mb-1 mt-3 px-1 text-xs font-semibold text-neutral-mid first:mt-2 min-[1300px]:px-3">
               {section.label}（{section.rows.length}）
             </p>
           )}

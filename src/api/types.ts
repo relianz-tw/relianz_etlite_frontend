@@ -965,18 +965,15 @@ export interface SettleChannel {
   amount: number;
 }
 
-/** 匯總沖帳手續費物件（單一物件，非陣列），銷項／進項共用同一結構 */
+/** 匯總沖帳手續費物件（單一物件，非陣列），銷項／進項共用同一結構；API 僅需 feeAmount */
 export interface SettleSummaryFee {
-  /** 沖帳項目名稱，目前固定帶入「手續費」 */
-  name: string;
   /** 手續費 */
   feeAmount: number;
 }
 
-/** 電商平台扣款物件（僅應收沖帳 API 支援）：feeAmount 為正的扣款金額，officialAccountingSubjectId 固定為電商平台扣款科目 */
+/** 電商平台扣款物件（僅應收沖帳 API 支援）：feeAmount 為正的扣款金額；API 僅需 feeAmount */
 export interface SettleEcommercePlatformFee {
   feeAmount: number;
-  officialAccountingSubjectId: number;
 }
 
 /** 匯總沖帳的額外扣款項（可無限新增），銷項／進項共用同一結構 */
@@ -1340,6 +1337,59 @@ export interface EntryDetailSettleEventDto {
   /** 目前是否可撤銷（未撤銷且無更新的未撤銷事件） */
   canReverse: boolean;
   createdAt: string;
+}
+
+/** GET /ael/ledger/settle/event/list 回應中，展開明細單筆原單的欄位 */
+export interface SettleEventListDetailDto {
+  /** 原單交易 uuid */
+  ledgerUuid: string;
+  /** 憑證開立日，YYYYMMDD */
+  voucherDate: string;
+  /** 發票字軌＋號碼；無票為空字串 */
+  voucherNumber: string;
+  /** 「買受人」或「賣方」（依 side 決定文字） */
+  counterpartyLabel: string;
+  /** 買受人／賣方名稱 */
+  counterpartyName: string;
+  /** 該原單本次分配到的沖帳金額 */
+  amount: number;
+}
+
+/** GET /ael/ledger/settle/event/list 回應單筆沖帳事件；供「沖帳紀錄」清單顯示與就地復原使用 */
+export interface SettleEventListItemDto {
+  /** settle_events.uuid，復原時要傳入 */
+  settleEventUuid: string;
+  /** 0 手動沖帳／2 匯總沖帳；決定復原時要打哪支 API */
+  reconMethod: number;
+  /** 0 銷項／1 進項 */
+  side: number;
+  /** 收／付款日，YYYYMMDD */
+  paymentDate: string;
+  /** 沖帳建立時間，ISO 格式（含時區位移） */
+  createdAt: string;
+  /** 帳面沖帳金額 */
+  settleAmount: number;
+  /** 實際收付金額（銷項為存入、進項為付款） */
+  cashAmount: number;
+  /** 目前是否可撤銷（未撤銷且無更新的未撤銷事件） */
+  canReverse: boolean;
+  /** 進項＝廠商名；銷項＝銷售管道名 */
+  counterpartyName: string;
+  /** 收／付款管道顯示名，一次沖帳可能拆多個管道 */
+  targetNames: string[];
+  /** 本批原單筆數 */
+  itemCount: number;
+  /** 展開明細，一次帶回不分頁 */
+  details: SettleEventListDetailDto[];
+}
+
+/** GET /ael/ledger/settle/event/list 回應 data 區塊 */
+export interface SettleEventListResult {
+  /** 符合條件總筆數（不含已復原） */
+  total: number;
+  page: number;
+  pageSize: number;
+  items: SettleEventListItemDto[];
 }
 
 /** GET /ael/ledger/settle/event 回應；依沖帳事件反查關聯交易 uuid，只回 uuid 陣列，

@@ -68,7 +68,7 @@ export default function ReconTargetSelect({ options, value, onChange, takenKeys,
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="搜尋帳戶或科目"
-            className="w-full min-w-0 bg-transparent text-base text-neutral-dark outline-none placeholder:text-neutral-mid nav:text-sm"
+            className="w-full min-w-0 bg-transparent text-base text-neutral-dark outline-none placeholder:text-neutral-mid min-[1300px]:text-sm"
           />
         </div>
         <div role="listbox" className="max-h-72 overflow-auto py-1">

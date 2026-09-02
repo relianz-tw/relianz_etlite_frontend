@@ -38,7 +38,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
 
   return (
     <Modal open onClose={onClose} title="沖帳結果" widthClassName="max-w-[840px]">
-      <div className="grid grid-cols-1 gap-y-2 text-sm nav:grid-cols-3 nav:gap-x-6">
+      <div className="grid grid-cols-1 gap-y-2 text-sm min-[1300px]:grid-cols-3 min-[1300px]:gap-x-6">
         {summaryRows.map(row => (
           <div key={row.label} className="flex items-center justify-between gap-2">
             <span className="shrink-0 text-neutral-mid">{row.label}</span>
@@ -56,8 +56,8 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
 
       {/* 手機上筆數多時內容可能高達數千 px，關閉鈕黏在底部，避免使用者要捲到最底才找得到唯一的關閉出口；
           負 margin 對齊 Modal 面板內距（手機 p-4／桌機 p-6，見 Modal.tsx） */}
-      <div className="sticky bottom-0 -mx-4 -mb-4 mt-6 flex justify-end border-t border-neutral-blue-gray/30 bg-white px-4 py-3 nav:static nav:mx-0 nav:mb-0 nav:mt-6 nav:border-0 nav:bg-transparent nav:px-0 nav:py-0">
-        <Button variant="primary" onClick={onClose} className="w-full nav:w-auto">
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-6 flex justify-end border-t border-neutral-blue-gray/30 bg-white px-4 py-3 min-[1300px]:static min-[1300px]:mx-0 min-[1300px]:mb-0 min-[1300px]:mt-6 min-[1300px]:border-0 min-[1300px]:bg-transparent min-[1300px]:px-0 min-[1300px]:py-0">
+        <Button variant="primary" onClick={onClose} className="w-full min-[1300px]:w-auto">
           關閉
         </Button>
       </div>

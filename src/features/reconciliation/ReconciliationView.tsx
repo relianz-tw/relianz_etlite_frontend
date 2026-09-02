@@ -19,6 +19,7 @@ import ReconAmountFilter from './components/ReconAmountFilter';
 import ReconConfirmSummaryModal from './components/ReconConfirmSummaryModal';
 import ReconDateFilter from './components/ReconDateFilter';
 import ReconGroupSidebar from './components/ReconGroupSidebar';
+import ReconHistoryList from './components/ReconHistoryList';
 import ReconMobileActionBar from './components/ReconMobileActionBar';
 import ReconPoolPanel, { type ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import ReconPoolSummary from './components/ReconPoolSummary';
@@ -51,6 +52,7 @@ const SIDE_OPTIONS: { value: ReconSide; label: string }[] = [
 const MODE_OPTIONS: { value: ReconMode; label: string }[] = [
   { value: 'perTxn', label: '逐筆沖帳' },
   { value: 'summary', label: '匯總沖帳' },
+  { value: 'history', label: '沖帳紀錄' },
 ];
 
 interface SideData {
@@ -98,6 +100,10 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
  *   （依 transaction_date 由舊到新分配），前端不由使用者手動勾選調整；下方交易清單改為純檢視，
  *   將預覽結果疊加顯示為圓形狀態（見 ReconTxnList）。僅有明確 uuid 的真實管道／廠商可使用。
  *
+ * 響應式斷點例外：沖帳中心版面資訊密度高（管道 chips＋交易清單＋金額面板三欄需同時可視），全站唯一斷點
+ * `nav`（1000px）在此頁會太早切成桌機橫排導致擠壓，故本頁與其子元件改用 Tailwind arbitrary variant
+ * `min-[1300px]:` 取代 `nav:`，僅此頁面／元件適用，不影響其餘頁面的 `nav` 斷點（見 DESIGN.md 響應式斷點章節）。
+ *
  * 兩種模式共用同一套「確認沖帳→結果」一段式流程（見 handleOpenConfirm）：按下主要按鈕「確認沖帳」，
  * 逐筆勾 1 筆改為本地試算（拆帳結果本來就是確定的），其餘打 settle/preview 取得逐筆拆帳明細，
  * 隨即顯示於 ReconConfirmSummaryModal（含每筆交易的沖前/沖後剩餘與狀態），使用者僅能取消或直接確認送出，
@@ -132,7 +138,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
   const [confirmSummaryOpen, setConfirmSummaryOpen] = useState(false);
-  // 行動版（< nav 1000px）金額表單以 BottomSheet 疊在交易清單上；桌機版不使用，面板改常駐右欄（見下方雙掛載）
+  // 行動版（< 1300px，沖帳中心專用斷點，見檔案頂部說明）金額表單以 BottomSheet 疊在交易清單上；桌機版不使用，面板改常駐右欄（見下方雙掛載）
   const [sheetOpen, setSheetOpen] = useState(false);
   // 本次沖帳涉及原單的買受人／賣方與憑證號碼快照（見 ReconAllocationInfo 說明），確認彈窗與結果彈窗共用同一份，
   // 在 handleOpenConfirm 取得拆帳明細當下建立，避免沖帳完成後候選清單重抓、已結清交易消失導致欄位變成空白
@@ -259,6 +265,16 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     };
     return [allGroup, ...buildReconGroups(availableCandidates, groupOptions)];
   }, [availableCandidates, groupOptions, side]);
+
+  // 匯總沖帳不顯示「全部管道／全部廠商」（見 ReconGroupSidebar showAllGroup），故目前選取項若仍是「全部」
+  // 或不在目前清單中（如剛切換分頁／區間、資料尚未載入完成），改自動選取第一個真實管道／廠商
+  useEffect(() => {
+    if (mode !== 'summary') return;
+    const channelGroups = groups.filter(g => g.key !== ALL_GROUP_KEY);
+    if (channelGroups.length === 0) return;
+    if (channelGroups.some(g => g.key === selectedGroupKey)) return;
+    setSelectedGroupKey(channelGroups[0].key);
+  }, [mode, groups, selectedGroupKey]);
 
   const catchAllKey = useMemo(() => resolveCatchAllKey(groupOptions), [groupOptions]);
   const isAllGroup = selectedGroupKey === ALL_GROUP_KEY;
@@ -627,7 +643,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   // 金額面板 props 單一來源：逐筆沖帳桌機（固定於右欄）與行動版（BottomSheet 內）共用同一份表單，
   // 僅顯示位置不同，避免同一套欄位／驗證邏輯在兩處各維護一份（見 DESIGN.md「Bottom Sheet」與 ReconPoolPanel 的 hideHeader）。
-  // 匯總沖帳桌機固定於右欄、行動版改在清單上方常駐顯示完整表單（見下方 nav:hidden 區塊，不使用 BottomSheet），
+  // 匯總沖帳桌機固定於右欄、行動版改在清單上方常駐顯示完整表單（見下方 min-[1300px]:hidden 區塊，不使用 BottomSheet），
   // 兩處同樣共用這份 props，改任一邊都會同步
   const poolPanelBaseProps: Omit<ComponentProps<typeof ReconPoolPanel>, 'hideHeader'> = {
     mode,
@@ -685,13 +701,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   return (
     <div className="min-h-screen bg-surface-off-white">
-      <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-28 nav:px-7 nav:pt-7 nav:pb-7">
-        <div className="mb-5 flex flex-col gap-3 nav:flex-row nav:items-end nav:justify-between">
+      <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-28 min-[1300px]:px-7 min-[1300px]:pt-7 min-[1300px]:pb-7">
+        <div className="mb-5 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:items-end min-[1300px]:justify-between">
           <div>
-            <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">沖帳中心</h1>
+            <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark min-[1300px]:text-[28px]">沖帳中心</h1>
             <p className="mt-1 text-sm text-neutral-mid">選擇交易後確認金額，完成應收應付沖帳</p>
           </div>
-          <div className="w-full nav:w-56">
+          <div className="w-full min-[1300px]:w-56">
             <SegmentedControl options={SIDE_OPTIONS} value={side} onChange={handleSideChange} size="md" />
           </div>
         </div>
@@ -710,11 +726,25 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
               onApply={handleApplyDateRange}
               onToggleUnlimitedDate={handleToggleUnlimitedDate}
             />
-            <ReconAmountFilter amountFrom={amountRange.amountFrom} amountTo={amountRange.amountTo} onApply={handleApplyAmountRange} />
+            {mode !== 'history' && (
+              <ReconAmountFilter amountFrom={amountRange.amountFrom} amountTo={amountRange.amountTo} onApply={handleApplyAmountRange} />
+            )}
           </div>
         </div>
 
-        {dataLoading ? (
+        {mode === 'history' ? (
+          <ReconHistoryList
+            side={side}
+            dateFrom={dateRange.dateFrom}
+            dateTo={dateRange.dateTo}
+            unlimitedDate={unlimitedDate}
+            onReversed={() => {
+              // 復原後餘額與待沖清單已變，比照 finalizeSettle 清空快取觸發重新拉取
+              if (side === 'receivable') setReceivableData(null);
+              else setPayableData(null);
+            }}
+          />
+        ) : dataLoading ? (
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
             載入{side === 'receivable' ? '銷售管道與應收帳款' : '廠商與應付帳款'}中…
           </div>
@@ -722,16 +752,17 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{dataError}</div>
         ) : (
           <div className="flex flex-col gap-4">
-            <ReconGroupSidebar side={side} groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} />
+            <ReconGroupSidebar side={side} groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} showAllGroup={mode !== 'summary'} />
 
             <ResizableSplitPane
               panelSide="right"
+              breakpoint="wide"
               defaultPanelWidth={340}
               minPanelWidth={300}
               maxPanelWidth={420}
               panel={
                 selectedGroupKey && (
-                  <div className="hidden nav:sticky nav:top-7 nav:block">
+                  <div className="hidden min-[1300px]:sticky min-[1300px]:top-7 min-[1300px]:block">
                     <ReconPoolPanel {...poolPanelBaseProps} />
                   </div>
                 )
@@ -767,9 +798,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
                   {/* 行動版：匯總沖帳把完整金額表單（含使用餘額／手續費／額外金額／收款日／銀行帳戶／確認沖帳）
                       移到清單上方常駐顯示，不再切成僅一顆入帳金額欄位＋另開 BottomSheet 兩處——兩處分別維護
                       同一份表單容易讓使用者以為只有一欄可填。與桌機右欄共用同一份 poolPanelBaseProps，
-                      改任一邊都會同步；桌機僅顯示於右欄，此區塊 nav:hidden */}
+                      改任一邊都會同步；桌機僅顯示於右欄，此區塊 min-[1300px]:hidden */}
                   {mode === 'summary' && (
-                    <div className="nav:hidden">
+                    <div className="min-[1300px]:hidden">
                       <ReconPoolPanel {...poolPanelBaseProps} />
                     </div>
                   )}
@@ -820,8 +851,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       </div>
 
       {/* 行動版：底部固定操作條常駐顯示摘要，點擊開啟 BottomSheet 內的金額表單（見上方 poolPanelBaseProps）；
-          僅逐筆沖帳使用——匯總沖帳的完整表單已常駐於清單上方（見上方 nav:hidden 區塊），不需要底部操作條
-          與 BottomSheet 這組雙層入口。桌機不出現，金額面板已固定於右欄（nav:sticky） */}
+          僅逐筆沖帳使用——匯總沖帳的完整表單已常駐於清單上方（見上方 min-[1300px]:hidden 區塊），不需要底部操作條
+          與 BottomSheet 這組雙層入口。桌機不出現，金額面板已固定於右欄（min-[1300px]:sticky） */}
       {mode === 'perTxn' && selectedGroupKey && showActionArea && (
         <ReconMobileActionBar
           summaryLabel={mobileSummaryLabel}

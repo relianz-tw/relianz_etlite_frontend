@@ -126,14 +126,14 @@ export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, 
   return (
     <Modal open onClose={onClose} title="選擇應付憑證" widthClassName="max-w-[720px]">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 nav:flex-row">
+        <div className="flex flex-col gap-2 min-[1300px]:flex-row">
           <TextInput
             widthClassName="w-full flex-1"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="搜尋廠商、交易編號或憑證號碼"
           />
-          <Select widthClassName="w-full nav:w-44" value={vendorKey} onValueChange={setVendorKey}>
+          <Select widthClassName="w-full min-[1300px]:w-44" value={vendorKey} onValueChange={setVendorKey}>
             <option value={ALL_VENDOR_KEY}>全部廠商</option>
             {vendorOptions.map(([uuid, name]) => (
               <option key={uuid} value={uuid}>
@@ -177,7 +177,7 @@ export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, 
             })}
         </div>
 
-        <div className="flex flex-col items-stretch gap-2 rounded-md bg-surface-cream p-3 text-sm nav:flex-row nav:items-center nav:justify-between">
+        <div className="flex flex-col items-stretch gap-2 rounded-md bg-surface-cream p-3 text-sm min-[1300px]:flex-row min-[1300px]:items-center min-[1300px]:justify-between">
           <span className="text-neutral-dark">
             已選 {pickedRows.length} 筆 · 合計 {fmtCurrency(pickedTotal)} ／ 應等於 {fmtCurrency(targetAmount)}
           </span>

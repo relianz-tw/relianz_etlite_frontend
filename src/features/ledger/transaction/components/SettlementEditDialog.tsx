@@ -162,7 +162,7 @@ function SettlementEditDialogContent({
       onClose();
       return;
     }
-    const allocations: SettleSummaryFee[] = fee > 0 ? [{ name: '手續費', feeAmount: fee }] : [];
+    const allocations: SettleSummaryFee[] = fee > 0 ? [{ feeAmount: fee }] : [];
     const otherDeductionsBody =
       otherDeductions.length > 0
         ? otherDeductions.map(r => ({

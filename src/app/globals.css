@@ -124,10 +124,15 @@ body {
   -moz-appearance: textfield;
 }
 
-/* Recharts 會在 <svg> 根節點與點擊後的作用中圖形（如 <g class="recharts-zIndex-layer_*">）
-   加上 tabindex 供其內建鍵盤導覽用，但本專案未使用該功能，點擊長條/扇形時瀏覽器仍會顯示
-   預設 focus 外框；圖表的鍵盤可及入口另由圖例/排名列表的 <button> 提供（DESIGN.md §11.11），
-   故移除圖表內部所有元素的外框不影響無障礙性 */
-.recharts-wrapper :focus {
+/* 全站移除瀏覽器原生點擊反白／外框：許多自訂互動元件（如核取圓圈、清單列的可點擊 <button>，
+   含 Recharts 圖表點擊後的作用中圖形）未各自處理 focus 樣式，點擊後會冒出與元件外觀（圓形、
+   無邊框列等）不搭的矩形藍框；圖表的鍵盤可及入口另由圖例/排名列表的 <button> 提供
+   （DESIGN.md §11.11）。已有專屬 focus 樣式的元件（Button、TextInput 等表單元件）用的是
+   Tailwind ring（box-shadow），不受 outline 屬性影響，故此處全域關閉不影響其外觀 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus {
   outline: none;
 }

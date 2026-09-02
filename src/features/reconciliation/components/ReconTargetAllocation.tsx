@@ -128,7 +128,7 @@ export default function ReconTargetAllocation({
               onClick={() => onRemoveRow(row.id)}
               disabled={disabled}
               aria-label="移除此分出對象"
-              className="flex min-h-11 items-center justify-end gap-1 self-end text-xs text-neutral-mid transition-colors hover:text-semantic-error disabled:cursor-not-allowed disabled:opacity-50 nav:min-h-0"
+              className="flex min-h-11 items-center justify-end gap-1 self-end text-xs text-neutral-mid transition-colors hover:text-semantic-error disabled:cursor-not-allowed disabled:opacity-50 min-[1300px]:min-h-0"
             >
               <Trash2 size={13} />
               移除

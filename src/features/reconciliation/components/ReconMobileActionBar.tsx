@@ -15,12 +15,12 @@ interface ReconMobileActionBarProps {
 
 /**
  * 行動版底部固定操作條（Sticky Action Bar，見 DESIGN.md「Sticky Action Bar（行動版底部固定操作條）」）：
- * 手機（< nav 1000px）捲動交易清單時常駐顯示已選摘要與主要動作按鈕，避免使用者捲到清單底部才看得到
- * 沖帳入口。桌機不出現（nav:hidden），主要動作按鈕改置於側欄 ReconPoolPanel 內。
+ * 手機（< 1300px，沖帳中心專用斷點）捲動交易清單時常駐顯示已選摘要與主要動作按鈕，避免使用者捲到清單底部
+ * 才看得到沖帳入口。桌機不出現（min-[1300px]:hidden），主要動作按鈕改置於側欄 ReconPoolPanel 內。
  */
 export default function ReconMobileActionBar({ summaryLabel, summaryValue, actionLabel, actionDisabled, onAction }: ReconMobileActionBarProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-neutral-blue-gray/30 bg-white px-4 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] nav:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-neutral-blue-gray/30 bg-white px-4 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] min-[1300px]:hidden">
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-neutral-mid">{summaryLabel}</p>
         <p className="truncate font-mono text-sm font-semibold tabular-nums text-neutral-dark">{summaryValue}</p>

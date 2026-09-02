@@ -446,6 +446,52 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 
 對應元件：`src/features/business-tax/components/InvoiceTable.tsx`、`InvoiceCards.tsx`。
 
+### Record Row（欄位化紀錄列，桌機）
+
+用於桌機版資訊密度高的紀錄清單（如沖帳中心交易清單／沖帳紀錄），以「時間或日期為主軸」的
+單列掃視取代 label 左、數值右的卡片版面，避免版面滿版時視線要左右來回掃。
+
+```
+欄位骨架（由左至右，寬度依實際欄位數調整，非固定死值）：
+  時間 / 主鍵欄（如 HH:mm），font-mono，text-xs 或 text-neutral-mid（附屬資訊，不搶眼）
+  主識別欄：單一數值型清單（如 ReconTxnList 每列僅一組金額）可用雙行呈現主名稱＋次要資訊；
+    若同一列另有更重要的主軸資訊（如沖帳紀錄以「日期＋金額」為主軸），主識別欄改回單行、
+    降為 text-sm text-neutral-dark，把視覺重量讓給真正的主要欄位
+  金額欄（可重複多欄），見下方 Amount Cell 排版
+  flex-1 次要文字（管道／帳戶等），truncate + title，ml-3
+
+Amount Cell：
+  $ 固定貼齊欄位左緣，數字貼齊欄位右緣（font-mono tabular-nums），
+  用 justify-between 撐開，讓同一欄內每列的 $ 對齊成同一直排
+
+主／附屬分層（一列有多個金額欄時必用）：
+  一列只能有一個主要數值欄（如沖帳金額），emphasis 樣式為 text-[15px] font-semibold
+  text-neutral-dark，$ 符號 text-neutral-mid；其餘金額欄一律降為附屬：text-sm
+  text-neutral-mid，$ 符號降到 text-neutral-blue-gray。避免所有欄位等重，看不出主要數字
+  在哪裡（單一金額欄的列不受此限，直接用一般深色即可）
+
+列容器：rounded-md bg-white px-3 py-2 text-sm hover:bg-surface-cream，不加 border
+  （每列固定為清爽白色塊、與頁面背景清爽白區隔出區塊感，靠底色差異而非邊框分隔，
+  hover 再轉為 surface-cream 標示互動）
+尾端：ChevronDown size={16}，展開時 rotate-180；操作按鈕（如復原）獨立於可展開的列主體之外，
+  避免巢狀 button
+表頭：hidden min-[1300px]:flex，欄名／欄寬與資料列一一對應，套用既有 HEADER_CLASS
+  （text-xs font-semibold text-neutral-mid）
+
+分組標頭（依日期／類別分組的清單適用，如沖帳紀錄依收付款日分組）：
+  當分組依據（如日期）本身就是這份清單的主軸時，標頭需比列內容更重，不能只是小灰字：
+  text-[15px] font-semibold text-neutral-dark，左側加 h-4 w-[3px] rounded-full bg-brand-blue
+  短豎線標記層級，底部加一條 border-neutral-blue-gray/20 細線；分組筆數等次要資訊降為
+  text-xs text-neutral-mid 放在標頭右側
+```
+
+響應式：僅 ≥ 1300px（沖帳中心專屬斷點，見「8. Responsive Breakpoints」例外）套用此版面，
+< 1300px 一律降級為卡片式或精簡列。
+
+對應元件：`src/features/reconciliation/components/ReconTxnList.tsx`（`TxnRow` 桌機列，
+單一金額欄範例）、`ReconHistoryCard.tsx` 桌機列與 `ReconHistoryList.tsx` 分組標頭
+（多金額欄＋分層範例）。
+
 ### Tab Bar (Underline)
 
 用途：附著於資料表格頂部的檢視切換（如帳簿應收/已收款、應付/已付款）。
@@ -742,6 +788,12 @@ Dialog 內左滑面板（桌機，於 Modal 對話框內使用）：
 | 桌機（≥ nav） | ≥ 1000px | 多欄／可拖曳分割面板、欄位化表格、Sidebar 固定於左側 |
 
 實作慣例：預設樣式即手機版，桌機專屬樣式一律加 `nav:` 前綴覆寫（mobile-first）。
+
+**例外**：沖帳中心（`src/features/reconciliation/**`）版面資訊密度高（管道 chips／交易清單／金額面板三欄
+需同時可視），全站 `nav`（1000px）斷點會太早切成桌機橫排導致擠壓，此頁與其專屬子元件改用 Tailwind
+arbitrary variant `min-[1300px]:` 取代 `nav:`，斷點為 1300px；共用元件 `ResizableSplitPane`
+（`src/components/ui/ResizableSplitPane.tsx`）為此提供 `breakpoint="wide"` 參數（預設仍是全站 `nav`
+斷點）。僅沖帳中心適用，其餘頁面一律維持 `nav` 唯一斷點，不再擴增其他自訂斷點。
 
 ---
 

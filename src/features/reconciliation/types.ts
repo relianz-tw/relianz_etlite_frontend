@@ -12,8 +12,9 @@ export type ReconSide = 'receivable' | 'payable';
  *   （見 ReconciliationView 的 handleOpenConfirm）：按下「確認沖帳」即打 preview（或單筆本地試算）取得逐筆
  *   明細，於彈窗顯示後直接送出執行 API，沒有中途選項；超沖／少沖差額一律直接留在該筆原單／沖入最後一筆交易。
  * - summary：匯總沖帳，沿用既有 settle/preview + settle/summary 流程（reconMethod=2），僅能整批恢復。
+ * - history：沖帳紀錄，日期分組檢視歷次沖帳事件並可就地復原（見 ReconHistoryList），不涉及候選交易勾選。
  */
-export type ReconMode = 'perTxn' | 'summary';
+export type ReconMode = 'perTxn' | 'summary' | 'history';
 
 /**
  * 匯總沖帳預覽／執行結果，正規化銷項（depositAmount／paymentChannelUuid）與進項

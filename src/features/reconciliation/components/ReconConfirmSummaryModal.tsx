@@ -79,7 +79,7 @@ export default function ReconConfirmSummaryModal({
       </div>
 
       {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
-      <div className="mt-6 flex flex-col gap-3 nav:flex-row nav:justify-end">
+      <div className="mt-6 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:justify-end">
         <Button variant="outline" onClick={onCancel} disabled={submitting}>
           取消
         </Button>

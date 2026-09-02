@@ -52,7 +52,7 @@ export default function ReconAmountFilter({ amountFrom, amountTo, onApply }: Rec
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex h-9 shrink-0 items-center gap-2 rounded-lg border-[1.5px] border-neutral-blue-gray/50 bg-white px-3 text-xs text-neutral-dark transition-colors hover:border-brand-blue nav:text-sm"
+          className="flex h-9 shrink-0 items-center gap-2 rounded-lg border-[1.5px] border-neutral-blue-gray/50 bg-white px-3 text-xs text-neutral-dark transition-colors hover:border-brand-blue min-[1300px]:text-sm"
         >
           <SlidersHorizontal size={14} className="shrink-0 text-neutral-mid" />
           <span className="whitespace-nowrap font-mono">{label}</span>

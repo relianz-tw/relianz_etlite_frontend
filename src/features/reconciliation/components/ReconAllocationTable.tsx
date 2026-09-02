@@ -26,7 +26,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
   return (
     <>
       {/* 行動版：卡片式列表，避免窄螢幕橫向滑動表格導致狀態欄被切到看不見；筆數多時內容過長，限制最大高度可捲動 */}
-      <div className="flex max-h-[55vh] flex-col gap-2 overflow-y-auto overscroll-contain nav:hidden nav:max-h-none nav:overflow-visible">
+      <div className="flex max-h-[55vh] flex-col gap-2 overflow-y-auto overscroll-contain min-[1300px]:hidden min-[1300px]:max-h-none min-[1300px]:overflow-visible">
         {allocations.map(a => {
           const badge = getSettlementStatusBadge(a.settlementStatus);
           const info = allocationInfoByUuid.get(a.ledgerUuid);
@@ -67,7 +67,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
       </div>
 
       {/* 桌機：欄位化表格 */}
-      <div className="hidden overflow-x-auto rounded-md border border-neutral-blue-gray/30 nav:block">
+      <div className="hidden overflow-x-auto rounded-md border border-neutral-blue-gray/30 min-[1300px]:block">
         <table className="w-full min-w-[920px] border-collapse">
           <thead className="bg-surface-off-white">
             <tr className="border-b border-neutral-blue-gray/40">
