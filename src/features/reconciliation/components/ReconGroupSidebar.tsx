@@ -58,7 +58,7 @@ export default function ReconGroupSidebar({ side, groups, selectedKey, onSelect,
             onClick={() => onSelect(allGroup.key)}
             title={allGroup.label}
             className={cn(
-              'flex shrink-0 flex-col items-start gap-0.5 rounded-md border px-4 py-2.5 text-left transition-colors',
+              'flex shrink-0 flex-col items-start justify-center gap-0.5 rounded-md border px-4 py-2.5 text-left transition-colors',
               allGroup.key === selectedKey
                 ? 'border-brand-blue bg-brand-blue'
                 : 'border-neutral-blue-gray/30 bg-surface-cream hover:bg-surface-cream/70',
@@ -83,7 +83,7 @@ export default function ReconGroupSidebar({ side, groups, selectedKey, onSelect,
                 onClick={() => onSelect(group.key)}
                 title={group.label}
                 className={cn(
-                  'flex shrink-0 flex-col items-start gap-0.5 rounded-md border bg-white px-3 py-1.5 text-left transition-colors',
+                  'flex shrink-0 flex-col items-start justify-center gap-0.5 rounded-md border bg-white px-3 py-1.5 text-left transition-colors',
                   active ? 'border-brand-blue bg-surface-cream' : 'border-neutral-blue-gray/30 hover:bg-surface-cream',
                 )}
               >
