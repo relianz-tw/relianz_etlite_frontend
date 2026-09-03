@@ -64,10 +64,10 @@ export default function ReconGroupSidebar({ side, groups, selectedKey, onSelect,
                 : 'border-neutral-blue-gray/30 bg-surface-cream hover:bg-surface-cream/70',
             )}
           >
-            <span className={cn('max-w-[14rem] truncate text-sm font-semibold', allGroup.key === selectedKey ? 'text-white' : 'text-neutral-dark')}>
+            <span className={cn('max-w-[14rem] truncate text-sm font-semibold leading-none', allGroup.key === selectedKey ? 'text-white' : 'text-neutral-dark')}>
               {allGroup.label}
             </span>
-            <span className={cn('whitespace-nowrap text-xs', allGroup.key === selectedKey ? 'text-white/80' : 'text-neutral-mid')}>
+            <span className={cn('whitespace-nowrap text-xs leading-none', allGroup.key === selectedKey ? 'text-white/80' : 'text-neutral-mid')}>
               {allGroup.count} 筆 · {fmtCurrency(allGroup.amount)}
             </span>
           </button>
@@ -87,10 +87,10 @@ export default function ReconGroupSidebar({ side, groups, selectedKey, onSelect,
                   active ? 'border-brand-blue bg-surface-cream' : 'border-neutral-blue-gray/30 hover:bg-surface-cream',
                 )}
               >
-                <span className={cn('max-w-[14rem] truncate text-sm', active ? 'font-semibold text-brand-blue' : 'text-neutral-dark')} title={group.label}>
+                <span className={cn('max-w-[14rem] truncate text-sm leading-none', active ? 'font-semibold text-brand-blue' : 'text-neutral-dark')} title={group.label}>
                   {group.label}
                 </span>
-                <span className={cn('whitespace-nowrap text-xs', active ? 'text-brand-blue' : 'text-neutral-mid')}>
+                <span className={cn('whitespace-nowrap text-xs leading-none', active ? 'text-brand-blue' : 'text-neutral-mid')}>
                   {group.count} 筆 · {fmtCurrency(group.amount)}
                 </span>
               </button>
