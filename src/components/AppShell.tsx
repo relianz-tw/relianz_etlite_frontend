@@ -21,10 +21,15 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     setOpen(false);
   }, [pathname]);
 
+  // 勞報單對外免登入簽署頁：無側欄／導覽的公開頁面，不套用一般殼層
+  if (pathname?.startsWith("/withholding/labor/sign")) {
+    return <>{children}</>;
+  }
+
   return (
     <div style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}>
       {/* 手機版固定頂部列：logo 與選單鈕同列呈現 */}
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-surface-cream bg-white px-4 nav:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-surface-cream bg-white px-4 nav:hidden print:hidden">
         <picture>
           <img
             src="/etlite/logo.png"
@@ -51,8 +56,9 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
         maxWidth={SIDEBAR_MAX_WIDTH}
       />
 
-      {/* 手機版固定頂部列高度需保留淨空；桌機側邊欄固定展開，版面依側欄目前寬度留出空間 */}
-      <div className="pt-14 nav:ml-[var(--sidebar-w)] nav:pt-0">{children}</div>
+      {/* 手機版固定頂部列高度需保留淨空；桌機側邊欄固定展開，版面依側欄目前寬度留出空間；
+          列印時（如勞務報酬單）側欄與淨空皆不需要，比照 print:hidden 一併還原 */}
+      <div className="pt-14 nav:ml-[var(--sidebar-w)] nav:pt-0 print:ml-0 print:pt-0">{children}</div>
     </div>
   );
 };

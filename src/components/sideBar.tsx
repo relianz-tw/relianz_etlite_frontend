@@ -114,7 +114,7 @@ const Sidebar = ({
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-50 flex h-full w-64 flex-col border-l border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:left-0 nav:right-auto nav:w-[var(--sidebar-w)] nav:translate-x-0 nav:border-l-0 nav:border-r nav:shadow-none ${
+        className={`fixed inset-y-0 right-0 z-50 flex h-full w-64 flex-col border-l border-surface-cream bg-white shadow-level1 transition-transform duration-200 nav:left-0 nav:right-auto nav:w-[var(--sidebar-w)] nav:translate-x-0 nav:border-l-0 nav:border-r nav:shadow-none print:hidden ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
