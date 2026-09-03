@@ -4,7 +4,6 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ExportSelectedDialog from '@/components/ui/ExportSelectedDialog';
-import Select from '@/components/ui/Select';
 import { SubjectNameSelect } from '@/components/ui/SubjectSelect';
 import { ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, CircleX, Download } from 'lucide-react';
 import { cn, fmtCurrency } from '@/lib/utils';
@@ -16,7 +15,13 @@ import type { PurchaseRow, PurchaseSubTab, SalesRow, SalesSubTab, SortKey, SortS
 import { withReturnParam } from '../urlState';
 import LedgerAllowanceChildren from './LedgerAllowanceChildren';
 
-type LedgerTableProps = { totalCount: number; totalAmount: string; sort: SortState; onSortToggle: (key: SortKey) => void } & (
+type LedgerTableProps = {
+  pageAmount: string;
+  totalAmount: string;
+  totalCount: number;
+  sort: SortState;
+  onSortToggle: (key: SortKey) => void;
+} & (
   | { side: 'sales'; subTab: SalesSubTab; rows: SalesRow[]; channelNameByUuid: Map<string, string> }
   | { side: 'purchase'; subTab: PurchaseSubTab; rows: PurchaseRow[] }
 );
@@ -79,15 +84,21 @@ function ExpandToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () 
   );
 }
 
-/** 表格底部總計列：金額欄與上方「交易金額」欄對齊，緊貼表格最下方；children 可附加額外列（如批次更新列） */
+/**
+ * 表格底部總計列：金額欄與上方「交易金額」欄對齊，緊貼表格最下方；children 可附加額外列（如批次更新列）。
+ * 「本頁加總」／「全部加總」比照營業稅中心 InvoiceTable 樣式，兩者皆吃後端 pageAmount/totalAmount/totalCount
+ * （皆已排除折讓），前端不自行加總。
+ */
 function TableFooter({
-  totalCount,
+  pageAmount,
   totalAmount,
+  totalCount,
   colSpanAfter,
   children,
 }: {
-  totalCount: number;
+  pageAmount: string;
   totalAmount: string;
+  totalCount: number;
   colSpanAfter: number;
   children?: ReactNode;
 }) {
@@ -95,20 +106,17 @@ function TableFooter({
     <tfoot>
       <tr className="border-t border-neutral-blue-gray/40 bg-surface-off-white">
         <td colSpan={2} className={`${tdClass} text-neutral-mid`}>
-          目前顯示 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
+          本頁加總
+        </td>
+        <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{pageAmount}</td>
+        <td colSpan={colSpanAfter} className={tdClass} />
+      </tr>
+      <tr className="border-t border-neutral-blue-gray/20 bg-surface-off-white">
+        <td colSpan={2} className={`${tdClass} text-neutral-mid`}>
+          全部加總 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
         </td>
         <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{totalAmount}</td>
-        <td colSpan={colSpanAfter} className={tdClass}>
-          <div className="flex items-center justify-end gap-2 text-sm text-neutral-mid">
-            每頁顯示：
-            <Select widthClassName="w-20" defaultValue="10">
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </Select>
-            筆
-          </div>
-        </td>
+        <td colSpan={colSpanAfter} className={tdClass} />
       </tr>
       {children}
     </tfoot>
@@ -228,7 +236,7 @@ export default function LedgerTable(props: LedgerTableProps) {
   );
 
   if (props.side === 'sales') {
-    const { rows, totalCount, totalAmount, sort, onSortToggle, channelNameByUuid } = props;
+    const { rows, pageAmount, totalAmount, totalCount, sort, onSortToggle, channelNameByUuid } = props;
     return (
       <>
       {exportDialog}
@@ -331,7 +339,7 @@ export default function LedgerTable(props: LedgerTableProps) {
               </Fragment>
             ))}
           </tbody>
-          <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={5}>
+          <TableFooter pageAmount={pageAmount} totalAmount={totalAmount} totalCount={totalCount} colSpanAfter={5}>
             {selectedCount > 0 && (
               <SelectionExportRow
                 colSpan={8}
@@ -348,7 +356,7 @@ export default function LedgerTable(props: LedgerTableProps) {
     );
   }
 
-  const { rows, subTab, totalCount, totalAmount, sort, onSortToggle } = props;
+  const { rows, subTab, pageAmount, totalAmount, totalCount, sort, onSortToggle } = props;
   const editableSelected = rows.filter(r => checked[r.id] && r.source === 'invoice');
   const batchSelectedAmount = fmtCurrency(editableSelected.reduce((sum, r) => sum + r.amount, 0));
   const handleBatchApply = () => {
@@ -465,7 +473,7 @@ export default function LedgerTable(props: LedgerTableProps) {
             );
           })}
         </tbody>
-        <TableFooter totalCount={totalCount} totalAmount={totalAmount} colSpanAfter={4}>
+        <TableFooter pageAmount={pageAmount} totalAmount={totalAmount} totalCount={totalCount} colSpanAfter={4}>
           {selectedCount > 0 && (
             <SelectionExportRow
               colSpan={7}

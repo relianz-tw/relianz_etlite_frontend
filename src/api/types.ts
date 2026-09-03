@@ -601,8 +601,8 @@ export interface PayableListItemDto {
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
-  /** 進折為 true；paid/filter 未記載是否回傳此欄位，故為選填，讀取時應搭配 ?? false */
-  isAllowance?: boolean;
+  /** 進折為 true；4 支 filter 端點（含 paid/filter）皆穩定回傳 */
+  isAllowance: boolean;
   /** 折讓時有值，指原單交易 uuid */
   originLedgerUuid?: string;
   /** 該原單已開立的折讓單數量；大於 0 代表可展開查看折讓單清單 */
@@ -612,6 +612,7 @@ export interface PayableListItemDto {
 /** 查詢進項應付交易列表回應（data 內容） */
 export interface PayablesFilterResult {
   items: PayableListItemDto[];
+  /** 總筆數（含折讓），用於計算分頁頁數 */
   total: number;
   limit: number;
   page: number;
@@ -621,6 +622,14 @@ export interface PayablesFilterResult {
   paidAmount: number;
   /** 應付帳款金額（彙總） */
   payableAmount: number;
+  /** 本頁 items 中 isAllowance===false 的 amount 加總 */
+  pageAmount: number;
+  /** 本頁 items 中 isAllowance===false 的筆數 */
+  pageCount: number;
+  /** 篩選條件下、不分頁的全部資料中 isAllowance===false 的 amount 加總 */
+  totalAmount: number;
+  /** 篩選條件下、不分頁的全部資料中 isAllowance===false 的筆數 */
+  totalCount: number;
 }
 
 /** 查詢銷項應收交易列表（POST /ael/ledger/receivables/filter）body */
@@ -677,8 +686,8 @@ export interface ReceivableListItemDto {
   memo: string;
   createdAt: string;
   invoice: LedgerEntryInvoiceDto | null;
-  /** 銷折為 true；collected/filter 未記載是否回傳此欄位，故為選填，讀取時應搭配 ?? false */
-  isAllowance?: boolean;
+  /** 銷折為 true；4 支 filter 端點（含 collected/filter）皆穩定回傳 */
+  isAllowance: boolean;
   /** 折讓時有值，指原單交易 uuid */
   originLedgerUuid?: string;
   /** 該原單已開立的折讓單數量；大於 0 代表可展開查看折讓單清單 */
@@ -688,6 +697,7 @@ export interface ReceivableListItemDto {
 /** 查詢銷項應收交易列表回應（data 內容） */
 export interface ReceivablesFilterResult {
   items: ReceivableListItemDto[];
+  /** 總筆數（含折讓），用於計算分頁頁數 */
   total: number;
   limit: number;
   page: number;
@@ -697,6 +707,14 @@ export interface ReceivablesFilterResult {
   collectedAmount: number;
   /** 應收帳款金額（彙總） */
   receivableAmount: number;
+  /** 本頁 items 中 isAllowance===false 的 amount 加總 */
+  pageAmount: number;
+  /** 本頁 items 中 isAllowance===false 的筆數 */
+  pageCount: number;
+  /** 篩選條件下、不分頁的全部資料中 isAllowance===false 的 amount 加總 */
+  totalAmount: number;
+  /** 篩選條件下、不分頁的全部資料中 isAllowance===false 的筆數 */
+  totalCount: number;
 }
 
 /**

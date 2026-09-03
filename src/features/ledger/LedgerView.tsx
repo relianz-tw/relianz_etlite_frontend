@@ -8,6 +8,7 @@ import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import Select from '@/components/ui/Select';
 import TabBar from '@/components/ui/TabBar';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, sortRows } from '@/lib/utils';
@@ -23,9 +24,6 @@ import { formatYmd } from './transaction/data';
 import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
 import { buildLedgerQueryString, defaultSubTabForSide, DEFAULT_SORT, parseLedgerFilters } from './urlState';
 import type { LedgerFilterState } from './urlState';
-
-/** 對齊表格底部「每頁顯示」欄位目前固定顯示的 10 筆，同時作為後端 filter API 的 limit */
-const PAGE_LIMIT = 10;
 
 const getCounterparty = (row: SalesRow | PurchaseRow) => ('counterparty' in row ? row.counterparty : row.party);
 
@@ -45,6 +43,7 @@ const SORT_KEY_FN: Record<SortKey, (row: SalesRow | PurchaseRow) => string | num
  */
 function buildFilterBody(
   page: number,
+  limit: number,
   quickField: QuickSearchField,
   query: string,
   advanced: AdvancedFilter,
@@ -54,7 +53,7 @@ function buildFilterBody(
   const value = query.trim();
   return {
     page,
-    limit: PAGE_LIMIT,
+    limit,
     amountFrom: advanced.minAmount ? Number(advanced.minAmount) : undefined,
     amountTo: advanced.maxAmount ? Number(advanced.maxAmount) : undefined,
     dateFrom: formatYmd(parseRocDate(advanced.dateFrom)),
@@ -124,6 +123,10 @@ export default function LedgerView() {
   // 應付/已付/應收/已收四個子分頁共用同一組載入狀態；四支 filter API 依 side + 子分頁擇一呼叫
   const [rows, setRows] = useState<(SalesRow | PurchaseRow)[]>([]);
   const [total, setTotal] = useState(0);
+  // 本頁／全部加總（皆排除折讓）：後端直接回傳，前端不自行加總，見 pageAmount/totalAmount/totalCount 欄位說明
+  const [pageAmount, setPageAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -154,20 +157,27 @@ export default function LedgerView() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    const body = buildFilterBody(filters.page, filters.quickField, filters.query, filters.advanced, filters.side, filters.channelUuid);
+    const body = buildFilterBody(filters.page, filters.limit, filters.quickField, filters.query, filters.advanced, filters.side, filters.channelUuid);
 
     // 折讓單改為掛在原單展開區內顯示（見 LedgerTable/LedgerCards 的 LedgerAllowanceChildren），
-    // 故從最上層列表過濾掉；下方「共 N 筆／合計」因此是過濾後的前端筆數，與後端 total 不同（刻意如此），
-    // 分頁頁數仍全部使用後端原始數字，不受影響；頂部三張卡片數字改由 useLedgerSummary 另外抓取，不吃這裡的結果
+    // 故從最上層列表過濾掉；下方「本頁加總／全部加總」改吃後端 pageAmount/totalAmount/totalCount
+    // （皆已排除折讓），不再由前端 reduce 拼湊；分頁頁數仍用後端原始 total（含折讓）計算，不受影響；
+    // 頂部三張卡片數字改由 useLedgerSummary 另外抓取，不吃這裡的結果
     const request =
       filters.side === 'purchase'
         ? (filters.subTab === 'payable' ? fetchPayables(body) : fetchPayablesPaid(body)).then(async result => ({
             rows: (await mapPayableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
+            pageAmount: result.pageAmount,
+            totalAmount: result.totalAmount,
+            totalCount: result.totalCount,
           }))
         : (filters.subTab === 'receivable' ? fetchReceivables(body) : fetchReceivablesCollected(body)).then(async result => ({
             rows: (await mapReceivableItemsToRows(result.items)).filter(row => !row.isAllowance),
             total: result.total,
+            pageAmount: result.pageAmount,
+            totalAmount: result.totalAmount,
+            totalCount: result.totalCount,
           }));
 
     request
@@ -175,6 +185,9 @@ export default function LedgerView() {
         if (cancelled) return;
         setRows(result.rows);
         setTotal(result.total);
+        setPageAmount(result.pageAmount);
+        setTotalAmount(result.totalAmount);
+        setTotalCount(result.totalCount);
       })
       .catch(err => {
         if (cancelled) return;
@@ -235,12 +248,12 @@ export default function LedgerView() {
   };
   // 卡片 C（管道／廠商佔比）長條點擊：寫回 channelUuid；再點同一項清除
   const handleChannelSelect = (uuid: string | null) => updateFilters({ channelUuid: uuid, page: 1 });
+  const handleLimitChange = (v: number) => updateFilters({ limit: v, page: 1 });
 
   // 排序僅對目前這頁的資料進行（API 未提供排序），桌機表格與手機卡片共用同一份已排序資料
   const sortKeyFn = filters.sort.key ? SORT_KEY_FN[filters.sort.key] : null;
   const sortedRows = sortKeyFn ? sortRows(rows, sortKeyFn, filters.sort.dir) : rows;
-  const totalAmount = fmtCurrency(sortedRows.reduce((sum, r) => sum + r.amount, 0));
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+  const totalPages = Math.max(1, Math.ceil(total / filters.limit));
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -276,16 +289,27 @@ export default function LedgerView() {
           />
         </div>
 
-        <div className="mb-5 w-full nav:w-56">
-          <SegmentedControl
-            options={[
-              { value: 'sales', label: '銷項' },
-              { value: 'purchase', label: '進項' },
-            ]}
-            value={filters.side}
-            onChange={handleSideChange}
-            size="md"
-          />
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="w-full nav:w-56">
+            <SegmentedControl
+              options={[
+                { value: 'sales', label: '銷項' },
+                { value: 'purchase', label: '進項' },
+              ]}
+              value={filters.side}
+              onChange={handleSideChange}
+              size="md"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-sm text-neutral-mid">
+            每頁顯示：
+            <Select widthClassName="w-20" value={String(filters.limit)} onValueChange={v => handleLimitChange(Number(v))}>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </Select>
+            筆
+          </div>
         </div>
         {/* 表格檢視切換：底線分頁附著於下方表格卡片頂部，與上方主切換（銷項/進項）視覺區隔；
             手機無下方桌機表格可接續，維持四角圓角獨立列，桌機則去除下緣圓角以接續表格 */}
@@ -311,8 +335,9 @@ export default function LedgerView() {
               side="sales"
               subTab={filters.subTab as SalesSubTab}
               rows={sortedRows as SalesRow[]}
-              totalCount={sortedRows.length}
-              totalAmount={totalAmount}
+              pageAmount={fmtCurrency(pageAmount)}
+              totalAmount={fmtCurrency(totalAmount)}
+              totalCount={totalCount}
               sort={filters.sort}
               onSortToggle={handleSortToggle}
               channelNameByUuid={channelNameByUuid}
@@ -321,8 +346,9 @@ export default function LedgerView() {
               side="sales"
               subTab={filters.subTab as SalesSubTab}
               rows={sortedRows as SalesRow[]}
-              totalCount={sortedRows.length}
-              totalAmount={totalAmount}
+              pageAmount={fmtCurrency(pageAmount)}
+              totalAmount={fmtCurrency(totalAmount)}
+              totalCount={totalCount}
               sort={filters.sort}
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}
@@ -335,8 +361,9 @@ export default function LedgerView() {
               side="purchase"
               subTab={filters.subTab as PurchaseSubTab}
               rows={sortedRows as PurchaseRow[]}
-              totalCount={sortedRows.length}
-              totalAmount={totalAmount}
+              pageAmount={fmtCurrency(pageAmount)}
+              totalAmount={fmtCurrency(totalAmount)}
+              totalCount={totalCount}
               sort={filters.sort}
               onSortToggle={handleSortToggle}
             />
@@ -344,8 +371,9 @@ export default function LedgerView() {
               side="purchase"
               subTab={filters.subTab as PurchaseSubTab}
               rows={sortedRows as PurchaseRow[]}
-              totalCount={sortedRows.length}
-              totalAmount={totalAmount}
+              pageAmount={fmtCurrency(pageAmount)}
+              totalAmount={fmtCurrency(totalAmount)}
+              totalCount={totalCount}
               sort={filters.sort}
               onSortFieldChange={handleSortFieldChange}
               onSortDirToggle={handleSortDirToggle}

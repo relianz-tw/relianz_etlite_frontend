@@ -27,8 +27,9 @@ const SORT_KEY_LABELS: Record<SortKey, string> = {
 const SORT_KEYS: SortKey[] = ['id', 'amount', 'counterparty', 'date'];
 
 type LedgerCardsProps = {
-  totalCount: number;
+  pageAmount: string;
   totalAmount: string;
+  totalCount: number;
   sort: SortState;
   onSortFieldChange: (key: SortKey | null) => void;
   onSortDirToggle: () => void;
@@ -359,10 +360,15 @@ export default function LedgerCards(props: LedgerCardsProps) {
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="whitespace-nowrap text-sm text-neutral-mid">
-                目前顯示 <span className="font-semibold text-neutral-dark">{props.totalCount}</span> 筆{' '}
-                <span className="font-mono font-semibold tabular-nums text-neutral-dark">{props.totalAmount}</span>
-              </span>
+              <div className="flex flex-col gap-0.5 text-sm text-neutral-mid">
+                <span className="whitespace-nowrap">
+                  本頁加總 <span className="font-mono font-semibold tabular-nums text-neutral-dark">{props.pageAmount}</span>
+                </span>
+                <span className="whitespace-nowrap">
+                  全部加總 <span className="font-semibold text-neutral-dark">{props.totalCount}</span> 筆{' '}
+                  <span className="font-mono font-semibold tabular-nums text-neutral-dark">{props.totalAmount}</span>
+                </span>
+              </div>
               <MobileSortControl sort={props.sort} onFieldChange={props.onSortFieldChange} onDirToggle={props.onSortDirToggle} />
             </div>
             <Button variant="warm" size="sm" icon={Download} onClick={() => setExportDialogOpen(true)}>

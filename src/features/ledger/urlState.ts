@@ -9,6 +9,7 @@ export interface LedgerFilterState {
   advanced: AdvancedFilter;
   sort: SortState;
   page: number;
+  limit: number;
   /** 帳簿總覽「銷售管道／廠商佔比」卡片的下鑽篩選；null 代表不篩。
    *  銷項送 API 的 paymentChannelUuid、進項送 counterpartyUuid（見 fetchLedgerPage 的 buildFilterBody）。 */
   channelUuid: string | null;
@@ -20,6 +21,8 @@ const DEFAULT_PURCHASE_SUB_TAB: PurchaseSubTab = 'payable';
 const DEFAULT_QUICK_FIELD: QuickSearchField = 'id';
 export const DEFAULT_SORT: SortState = { key: null, dir: 'none' };
 const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const VALID_LIMITS = new Set([10, 25, 50]);
 
 /** 佔比下鑽在網址上的參數名稱：銷項為銷售管道、進項為廠商，語意不同故不共用同一個名字；
  *  依 side 取名亦保證切換銷項/進項時舊 uuid 不會殘留在網址上 */
@@ -65,9 +68,12 @@ export function parseLedgerFilters(searchParams: ReadonlyURLSearchParams): Ledge
   const pageParam = Number.parseInt(searchParams.get('page') ?? '', 10);
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : DEFAULT_PAGE;
 
+  const limitParam = Number.parseInt(searchParams.get('limit') ?? '', 10);
+  const limit = VALID_LIMITS.has(limitParam) ? limitParam : DEFAULT_LIMIT;
+
   const channelUuid = searchParams.get(SHARE_PARAM[side]) || null;
 
-  return { side, subTab, quickField, query, advanced, sort, page, channelUuid };
+  return { side, subTab, quickField, query, advanced, sort, page, limit, channelUuid };
 }
 
 /** 將篩選狀態序列化為查詢字串；欄位值等於預設值時省略，維持網址乾淨 */
@@ -88,6 +94,7 @@ export function buildLedgerQueryString(state: LedgerFilterState): string {
     params.set('sortDir', state.sort.dir === 'desc' ? 'desc' : 'asc');
   }
   if (state.channelUuid) params.set(SHARE_PARAM[state.side], state.channelUuid);
+  if (state.limit !== DEFAULT_LIMIT) params.set('limit', String(state.limit));
   if (state.page !== DEFAULT_PAGE) params.set('page', String(state.page));
   return params.toString();
 }
