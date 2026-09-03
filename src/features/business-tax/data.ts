@@ -3,14 +3,13 @@ import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { generateDailyTrend } from '@/lib/utils';
 import type { FilingPeriod, ReportSummary, TaxInvoiceRow } from './types';
 
-// 營業稅為雙月申報，115 年度共 6 個申報期別
+// 營業稅為雙月申報；由新到舊排列，且 115 年度尚未進入 11-12 月期別，故不列入
 export const FILING_PERIODS: FilingPeriod[] = [
-  { value: '115-01', label: '115 年 1 - 2 月份' },
-  { value: '115-03', label: '115 年 3 - 4 月份' },
-  { value: '115-05', label: '115 年 5 - 6 月份' },
-  { value: '115-07', label: '115 年 7 - 8 月份' },
   { value: '115-09', label: '115 年 9 - 10 月份' },
-  { value: '115-11', label: '115 年 11 - 12 月份' },
+  { value: '115-07', label: '115 年 7 - 8 月份' },
+  { value: '115-05', label: '115 年 5 - 6 月份' },
+  { value: '115-03', label: '115 年 3 - 4 月份' },
+  { value: '115-01', label: '115 年 1 - 2 月份' },
 ];
 
 /** 期別下拉 value（`${民國年}-${期別}`）→ 查詢用的 cmsYear／cmsPhase；格式不符時退回 FILING_PERIODS 第一筆 */

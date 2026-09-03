@@ -12,7 +12,7 @@ export interface BusinessTaxFilterState {
   sort: SortState;
 }
 
-const DEFAULT_PERIOD = FILING_PERIODS[FILING_PERIODS.length - 1].value;
+const DEFAULT_PERIOD = FILING_PERIODS[0].value;
 const DEFAULT_SIDE: TaxSide = 'sales';
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
