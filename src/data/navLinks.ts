@@ -37,7 +37,7 @@ export const navLinks: NavLink[] = [
     children: [
       { name: '薪資', path: '/withholding/salary' },
       { name: '勞報單', path: '/withholding/labor' },
-      { name: '其他扣繳', path: '/withholding/other' },
+      { name: '各類扣繳', path: '/withholding/other' },
     ],
   },
   { name: '營所稅中心', path: '/income-tax' },
