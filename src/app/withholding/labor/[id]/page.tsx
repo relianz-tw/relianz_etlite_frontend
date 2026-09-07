@@ -5,6 +5,6 @@ export const metadata: Metadata = {
   title: '勞報單詳細 | Easytax Lite',
 };
 
-export default function LaborDetailPage({ params }: { params: { id: string } }) {
-  return <LaborDetailView uuid={params.id} />;
+export default function LaborDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { ic?: string } }) {
+  return <LaborDetailView uuid={params.id} incomeCode={searchParams.ic} />;
 }

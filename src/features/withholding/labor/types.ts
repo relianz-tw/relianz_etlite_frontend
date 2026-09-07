@@ -3,18 +3,24 @@ import type { MockFile } from '../components/mockFile';
 /** 工作類型代碼：50 兼職/臨時人員、9A 專業服務（執行業務）、9B 稿費 */
 export type LaborServiceType = '50' | '9A' | '9B';
 
+/** 國籍代碼：1 本國籍、2 外國籍在台滿 183 天、3 外國籍未滿 183 天（對應 POST /ael/labour 的 nationality） */
+export type LaborNationalityCode = '1' | '2' | '3';
+
 /** 二代健保申報狀態：0 取消申報、1 已受理、2 系統入檔中、3 入檔成功、4 入檔失敗 */
 export type NhiDeclareStatus = 0 | 1 | 2 | 3 | 4;
 
+/** 畫面用勞報單資料，由 LabourFormDto（見 @/api/types）轉換而成，見 data.ts 的 mapLabourDtoToRecord */
 export interface LaborRecord {
   uuid: string;
-  /** 編號，對應原版「扣繳首頁編號」欄，此處以流水號模擬 */
   withholdingId: string;
+  /** 交易編號，見 localExtras.ts 的 getLaborOrderCode／setLaborOrderCode 說明 */
+  orderCode: string;
   name: string;
   idNumber: string;
   phone: string;
   address: string;
-  nationality: string;
+  addressPostal: string;
+  nationality: LaborNationalityCode;
   isUnionInsured: boolean;
   serviceType: LaborServiceType;
   serviceName: string;
@@ -28,9 +34,17 @@ export interface LaborRecord {
   withholdingTax: number;
   secondHealthInsuranceFee: number;
   actualPaymentAmount: number;
-  /** 簽署狀態：0 未簽署、1 已簽署（由 /labor/sign 簽署頁流程設定） */
+  /** 簽署狀態：0 未簽署、1 已簽署 */
   signStatus: 0 | 1;
   signTime: string;
+  /** 國家代碼／名稱，簽署完成前多為 0／空字串 */
+  countryCode: number;
+  countryName: string;
+  /** 所得類別代碼，簽署 PATCH 時沿用此值送出 */
+  code: number;
+  createTime: string;
+
+  // 以下欄位後端尚無對應 API，暫存於前端記憶體（見 localExtras.ts），重新整理頁面會重置
   tags: string[];
   projects: string[];
   withholdingFiles: MockFile[];
@@ -41,13 +55,4 @@ export interface LaborRecord {
   nhiPaid: boolean;
   nhiDeclareStatus: NhiDeclareStatus;
   isNhiDeclared: boolean;
-}
-
-/** 記住的勞務者資料，供新增勞報單時姓名自動完成帶入 */
-export interface SavedProvider {
-  name: string;
-  idNumber: string;
-  phone: string;
-  nationality: string;
-  isUnionInsured: boolean;
 }

@@ -11,7 +11,7 @@ import MockFilePreviewModal from '../../components/MockFilePreviewModal';
 import PaymentProofDialog from '../../components/PaymentProofDialog';
 import { createMockFile, type MockFile } from '../../components/mockFile';
 import { nhiDeclareStatusText } from '../data';
-import { cycleNhiDeclareStatus, updateLaborRecord } from '../mockStore';
+import { cycleNhiDeclareStatus, updateLaborLocalExtras } from '../localExtras';
 import type { LaborRecord } from '../types';
 
 interface LaborPdfManagerProps {
@@ -19,7 +19,10 @@ interface LaborPdfManagerProps {
   onChange: () => void;
 }
 
-/** 勞報單的扣繳繳款書／二代健保繳款書管理，比照原版 WithholdingPdfManager／HealthInsurancePdfManager 精簡而成 */
+/**
+ * 勞報單的扣繳繳款書／二代健保繳款書管理，比照原版 WithholdingPdfManager／HealthInsurancePdfManager 精簡而成。
+ * 後端尚無繳款書產生／繳款狀態／二代健保申報 API，暫以前端記憶體模擬（見 localExtras.ts），重新整理頁面會重置。
+ */
 export default function LaborPdfManager({ record, onChange }: LaborPdfManagerProps) {
   const { isLocked } = useLock();
   const [taxProofOpen, setTaxProofOpen] = useState(false);
@@ -32,7 +35,7 @@ export default function LaborPdfManager({ record, onChange }: LaborPdfManagerPro
       { label: '所得人', value: record.name },
       { label: '扣繳稅額', value: fmtCurrency(record.withholdingTax) },
     ]);
-    updateLaborRecord(record.uuid, { withholdingFiles: [...record.withholdingFiles, file] });
+    updateLaborLocalExtras(record.uuid, { withholdingFiles: [...record.withholdingFiles, file] });
     onChange();
   };
 
@@ -41,21 +44,21 @@ export default function LaborPdfManager({ record, onChange }: LaborPdfManagerPro
       { label: '所得人', value: record.name },
       { label: '二代健保金額', value: fmtCurrency(record.secondHealthInsuranceFee) },
     ]);
-    updateLaborRecord(record.uuid, { nhiFiles: [...record.nhiFiles, file] });
+    updateLaborLocalExtras(record.uuid, { nhiFiles: [...record.nhiFiles, file] });
     onChange();
   };
 
   const handleDeleteFile = () => {
     if (!deleteTarget) return;
-    updateLaborRecord(record.uuid, { [deleteTarget.kind]: record[deleteTarget.kind].filter(f => f.id !== deleteTarget.file.id) });
+    updateLaborLocalExtras(record.uuid, { [deleteTarget.kind]: record[deleteTarget.kind].filter(f => f.id !== deleteTarget.file.id) });
     onChange();
   };
 
   const handleDeclare = () => {
     if (!record.isNhiDeclared) {
-      updateLaborRecord(record.uuid, { isNhiDeclared: true, nhiDeclareStatus: 1 });
+      updateLaborLocalExtras(record.uuid, { isNhiDeclared: true, nhiDeclareStatus: 1 });
     } else {
-      updateLaborRecord(record.uuid, { nhiDeclareStatus: cycleNhiDeclareStatus(record.nhiDeclareStatus) });
+      updateLaborLocalExtras(record.uuid, { nhiDeclareStatus: cycleNhiDeclareStatus(record.nhiDeclareStatus) });
     }
     onChange();
   };
@@ -143,7 +146,7 @@ export default function LaborPdfManager({ record, onChange }: LaborPdfManagerPro
         title="扣繳繳稅證明上傳"
         onConfirm={(date, fileName) => {
           const file = createMockFile(fileName, [{ label: '繳款日期', value: date.toLocaleDateString('zh-TW') }]);
-          updateLaborRecord(record.uuid, { withholdingPaid: true, withholdingProofFiles: [...record.withholdingProofFiles, file] });
+          updateLaborLocalExtras(record.uuid, { withholdingPaid: true, withholdingProofFiles: [...record.withholdingProofFiles, file] });
           onChange();
         }}
       />
@@ -153,7 +156,7 @@ export default function LaborPdfManager({ record, onChange }: LaborPdfManagerPro
         title="二代健保繳費證明上傳"
         onConfirm={(date, fileName) => {
           const file = createMockFile(fileName, [{ label: '繳款日期', value: date.toLocaleDateString('zh-TW') }]);
-          updateLaborRecord(record.uuid, { nhiPaid: true, nhiProofFiles: [...record.nhiProofFiles, file] });
+          updateLaborLocalExtras(record.uuid, { nhiPaid: true, nhiProofFiles: [...record.nhiProofFiles, file] });
           onChange();
         }}
       />

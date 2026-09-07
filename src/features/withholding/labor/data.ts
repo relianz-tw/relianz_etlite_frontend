@@ -1,4 +1,7 @@
-import type { LaborServiceType, NhiDeclareStatus } from './types';
+import type { LabourFormDto } from '@/api/types';
+import { getLaborOrderCode } from './localExtras';
+import type { LaborLocalExtras } from './localExtras';
+import type { LaborNationalityCode, LaborRecord, LaborServiceType, NhiDeclareStatus } from './types';
 
 export const SERVICE_TYPE_OPTIONS: { value: LaborServiceType; label: string; hint: string }[] = [
   { value: '50', label: '兼職 / 臨時人員 (50)', hint: '例：一般約聘員工或臨時人員，固定薪資員工無需填寫勞報單' },
@@ -6,41 +9,20 @@ export const SERVICE_TYPE_OPTIONS: { value: LaborServiceType; label: string; hin
   { value: '9B', label: '稿費 (9B)', hint: '例：演講講師稿費、版稅、樂譜、作曲、編劇、漫畫' },
 ];
 
-export const NATIONALITY_OPTIONS = ['本國籍', '外國籍 (在台滿 183 天)', '外國籍 (在台未滿 183 天)'];
+/** 國籍代碼下拉選項；code 直接對應 POST /ael/labour 的 nationality（'1'｜'2'｜'3'） */
+export const NATIONALITY_OPTIONS: { value: LaborNationalityCode; label: string }[] = [
+  { value: '1', label: '本國籍' },
+  { value: '2', label: '外國籍 (在台滿 183 天)' },
+  { value: '3', label: '外國籍 (在台未滿 183 天)' },
+];
 
-/**
- * 扣繳稅額／二代健保費簡化試算公式（無後端試算 API，比照原專案 withholdingCalculations.ts 的
- * 費率常數，並與勞務報酬單列印頁面印出的費率文字一致）：
- * - 兼職/臨時人員 (50)：5% 扣稅，金額 ≤ 20,000 免扣繳
- * - 專業服務/稿費 (9A/9B)：10% 扣稅，金額 ≤ 20,000 免扣繳
- * - 二代健保：2.11%
- */
-const WITHHOLDING_THRESHOLD = 20000;
-const NHI_RATE = 0.0211;
-
-export function calculateWithholdingTax(serviceType: LaborServiceType, amount: number): number {
-  if (amount <= WITHHOLDING_THRESHOLD) return 0;
-  const rate = serviceType === '50' ? 0.05 : 0.1;
-  return Math.floor(amount * rate);
-}
-
-export function calculateSecondHealthInsuranceFee(amount: number): number {
-  return Math.round(amount * NHI_RATE);
-}
-
-export function calculateActualPayment(amount: number, withholdingTax: number, secondHealthInsuranceFee: number): number {
-  return amount - withholdingTax - secondHealthInsuranceFee;
+export function nationalityLabel(code: string): string {
+  return NATIONALITY_OPTIONS.find(o => o.value === code)?.label ?? code;
 }
 
 /** 依 serviceType 取得下拉選單顯示用完整標籤，供列表/詳情頁還原顯示 */
-export function serviceTypeLabel(serviceType: LaborServiceType): string {
+export function serviceTypeLabel(serviceType: string): string {
   return SERVICE_TYPE_OPTIONS.find(o => o.value === serviceType)?.label ?? serviceType;
-}
-
-/** 有資料的可選年度（西元年），無後端時固定近三年（與 salary/data.ts 的同名函式各自獨立，避免子模組互相依賴） */
-export function availableYears(): number[] {
-  const currentYear = 2026; // 對齊專案假資料基準年（見 CLAUDE.md currentDate）
-  return [currentYear, currentYear - 1, currentYear - 2];
 }
 
 const NHI_DECLARE_STATUS_TEXT: Record<NhiDeclareStatus, string> = {
@@ -55,7 +37,53 @@ export function nhiDeclareStatusText(status: NhiDeclareStatus): string {
   return NHI_DECLARE_STATUS_TEXT[status];
 }
 
-/** 對外免登入簽署頁連結；basePath '/etlite' 對齊 next.config.js 設定 */
-export function signLinkFor(uuid: string): string {
-  return `${window.location.origin}/etlite/withholding/labor/sign/${uuid}`;
+/**
+ * 對外免登入簽署頁連結；ic 帶入所得類別代號（GET /ael/labour 詳情／簽署頁查詢需要），
+ * basePath '/etlite' 對齊 next.config.js 設定。
+ */
+export function signLinkFor(uuid: string, serviceType: LaborServiceType): string {
+  return `${window.location.origin}/etlite/withholding/labor/sign/${uuid}?ic=${serviceType}`;
+}
+
+/** Date → 西元 YYYYMMDD，供勞報單篩選 API 的日期區間參數使用 */
+export function toYyyymmdd(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
+
+/** API DTO → 畫面用 LaborRecord；標籤／繳款書等後端無 API 的欄位由呼叫端另外併入 extras（見 localExtras.ts） */
+export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtras): LaborRecord {
+  return {
+    uuid: dto.labourUuid,
+    withholdingId: dto.withholdingId ?? '',
+    orderCode: dto.orderCode || getLaborOrderCode(dto.labourUuid),
+    name: dto.name,
+    idNumber: dto.identifyNumber,
+    phone: dto.phone,
+    address: dto.address,
+    addressPostal: dto.addressPostal,
+    nationality: (dto.nationality as LaborNationalityCode) || '1',
+    isUnionInsured: dto.isUnionInsured,
+    serviceType: dto.serviceType as LaborServiceType,
+    serviceName: dto.serviceName,
+    serviceYear: dto.year,
+    serviceMonth: dto.month,
+    serviceDay: dto.day,
+    paymentYear: dto.paymentYear,
+    paymentMonth: dto.paymentMonth,
+    paymentDay: dto.paymentDay,
+    payableAmount: dto.payableAmount,
+    withholdingTax: dto.withholdingTax,
+    secondHealthInsuranceFee: dto.secondHealthInsuranceFee,
+    actualPaymentAmount: dto.actualPaymentAmount,
+    signStatus: dto.signStatus === 1 ? 1 : 0,
+    signTime: dto.signTime ?? '',
+    countryCode: dto.countryCode,
+    countryName: dto.countryName,
+    code: dto.code,
+    createTime: dto.createTime,
+    ...extras,
+  };
 }

@@ -1,49 +1,75 @@
 'use client';
 
+import { getLabourDetail } from '@/api/labour';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import MoneyInput from '@/components/ui/MoneyInput';
 import SectionCard from '@/components/ui/SectionCard';
 import TextInput from '@/components/ui/TextInput';
-import { fmtCurrency } from '@/lib/utils';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Backpack, BookOpen, ChevronLeft, FileText, Trash2, User } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Field from '../components/Field';
 import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
 import LaborPdfManager from './components/LaborPdfManager';
 import TagChipsField from './components/TagChipsField';
-import { serviceTypeLabel, signLinkFor } from './data';
-import { addProject, addTag, deleteLaborRecord, getLaborRecord, listAllProjects, listAllTags, updateLaborRecord } from './mockStore';
+import { mapLabourDtoToRecord, nationalityLabel, serviceTypeLabel, signLinkFor } from './data';
+import { addProject, addTag, getLaborLocalExtras, listAllProjects, listAllTags, updateLaborLocalExtras } from './localExtras';
+import type { LaborRecord } from './types';
 
 function rocDate(year: number, month: number, day: number): string {
   return `${year - 1911}/${month}/${day}`;
 }
 
-export default function LaborDetailView({ uuid }: { uuid: string }) {
-  const router = useRouter();
-  const { isLocked } = useLock();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
-  void tick;
+interface LaborDetailViewProps {
+  uuid: string;
+  incomeCode?: string;
+}
 
-  const record = getLaborRecord(uuid);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewProps) {
+  const { isLocked } = useLock();
+  const [record, setRecord] = useState<LaborRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    getLabourDetail({ labourUuid: uuid, incomeCode })
+      .then(dto => {
+        if (cancelled) return;
+        setRecord(mapLabourDtoToRecord(dto, getLaborLocalExtras(dto.labourUuid)));
+      })
+      .catch(err => {
+        if (!cancelled) setError(getFriendlyErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uuid, incomeCode, reloadKey]);
+
+  const refresh = () => setReloadKey(k => k + 1);
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">載入中…</div>;
+  }
+  if (error) {
+    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-semantic-error">{error}</div>;
+  }
   if (!record) {
     return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">找不到此勞報單資料</div>;
   }
 
-  const handleDelete = () => {
-    deleteLaborRecord(record.uuid);
-    router.push('/withholding/labor');
-  };
-
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(signLinkFor(record.uuid));
+    await navigator.clipboard.writeText(signLinkFor(record.uuid, record.serviceType));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -82,7 +108,7 @@ export default function LaborDetailView({ uuid }: { uuid: string }) {
                 <TextInput disabled value={record.idNumber || '-'} />
               </Field>
               <Field label="國籍">
-                <TextInput disabled value={record.nationality} />
+                <TextInput disabled value={nationalityLabel(record.nationality)} />
               </Field>
               <Field label="有無投保於工會">
                 <TextInput disabled value={record.isUnionInsured ? '有' : '沒有'} />
@@ -117,7 +143,7 @@ export default function LaborDetailView({ uuid }: { uuid: string }) {
                 prefix="#"
                 value={record.tags}
                 onChange={next => {
-                  updateLaborRecord(record.uuid, { tags: next });
+                  updateLaborLocalExtras(record.uuid, { tags: next });
                   refresh();
                 }}
                 options={listAllTags()}
@@ -128,28 +154,29 @@ export default function LaborDetailView({ uuid }: { uuid: string }) {
                 prefix="@"
                 value={record.projects}
                 onChange={next => {
-                  updateLaborRecord(record.uuid, { projects: next });
+                  updateLaborLocalExtras(record.uuid, { projects: next });
                   refresh();
                 }}
                 options={listAllProjects()}
                 onCreateNew={addProject}
               />
+              <p className="text-xs text-neutral-mid">標籤／專案尚未串接後端 API，暫存於瀏覽器記憶體，重新整理頁面會重置。</p>
             </div>
           </SectionCard>
 
           <SectionCard title="應付及扣繳金額" icon={Backpack}>
             <div className="flex flex-col gap-4">
               <Field label="應付金額">
-                <TextInput disabled value={fmtCurrency(record.payableAmount)} />
+                <MoneyInput disabled readOnly value={record.payableAmount} />
               </Field>
               <Field label="扣繳稅額">
-                <TextInput disabled value={fmtCurrency(record.withholdingTax)} />
+                <MoneyInput disabled readOnly value={record.withholdingTax} />
               </Field>
               <Field label="二代健保費">
-                <TextInput disabled value={fmtCurrency(record.secondHealthInsuranceFee)} />
+                <MoneyInput disabled readOnly value={record.secondHealthInsuranceFee} />
               </Field>
               <Field label="實際給付金額">
-                <TextInput disabled value={fmtCurrency(record.actualPaymentAmount)} />
+                <MoneyInput disabled readOnly value={record.actualPaymentAmount} />
               </Field>
             </div>
           </SectionCard>
@@ -157,10 +184,10 @@ export default function LaborDetailView({ uuid }: { uuid: string }) {
           <LaborPdfManager record={record} onChange={refresh} />
 
           <div className="flex items-center justify-between">
-            <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)} disabled={isLocked}>
+            <Button variant="danger" icon={Trash2} disabled title="刪除功能尚未串接後端 API">
               刪除
             </Button>
-            <Link href={`/withholding/labor/${record.uuid}/doc`} className="inline-flex">
+            <Link href={`/withholding/labor/${record.uuid}/doc?ic=${record.serviceType}`} className="inline-flex">
               <Button variant="outline" icon={FileText}>
                 檢視勞報單
               </Button>
@@ -168,14 +195,6 @@ export default function LaborDetailView({ uuid }: { uuid: string }) {
           </div>
         </div>
       </div>
-
-      <ConfirmDialog
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={handleDelete}
-        title="確認刪除此勞報單？"
-        message="此操作無法復原。"
-      />
     </div>
   );
 }

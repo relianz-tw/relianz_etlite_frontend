@@ -1,6 +1,8 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import DatePicker from '@/components/ui/DatePicker';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,6 +11,8 @@ import type { LaborRecord } from '../types';
 
 interface LaborTableProps {
   rows: LaborRecord[];
+  isLocked: boolean;
+  onPaymentDateChange: (uuid: string, date: Date) => Promise<void>;
 }
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
@@ -25,14 +29,33 @@ function rocDateTime(iso: string): string {
   return `${year}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function LaborTable({ rows }: LaborTableProps) {
+export default function LaborTable({ rows, isLocked, onPaymentDateChange }: LaborTableProps) {
   const router = useRouter();
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
+  const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
+  const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
 
-  const handleCopyLink = async (uuid: string) => {
-    await navigator.clipboard.writeText(signLinkFor(uuid));
-    setCopiedUuid(uuid);
-    setTimeout(() => setCopiedUuid(prev => (prev === uuid ? null : prev)), 2000);
+  const handleCopyLink = async (row: LaborRecord) => {
+    await navigator.clipboard.writeText(signLinkFor(row.uuid, row.serviceType));
+    setCopiedUuid(row.uuid);
+    setTimeout(() => setCopiedUuid(prev => (prev === row.uuid ? null : prev)), 2000);
+  };
+
+  const handleDateChange = async (row: LaborRecord, date: Date | undefined) => {
+    if (!date) return;
+    setUpdatingUuid(row.uuid);
+    setDateErrors(prev => {
+      const next = { ...prev };
+      delete next[row.uuid];
+      return next;
+    });
+    try {
+      await onPaymentDateChange(row.uuid, date);
+    } catch (err) {
+      setDateErrors(prev => ({ ...prev, [row.uuid]: getFriendlyErrorMessage(err) }));
+    } finally {
+      setUpdatingUuid(null);
+    }
   };
 
   return (
@@ -40,7 +63,7 @@ export default function LaborTable({ rows }: LaborTableProps) {
       <table className="w-full border-collapse">
         <thead className="bg-surface-off-white">
           <tr className="border-b border-neutral-blue-gray/40">
-            <th className={thClass}>編號</th>
+            <th className={thClass}>交易編號</th>
             <th className={thClass}>姓名</th>
             <th className={thClass}>專案名稱</th>
             <th className={`${thClass} text-right`}>總金額</th>
@@ -62,22 +85,32 @@ export default function LaborTable({ rows }: LaborTableProps) {
             rows.map((row, i) => (
               <tr
                 key={row.uuid}
-                onClick={() => router.push(`/withholding/labor/${row.uuid}`)}
+                onClick={() => router.push(`/withholding/labor/${row.uuid}?ic=${row.serviceType}`)}
                 className={`cursor-pointer border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}
               >
-                <td className={`${tdClass} font-mono`}>{row.withholdingId}</td>
+                <td className={`${tdClass} font-mono`}>{row.orderCode || '-'}</td>
                 <td className={tdClass}>{row.name}</td>
                 <td className={tdClass}>{row.serviceName}</td>
                 <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.payableAmount)}</td>
                 <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.withholdingTax)}</td>
                 <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(row.secondHealthInsuranceFee)}</td>
                 <td className={`${tdClass} font-mono`}>{rocDate(row.serviceYear, row.serviceMonth, row.serviceDay)}</td>
-                <td className={`${tdClass} font-mono`}>{rocDate(row.paymentYear, row.paymentMonth, row.paymentDay)}</td>
+                <td className={tdClass} onClick={e => e.stopPropagation()}>
+                  <div className="w-40">
+                    <DatePicker
+                      value={new Date(row.paymentYear, row.paymentMonth - 1, row.paymentDay)}
+                      onChange={date => handleDateChange(row, date)}
+                      disabled={isLocked || updatingUuid === row.uuid}
+                    />
+                  </div>
+                  {updatingUuid === row.uuid && <p className="mt-1 text-xs text-neutral-mid">更新中…</p>}
+                  {dateErrors[row.uuid] && <p className="mt-1 text-xs text-semantic-error">{dateErrors[row.uuid]}</p>}
+                </td>
                 <td className={tdClass} onClick={e => e.stopPropagation()}>
                   {row.signStatus === 1 ? (
                     <span className="font-mono text-xs text-neutral-mid">{rocDateTime(row.signTime)}</span>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => handleCopyLink(row.uuid)}>
+                    <Button size="sm" variant="outline" disabled={isLocked} onClick={() => handleCopyLink(row)}>
                       {copiedUuid === row.uuid ? '已複製連結' : '複製簽署連結'}
                     </Button>
                   )}

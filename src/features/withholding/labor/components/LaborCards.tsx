@@ -17,13 +17,14 @@ export default function LaborCards({ rows }: { rows: LaborRecord[] }) {
   return (
     <div className="flex flex-col gap-3 nav:hidden">
       {rows.map(row => (
-        <Link key={row.uuid} href={`/withholding/labor/${row.uuid}`} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-          <div className="mb-2 flex items-center justify-between">
+        <Link key={row.uuid} href={`/withholding/labor/${row.uuid}?ic=${row.serviceType}`} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <span className="font-semibold text-neutral-dark">{row.name}</span>
             <Badge tone={row.signStatus === 1 ? 'success' : 'neutral'}>{row.signStatus === 1 ? '已簽署' : '未簽署'}</Badge>
           </div>
-          <p className="mb-2 text-sm text-neutral-mid">{row.serviceName}</p>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+            <span className="text-neutral-mid">專案名稱</span>
+            <span className="truncate text-right font-medium text-neutral-dark">{row.serviceName}</span>
             <span className="text-neutral-mid">總金額</span>
             <span className="text-right font-mono tabular-nums text-neutral-dark">{fmtCurrency(row.payableAmount)}</span>
             <span className="text-neutral-mid">扣繳稅金</span>

@@ -55,6 +55,8 @@ export default function LaborImportDialog({ open, onClose, disabled }: LaborImpo
         <div className="flex flex-col gap-4">
           <p className="text-xs leading-relaxed text-neutral-mid">
             匯入檔案格式必須是 Excel (.xlsx) 檔案。同服務日期＋同給付日期＋同身分證字號＋同專案名稱只能一筆；系統匯入完畢後請記得複製簽署連結並提供給對方做簽署。
+            <br />
+            <span className="text-semantic-error">批次匯入尚未串接後端 API，以下為示意流程，不會產生實際勞報單資料。</span>
           </p>
           <label className="flex h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-neutral-blue-gray/50 bg-white text-center hover:border-brand-blue">
             <Upload size={22} className="text-neutral-mid" />

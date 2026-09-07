@@ -1717,3 +1717,263 @@ export interface VatPeriodSummaryDto {
   /** 銷項稅合計 − 進項稅合計；可為負 */
   businessTaxTotal: number;
 }
+
+/**
+ * 勞報單相關端點的 DTO／請求／回應型別（/ael/labour/*，見 Apifox EasyTax_Lite 專案「勞報單」分類）。
+ * ⚠️ 已知後端規格與畫面設計有落差之處，逐一標註於各欄位／型別註解中。
+ */
+
+/** 有資料的勞務提供年月（GET /ael/labour/date 回應項目），西元年，DESC 排序 */
+export interface LabourDateDto {
+  year: number;
+  month: number;
+}
+
+/**
+ * 勞報單主列表篩選（POST /ael/labour/data/filter）請求體。不分頁，回應依 createTime DESC 排序。
+ * ⚠️ isSign 為後端必填欄位，故無法直接對應畫面的「全部」選項；「全部」時請改用
+ * fetchLabourListAllSignStatus（見 @/api/labour），分別查已簽署／未簽署後前端合併。
+ */
+export interface LabourFilterBody {
+  companyUuid: string;
+  /** 勞務提供年（西元） */
+  year: number;
+  /** 0 或省略＝全年，1–12＝該月 */
+  month?: number;
+  /** false→signStatus=0；true→1 */
+  isSign: boolean;
+  /** 姓名 LIKE */
+  name?: string;
+  /** 服務名稱 LIKE */
+  serviceName?: string;
+  payableAmountMin?: number;
+  payableAmountMax?: number;
+  withholdingTaxMin?: number;
+  withholdingTaxMax?: number;
+  secondHealthInsuranceFeeMin?: number;
+  secondHealthInsuranceFeeMax?: number;
+  /** 勞務日期起，格式 YYYYMMDD */
+  serviceDateStart?: string;
+  /** 勞務日期迄，格式 YYYYMMDD */
+  serviceDateEnd?: string;
+  /** 給付日期起，格式 YYYYMMDD */
+  paymentDateStart?: string;
+  /** 給付日期迄，格式 YYYYMMDD */
+  paymentDateEnd?: string;
+}
+
+/**
+ * 勞報單單筆資料，列表篩選（POST /ael/labour/data/filter）與單筆詳情（GET /ael/labour）共用。
+ * nationality 為 '1'｜'2'｜'3'（本國籍／外國籍在台滿 183 天／外國籍未滿 183 天）；
+ * serviceType 為 '50'｜'9A'｜'9B'。
+ */
+export interface LabourFormDto {
+  labourUuid: string;
+  companyUuid: string;
+  name: string;
+  nationality: string;
+  isUnionInsured: boolean;
+  phone: string;
+  serviceType: string;
+  serviceName: string;
+  /** 勞務提供日－年（西元） */
+  year: number;
+  month: number;
+  day: number;
+  identifyNumber: string;
+  address: string;
+  addressPostal: string;
+  payableAmount: number;
+  withholdingTax: number;
+  secondHealthInsuranceFee: number;
+  actualPaymentAmount: number;
+  idPicFront: string;
+  idPicBack: string;
+  passportPic: string;
+  healthInsurancePic: string;
+  /** 0 未簽署、1 已簽署 */
+  signStatus: number;
+  createTime: string;
+  signTime: string;
+  signPic: string;
+  /** 給付日－年（西元） */
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  /** 對應扣繳首頁的編號欄，由後端流水號補齊 */
+  withholdingId: string;
+  /** 交易編號（無票應付立帳），⚠️ 目前 GET /ael/labour、POST /ael/labour/data/filter 尚未回這欄位，僅 POST /ael/labour 建立回應有 */
+  orderCode?: string;
+  withholdingRemitDate: string;
+  nhiRemitDate: string;
+  nhiDeclareDate: string;
+  isRemitNhi: boolean;
+  isRemitWithholding: boolean;
+  isNhiDeclare: boolean;
+  /** 國家代碼，對應 GET /ael/labour/country 的 id；簽署（PATCH）完成前多為 0 */
+  countryCode: number;
+  /** 所得類別代碼（9A 業別／9B 費用別代號），PATCH /ael/labour 時需沿用此值送出 */
+  code: number;
+  countryName: string;
+}
+
+/**
+ * 創建勞報單（POST /ael/labour）請求體。
+ * ⚠️ address／addressPostal 為後端必填，但畫面設計上這兩欄位留到簽署頁（PATCH /ael/labour）才由
+ * 勞務提供者本人填寫；建立時若尚未知悉，一律送出空字串。
+ */
+export interface CreateLabourBody {
+  companyUuid: string;
+  name: string;
+  /** 1 本國籍／2 外國籍在台滿 183 天／3 外國籍未滿 183 天 */
+  nationality: '1' | '2' | '3';
+  isUnionInsured: boolean;
+  phone: string;
+  /** 50｜9A｜9B */
+  serviceType: string;
+  serviceName: string;
+  year: number;
+  month: number;
+  day: number;
+  identifyNumber: string;
+  address: string;
+  addressPostal: string;
+  payableAmount: number;
+  withholdingTax: number;
+  secondHealthInsuranceFee: number;
+  actualPaymentAmount: number;
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  incomeTypeCode?: number;
+}
+
+/** 創建勞報單（POST /ael/labour）成功回應 data */
+export interface CreateLabourResult {
+  /** 勞報單 uuid */
+  labourUuid: string;
+  /** 無票應付立帳 ledger uuid */
+  ledgerUuid: string;
+  /** 交易編號；⚠️ 目前僅此建立回應會回傳，GET /ael/labour、POST /ael/labour/data/filter 尚未回這欄位 */
+  orderCode: string;
+}
+
+/**
+ * 更新勞報單基本資料，即簽署頁最後一步（PATCH /ael/labour）請求體。
+ * ⚠️ 無業別／費用別代號碼表 API，incomeTypeCode 沿用 GET /ael/labour 回應的 code 欄位送出。
+ */
+export interface UpdateLabourBasicInfoBody {
+  labourUuid: string;
+  identifyNumber: string;
+  address: string;
+  addressPostal: string;
+  /** 國籍代碼，對應 GET /ael/labour/country 的 id */
+  countryId: number;
+  incomeTypeCode: number;
+}
+
+export interface UpdateLabourBasicInfoResult {
+  labourUuid: string;
+  /** 固定為 1（已簽署） */
+  signStatus: number;
+}
+
+/** 試算勞報單扣繳／二代健保／實付（POST /ael/labour/calculate）請求體 */
+export interface LabourCalculateBody {
+  /** 依規格可傳 '1'｜'2'｜'3' */
+  nationality: string;
+  /** 50｜9A｜9B */
+  serviceType: string;
+  /** 是否投保於工會；true 時二代健保費（ghi）固定為 0 */
+  sghi: boolean;
+  amount: number;
+}
+
+export interface LabourCalculateResult {
+  /** 扣繳稅額 */
+  tax: number;
+  /** 二代健保費 */
+  ghi: number;
+  /** 實付＝amount − tax − ghi */
+  apa: number;
+}
+
+export interface UpdateLabourPaymentDateBody {
+  companyUuid: string;
+  labourUuid: string;
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+}
+
+export interface UpdateLabourPaymentDateResult {
+  labourUuid: string;
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  entryDate: string;
+}
+
+/**
+ * 簽署勞報單（POST /ael/labour/sign，multipart/form-data）回應。
+ * ⚠️ 規格書僅列出 labourUuid 為請求欄位，檔案表單欄位名沿用此回應 files 內的 key
+ * （sign_pic／id_pic_front／id_pic_back／passport_pic／health_insurance_pic），實際欄位名待後端確認。
+ */
+export interface LabourSignResult {
+  labourUuid: string;
+  /** 僅含本次有上傳的欄位 */
+  files: Partial<Record<'sign_pic' | 'id_pic_front' | 'id_pic_back' | 'passport_pic' | 'health_insurance_pic', string>>;
+}
+
+/** 國籍碼表（GET /ael/labour/country）項目 */
+export interface LabourCountryDto {
+  id: number;
+  abbreviation: string;
+  nameEn: string;
+  nameZh: string;
+}
+
+/** 勞務提供者資料（GET /ael/labour/provider、GET /ael/labour/provider/name、POST /ael/labour/provider 共用結構） */
+export interface LabourProviderDto {
+  providerUuid: string;
+  companyUuid: string;
+  name: string;
+  phone: string;
+  identifyNumber: string;
+  residencePermitNumber: string;
+  passportNumber: string;
+  address: string;
+  idPicFront: string;
+  idPicBack: string;
+  residencePermitPicFront: string;
+  residencePermitPicBack: string;
+  passportPic: string;
+  createTime: string;
+  updateTime: string;
+  nationality: string;
+  countryCode: number;
+  /** 50｜9A｜9B */
+  incomeCode: string;
+  code: number;
+}
+
+/** Upsert 勞務提供者（POST /ael/labour/provider）請求體；providerUuid 留空＝新增 */
+export interface SaveLabourProviderBody {
+  providerUuid?: string;
+  companyUuid: string;
+  name: string;
+  phone?: string;
+  identifyNumber?: string;
+  residencePermitNumber?: string;
+  passportNumber?: string;
+  address?: string;
+  idPicFront?: string;
+  idPicBack?: string;
+  residencePermitPicFront?: string;
+  residencePermitPicBack?: string;
+  passportPic?: string;
+  nationality?: string;
+  countryCode?: number;
+  incomeCode?: string;
+  code?: number;
+}

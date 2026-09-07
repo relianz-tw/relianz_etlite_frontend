@@ -5,10 +5,12 @@ import { useState } from 'react';
 
 interface SignImageUploadProps {
   title: string;
+  /** 選檔／刪除時回傳實際 File 供 signLabour 上傳；旋轉僅為預覽用途，不會套用到實際上傳的檔案 */
+  onFileChange: (file: File | null) => void;
 }
 
-/** 簽署頁的證件照片上傳卡：僅本機預覽（URL.createObjectURL），不做真實上傳，重新整理即消失 */
-export default function SignImageUpload({ title }: SignImageUploadProps) {
+/** 簽署頁的證件照片上傳卡：本機預覽（URL.createObjectURL），實際檔案由呼叫端收集後透過 POST /ael/labour/sign 上傳 */
+export default function SignImageUpload({ title, onFileChange }: SignImageUploadProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
 
@@ -17,6 +19,12 @@ export default function SignImageUpload({ title }: SignImageUploadProps) {
     if (!file) return;
     setPreview(URL.createObjectURL(file));
     setRotation(0);
+    onFileChange(file);
+  };
+
+  const handleRemove = () => {
+    setPreview(null);
+    onFileChange(null);
   };
 
   return (
@@ -24,7 +32,7 @@ export default function SignImageUpload({ title }: SignImageUploadProps) {
       <p className="mb-2 text-sm font-semibold text-neutral-dark">{title}</p>
       {preview ? (
         <div className="flex flex-col gap-2">
-          <div className="flex h-40 items-center justify-center overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-surface-cream">
+          <div className="flex h-56 items-center justify-center overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-surface-cream">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt={title} style={{ transform: `rotate(${rotation}deg)` }} className="max-h-full max-w-full object-contain" />
           </div>
@@ -39,7 +47,7 @@ export default function SignImageUpload({ title }: SignImageUploadProps) {
             </button>
             <button
               type="button"
-              onClick={() => setPreview(null)}
+              onClick={handleRemove}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-blue-gray/50 py-1.5 text-xs text-semantic-error hover:bg-semantic-error/5"
             >
               <Trash2 size={13} />
@@ -48,7 +56,7 @@ export default function SignImageUpload({ title }: SignImageUploadProps) {
           </div>
         </div>
       ) : (
-        <label className="flex h-40 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-neutral-blue-gray/50 hover:border-brand-blue">
+        <label className="flex h-56 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-neutral-blue-gray/50 hover:border-brand-blue">
           <ImagePlus size={22} className="text-neutral-mid" />
           <span className="text-xs text-neutral-mid">瀏覽照片</span>
           <input type="file" accept=".jpg,.jpeg,.png" className="hidden" onChange={handleFileChange} />
