@@ -613,7 +613,7 @@ export default function TransactionMetaCard({
                   maxLength={8}
                   value={form.invoiceSerial}
                   aiFilled={aiFields.has('invoiceSerial')}
-                  onChange={e => onChange({ invoiceSerial: e.target.value })}
+                  onChange={e => onChange({ invoiceSerial: e.target.value.replace(/[^0-9]/g, '') })}
                 />
               </div>
             ) : (
