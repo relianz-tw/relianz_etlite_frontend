@@ -31,6 +31,11 @@ export function toInvoicePeriodOption(period: { year: number; phase: number }): 
   };
 }
 
+/** 期別選項依 rocYear、phase 由新到舊排序，供下拉選單「最新在最上方」使用 */
+export function sortInvoicePeriodOptions(options: InvoicePeriodOption[]): InvoicePeriodOption[] {
+  return [...options].sort((a, b) => b.rocYear - a.rocYear || b.phase - a.phase);
+}
+
 /** 下拉選單 value（`${民國年}-${期別}`）→ 查詢用的 rocYear／phase；格式不符時回傳 null */
 export function parseInvoicePeriodValue(value: string): { rocYear: number; phase: number } | null {
   const match = /^(\d+)-(\d+)$/.exec(value);
