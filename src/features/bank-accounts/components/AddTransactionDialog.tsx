@@ -22,10 +22,10 @@ interface AddTransactionDialogProps {
 
 type Direction = '0' | '1';
 
-// 順序與標籤比照交易列表「支出金額／存入金額」欄位慣例；cashDirection 0=存入／1=支出
+// cashDirection 0=收（存入）／1=支（提出）
 const DIRECTION_OPTIONS: { value: Direction; label: string }[] = [
-  { value: '1', label: '支出' },
-  { value: '0', label: '存入' },
+  { value: '1', label: '支' },
+  { value: '0', label: '收' },
 ];
 
 interface FormState {
@@ -120,7 +120,7 @@ export default function AddTransactionDialog({ open, onClose, onSubmit }: AddTra
         </div>
 
         <div>
-          <Label required>收支方向與金額</Label>
+          <Label required>收支</Label>
           <div className="flex items-center gap-3">
             <div className="w-32 shrink-0">
               {/* 切換收支方向會改變會計科目「建議」清單的 buyOrSell 篩選，先前選定的科目可能不再適用，故一併清空 */}

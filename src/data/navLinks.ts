@@ -40,7 +40,13 @@ export const navLinks: NavLink[] = [
       { name: '各類扣繳', path: '/withholding/other' },
     ],
   },
-  { name: '營所稅中心', path: '/income-tax' },
+  {
+    name: '營所稅中心',
+    path: '/income-tax',
+    children: [
+      { name: '固定資產', path: '/income-tax/fixed-assets' },
+    ],
+  },
   { name: '檔案紀錄', path: '/files' },
   { name: '報表中心', path: '/reports' },
   { name: '設定', path: '/settings' },

@@ -13,11 +13,13 @@ interface ReconSettleResultModalProps {
   result: ReconSettleResult | null;
   /** ledgerUuid → 買受人／賣方與憑證號碼，供明細表補上沖帳 API 回應本身沒有的欄位 */
   allocationInfoByUuid: Map<string, ReconAllocationInfo>;
+  /** 主沖帳已成功、但電商平台扣款憑證沖銷失敗時的提示（見 ReconciliationView 的 settlePlatformFeeVouchers） */
+  warning?: string;
   onClose: () => void;
 }
 
 /** 沖帳執行結果：呼叫 settle/summary 成功後，顯示本次實際入帳的摘要（含沖前/沖後餘額）與各原單明細 */
-export default function ReconSettleResultModal({ open, side, groupLabel, result, allocationInfoByUuid, onClose }: ReconSettleResultModalProps) {
+export default function ReconSettleResultModal({ open, side, groupLabel, result, allocationInfoByUuid, warning, onClose }: ReconSettleResultModalProps) {
   if (!open || !result) return null;
 
   // wrap 'nowrap'：金額／筆數／日期等短值不換行；'break'：結算單號可能很長，逐字斷行避免只在連字號處攔腰折斷
@@ -38,6 +40,7 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
 
   return (
     <Modal open onClose={onClose} title="沖帳結果" widthClassName="max-w-[840px]">
+      {warning && <p className="mb-3 rounded-md bg-semantic-error/10 px-3 py-2 text-sm text-semantic-error">{warning}</p>}
       <div className="grid grid-cols-1 gap-y-2 text-sm min-[1300px]:grid-cols-3 min-[1300px]:gap-x-6">
         {summaryRows.map(row => (
           <div key={row.label} className="flex items-center justify-between gap-2">

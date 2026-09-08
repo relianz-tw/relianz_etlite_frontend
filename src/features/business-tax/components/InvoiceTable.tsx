@@ -59,7 +59,7 @@ export default function InvoiceTable({
 }) {
   const counterpartyLabel = side === 'sales' ? '買受人' : '賣方';
   // 進項僅顯示可否扣抵；作廢狀態僅在銷項呈現（進項作廢不特別標示，避免刪除線卻無說明文字）
-  const statusLabel = side === 'sales' ? '作廢狀態' : '可否扣抵';
+  const statusLabel = side === 'sales' ? '折讓/作廢' : '可否扣抵';
 
   return (
     <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
@@ -103,15 +103,12 @@ export default function InvoiceTable({
               >
                 <td className={`${cell} font-mono`}>{row.date}</td>
                 <td className={`${cell} font-mono text-[13px] font-semibold`}>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Link
-                      href={withReturnParam(`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`, searchParams)}
-                      className={`hover:text-brand-blue hover:underline ${amountStrike}`}
-                    >
-                      {row.id}
-                    </Link>
-                    {row.isAllowance && <Badge tone="info">折讓</Badge>}
-                  </div>
+                  <Link
+                    href={withReturnParam(`/business-tax/${row.ledgerUuid}?side=${side}${row.isVoid ? '&void=1' : ''}`, searchParams)}
+                    className={`hover:text-brand-blue hover:underline ${amountStrike}`}
+                  >
+                    {row.id}
+                  </Link>
                 </td>
                 <td className={`${cell} text-right font-mono tabular-nums ${amountStrike}`}>{fmtCurrency(row.untaxed)}</td>
                 <td className={`${cell} text-right font-mono tabular-nums ${amountStrike}`}>{fmtCurrency(row.tax)}</td>
@@ -120,9 +117,15 @@ export default function InvoiceTable({
                 <td className={cell}>
                   <Badge tone={row.declared ? 'success' : 'neutral'}>{row.declared ? '已申報' : '未申報'}</Badge>
                 </td>
-                <td className={cell}>
+                <td className={`${cell} text-center`}>
                   {side === 'sales' ? (
-                    <Badge tone={row.isVoid ? 'error' : 'neutral'}>{row.isVoid ? '已作廢' : '正常'}</Badge>
+                    row.isVoid || row.isAllowance ? (
+                      <Badge tone={row.isVoid ? 'error' : 'info'}>
+                        {row.isVoid ? '已作廢' : '折讓'}
+                      </Badge>
+                    ) : (
+                      <span className="text-neutral-mid">—</span>
+                    )
                   ) : (
                     <Badge tone={row.deductible ? 'success' : 'neutral'}>{row.deductible ? '可扣抵' : '不可扣抵'}</Badge>
                   )}

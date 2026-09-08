@@ -61,7 +61,7 @@ export default function InvoiceDeclareStatusCard({
           label: '是否作廢',
           value: (
             <Badge tone={isVoid ? 'error' : 'success'} variant="muted">
-              {isVoid ? '已作廢' : '無'}
+              {isVoid ? '已作廢' : '否'}
             </Badge>
           ),
         },

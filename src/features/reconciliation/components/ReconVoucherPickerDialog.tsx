@@ -8,6 +8,8 @@ import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { cn, fmtCurrency } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { payableGroupsToCandidates, type ReconCandidate } from '../data';
 import type { ReconTxnRef } from '../types';
@@ -40,10 +42,12 @@ function toTxnRef(c: ReconCandidate): ReconTxnRef {
 /**
  * 電商平台扣款的憑證選擇彈窗：從未結清應付交易（GET /ael/ledger/reconciliation/payables?settled=false，
  * 與沖帳中心同一支 API，一次全撈不分頁）挑選單張或多張，供使用者佐證處理費金額。
- * 目前沖帳 API（otherDeductions）無法帶入關聯的應付單 uuid，故本次選擇結果僅供前端強制驗證「金額須等值」，
- * 尚未送給後端；待後端補上對應欄位後再串接（見 ReconciliationView 的 platformFeeVouchers）。
+ * 選擇結果除了前端強制驗證「金額須等值」外，主沖帳送出成功後會逐張呼叫手動沖帳應付 API 全額沖銷
+ * （見 ReconciliationView 的 platformFeeVouchers、settle.ts 的 submitPlatformFeeVoucherSettles）。
+ * 左下角「新增進項交易」供使用者尚無對應應付憑證時直接跳去新增（/ledger/new?side=purchase）。
  */
 export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, selected, onConfirm }: ReconVoucherPickerDialogProps) {
+  const router = useRouter();
   const [candidates, setCandidates] = useState<ReconCandidate[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -131,7 +135,7 @@ export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, 
             widthClassName="w-full flex-1"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="搜尋廠商、交易編號或憑證號碼"
+            placeholder="搜尋廠商、憑證號碼或交易編號"
           />
           <Select widthClassName="w-full min-[1300px]:w-44" value={vendorKey} onValueChange={setVendorKey}>
             <option value={ALL_VENDOR_KEY}>全部廠商</option>
@@ -164,9 +168,9 @@ export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, 
                   <Checkbox checked={checked} onChange={() => toggleRow(row.uuid)} aria-label={`選擇 ${row.orderCode}`} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-neutral-dark">
-                      {row.date} · {row.orderCode} · {row.counterparty}
+                      {row.date} · {row.voucherNumber || '無憑證號碼'} · {row.counterparty}
                     </p>
-                    <p className="truncate text-xs text-neutral-mid">{row.voucherNumber || '無憑證號碼'}</p>
+                    <p className="truncate text-xs text-neutral-mid">{row.orderCode}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="font-mono font-medium tabular-nums text-neutral-dark">{fmtCurrency(row.amount)}</p>
@@ -187,13 +191,18 @@ export default function ReconVoucherPickerDialog({ open, onClose, targetAmount, 
         </div>
       </div>
 
-      <div className="mt-4 flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose}>
-          取消
+      <div className="mt-4 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:items-center min-[1300px]:justify-between">
+        <Button variant="outline" icon={Plus} onClick={() => router.push('/ledger/new?side=purchase')}>
+          新增進項交易
         </Button>
-        <Button variant="primary" onClick={handleConfirm} disabled={diff !== 0}>
-          確認
-        </Button>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button variant="primary" onClick={handleConfirm} disabled={diff !== 0}>
+            確認
+          </Button>
+        </div>
       </div>
     </Modal>
   );

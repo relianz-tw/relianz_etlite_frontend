@@ -7,8 +7,8 @@ import type { Side } from '../types';
 import { resolveLedgerBackHref } from '../urlState';
 
 const SIDE_CONFIG: Record<Side, { title: string; label: string }> = {
-  sales: { title: '已開立發票金額趨勢', label: '已開立發票金額' },
-  purchase: { title: '已收取憑證金額趨勢', label: '已收取憑證金額' },
+  sales: { title: '代收金額趨勢', label: '代收金額' },
+  purchase: { title: '代付金額趨勢', label: '代付金額' },
 };
 
 export default function TrendDetailPageView({ side, returnQuery }: { side: Side; returnQuery?: string }) {

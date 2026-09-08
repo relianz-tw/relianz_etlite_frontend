@@ -17,7 +17,9 @@ const SPAN_CLASS: Record<3 | 6, string> = {
 
 export default function SummaryCardShell({ label, action, span, children }: SummaryCardShellProps) {
   return (
-    <div className={`flex min-w-0 flex-col rounded-lg border border-neutral-blue-gray/30 bg-white p-5 ${SPAN_CLASS[span]}`}>
+    <div
+      className={`flex w-full min-w-0 shrink-0 snap-center flex-col rounded-lg border border-neutral-blue-gray/30 bg-white p-5 ${SPAN_CLASS[span]}`}
+    >
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <span className="text-[13px] font-semibold text-neutral-mid">{label}</span>
         {action}

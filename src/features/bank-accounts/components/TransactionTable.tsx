@@ -146,7 +146,7 @@ export default function TransactionTable({ rows, totalCount, expandedId, onToggl
         <thead className="bg-surface-off-white">
           <tr className="border-b border-neutral-blue-gray/40">
             <th className={thClass}>交易日期</th>
-            <th className={thClass}>方向</th>
+            <th className={thClass}>收支</th>
             <th className={thClass}>交易對象</th>
             <th className={`${thClass} text-right`}>支出金額</th>
             <th className={`${thClass} text-right`}>存入金額</th>

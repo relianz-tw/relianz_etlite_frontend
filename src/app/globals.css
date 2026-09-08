@@ -124,6 +124,15 @@ body {
   -moz-appearance: textfield;
 }
 
+/* 隱藏原生捲軸但保留可捲動性（行動版圖表卡片輪播等橫向 snap 捲動區域，DESIGN.md §11.13） */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* 全站移除瀏覽器原生點擊反白／外框：許多自訂互動元件（如核取圓圈、清單列的可點擊 <button>，
    含 Recharts 圖表點擊後的作用中圖形）未各自處理 focus 樣式，點擊後會冒出與元件外觀（圓形、
    無邊框列等）不搭的矩形藍框；圖表的鍵盤可及入口另由圖例/排名列表的 <button> 提供

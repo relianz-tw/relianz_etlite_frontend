@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { fmtCurrency } from '@/lib/utils';
 import ReconAllocationTable from './ReconAllocationTable';
-import type { ReconAllocationInfo, ReconSettleResult, ReconSide } from '../types';
+import type { ReconAllocationInfo, ReconSettleResult, ReconSide, ReconTxnRef } from '../types';
 
 interface ReconConfirmSummaryModalProps {
   open: boolean;
@@ -19,6 +19,8 @@ interface ReconConfirmSummaryModalProps {
   isSingleSelection: boolean;
   /** ledgerUuid → 買受人／賣方與憑證號碼，供明細表補上沖帳 API 回應本身沒有的欄位 */
   allocationInfoByUuid: Map<string, ReconAllocationInfo>;
+  /** 電商平台扣款已選的佐證憑證（僅應收側非 0 時有值），確認送出後會一併沖銷這些憑證 */
+  platformFeeVouchers?: ReconTxnRef[];
   submitting?: boolean;
   submitError?: string;
   onCancel: () => void;
@@ -38,12 +40,15 @@ export default function ReconConfirmSummaryModal({
   diffAmount,
   isSingleSelection,
   allocationInfoByUuid,
+  platformFeeVouchers = [],
   submitting,
   submitError,
   onCancel,
   onConfirm,
 }: ReconConfirmSummaryModalProps) {
   if (!open) return null;
+
+  const platformFeeVoucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
 
   // 管道／廠商名稱長度不定，允許斷行；其餘皆為固定格式的筆數與金額，維持不換行
   const rows: { label: string; value: string; wrap: 'nowrap' | 'break'; tone?: 'error' }[] = [
@@ -77,6 +82,32 @@ export default function ReconConfirmSummaryModal({
       <div className="mt-4">
         <ReconAllocationTable allocations={result.allocations} side={side} allocationInfoByUuid={allocationInfoByUuid} />
       </div>
+
+      {platformFeeVouchers.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-semibold text-neutral-dark">電商平台扣款憑證</p>
+          <div className="flex flex-col gap-2 rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3">
+            {platformFeeVouchers.map(v => (
+              <div key={v.uuid} className="flex items-center justify-between gap-4 text-sm">
+                <span className="min-w-0 truncate text-neutral-dark">
+                  {v.date} · {v.voucherNumber || '無憑證號碼'} · {v.counterparty}
+                </span>
+                <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">
+                  <span className="text-neutral-mid">$</span>
+                  {v.amount.toLocaleString('en-US')}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-4 border-t border-neutral-blue-gray/30 pt-2 text-sm font-semibold">
+              <span className="text-neutral-mid">合計</span>
+              <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">
+                <span className="text-neutral-mid">$</span>
+                {platformFeeVoucherTotal.toLocaleString('en-US')}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
       <div className="mt-6 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:justify-end">

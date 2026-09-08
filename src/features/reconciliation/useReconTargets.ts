@@ -87,7 +87,8 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
       return;
     }
     let cancelled = false;
-    listSubjectBalances(officialSubjects.map(s => s.id))
+    // 同一父科目可能因多個子科目攤平成多筆 ReconTarget（見 buildTargets），id 去重避免重複查詢同一科目餘額
+    listSubjectBalances(Array.from(new Set(officialSubjects.map(s => s.id))))
       .then(list => {
         if (!cancelled) setSubjectBalances(list);
       })

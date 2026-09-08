@@ -36,7 +36,7 @@ interface TrendCardProps {
   detailHref: string;
 }
 
-const LABEL: Record<Side, string> = { sales: '已開立發票金額', purchase: '已收取憑證金額' };
+const LABEL: Record<Side, string> = { sales: '代收金額', purchase: '代付金額' };
 
 export default function TrendCard({ side, range, selectedRange, dailyAmounts, primaryAmount, loading, onRangeSelect, detailHref }: TrendCardProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);

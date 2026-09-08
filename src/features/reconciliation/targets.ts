@@ -20,6 +20,8 @@ export interface ReconTarget {
   balance?: number;
   bankAccountUuid?: string;
   officialAccountingSubjectId?: number;
+  /** 公司自訂子科目 uuid；選到子科目時才有值，送出 API 時對應 SettleChannel.companyAccountingSubjectUuid（選填） */
+  companyAccountingSubjectUuid?: string;
   subjectCode?: string;
   /** 同一次沖帳最多只能被選一次（固定科目為 true，銀行帳戶可重複選則為 false，目前恆不重複故一律 true 亦可，
    * 保留欄位供未來若允許同帳戶拆多筆時放寬） */
@@ -51,15 +53,37 @@ export function buildTargets(accounts: BankAccountDto[], officialSubjects: Offic
     singleUse: true,
   }));
 
-  const subjectTargets: ReconTarget[] = officialSubjects.map(s => ({
-    key: `subject:${s.subjectCode}`,
-    kind: 'subject',
-    name: s.name,
-    subLabel: s.subjectCode,
-    officialAccountingSubjectId: s.id,
-    subjectCode: s.subjectCode,
-    singleUse: true,
-  }));
+  // 有子科目（children）的官方科目改列出子科目本身，不再列父科目一筆——子科目才是使用者實際要選的記帳對象
+  // （如「銀行存款」底下的「銀行存款-國泰世華」）。子科目若掛有 bankAccountUuid，代表與上方銀行帳戶分組
+  // 是同一個帳戶（見 SubjectChildDto.bankAccountUuid 註解），此處略過避免重複；若該父科目底下的子科目
+  // 因此被略光，則整個父科目都不出現在清單中。
+  const subjectTargets: ReconTarget[] = officialSubjects.flatMap(s => {
+    if (!s.children || s.children.length === 0) {
+      return [
+        {
+          key: `subject:${s.subjectCode}`,
+          kind: 'subject' as const,
+          name: s.name,
+          subLabel: s.subjectCode,
+          officialAccountingSubjectId: s.id,
+          subjectCode: s.subjectCode,
+          singleUse: true,
+        },
+      ];
+    }
+    return s.children
+      .filter(c => !c.bankAccountUuid)
+      .map(c => ({
+        key: `subject:${c.subjectCode}`,
+        kind: 'subject' as const,
+        name: c.name,
+        subLabel: c.subjectCode,
+        officialAccountingSubjectId: s.id,
+        companyAccountingSubjectUuid: c.uuid,
+        subjectCode: c.subjectCode,
+        singleUse: true,
+      }));
+  });
 
   return [...bankTargets, ...subjectTargets];
 }
@@ -128,7 +152,12 @@ export function buildSettleChannels(options: ReconTarget[], primaryTargetKey: st
     if (!target || amount <= 0) return null;
     return target.kind === 'bankAccount'
       ? { isBankAccount: true, bankAccountUuid: target.bankAccountUuid, amount }
-      : { isBankAccount: false, officialAccountingSubjectId: target.officialAccountingSubjectId, amount };
+      : {
+          isBankAccount: false,
+          officialAccountingSubjectId: target.officialAccountingSubjectId,
+          companyAccountingSubjectUuid: target.companyAccountingSubjectUuid,
+          amount,
+        };
   };
 
   const { primaryAmount } = computeAllocation(depositAmount, rows);

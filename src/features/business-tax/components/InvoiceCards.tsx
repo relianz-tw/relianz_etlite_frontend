@@ -60,7 +60,11 @@ function InvoiceCard({ side, row, onClick }: { side: TaxSide; row: TaxInvoiceRow
       <div className="flex justify-end gap-1.5">
         <Badge tone={row.declared ? 'success' : 'neutral'}>{row.declared ? '已申報' : '未申報'}</Badge>
         {side === 'sales' ? (
-          <Badge tone={row.isVoid ? 'error' : 'neutral'}>{row.isVoid ? '已作廢' : '正常'}</Badge>
+          (row.isVoid || row.isAllowance) ? (
+            <Badge tone={row.isVoid ? 'error' : 'info'}>
+              {row.isVoid ? '已作廢' : '折讓'}
+            </Badge>
+          ) : null
         ) : (
           <Badge tone={row.deductible ? 'success' : 'neutral'}>{row.deductible ? '可扣抵' : '不可扣抵'}</Badge>
         )}

@@ -10,7 +10,6 @@ import InvoiceBookTab from './components/InvoiceBookTab';
 import OperatingStatusTab from './components/OperatingStatusTab';
 import PaymentSettingsTab from './components/PaymentSettingsTab';
 import PlanDetailTab from './components/PlanDetailTab';
-import ReconciliationMethodSection from './components/ReconciliationMethodSection';
 import TagsProjectsTab from './components/TagsProjectsTab';
 import type { SettingsTab } from './types';
 
@@ -27,12 +26,7 @@ const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
 function renderActiveTab(tab: SettingsTab): ReactNode {
   switch (tab) {
     case 'basic':
-      return (
-        <div className="flex flex-col gap-5">
-          <BasicInfoTab />
-          <ReconciliationMethodSection />
-        </div>
-      );
+      return <BasicInfoTab />;
     case 'tagsProjects':
       return <TagsProjectsTab />;
     case 'invoiceBook':

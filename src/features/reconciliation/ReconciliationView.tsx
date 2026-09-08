@@ -39,7 +39,7 @@ import {
   resolveCatchAllKey,
 } from './data';
 import type { ReconGroup, ReconGroupOption } from './data';
-import { previewSettle, submitSettle, submitSingleSettle } from './settle';
+import { previewSettle, submitPlatformFeeVoucherSettles, submitSettle, submitSingleSettle } from './settle';
 import { buildSettleChannels, validateAllocationRows } from './targets';
 import type { ReconAllocationInfo, ReconMode, ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 import { useReconTargets } from './useReconTargets';
@@ -129,7 +129,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const [otherDeductions, setOtherDeductions] = useState<ReconOtherDeductionRow[]>([]);
   const otherDeductionIdRef = useRef(0);
   // 電商平台扣款（僅應收）：金額非 0 時強制須選滿等值的應付憑證作為佐證，見 validateAmountInputs；
-  // 選中的憑證目前無法送給沖帳 API（otherDeductions 沒有可帶關聯應付單的欄位），僅供前端驗證用
+  // 主沖帳送出成功後會逐張沖銷這些憑證（見 settlePlatformFeeVouchers、settle.ts 的 submitPlatformFeeVoucherSettles）
   const [platformFeeAmount, setPlatformFeeAmount] = useState(0);
   const [platformFeeVouchers, setPlatformFeeVouchers] = useState<ReconTxnRef[]>([]);
   const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
@@ -151,6 +151,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 沖帳執行結果（正規化後統一形狀）：成功後開結果 modal 顯示摘要與各原單明細，逐筆／匯總沖帳共用
   const [settleResult, setSettleResult] = useState<ReconSettleResult | null>(null);
   const [settleResultOpen, setSettleResultOpen] = useState(false);
+  // 主沖帳已成功，但電商平台扣款憑證沖銷失敗時的提示訊息（見 settlePlatformFeeVouchers）；
+  // 顯示於結果彈窗——此時無法回滾主沖帳，只能提醒使用者另行處理，不當一般送出錯誤擋下整個流程
+  const [settleResultWarning, setSettleResultWarning] = useState('');
 
   const [receivableData, setReceivableData] = useState<SideData | null>(null);
   const [payableData, setPayableData] = useState<SideData | null>(null);
@@ -416,6 +419,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   const handlePlatformFeeAmountChange = (value: number) => {
     setPlatformFeeAmount(value);
+    // 金額歸零代表使用者不再需要佐證憑證，已選的憑證一併清空，避免殘留與 0 元金額不一致的選取狀態
+    if (value === 0) setPlatformFeeVouchers([]);
     clearComputedState();
   };
 
@@ -534,8 +539,9 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     }
   };
 
-  // 執行沖帳成功後的共用收尾：清空快取候選清單觸發重新拉取（含最新餘額），並開啟結果彈窗（逐筆／匯總沖帳共用）
-  const finalizeSettle = (result: ReconSettleResult) => {
+  // 執行沖帳成功後的共用收尾：清空快取候選清單觸發重新拉取（含最新餘額），並開啟結果彈窗（逐筆／匯總沖帳共用）。
+  // warning：電商平台扣款憑證沖銷失敗時的提示訊息（見 settlePlatformFeeVouchers），主沖帳本身已成功不受影響
+  const finalizeSettle = (result: ReconSettleResult, warning?: string) => {
     if (side === 'receivable') setReceivableData(null);
     else setPayableData(null);
     setStatementAmount(0);
@@ -548,7 +554,20 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     setConfirmSummaryOpen(false);
     setSelectedUuids(new Set());
     setSettleResult(result);
+    setSettleResultWarning(warning ?? '');
     setSettleResultOpen(true);
+  };
+
+  // 電商平台扣款已選憑證的沖銷：僅應收側且有選憑證時才呼叫，逐張全額沖銷（見 settle.ts）。
+  // 主沖帳已成功後才呼叫，失敗時不 throw（不擋下 finalizeSettle），改回傳提示訊息交由結果彈窗顯示。
+  const settlePlatformFeeVouchers = async (): Promise<string | undefined> => {
+    if (side !== 'receivable' || platformFeeVouchers.length === 0) return undefined;
+    try {
+      await submitPlatformFeeVoucherSettles(platformFeeVouchers, toYyyymmdd(paymentDate));
+      return undefined;
+    } catch (err) {
+      return `本次沖帳已完成，但電商平台扣款憑證沖銷失敗：${getFriendlyErrorMessage(err)}，請至沖帳紀錄確認`;
+    }
   };
 
   // 送給沖帳 API 的收付款管道：主對象自動補足金額 + 分出列，見 targets.ts 的 buildSettleChannels
@@ -591,7 +610,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         otherDeductions,
         platformFeeAmount,
       });
-      finalizeSettle(result);
+      const warning = await settlePlatformFeeVouchers();
+      finalizeSettle(result, warning);
     } catch (err) {
       setSubmitError(getFriendlyErrorMessage(err));
     } finally {
@@ -616,7 +636,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         otherDeductions,
         platformFeeAmount,
       });
-      finalizeSettle(result);
+      const warning = await settlePlatformFeeVouchers();
+      finalizeSettle(result, warning);
     } catch (err) {
       setSubmitError(getFriendlyErrorMessage(err));
     } finally {
@@ -878,6 +899,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           diffAmount={diffAmount}
           isSingleSelection={isSingleSelection}
           allocationInfoByUuid={allocationInfoByUuid}
+          platformFeeVouchers={platformFeeVouchers}
           submitting={submitLoading}
           submitError={submitError}
           onCancel={() => {
@@ -894,6 +916,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         groupLabel={selectedGroupLabel}
         result={settleResult}
         allocationInfoByUuid={allocationInfoByUuid}
+        warning={settleResultWarning}
         onClose={() => setSettleResultOpen(false)}
       />
 

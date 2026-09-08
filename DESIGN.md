@@ -412,6 +412,9 @@ Font: Noto Sans TC 12px, font-weight 600
 - 進行中狀態／復業／單據類型標示（如折讓） → info
 - 待處理／未完成／未申報 → neutral
 
+應收／應付狀態標示：沿用 Badge 元件、`variant="muted"`——應收 `tone="info"`、應付 `tone="neutral"`。
+對應元件：`src/features/reconciliation/components/ReconHistoryCard.tsx`（沖帳紀錄列的交易狀態欄）。
+
 ### Sortable Table Header
 
 用於可點擊排序的表格欄位標題（如帳簿、營業稅中心的列表表頭）。
@@ -454,6 +457,7 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 ```
 欄位骨架（由左至右，寬度依實際欄位數調整，非固定死值）：
   時間 / 主鍵欄（如 HH:mm），font-mono，text-xs 或 text-neutral-mid（附屬資訊，不搶眼）
+  狀態欄（選用，如應收／應付）：置於時間欄之後，寬度固定 w-16，套用 Status Badge 應收／應付標示
   主識別欄：單一數值型清單（如 ReconTxnList 每列僅一組金額）可用雙行呈現主名稱＋次要資訊；
     若同一列另有更重要的主軸資訊（如沖帳紀錄以「日期＋金額」為主軸），主識別欄改回單行、
     降為 text-sm text-neutral-dark，把視覺重量讓給真正的主要欄位
@@ -931,3 +935,11 @@ White:                #FFFFFF
 ### 11.12 動畫
 所有圖表預設 `isAnimationActive={false}`。多數圖表會隨篩選條件頻繁重新取資料，
 每次都重播進場動畫會顯得雜亂且不符合專案克制的視覺調性；如確有需要，先更新本節再實作。
+
+### 11.13 行動版圖表卡片輪播
+多張摘要圖表卡（如帳簿總覽的趨勢圖／入帳狀況／管道佔比）在行動版（< `nav` 斷點）改為
+單卡滿版、橫向 `snap-x snap-mandatory` 捲動，一次僅顯示一張；達 `nav` 斷點恢復 12 欄 grid 並列。
+- 卡片間距沿用 8px 基底系統的 `gap-3`（12px），左右與頁面內距對齊（出血捲動）
+- 必須提供頁面指示點：8px 圓點、`gap-1.5`，目前頁 `brand-blue`、其餘 `neutral-blue-gray`；
+  指示點為可點擊的 `<button>` 直接跳頁，熱區以透明 padding 擴大至 44×44px（§5 Touch Target）
+- 隱藏原生捲軸（`.scrollbar-none`），捲動仍可用觸控/滑鼠拖曳操作，不影響無障礙捲動能力

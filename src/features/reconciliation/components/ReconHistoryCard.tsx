@@ -1,6 +1,7 @@
 'use client';
 
 import type { SettleEventListItemDto } from '@/api/types';
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { cn, fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
@@ -13,6 +14,12 @@ interface ReconHistoryCardProps {
   item: SettleEventListItemDto;
   onReverse: (item: SettleEventListItemDto) => void;
 }
+
+/** 交易狀態標示（見 DESIGN.md Status Badge「應收／應付狀態標示」），比照 ReconTxnList 的 SETTLEMENT_STATUS_BADGE 寫法 */
+const SIDE_BADGE: Record<ReconSide, { label: string; tone: 'info' | 'neutral' }> = {
+  receivable: { label: '應收', tone: 'info' },
+  payable: { label: '應付', tone: 'neutral' },
+};
 
 /** createdAt 為 ISO 字串（含時區位移），直接切片取時分即為當地時間 */
 function formatTimeHHmm(createdAt: string): string {
@@ -33,7 +40,7 @@ function DeskAmountCell({ amount, emphasis }: { amount: number; emphasis?: boole
     <span
       className={cn(
         'flex shrink-0 items-baseline justify-end gap-0.5 font-mono text-sm tabular-nums',
-        emphasis ? 'w-32 text-neutral-dark' : 'w-28 text-neutral-mid',
+        emphasis ? 'w-24 text-neutral-dark' : 'w-20 text-neutral-mid',
       )}
     >
       <span className={emphasis ? 'text-neutral-mid' : 'text-neutral-blue-gray'}>$</span>
@@ -47,6 +54,8 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
   const isPayable = side === 'payable';
   const cashLabel = isPayable ? '實際付款金額' : '實際存入金額';
   const targetLabel = isPayable ? '付款帳戶' : '存入帳戶';
+  const originAmountLabel = isPayable ? '應付金額' : '應收金額';
+  const balanceLabel = isPayable ? '應付餘額' : '應收餘額';
   const targetText = targetSummary(item.targetNames);
   // 後端僅回傳沖帳金額與實際收付金額的合計差額，無法拆分手續費／額外項目明細，差額為 0 時不顯示該列（比照 TransactionSettlementHistory）
   const deduction = item.settleAmount - item.cashAmount;
@@ -74,6 +83,10 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
               </Link>
             </span>
           </div>
+          <div className="flex items-center justify-between gap-2 text-neutral-mid">
+            <span>{isPayable ? '應付' : '應收'} {fmtCurrency(d.originAmount)}</span>
+            <span className="font-mono tabular-nums">{fmtCurrency(d.balanceAfter)}</span>
+          </div>
           <span className="text-neutral-mid">
             {d.counterpartyLabel}：{d.counterpartyName}
           </span>
@@ -88,6 +101,9 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
       <div className="min-[1300px]:hidden rounded-md border border-neutral-blue-gray/30 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold text-neutral-dark">{formatTimeHHmm(item.createdAt)}</span>
+          <Badge tone={SIDE_BADGE[side].tone} variant="muted">
+            {SIDE_BADGE[side].label}
+          </Badge>
           <span className="text-neutral-mid">{item.counterpartyName}</span>
         </div>
 
@@ -95,6 +111,14 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
           <div className="flex items-center justify-between">
             <span className="text-neutral-mid">{item.itemCount} 筆 · 沖帳金額</span>
             <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(item.settleAmount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-neutral-mid">
+            <span>{originAmountLabel}</span>
+            <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(item.originAmount)}</span>
+          </div>
+          <div className="flex items-center justify-between text-neutral-mid">
+            <span>{balanceLabel}</span>
+            <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(item.balanceAfter)}</span>
           </div>
           {deduction !== 0 && (
             <div className="flex items-center justify-between text-neutral-mid">
@@ -132,13 +156,20 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
         <div className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm hover:bg-surface-cream">
           <button type="button" onClick={() => setExpanded(e => !e)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
             <span className="w-14 shrink-0 font-mono text-xs text-neutral-mid">{formatTimeHHmm(item.createdAt)}</span>
-            <span className="w-40 min-w-0 shrink-0 truncate text-sm text-neutral-dark" title={item.counterpartyName}>
+            <span className="w-16 shrink-0">
+              <Badge tone={SIDE_BADGE[side].tone} variant="muted">
+                {SIDE_BADGE[side].label}
+              </Badge>
+            </span>
+            <span className="w-28 min-w-0 shrink-0 truncate text-sm text-neutral-dark" title={item.counterpartyName}>
               {item.counterpartyName}
             </span>
             <span className="w-14 shrink-0 text-right text-xs text-neutral-mid">{item.itemCount} 筆</span>
+            <DeskAmountCell amount={item.originAmount} />
             <DeskAmountCell amount={item.settleAmount} emphasis />
             <DeskAmountCell amount={deduction} />
             <DeskAmountCell amount={item.cashAmount} />
+            <DeskAmountCell amount={item.balanceAfter} />
             <span className="ml-3 min-w-0 flex-1 truncate text-sm text-neutral-mid" title={item.targetNames.join('、')}>
               {targetText}
             </span>

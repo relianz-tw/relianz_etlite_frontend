@@ -18,13 +18,12 @@ import { withReturnParam } from '../urlState';
 import { useLongPress } from '../useLongPress';
 import LedgerAllowanceChildren from './LedgerAllowanceChildren';
 
-const SORT_KEY_LABELS: Record<SortKey, string> = {
-  id: '交易編號',
+const SORT_KEY_LABELS: Record<Exclude<SortKey, 'id'>, string> = {
   amount: '交易金額',
   counterparty: '往來對象',
   date: '開立日期',
 };
-const SORT_KEYS: SortKey[] = ['id', 'amount', 'counterparty', 'date'];
+const SORT_KEYS: Exclude<SortKey, 'id'>[] = ['amount', 'counterparty', 'date'];
 
 type LedgerCardsProps = {
   pageAmount: string;
@@ -170,7 +169,7 @@ function SalesCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {!selectionMode && !!row.allowanceCount && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
-          <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
+          <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.voucherNumber ?? '—'}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
               折讓
@@ -248,7 +247,7 @@ function PurchaseCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {!selectionMode && !!row.allowanceCount && <ExpandToggle expanded={expanded} onToggle={onToggle} />}
-          <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.id}</span>
+          <span className="font-mono text-[15px] font-semibold text-neutral-dark">{row.voucherNumber ?? '—'}</span>
           {row.isAllowance && (
             <Badge tone="info" variant="muted">
               折讓

@@ -7,9 +7,13 @@
  * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
+import { filterOfficialSubjects } from '@/api/subjects';
 import type { SettleChannel, SettleEcommercePlatformFee, SettleLedgerAllocation, SettleSummaryFee, SettleSummaryOtherDeduction } from '@/api/types';
 import type { ReconOtherDeductionRow } from './components/ReconPoolPanel';
-import type { ReconSettleResult, ReconSide } from './types';
+import type { ReconSettleResult, ReconSide, ReconTxnRef } from './types';
+
+/** 電商平台扣款佐證憑證的沖帳科目名稱，用於查出對應官方科目 id（見 submitPlatformFeeVoucherSettles） */
+const PLATFORM_FEE_SUBJECT_VALUE = '電商平台費';
 
 /** 應收側 ecommercePlatformFee 物件：UI 帶號（負）輸入，API 欄位語意為正的金額，故反號；僅應收 API 支援此欄位 */
 function toEcommercePlatformFee(platformFeeAmount: number): SettleEcommercePlatformFee {
@@ -249,4 +253,33 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
     allocations: [allocation],
     paymentDate: res.paymentDate,
   };
+}
+
+/**
+ * 電商平台扣款佐證憑證：逐張呼叫手動沖帳應付 API（POST /ael/ledger/payables/settle）全額沖銷。
+ * 收付款管道只帶「電商平台費」科目（平台直接扣抵，未經銀行帳戶），手續費與其他減項一律不帶；
+ * 逐張依序（非併發）送出，避免同一批沖帳請求在後端互相搶鎖。
+ * 呼叫端（ReconciliationView）須在主沖帳成功之後才呼叫本函式，且需接受「主沖帳已成功、
+ * 憑證沖帳失敗」時無法回滾——失敗時仍要當作本次沖帳整體完成，只提示使用者憑證沖銷失敗。
+ */
+export async function submitPlatformFeeVoucherSettles(vouchers: ReconTxnRef[], paymentDate: string): Promise<void> {
+  if (vouchers.length === 0) return;
+
+  const subjects = await filterOfficialSubjects({ value: PLATFORM_FEE_SUBJECT_VALUE });
+  const feeSubjectId = subjects[0]?.id;
+  if (!feeSubjectId) throw new Error(`查無「${PLATFORM_FEE_SUBJECT_VALUE}」科目，請確認會計科目設定`);
+
+  for (const voucher of vouchers) {
+    await settlePayable({
+      ledgerUuid: voucher.uuid,
+      paymentDate,
+      paymentChannels: [{ isBankAccount: false, officialAccountingSubjectId: feeSubjectId, amount: voucher.amount }],
+      settleAmount: voucher.amount,
+      paymentAmount: voucher.amount,
+      balanceUsed: 0,
+      memo: '',
+      allocations: [],
+      otherDeductions: undefined,
+    });
+  }
 }

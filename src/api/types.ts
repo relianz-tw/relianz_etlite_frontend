@@ -162,7 +162,6 @@ export type UpdateBankAccountBody = Pick<
 
 /**
  * 公司基本設定 DTO，對應 basic.html 內嵌 OpenAPI 規格（/ael/basic/companySetting）。
- * buyReconciliationMethod／sellReconciliationMethod：0 為手動對帳，1 為自動對帳（發票開立/上傳即收付款）。
  */
 export interface BasicSettingDto {
   acUuid: string;
@@ -184,8 +183,6 @@ export interface BasicSettingDto {
   nhiInsuranceCode: string;
   customerNumber: number;
   disasterRateId: number | null;
-  buyReconciliationMethod: number;
-  sellReconciliationMethod: number;
   createTime: string;
   updateTime: string;
 }
@@ -199,10 +196,6 @@ export interface UpdateBasicSettingBody {
   contactPhone?: string;
   contactEmail?: string;
   nhiInsuranceCode?: string;
-  /** 0：手動對帳，1：發票開立即收款 */
-  sellReconciliationMethod?: number;
-  /** 0：手動對帳，1：發票上傳即付款 */
-  buyReconciliationMethod?: number;
 }
 
 /**
@@ -703,7 +696,7 @@ export interface ReceivablesFilterResult {
   page: number;
   /** 已開立憑證金額（彙總） */
   issuedVoucherAmount: number;
-  /** 已收款金額（彙總） */
+  /** 已收金額（彙總） */
   collectedAmount: number;
   /** 應收帳款金額（彙總） */
   receivableAmount: number;
@@ -725,7 +718,7 @@ export interface ReceivablesFilterResult {
  */
 export type ReceivablesSummaryBody = Omit<ReceivablesFilterBody, 'limit' | 'page'>;
 
-/** 帳簿總覽「已開立發票金額」趨勢圖單日資料點 */
+/** 帳簿總覽「代收金額」趨勢圖單日資料點 */
 export interface LedgerDailyAmount {
   /** 西元 YYYYMMDD；口徑為憑證開立日（invoice.date），非收款日 */
   date: string;
@@ -1371,6 +1364,12 @@ export interface SettleEventListDetailDto {
   counterpartyName: string;
   /** 該原單本次分配到的沖帳金額 */
   amount: number;
+  /** 原單交易金額（正值） */
+  originAmount: number;
+  /** 沖前餘額 */
+  balanceBefore: number;
+  /** 沖後餘額 */
+  balanceAfter: number;
 }
 
 /** GET /ael/ledger/settle/event/list 回應單筆沖帳事件；供「沖帳紀錄」清單顯示與就地復原使用 */
@@ -1399,6 +1398,12 @@ export interface SettleEventListItemDto {
   itemCount: number;
   /** 展開明細，一次帶回不分頁 */
   details: SettleEventListDetailDto[];
+  /** 本批原單合計金額 */
+  originAmount: number;
+  /** 本批沖前餘額合計 */
+  balanceBefore: number;
+  /** 本批沖後餘額合計 */
+  balanceAfter: number;
 }
 
 /** GET /ael/ledger/settle/event/list 回應 data 區塊 */

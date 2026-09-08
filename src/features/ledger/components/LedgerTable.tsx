@@ -264,9 +264,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                   aria-label="全選"
                 />
               </th>
-              <th className={thClass}>
-                <SortHeader label="交易編號" sortKey="id" sort={sort} onToggle={onSortToggle} />
-              </th>
+              <th className={thClass}>發票號碼</th>
               <th className={`${thClass} text-right`}>
                 <SortHeader label="交易金額" sortKey="amount" sort={sort} onToggle={onSortToggle} align="right" />
               </th>
@@ -297,7 +295,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=sales`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
                       >
-                        {row.id}
+                        {row.voucherNumber ?? '—'}
                       </Link>
                       {row.isAllowance && (
                         <Badge tone="info" variant="muted">
@@ -390,9 +388,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                 aria-label="全選"
               />
             </th>
-            <th className={thClass}>
-              <SortHeader label="交易編號" sortKey="id" sort={sort} onToggle={onSortToggle} />
-            </th>
+            <th className={thClass}>發票號碼</th>
             <th className={`${thClass} text-right`}>
               <SortHeader label="交易金額" sortKey="amount" sort={sort} onToggle={onSortToggle} align="right" />
             </th>
@@ -429,7 +425,7 @@ export default function LedgerTable(props: LedgerTableProps) {
                         href={withReturnParam(`/ledger/${row.uuid ?? row.id}?side=purchase`, searchParams)}
                         className="font-mono text-[13px] font-semibold text-neutral-dark hover:text-brand-blue hover:underline"
                       >
-                        {row.id}
+                        {row.voucherNumber ?? '—'}
                       </Link>
                       {row.isAllowance && (
                         <Badge tone="info" variant="muted">

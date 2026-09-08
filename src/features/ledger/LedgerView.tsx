@@ -146,11 +146,13 @@ export default function LedgerView() {
     };
   }, []);
 
-  // 以目前 filters 為基礎合併變更後寫回網址；side/subTab/搜尋/排序/分頁的所有異動皆經此函式
-  const updateFilters = (patch: Partial<LedgerFilterState>) => {
+  // 以目前 filters 為基礎合併變更後寫回網址；side/subTab/搜尋/排序/分頁的所有異動皆經此函式。
+  // scroll 預設 true（沿用 Next.js 導航後捲回頁頂的行為）；手機版兩張可互動圖表卡（趨勢長條／管道佔比甜甜圈）
+  // 點擊套用篩選時傳 false，避免使用者的視角從卡片本身被硬拉回頁面最上方
+  const updateFilters = (patch: Partial<LedgerFilterState>, opts?: { scroll?: boolean }) => {
     const next: LedgerFilterState = { ...filters, ...patch };
     const qs = buildLedgerQueryString(next);
-    router.replace(qs ? `${pathname}?${qs}` : pathname);
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: opts?.scroll ?? true });
   };
 
   useEffect(() => {
@@ -244,10 +246,10 @@ export default function LedgerView() {
     const next: AdvancedFilter = { ...advanced, dateFrom: range?.from ?? '', dateTo: range?.to ?? '' };
     setAdvanced(next); // 同步進階搜尋輸入框草稿，避免面板顯示與網址不一致
     skipChartRangeSyncRef.current = true; // 這次 filters.advanced 變動由圖表點擊觸發，圖表區間本身不跟著變
-    updateFilters({ advanced: next, page: 1 });
+    updateFilters({ advanced: next, page: 1 }, { scroll: false });
   };
   // 卡片 C（管道／廠商佔比）長條點擊：寫回 channelUuid；再點同一項清除
-  const handleChannelSelect = (uuid: string | null) => updateFilters({ channelUuid: uuid, page: 1 });
+  const handleChannelSelect = (uuid: string | null) => updateFilters({ channelUuid: uuid, page: 1 }, { scroll: false });
   const handleLimitChange = (v: number) => updateFilters({ limit: v, page: 1 });
 
   // 排序僅對目前這頁的資料進行（API 未提供排序），桌機表格與手機卡片共用同一份已排序資料

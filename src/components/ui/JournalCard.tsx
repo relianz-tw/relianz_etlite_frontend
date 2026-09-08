@@ -60,7 +60,7 @@ function SummaryCell({ summary, links }: { summary: string; links: Map<string, V
   return (
     <div>
       <button type="button" onClick={() => setExpanded(e => !e)} className="flex w-full min-w-0 items-center gap-1 text-left">
-        <span className="truncate" title={summary}>
+        <span className={expanded ? 'break-words' : 'truncate'} title={summary}>
           {summary}
         </span>
         {expanded ? (

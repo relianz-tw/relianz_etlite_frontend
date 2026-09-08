@@ -22,8 +22,8 @@ interface SettlementCardProps {
 const PRIMARY_KEY = 'primary';
 const COLLECTED_KEY = 'collected';
 /** 對齊 TrendCard 大數字的標籤（同一 totals.primary 欄位），讓兩張卡的數字語意一致 */
-const PRIMARY_LABEL: Record<Side, string> = { sales: '已開立發票金額', purchase: '已收取憑證金額' };
-const COLLECTED_LABEL: Record<Side, string> = { sales: '已收款金額', purchase: '已付款金額' };
+const PRIMARY_LABEL: Record<Side, string> = { sales: '代收金額', purchase: '代付金額' };
+const COLLECTED_LABEL: Record<Side, string> = { sales: '已收金額', purchase: '已付金額' };
 
 /**
  * 入帳狀況：比較同一區間內「開立／收到憑證總額」（totals.primary，transaction_date 口徑）
