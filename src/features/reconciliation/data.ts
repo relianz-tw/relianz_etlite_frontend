@@ -92,16 +92,18 @@ export function receivableGroupsToCandidates(groups: ReconReceivableGroupDto[]):
 /** 對帳中心進項應付分組回應 → 攤平為統一候選交易形狀，分組鍵為 counterpartyUuid（廠商） */
 export function payableGroupsToCandidates(groups: ReconPayableGroupDto[]): ReconCandidate[] {
   return groups.flatMap(group =>
-    group.items.map(item => ({
-      uuid: item.ledgerUuid,
-      orderCode: item.orderCode,
-      amount: item.totalAmount,
-      date: toIssueDate(item.invoice.date, item.entryDate),
-      counterparty: item.counterpartyName,
-      groupUuid: item.counterpartyUuid,
-      remainingAmount: item.remainingAmount,
-      voucherNumber: item.invoice.voucherNumber,
-    })),
+    group.items
+      .filter(item => item.invoice !== null)
+      .map(item => ({
+        uuid: item.ledgerUuid,
+        orderCode: item.orderCode,
+        amount: item.totalAmount,
+        date: toIssueDate(item.invoice!.date, item.entryDate),
+        counterparty: item.counterpartyName,
+        groupUuid: item.counterpartyUuid,
+        remainingAmount: item.remainingAmount,
+        voucherNumber: item.invoice!.voucherNumber,
+      })),
   );
 }
 

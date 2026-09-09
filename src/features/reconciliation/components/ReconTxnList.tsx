@@ -16,7 +16,7 @@ import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 /** 供 ReconciliationView 在清單卡標題列渲染「全選本管道」連結：目前（該群組全部）可勾選的交易 uuid
  * （待收/付金額為負代表已超沖，不可選）。純函式，與 ReconTxnList 內部搜尋/篩選無關（本版已移除清單內搜尋）。 */
 export function getSelectableUuids(sections: ReconSubGroup[]): string[] {
-  return sections.flatMap(s => s.rows).filter(r => (r.remainingAmount ?? r.amount) >= 0).map(r => r.uuid);
+  return sections.flatMap(s => s.rows).map(r => r.uuid);
 }
 
 interface ReconTxnListProps {
@@ -159,11 +159,10 @@ function TxnRow({
   // 已有預覽結果、該筆尚未結清（少沖／超沖仍有殘餘）時，於金額旁標示狀態徽章，讓使用者一眼看出差異落在哪一筆
   const statusBadge = allocation && !allocation.closed ? (SETTLEMENT_STATUS_BADGE[allocation.settlementStatus] ?? null) : null;
   const chevronClass = cn('shrink-0 text-neutral-blue-gray transition-transform', expanded && 'rotate-180');
-  // 待沖金額為負代表此筆已超沖（remainingAmount 定義見 types.ts），不應再被挑去參與沖帳，否則會疊加出更離譜的超沖
   const remainingAmount = row.remainingAmount ?? row.amount;
-  const isNegativeRemaining = remainingAmount < 0;
   // 逐筆沖帳可勾選（複選，勾 1 筆走手動沖帳 API、勾多筆走 summary API，見 ReconciliationView）；匯總沖帳僅唯讀顯示拆帳狀態
-  const isSelectable = mode === 'perTxn' && !isNegativeRemaining;
+  // 負值項目（超沖退款等）也允許勾選，且進入畫面時會自動預選，讓使用者連同一起沖帳
+  const isSelectable = mode === 'perTxn';
   const badge = statusBadge;
   const { detail, loading: detailLoading, error: detailError } = useLazyEntryDetail(row.uuid, expanded);
   const invoice = detail?.invoice;

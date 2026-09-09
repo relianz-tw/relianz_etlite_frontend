@@ -16,6 +16,8 @@ interface ReconDateFilterProps {
   unlimitedDate: boolean;
   onApply: (dateFrom: string, dateTo: string) => void;
   onToggleUnlimitedDate: () => void;
+  /** 「不限日期」checkbox 的說明文字，預設為「不限日期，顯示全部未結清交易」 */
+  unlimitedLabel?: string;
 }
 
 /**
@@ -23,7 +25,7 @@ interface ReconDateFilterProps {
  * 沖帳中心預設查詢全部未結清交易（unlimitedDate 初始 true，見 ReconciliationView），比起先前常駐展開的
  * 期間列，收合後首屏能少佔一排空間，讓金額面板與交易清單更早出現在可視範圍內。
  */
-export default function ReconDateFilter({ dateFrom, dateTo, defaultDateFrom, defaultDateTo, unlimitedDate, onApply, onToggleUnlimitedDate }: ReconDateFilterProps) {
+export default function ReconDateFilter({ dateFrom, dateTo, defaultDateFrom, defaultDateTo, unlimitedDate, onApply, onToggleUnlimitedDate, unlimitedLabel = '不限日期，顯示全部未結清交易' }: ReconDateFilterProps) {
   const [open, setOpen] = useState(false);
   const label = unlimitedDate ? '不限日期' : `${formatYyyymmddRoc(dateFrom)} – ${formatYyyymmddRoc(dateTo)}`;
 
@@ -45,8 +47,8 @@ export default function ReconDateFilter({ dateFrom, dateTo, defaultDateFrom, def
       <PopoverContent align="end" className="w-[min(92vw,560px)] p-4">
         <div className="flex flex-col gap-3">
           <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-neutral-dark">
-            <Checkbox checked={unlimitedDate} onChange={onToggleUnlimitedDate} aria-label="不限日期，顯示全部未結清交易" />
-            不限日期，顯示全部未結清交易
+            <Checkbox checked={unlimitedDate} onChange={onToggleUnlimitedDate} aria-label={unlimitedLabel} />
+            {unlimitedLabel}
           </label>
           <PeriodFilterBar
             dateFrom={dateFrom}

@@ -1,8 +1,8 @@
 'use client';
 
 import { listBankAccounts } from '@/api/bankAccounts';
-import { filterOfficialSubjects, listSubjectBalances } from '@/api/subjects';
-import type { BankAccountDto, OfficialSubjectDto, SubjectBalanceDto } from '@/api/types';
+import { filterOfficialSubjects } from '@/api/subjects';
+import type { BankAccountDto, OfficialSubjectDto } from '@/api/types';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildTargets, pickDefaultTargetKey } from './targets';
@@ -32,8 +32,8 @@ export interface UseReconTargetsResult {
  * 取代原本 ReconciliationView 內的 accounts／accountsLoading／accountsError／bankAccountUuid
  * 四個 state 與兩個 useEffect（見該檔案原本的沖帳對象載入區塊）。
  *
- * 科目清單依 side 呼叫 /ael/subject/official/list/filter（settle：應收 1、應付 2），
- * 科目餘額依清單取到的 id 逐一呼叫 /ael/ledger/subjectBalances（見 api/subjects.ts）。
+ * 科目清單與其餘額一併由 /ael/subject/official/list/filter 回傳（settle：應收 1、應付 2，
+ * 見 OfficialSubjectDto.balance），不需再逐科目查餘額。
  *
  * @param preferredBankAccountUuid 預設主對象的第一優先候選（目前選定銷售管道的收款帳戶 uuid），
  * 由 ReconciliationView 依 selectedGroupKey 算出；變動時（含側邊欄切換管道）會重新套用預設，見下方 effect
@@ -43,7 +43,6 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountsError, setAccountsError] = useState('');
   const [officialSubjects, setOfficialSubjects] = useState<OfficialSubjectDto[]>([]);
-  const [subjectBalances, setSubjectBalances] = useState<SubjectBalanceDto[]>([]);
 
   const [primaryTargetKey, setPrimaryTargetKey] = useState('');
   const [allocationRows, setAllocationRows] = useState<ReconAllocationRow[]>([]);
@@ -80,32 +79,7 @@ export function useReconTargets(side: ReconSide, preferredBankAccountUuid?: stri
     };
   }, [side]);
 
-  // 科目餘額跟隨科目清單：清單為空不打 API；純資訊、不參與任何驗證，失敗時對應選項餘額維持 undefined，顯示「—」
-  useEffect(() => {
-    if (officialSubjects.length === 0) {
-      setSubjectBalances([]);
-      return;
-    }
-    let cancelled = false;
-    // 同一父科目可能因多個子科目攤平成多筆 ReconTarget（見 buildTargets），id 去重避免重複查詢同一科目餘額
-    listSubjectBalances(Array.from(new Set(officialSubjects.map(s => s.id))))
-      .then(list => {
-        if (!cancelled) setSubjectBalances(list);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [officialSubjects]);
-
-  const options = useMemo(() => {
-    const built = buildTargets(accounts, officialSubjects);
-    return built.map(t =>
-      t.kind === 'subject'
-        ? { ...t, balance: subjectBalances.find(b => b.officialAccountingSubjectId === t.officialAccountingSubjectId)?.currentBalance }
-        : t,
-    );
-  }, [accounts, officialSubjects, subjectBalances]);
+  const options = useMemo(() => buildTargets(accounts, officialSubjects), [accounts, officialSubjects]);
 
   // 優先套用 preferredBankAccountUuid（見 pickDefaultTargetKey），查無則應付找預設付款帳戶、應收找預設收款帳戶；
   // side／帳戶載入完成／preferredBankAccountUuid 任一變動（含側邊欄切換銷售管道）都會重新套用預設

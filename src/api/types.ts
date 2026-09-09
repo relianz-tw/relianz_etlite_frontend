@@ -229,6 +229,8 @@ export interface OfficialSubjectDto {
   updatedAt: string;
   /** 該官方科目下的公司自訂子科目；僅 /ael/subject/official/list/filter 會回傳，/list/latest 不含此欄位 */
   children?: SubjectChildDto[];
+  /** 公司目前該科目餘額；僅 /ael/subject/official/list/filter 會回傳，/list/latest 不含此欄位 */
+  balance?: number;
 }
 
 /**
@@ -247,6 +249,8 @@ export interface SubjectChildDto {
   type?: number;
   calculationType?: number;
   buyOrSell?: number;
+  /** 公司目前該子科目餘額；僅 /ael/subject/official/list/filter 會回傳 */
+  balance?: number;
 }
 
 /** 使用者常用科目 DTO（/ael/subject/usage），依 rank 由小到大排序即為常用程度排名 */
@@ -257,19 +261,6 @@ export interface SubjectUsageDto {
   useCount: number;
   createTime: string;
   updateTime: string;
-}
-
-/**
- * 公司科目餘額（GET /ael/ledger/subjectBalances），沖帳中心「沖帳對象分配」科目選項用。
- * 端點為單科目查詢、回傳單一物件，查無資料時後端會先初始化，見 subjects.ts 的 getSubjectBalance()。
- */
-export interface SubjectBalanceDto {
-  companyUuid: string;
-  officialAccountingSubjectId: number;
-  name: string | null;
-  currentBalance: number;
-  /** YYYYMMDD；尚未異動餘額時為 null */
-  lastBalanceUpdateDate: string | null;
 }
 
 /** AI 依交易描述建議的會計科目（/ael/subject/identify），最多 3 筆，依信心排序 */

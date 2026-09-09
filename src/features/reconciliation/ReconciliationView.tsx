@@ -302,6 +302,17 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     return [{ key: selectedGroupKey, label: '', rows: groupRows }];
   }, [selectedGroupKey, isAllGroup, isOtherGroup, allRows, side, availableCandidates, groupOptions, sideData, groupRows]);
 
+  // sections 切換時，自動預選所有負值交易（退款／超沖），讓它們一起參與本次沖帳加總
+  useEffect(() => {
+    const negativeUuids = sections.flatMap(s => s.rows).filter(r => (r.remainingAmount ?? r.amount) < 0).map(r => r.uuid);
+    if (negativeUuids.length === 0) return;
+    setSelectedUuids(prev => {
+      const next = new Set(prev);
+      negativeUuids.forEach(uuid => next.add(uuid));
+      return next;
+    });
+  }, [sections]);
+
   const selectedGroup = groups.find(g => g.key === selectedGroupKey);
   const selectedGroupLabel = selectedGroup?.label ?? '';
 

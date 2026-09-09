@@ -2,6 +2,7 @@
 
 import type { OfficialSubjectDto, SubjectChildDto } from '@/api/types';
 import Button from '@/components/ui/Button';
+import { fmtCurrency } from '@/lib/utils';
 import { Check, ChevronRight, Info, Search, SearchX, Sparkles, X } from 'lucide-react';
 import type { RefObject } from 'react';
 import SubjectAiAssistant, { type AiPhase, type AiSuggestion } from './SubjectAiAssistant';
@@ -218,6 +219,9 @@ export default function SubjectPickerPanel({
                         <span className="w-24 shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-neutral-mid">{s.subjectCode}</span>
                         <span className="truncate">{s.name}</span>
                       </span>
+                      {s.balance != null && (
+                        <span className="shrink-0 text-xs tabular-nums text-neutral-mid">{fmtCurrency(s.balance)}</span>
+                      )}
                       {armed && (
                         <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
                       )}
@@ -240,6 +244,9 @@ export default function SubjectPickerPanel({
                             <span className="w-20 shrink-0 whitespace-nowrap font-mono tabular-nums text-neutral-mid/80">{child.subjectCode}</span>
                             <span className="truncate">{child.name}</span>
                           </span>
+                          {child.balance != null && (
+                            <span className="shrink-0 text-xs tabular-nums text-neutral-mid">{fmtCurrency(child.balance)}</span>
+                          )}
                           {childArmed && (
                             <span className="shrink-0 rounded-sm bg-brand-blue px-2 py-1 text-xs font-semibold text-white">確認</span>
                           )}
