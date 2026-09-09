@@ -12,7 +12,7 @@ import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Backpack, BookOpen, CircleCheck, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Field from '../components/Field';
-import { nationalityLabel, serviceTypeLabel } from './data';
+import { nationalityLabel, parseNationality, serviceTypeLabel } from './data';
 import SignImageUpload from './components/SignImageUpload';
 
 function rocDate(year: number, month: number, day: number): string {
@@ -93,7 +93,7 @@ export default function LaborSignView({ uuid, incomeCode }: LaborSignViewProps) 
     const name = record.name?.trim() || '';
     const isResidentCertFormat = /^[A-Z][89ABCD]\d{8}$/i.test(trimmed);
     const params =
-      record.nationality === '1'
+      parseNationality(record.nationality) === 0
         ? { name, identifyNumber: trimmed }
         : isResidentCertFormat
           ? { name, residencePermitNumber: trimmed }
@@ -113,7 +113,7 @@ export default function LaborSignView({ uuid, incomeCode }: LaborSignViewProps) 
 
   // 本國籍且尚未選擇國家時，預設帶入台灣（找不到則不預設，改由使用者自行選擇）
   useEffect(() => {
-    if (countryId !== null || countries.length === 0 || record?.nationality !== '1') return;
+    if (countryId !== null || countries.length === 0 || parseNationality(record?.nationality) !== 0) return;
     const tw = countries.find(c => c.abbreviation === 'TW');
     if (tw) setCountryId(tw.id);
   }, [countries, record, countryId]);
@@ -138,8 +138,8 @@ export default function LaborSignView({ uuid, incomeCode }: LaborSignViewProps) 
     );
   }
 
-  const isDomestic = record.nationality === '1';
-  const isForeignUnder183 = record.nationality === '3';
+  const isDomestic = parseNationality(record.nationality) === 0;
+  const isForeignUnder183 = parseNationality(record.nationality) === 2;
 
   const handleSubmit = () => {
     if (!idNumber.trim() || !address.trim() || !addressPostal.trim() || (!isDomestic && countryId === null)) {

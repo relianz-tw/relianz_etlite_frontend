@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import Field from '../components/Field';
 import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
-import { NATIONALITY_OPTIONS, SERVICE_TYPE_OPTIONS } from './data';
+import { NATIONALITY_OPTIONS, parseNationality, SERVICE_TYPE_OPTIONS } from './data';
 import { setLaborOrderCode } from './localExtras';
 import type { LaborNationalityCode, LaborServiceType } from './types';
 
@@ -44,7 +44,7 @@ export default function LaborFormView() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [addressPostal, setAddressPostal] = useState('');
-  const [nationality, setNationality] = useState<LaborNationalityCode>('1');
+  const [nationality, setNationality] = useState<LaborNationalityCode>(0);
   const [isUnionInsured, setIsUnionInsured] = useState(false);
   const [serviceType, setServiceType] = useState<LaborServiceType>('9A');
   const [serviceName, setServiceName] = useState('');
@@ -116,7 +116,7 @@ export default function LaborFormView() {
     setIdNumber(provider.identifyNumber || provider.residencePermitNumber || provider.passportNumber || '');
     setPhone(provider.phone ?? '');
     setAddress(provider.address ?? '');
-    if (provider.nationality) setNationality(provider.nationality as LaborNationalityCode);
+    if (provider.nationality !== null && provider.nationality !== undefined) setNationality(parseNationality(provider.nationality));
     setShowNameDropdown(false);
   };
 
@@ -221,9 +221,9 @@ export default function LaborFormView() {
                 )}
               </div>
               <Field label="國籍" required>
-                <Select widthClassName="w-full" value={nationality} onValueChange={v => setNationality(v as LaborNationalityCode)}>
+                <Select widthClassName="w-full" value={String(nationality)} onValueChange={v => setNationality(Number(v) as LaborNationalityCode)}>
                   {NATIONALITY_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>
+                    <option key={o.value} value={String(o.value)}>
                       {o.label}
                     </option>
                   ))}

@@ -3,8 +3,9 @@ import type { MockFile } from '../components/mockFile';
 /** 工作類型代碼：50 兼職/臨時人員、9A 專業服務（執行業務）、9B 稿費 */
 export type LaborServiceType = '50' | '9A' | '9B';
 
-/** 國籍代碼：1 本國籍、2 外國籍在台滿 183 天、3 外國籍未滿 183 天（對應 POST /ael/labour 的 nationality） */
-export type LaborNationalityCode = '1' | '2' | '3';
+/** 國籍代碼：0 本國籍(TW)、1 外國籍在台滿 183 天(RT183D)、2 外國籍未滿 183 天(NRT183D)
+ *  ⚠️ 寫入端（POST /ael/labour、/calculate）送 int；讀取端回中文描述，需經 parseNationality 還原 */
+export type LaborNationalityCode = 0 | 1 | 2;
 
 /** 二代健保申報狀態：0 取消申報、1 已受理、2 系統入檔中、3 入檔成功、4 入檔失敗 */
 export type NhiDeclareStatus = 0 | 1 | 2 | 3 | 4;

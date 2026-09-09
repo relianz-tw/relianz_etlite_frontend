@@ -1760,14 +1760,15 @@ export interface LabourFilterBody {
 
 /**
  * 勞報單單筆資料，列表篩選（POST /ael/labour/data/filter）與單筆詳情（GET /ael/labour）共用。
- * nationality 為 '1'｜'2'｜'3'（本國籍／外國籍在台滿 183 天／外國籍未滿 183 天）；
+ * ⚠️ nationality 為後端回傳的中文描述（例「本國人」／「本國籍」），非代碼，且可能為 null；
+ * 請用 parseNationality 還原成 LaborNationalityCode 再判斷，不要直接比對字串。
  * serviceType 為 '50'｜'9A'｜'9B'。
  */
 export interface LabourFormDto {
   labourUuid: string;
   companyUuid: string;
   name: string;
-  nationality: string;
+  nationality: string | null;
   isUnionInsured: boolean;
   phone: string;
   serviceType: string;
@@ -1821,8 +1822,8 @@ export interface LabourFormDto {
 export interface CreateLabourBody {
   companyUuid: string;
   name: string;
-  /** 1 本國籍／2 外國籍在台滿 183 天／3 外國籍未滿 183 天 */
-  nationality: '1' | '2' | '3';
+  /** 0 本國籍／1 外國籍在台滿 183 天／2 外國籍未滿 183 天 */
+  nationality: 0 | 1 | 2;
   isUnionInsured: boolean;
   phone: string;
   /** 50｜9A｜9B */
@@ -1876,8 +1877,8 @@ export interface UpdateLabourBasicInfoResult {
 
 /** 試算勞報單扣繳／二代健保／實付（POST /ael/labour/calculate）請求體 */
 export interface LabourCalculateBody {
-  /** 依規格可傳 '1'｜'2'｜'3' */
-  nationality: string;
+  /** 0=本國籍(TW)／1=外國籍在台滿 183 天(RT183D)／2=外國籍未滿 183 天(NRT183D) */
+  nationality: 0 | 1 | 2;
   /** 50｜9A｜9B */
   serviceType: string;
   /** 是否投保於工會；true 時二代健保費（ghi）固定為 0 */
@@ -1946,7 +1947,8 @@ export interface LabourProviderDto {
   passportPic: string;
   createTime: string;
   updateTime: string;
-  nationality: string;
+  /** ⚠️ 規格為 string（中文描述），實測目前不一定回傳；請用 parseNationality 還原 */
+  nationality: string | number | null;
   countryCode: number;
   /** 50｜9A｜9B */
   incomeCode: string;
@@ -1968,7 +1970,8 @@ export interface SaveLabourProviderBody {
   residencePermitPicFront?: string;
   residencePermitPicBack?: string;
   passportPic?: string;
-  nationality?: string;
+  /** 0 本國籍／1 外國籍在台滿 183 天／2 外國籍未滿 183 天；⚠️ 規格書仍寫 string，此處依約定送 int */
+  nationality?: 0 | 1 | 2;
   countryCode?: number;
   incomeCode?: string;
   code?: number;

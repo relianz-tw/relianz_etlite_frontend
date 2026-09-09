@@ -9,15 +9,32 @@ export const SERVICE_TYPE_OPTIONS: { value: LaborServiceType; label: string; hin
   { value: '9B', label: '稿費 (9B)', hint: '例：演講講師稿費、版稅、樂譜、作曲、編劇、漫畫' },
 ];
 
-/** 國籍代碼下拉選項；code 直接對應 POST /ael/labour 的 nationality（'1'｜'2'｜'3'） */
+/** 國籍代碼下拉選項；value 直接對應 POST /ael/labour 的 nationality（0｜1｜2） */
 export const NATIONALITY_OPTIONS: { value: LaborNationalityCode; label: string }[] = [
-  { value: '1', label: '本國籍' },
-  { value: '2', label: '外國籍 (在台滿 183 天)' },
-  { value: '3', label: '外國籍 (在台未滿 183 天)' },
+  { value: 0, label: '本國籍' },
+  { value: 1, label: '外國籍 (在台滿 183 天)' },
+  { value: 2, label: '外國籍 (在台未滿 183 天)' },
 ];
 
-export function nationalityLabel(code: string): string {
-  return NATIONALITY_OPTIONS.find(o => o.value === code)?.label ?? code;
+/**
+ * 將讀取端各種形態的 nationality（int 代碼／後端中文描述／null）正規化回 LaborNationalityCode。
+ * ⚠️ 後端讀寫語意不對稱：寫入送 0｜1｜2，讀取回中文描述（例「本國人」「本國籍」），且兩支 API 用字不一致，
+ * 故用關鍵字容錯比對；「未滿」需比「滿」優先判斷，避免「未滿 183 天」被誤判成「滿」。
+ * 無法辨識時預設回 0（本國籍），沿用舊版行為。
+ */
+export function parseNationality(raw: string | number | null | undefined): LaborNationalityCode {
+  if (raw === 0 || raw === 1 || raw === 2) return raw;
+  if (raw === '0' || raw === '1' || raw === '2') return Number(raw) as LaborNationalityCode;
+  if (typeof raw === 'string') {
+    if (raw.includes('未滿')) return 2;
+    if (raw.includes('本國')) return 0;
+    if (raw.includes('滿')) return 1;
+  }
+  return 0;
+}
+
+export function nationalityLabel(raw: string | number | null | undefined): string {
+  return NATIONALITY_OPTIONS.find(o => o.value === parseNationality(raw))?.label ?? String(raw);
 }
 
 /** 依 serviceType 取得下拉選單顯示用完整標籤，供列表/詳情頁還原顯示 */
@@ -64,7 +81,7 @@ export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtra
     phone: dto.phone,
     address: dto.address,
     addressPostal: dto.addressPostal,
-    nationality: (dto.nationality as LaborNationalityCode) || '1',
+    nationality: parseNationality(dto.nationality),
     isUnionInsured: dto.isUnionInsured,
     serviceType: dto.serviceType as LaborServiceType,
     serviceName: dto.serviceName,
