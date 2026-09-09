@@ -77,7 +77,7 @@ export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, pre
   // 欄位順序對齊交易細節頁「交易資訊」卡片（見 TransactionMetaCard.tsx 編輯模式）：
   // 發票號碼／開立日期／收入科目／銷售額／稅額／總金額／備註；交易編號、已沖／未沖金額為該頁沒有的
   // 補充資訊，穿插在對應欄位後方，查無憑證時個別欄位退回 '—'
-  const rows: DetailRow[] = entry
+  const topRows: DetailRow[] = entry
     ? [
         { label: '交易編號', value: entry.orderCode },
         { label: `${counterpartyLabel}統一編號`, value: counterpartyTaxId || '—' },
@@ -88,11 +88,26 @@ export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, pre
         { label: '未稅', value: fmtCurrency(entry.netAmount) },
         { label: '稅額', value: fmtCurrency(entry.taxAmount) },
         { label: '總金額', value: fmtCurrency(entry.totalAmount) },
+      ]
+    : [];
+
+  const bottomRows: DetailRow[] = entry
+    ? [
         { label: '已沖金額', value: fmtCurrency(entry.settledAmount) },
         { label: '未沖金額', value: fmtCurrency(entry.remainingAmount) },
         { label: '備註', value: invoice?.remark || '—' },
       ]
     : [];
+
+  // 折讓/退回可能為多筆，未稅與稅額各自加總後只顯示合計，明細請使用者點「查看原發票」查看
+  const allowances = detail?.allowances ?? [];
+  const hasAllowances = allowances.length > 0;
+  const allowanceNetAmount = allowances.reduce((sum, a) => sum + a.netAmount, 0);
+  const allowanceTaxAmount = allowances.reduce((sum, a) => sum + a.taxAmount, 0);
+  const allowanceRows: DetailRow[] = [
+    { label: '折讓/退回未稅金額', value: fmtCurrency(allowanceNetAmount) },
+    { label: '折讓/退回稅額', value: fmtCurrency(allowanceTaxAmount) },
+  ];
 
   return (
     <Modal open={open} onClose={onClose} title="原始憑證" widthClassName="max-w-[840px]">
@@ -106,12 +121,33 @@ export default function EntryVoucherModal({ open, onClose, ledgerUuid, side, pre
             <VoucherPreviewCard voucherImage={invoice?.invoicePicUrl || null} minHeightClassName="min-h-[220px] nav:min-h-[480px]" />
           </div>
           <div className="flex flex-1 flex-col gap-2">
-            {rows.map(row => (
+            {topRows.map(row => (
               <div key={row.label} className="flex flex-col items-start gap-0.5 text-sm nav:flex-row nav:items-center nav:justify-between nav:gap-3">
                 <span className="text-neutral-mid">{row.label}</span>
                 <span className="break-all font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
               </div>
             ))}
+            {hasAllowances && (
+              <div className="flex flex-col gap-2 border-y border-neutral-blue-gray/20 py-2">
+                {allowanceRows.map(row => (
+                  <div key={row.label} className="flex flex-col items-start gap-0.5 text-sm nav:flex-row nav:items-center nav:justify-between nav:gap-3">
+                    <span className="text-neutral-mid">{row.label}</span>
+                    <span className="break-all font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {bottomRows.map(row => (
+              <div key={row.label} className="flex flex-col items-start gap-0.5 text-sm nav:flex-row nav:items-center nav:justify-between nav:gap-3">
+                <span className="text-neutral-mid">{row.label}</span>
+                <span className="break-all font-mono font-semibold tabular-nums text-neutral-dark">{row.value}</span>
+              </div>
+            ))}
+            {hasAllowances && (
+              <p className="mt-1 text-xs text-neutral-mid">
+                註：折讓金額可能為多筆，如需查看細節請點選「查看原發票」來查看
+              </p>
+            )}
           </div>
         </div>
       )}
