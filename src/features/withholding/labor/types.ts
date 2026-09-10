@@ -1,5 +1,3 @@
-import type { MockFile } from '../components/mockFile';
-
 /** 工作類型代碼：50 兼職/臨時人員、9A 專業服務（執行業務）、9B 稿費 */
 export type LaborServiceType = '50' | '9A' | '9B';
 
@@ -7,14 +5,11 @@ export type LaborServiceType = '50' | '9A' | '9B';
  *  ⚠️ 寫入端（POST /ael/labour、/calculate）送 int；讀取端回中文描述，需經 parseNationality 還原 */
 export type LaborNationalityCode = 0 | 1 | 2;
 
-/** 二代健保申報狀態：0 取消申報、1 已受理、2 系統入檔中、3 入檔成功、4 入檔失敗 */
-export type NhiDeclareStatus = 0 | 1 | 2 | 3 | 4;
-
 /** 畫面用勞報單資料，由 LabourFormDto（見 @/api/types）轉換而成，見 data.ts 的 mapLabourDtoToRecord */
 export interface LaborRecord {
   uuid: string;
   withholdingId: string;
-  /** 交易編號，見 localExtras.ts 的 getLaborOrderCode／setLaborOrderCode 說明 */
+  /** 交易編號（2026-09-10 後端已在 GET /ael/labour、POST /ael/labour/data/filter 補上此欄位，已實測確認） */
   orderCode: string;
   name: string;
   idNumber: string;
@@ -44,16 +39,20 @@ export interface LaborRecord {
   /** 所得類別代碼，簽署 PATCH 時沿用此值送出 */
   code: number;
   createTime: string;
+  /** 扣繳款項是否已匯款（後端記錄，唯讀；前端無寫入端點） */
+  isRemitWithholding: boolean;
+  /** 扣繳匯款日期；未匯款時為空字串 */
+  withholdingRemitDate: string;
+  /** 二代健保是否已匯款（後端記錄，唯讀；前端無寫入端點） */
+  isRemitNhi: boolean;
+  /** 二代健保匯款日期；未匯款時為空字串 */
+  nhiRemitDate: string;
+  /** 二代健保是否已申報（後端記錄，唯讀；前端無寫入端點） */
+  isNhiDeclare: boolean;
+  /** 二代健保申報日期；未申報時為空字串 */
+  nhiDeclareDate: string;
 
   // 以下欄位後端尚無對應 API，暫存於前端記憶體（見 localExtras.ts），重新整理頁面會重置
   tags: string[];
   projects: string[];
-  withholdingFiles: MockFile[];
-  withholdingProofFiles: MockFile[];
-  withholdingPaid: boolean;
-  nhiFiles: MockFile[];
-  nhiProofFiles: MockFile[];
-  nhiPaid: boolean;
-  nhiDeclareStatus: NhiDeclareStatus;
-  isNhiDeclared: boolean;
 }

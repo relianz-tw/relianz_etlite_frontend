@@ -16,6 +16,8 @@ interface ApiEnvelope<T> {
   success: boolean;
   data: T | null;
   errorCode: string;
+  /** 少數端點（如 /ael/onboarding/salary/insurance）信封欄位為小寫 errorcode，需相容讀取 */
+  errorcode?: string;
   message: string;
 }
 
@@ -30,7 +32,8 @@ export function buildQuery(params: Record<string, string | number | undefined>):
   return query ? `?${query}` : '';
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+/** 發送請求並拆封固定信封，回傳整個信封物件（含 pagination 等額外欄位）；失敗一律 throw ApiError */
+async function fetchEnvelope<E extends ApiEnvelope<unknown>>(path: string, init?: RequestInit): Promise<E> {
   let res: Response;
   // body 為 FormData（檔案上傳）時不可手動指定 Content-Type，需讓瀏覽器自動帶上 boundary，
   // 否則後端收到的 multipart 內容會因缺少 boundary 而無法解析
@@ -50,15 +53,29 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   // 後端固定回傳 JSON 信封（含失敗時），故不特別依賴 HTTP status 判斷成敗，
   // 僅在 body 非合法 JSON（如 500 回 HTML）時才需要仰賴 status 組出錯誤訊息
-  let body: ApiEnvelope<T>;
+  let body: E;
   try {
     body = await res.json();
   } catch {
     throw new ApiError('F0002', `HTTP ${res.status} 回應非 JSON`, res.status);
   }
 
-  if (!body.success || body.errorCode !== '0000') {
-    throw new ApiError(body.errorCode ?? '', body.message ?? '', res.status);
+  const code = body.errorCode ?? body.errorcode;
+  if (!body.success || code !== '0000') {
+    throw new ApiError(code ?? '', body.message ?? '', res.status);
   }
+  return body;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const body = await fetchEnvelope<ApiEnvelope<T>>(path, init);
   return body.data as T;
+}
+
+/**
+ * 少數端點（如 GET /ael/employee）分頁資訊 pagination 與 data 同級、不在 data 內，
+ * 無法用 apiFetch 直接拆封取得，改用此函式取得整個信封物件。
+ */
+export async function apiFetchEnvelope<E extends ApiEnvelope<unknown>>(path: string, init?: RequestInit): Promise<E> {
+  return fetchEnvelope<E>(path, init);
 }

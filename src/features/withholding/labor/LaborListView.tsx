@@ -12,7 +12,6 @@ import { useLock } from '../components/LockContext';
 import WithholdingTabs from '../components/WithholdingTabs';
 import LaborCards from './components/LaborCards';
 import LaborFilterBar, { EMPTY_LABOR_ADVANCED, type LaborAdvancedFilter, type LaborQuickField } from './components/LaborFilterBar';
-import LaborImportDialog from './components/LaborImportDialog';
 import LaborTable from './components/LaborTable';
 import { toYyyymmdd } from './data';
 import { useLaborDates, useLaborList, type LaborSearchFilters, type SignFilter } from './useLaborList';
@@ -26,7 +25,6 @@ export default function LaborListView() {
   const [signFilter, setSignFilter] = useState<SignFilter>('all');
   const [year, setYear] = useState<number | null>(null);
   const [month, setMonth] = useState(0); // 0 = 全部月份
-  const [importOpen, setImportOpen] = useState(false);
 
   // 年月下拉資料到位後預設選最新一年（GET /ael/labour/date 依 year DESC 排序）
   useEffect(() => {
@@ -139,7 +137,7 @@ export default function LaborListView() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" icon={Upload} disabled={isLocked} onClick={() => setImportOpen(true)}>
+            <Button variant="outline" icon={Upload} disabled title="批次匯入尚未串接後端 API">
               批次匯入
             </Button>
             <Link href="/withholding/labor/create" className="inline-flex">
@@ -177,8 +175,6 @@ export default function LaborListView() {
           </>
         )}
       </div>
-
-      <LaborImportDialog open={importOpen} onClose={() => setImportOpen(false)} disabled={isLocked} />
     </div>
   );
 }

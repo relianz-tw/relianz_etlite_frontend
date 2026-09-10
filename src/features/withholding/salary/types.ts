@@ -1,37 +1,30 @@
-import type { MockFile } from '../components/mockFile';
-
 /** 員工在職狀態 */
 export type EmploymentStatus = 'active' | 'inactive';
 
-/** 員工投保級距（健保／勞保／勞退，皆為同一結構的假資料表） */
-export interface InsuranceGrade {
-  id: number;
-  /** 0 代表「無投保」 */
-  grade: number;
-  salaryMin: number;
-  salaryMax: number | null;
-}
-
+/** 畫面用員工資料，由 EmployeeDto 轉換而來（見 data.ts mapEmployeeDto），id 對齊後端改為 number */
 export interface Employee {
-  id: string;
+  id: number;
   name: string;
   idNumber: string;
   jobTitle: string;
   phoneNumber: string;
   email: string;
+  /** 身分證正面，GCS object path */
+  idCardFront: string;
+  /** 身分證反面，GCS object path */
+  idCardBack: string;
   householdAddress: string;
   contactAddress: string;
-  /** 健保投保級距 id（對應 NHI_GRADES） */
-  nhiGradeId: number;
-  hasDependents: boolean;
+  /** 健保投保級距 id；null＝無投保 */
+  nhiLevelId: number | null;
   nhiDependents: number;
-  /** 勞保投保級距 id（對應 LABOR_GRADES） */
-  laborGradeId: number;
+  /** 勞保投保級距 id；null＝無投保 */
+  laborLevelId: number | null;
+  /** YYYY-MM-DD；無投保時為空字串 */
   laborInsuranceStartDate: string;
-  hasVoluntaryPension: boolean;
   voluntaryPensionRate: number;
-  /** 勞退月提投保級距 id（對應 LABOR_PENSION_GRADES） */
-  laborPensionGradeId: number;
+  /** 勞退月提投保級距 id；null＝無自提 */
+  laborPensionLevelId: number | null;
   onboardDate: string;
   status: EmploymentStatus;
   quitDate: string;
@@ -48,9 +41,11 @@ export interface CustomSalaryItem {
 
 /** 單一員工單月的薪資明細列 */
 export interface PayrollItem {
-  employeeId: string;
+  employeeId: number;
   name: string;
   idNumber: string;
+  /** 健保投保級距 id；null＝無投保。用於判斷是否為「兼職」（無投保，見 data.ts isNhiUninsured） */
+  nhiLevelId: number | null;
   paymentYear?: number;
   paymentMonth?: number;
   paymentDay?: number;
@@ -74,15 +69,4 @@ export interface PayrollMonthSummary {
   fixedSalaryTotal: number;
   nonFixedSalaryTotal: number;
   payableSalaryTotal: number;
-}
-
-/** 單一年月的繳款書／申報狀態（模擬檔案，見 mockFile.ts） */
-export interface PayrollMonthDocs {
-  withholdingFiles: MockFile[];
-  withholdingProofFiles: MockFile[];
-  withholdingPaid: boolean;
-  nhiFiles: MockFile[];
-  nhiProofFiles: MockFile[];
-  nhiPaid: boolean;
-  nhiDeclared: boolean;
 }

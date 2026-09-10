@@ -1,46 +1,49 @@
 'use client';
 
+import { deleteEmployee as deleteEmployeeApi } from '@/api/employee';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { deleteEmployee, listEmployees } from './mockStore';
+import { useEffect, useState } from 'react';
+import { useEmployeeList } from './useEmployees';
 
 const PAGE_SIZE = 10;
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
 export default function EmployeeListView() {
+  const [queryInput, setQueryInput] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
-  const employees = useMemo(() => {
-    void refreshTick;
-    return listEmployees();
-  }, [refreshTick]);
+  // 搜尋框輸入 debounce 400ms 後才觸發查詢，避免每個按鍵都打 API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(queryInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [queryInput]);
 
-  const filtered = employees.filter(e => {
-    if (status !== 'all' && e.status !== status) return false;
-    if (!query.trim()) return true;
-    const q = query.trim();
-    return e.name.includes(q) || e.idNumber.includes(q) || e.phoneNumber.includes(q) || e.email.includes(q);
-  });
+  const { employees, pagination, loading, error, reload } = useEmployeeList({ status, search: query, page, pageSize: PAGE_SIZE });
+  const totalPages = Math.max(1, Math.ceil(pagination.totalSize / PAGE_SIZE));
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
+  // ConfirmDialog 點確認後會同步關閉，故刪除失敗的錯誤改用頁面上方的 deleteError 呈現
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
-    deleteEmployee(deleteTarget.id);
-    setRefreshTick(t => t + 1);
+    setDeleteError('');
+    deleteEmployeeApi(deleteTarget.id)
+      .then(reload)
+      .catch(err => setDeleteError(getFriendlyErrorMessage(err)));
   };
 
   return (
@@ -58,14 +61,7 @@ export default function EmployeeListView() {
 
         <div className="mb-5 flex flex-col gap-2 nav:flex-row">
           <div className="flex-1">
-            <TextInput
-              value={query}
-              onChange={e => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-              placeholder="搜尋員工（姓名、身分證字號、電話、Email）"
-            />
+            <TextInput value={queryInput} onChange={e => setQueryInput(e.target.value)} placeholder="搜尋員工（姓名、身分證字號、電話、Email）" />
           </div>
           <div className="w-full nav:w-40">
             <Select
@@ -88,6 +84,8 @@ export default function EmployeeListView() {
           </Link>
         </div>
 
+        {(error || deleteError) && <p className="mb-3 text-sm text-semantic-error">{error || deleteError}</p>}
+
         <div className="hidden overflow-hidden rounded-md border border-neutral-blue-gray/30 bg-white nav:block">
           <table className="w-full border-collapse">
             <thead className="bg-surface-off-white">
@@ -103,14 +101,20 @@ export default function EmployeeListView() {
               </tr>
             </thead>
             <tbody>
-              {pageRows.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-neutral-mid">
+                    載入中…
+                  </td>
+                </tr>
+              ) : employees.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center text-sm text-neutral-mid">
                     無符合條件的員工資料
                   </td>
                 </tr>
               ) : (
-                pageRows.map((e, i) => (
+                employees.map((e, i) => (
                   <tr key={e.id} className={`border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${i % 2 === 1 ? 'bg-surface-warm/30' : ''}`}>
                     <td className="whitespace-nowrap px-4 py-3.5 text-sm">
                       <Badge tone={e.status === 'active' ? 'success' : 'neutral'}>{e.status === 'active' ? '在職' : '離職'}</Badge>
@@ -144,10 +148,12 @@ export default function EmployeeListView() {
         </div>
 
         <div className="flex flex-col gap-3 nav:hidden">
-          {pageRows.length === 0 ? (
+          {loading ? (
+            <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
+          ) : employees.length === 0 ? (
             <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">無符合條件的員工資料</div>
           ) : (
-            pageRows.map(e => (
+            employees.map(e => (
               <div key={e.id} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 font-semibold text-neutral-dark">

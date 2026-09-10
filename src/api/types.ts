@@ -1799,8 +1799,8 @@ export interface LabourFormDto {
   paymentDay: number;
   /** 對應扣繳首頁的編號欄，由後端流水號補齊 */
   withholdingId: string;
-  /** 交易編號（無票應付立帳），⚠️ 目前 GET /ael/labour、POST /ael/labour/data/filter 尚未回這欄位，僅 POST /ael/labour 建立回應有 */
-  orderCode?: string;
+  /** 交易編號（無票應付立帳）；2026-09-10 後端已在 GET /ael/labour、POST /ael/labour/data/filter 補上，已實測確認 */
+  orderCode: string;
   withholdingRemitDate: string;
   nhiRemitDate: string;
   nhiDeclareDate: string;
@@ -1975,4 +1975,397 @@ export interface SaveLabourProviderBody {
   countryCode?: number;
   incomeCode?: string;
   code?: number;
+}
+
+/**
+ * 員工 DTO，對應 Apifox「員工」分類（/ael/employee、/ael/employees/*）回應項目。
+ * ⚠️ employmentStatus 規格未寫明語意，依回應範例（employmentStatus: 1 且 quitDate: null）判定 1=在職／0=離職。
+ */
+export interface EmployeeDto {
+  id: number;
+  name: string;
+  idNumber: string;
+  phoneNumber: string;
+  email: string;
+  /** 1 在職／0 離職 */
+  employmentStatus: number;
+  /** 身分證正面，GCS object path */
+  idCardFront: string;
+  /** 身分證反面，GCS object path */
+  idCardBack: string;
+  householdAddress: string;
+  contactAddress: string;
+  /** 健保投保級距 id；null＝無投保 */
+  nhiLevelId: number | null;
+  nhiAmount: number;
+  nhiDependents: number;
+  /** ISO 字串 */
+  onboardDate: string;
+  companyUuid: string;
+  createdAt: string;
+  updatedAt: string;
+  /** 到職年，西元年（2026-09-10 後端已由民國改為西元，已實測確認） */
+  onboardYear: number;
+  /** 到職月 1–12 */
+  onboardMonth: number;
+  /** ISO 字串；在職中為 null */
+  quitDate: string | null;
+  /** 離職年，西元年（2026-09-10 後端已由民國改為西元）；在職中為 0 */
+  quitYear: number;
+  /** 離職月；在職中為 0 */
+  quitMonth: number;
+  voluntaryPensionRate: number;
+  /** 勞保投保級距 id；null＝無投保 */
+  laborLevelId: number | null;
+  /** YYYY-MM-DD；無投保時為 null */
+  laborInsuranceStartDate: string | null;
+  laborAmount: number;
+  jobTitle: string | null;
+  /** 勞退月提投保級距 id；null＝無自提 */
+  laborPensionLevelId: number | null;
+  laborPensionAmount: number;
+  isHead: boolean;
+}
+
+/**
+ * 新增／更新員工（POST／PATCH /ael/employee）請求體。
+ * ⚠️ 讀寫語意不對稱：onboardDate／quitDate 讀回為 ISO 字串，寫入需為 unix seconds；
+ * laborInsuranceStartDate 讀回為 YYYY-MM-DD，寫入需為 YYYYMMDD（空字串＝到職日）。
+ */
+export interface SaveEmployeeBody {
+  /** 更新時帶入，新增可省略 */
+  id?: number;
+  name: string;
+  idNumber: string;
+  phoneNumber: string;
+  email: string;
+  employmentStatus: number;
+  idCardFront: string;
+  idCardBack: string;
+  householdAddress: string;
+  contactAddress: string;
+  nhiLevelId: number | null;
+  nhiDependents: number;
+  /** unix seconds */
+  onboardDate: number;
+  /** unix seconds；在職中傳 null */
+  quitDate: number | null;
+  companyUuid: string;
+  voluntaryPensionRate: number;
+  laborLevelId: number | null;
+  /** YYYYMMDD；空字串＝到職日 */
+  laborInsuranceStartDate: string;
+  laborPensionLevelId: number | null;
+  laborAmount: number;
+  nhiAmount: number;
+  laborPensionAmount: number;
+  jobTitle: string;
+  isHead: boolean;
+}
+
+/** 撈取員工列表（GET /ael/employee）回應；pagination 與 data 同級，非包在 data 內，故不能直接用 apiFetch 拆封 */
+export interface EmployeeListResult {
+  list: EmployeeDto[];
+  pagination: { page: number; pageSize: number; totalSize: number };
+}
+
+/** 上傳員工身分證（POST /ael/employees/upload）回應 data */
+export interface EmployeeIdCardUploadResult {
+  /** GCS object path，直接存入 idCardFront／idCardBack */
+  img: string;
+}
+
+/** GET /ael/employee/form 回應單筆；年份為西元年（2026-09-10 實測確認） */
+export interface SalaryYearMonthDto {
+  year: number;
+  month: number;
+}
+
+/** 健保／勞保／勞退投保級距（GET /ael/salary/insurance）單一級距項目 */
+export interface InsuranceGradeDto {
+  id: number;
+  /** 0＝無投保 */
+  grade: number;
+  salaryMin: number;
+  /** 最高級距可能為 null（無上限） */
+  salaryMax: number | null;
+  isParttime: boolean;
+  effectiveStart: string;
+  effectiveEnd: string;
+}
+
+/**
+ * GET /ael/salary/insurance 回應（西元年）。
+ * 2026-09-10 後端新增此端點取代舊的 GET /ael/onboarding/salary/insurance（沿用相同回應結構，
+ * 信封欄位為標準大寫 errorCode，不再需要 client.ts 的小寫 errorcode 相容處理）。
+ */
+export interface InsuranceGradesResult {
+  laborGrades: InsuranceGradeDto[];
+  laborPensionGrades: InsuranceGradeDto[];
+  nhiGrades: InsuranceGradeDto[];
+}
+
+/**
+ * 薪資明細（/ael/salary/*，見 Apifox EasyTax_Lite 專案「薪資」分類）。
+ * ⚠️ 年制對照（皆已實測或後端確認為西元）：
+ *   GET /ael/salary、GET /ael/salary/declare/month、GET /ael/salary/allsalary、
+ *   POST /ael/salary 的 year／paymentYear（paymentYear 已由後端確認，2026-09-10）、
+ *   calculate/insurance 的 year、calculate/other 的 year、calculate/rateValue 的 paymentYear
+ *   （allsalary 於 2026-09-10 由民國改西元、calculate/rateValue 的 paymentYear 同日也改成西元
+ *   且會擋民國值，回 `errorCode 0003「paymentYear/paymentMonth 無效（paymentYear 須為西元）」`）
+ */
+
+/**
+ * GET /ael/salary 內層薪資列。⚠️ OpenAPI 未定義此物件的完整 schema，僅由 example 洩漏以下 key
+ * （camelCase／snake_case 混用）：id、employeeId、employee_name、laborDays、voluntaryPensionAmount、
+ * paymentYear、laborInsurance、laborEmployeeAmount。故刻意不寫成具名 interface（避免在型別層捏造契約），
+ * 呼叫端一律透過 src/features/withholding/salary/salaryMapper.ts 的別名探測讀取。
+ */
+export type SalaryRowDto = Record<string, unknown>;
+
+/** GET /ael/salary 回應；pagination 與 data 同級（比照 EmployeeListResult），需改用 apiFetchEnvelope 取得 */
+export interface SalaryMonthResult {
+  /**
+   * key 為給付日 YYYYMMDD。⚠️ 實測證實：key 為 '00000000' 的陣列是後端為「該月尚無薪資列的員工」
+   * 自動產生的佔位列（id 為 null、金額欄位多為 0，但仍帶員工快照欄位），非真實薪資資料，
+   * 前端一律略過（見 salaryMapper.ts）。
+   */
+  byPaymentDate: Record<string, SalaryRowDto[]>;
+  pagination: { pageSize: number; totalSize: number };
+}
+
+/** GET /ael/salary/declare/month 回應；欄位名與 feature 層 PayrollMonthSummary 完全同名，可直接餵給畫面 */
+export interface SalaryDeclareMonthResult {
+  declareSalaryTotal: number;
+  payableSalaryTotal: number;
+  fixedSalaryTotal: number;
+  nonFixedSalaryTotal: number;
+}
+
+/** GET /ael/salary/allsalary 回應中的年度彙總；⚠️ 各欄語意（是否含自訂項目等）待後端確認 */
+export interface AllSalarySummaryDto {
+  totalCount: number;
+  totalFixedSalary: number;
+  totalNonFixedSalary: number;
+  totalOvertimePay: number;
+  totalMealAllowance: number;
+  totalAttendanceDeduction: number;
+  totalVolPension: number;
+  totalTaxWithheld: number;
+  totalLaborInsurance: number;
+  totalHealthInsurance: number;
+  totalNhiAmount: number;
+  totalOther: number;
+  totalSalary: number;
+}
+
+/**
+ * GET /ael/salary/allsalary 回應；⚠️ summary 與 data 同級（實測驗證），需改用 apiFetchEnvelope 取得。
+ * data 為 MM → MMDD → SalaryRowDto[]（查詢年度為西元年，2026-09-10 起，見 fetchAllSalary）。
+ */
+export interface AllSalaryResult {
+  byMonth: Record<string, Record<string, SalaryRowDto[]>>;
+  summary: AllSalarySummaryDto;
+}
+
+/** POST /ael/salary（Upsert 單筆薪資列）請求體 */
+export interface SaveSalaryBody {
+  companyUuid: string;
+  employeeId: number;
+  /** 西元年（比對姊妹專案 EASYTAX 規格確認） */
+  year: number;
+  month: number;
+  /** 西元年（後端已確認，2026-09-10）。注意 `calculate/rateValue` 的同名 `paymentYear` 卻是民國，兩者命名相同、年制不同，不可類推 */
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  /** 固定薪資 */
+  fixedSalary?: number;
+  /** 非固定薪資 */
+  nonFixedSalary?: number;
+  /** 加班費 */
+  overtimePay?: number;
+  /** 伙食費 */
+  mealAllowance?: number;
+  /** 請假/遲到/早退 */
+  attendanceDeduction?: number;
+  /** 退休金（勞退自提） */
+  volPension?: number;
+  /** 薪資扣繳 */
+  taxWithheld?: number;
+  /** 勞保 */
+  laborInsurance?: number;
+  /** 健保 */
+  healthInsurance?: number;
+  /** 總金額 */
+  totalSalary?: number;
+  secondHealthInsuranceFee?: number;
+  /**
+   * 自訂薪資項目（加項／減項）。OpenAPI 規格本身 properties 是空的，格式依使用者提供的範例：
+   * key 為項目名稱，`addSub` 為 `'+'`（加項）或 `'-'`（減項），`value` 為金額。
+   * ⚠️ 用項目名稱當 object key，改名或兩個項目同名時會互相覆蓋，是這個格式本身的限制，
+   * 見 SaveSalaryBody 下方 JSDoc 的替代設計建議。
+   */
+  extraFields?: Record<string, { addSub: '+' | '-'; value: number }>;
+}
+
+/**
+ * `extraFields` 更穩健的替代設計建議（供之後跟後端討論用，目前未採用）：
+ * 改成陣列 `[{ name: string; addSub: '+' | '-'; value: number }]`，不用項目名稱當 key，
+ * 避免改名/同名互相覆蓋，陣列順序也能明確保留使用者排的加減項順序（object 的 key 順序雖然
+ * JS 引擎實務上會保留，但不是 JSON 規格保證的行為）。
+ */
+
+/** POST /ael/salary 回應 */
+export interface SaveSalaryResult {
+  message: string;
+  action: 'create' | 'update';
+  id: number;
+}
+
+/** DELETE /ael/salary 回應；id 為 etlite_salary.id（單筆薪資列主鍵），非 companyUuid+id 組合 */
+export interface DeleteSalaryResult {
+  deleted: boolean;
+}
+
+/** POST /ael/salary/calculate/insurance 請求體 */
+export interface SalaryInsuranceCalcBody {
+  employeeId: number;
+  companyUuid: string;
+  /** 西元年（比對姊妹專案 EASYTAX 規格確認） */
+  year: number;
+  month: number;
+}
+
+/** POST /ael/salary/calculate/insurance 回應：員工勞保／員工健保／勞退自提試算預設值 */
+export interface SalaryInsuranceCalcResult {
+  /** 員工勞保 */
+  laborInsurance: number;
+  /** 員工健保 */
+  healthInsurance: number;
+  /** 勞退自提 */
+  volPension: number;
+}
+
+/**
+ * POST /ael/salary/calculate/other 請求體。
+ * ⚠️ 姊妹專案 EASYTAX 對應端點只吃 employeeId／companyUuid／year／month 四個參數，
+ * 沒有 amount／salary／nonFixedSalary，無法比對確認這三者語意，仍待後端回覆。
+ */
+export interface SalaryOtherCalcBody {
+  employeeId: number;
+  companyUuid: string;
+  /** 西元年（比對姊妹專案 EASYTAX 規格確認） */
+  year: number;
+  month: number;
+  amount: number;
+  salary: number;
+  nonFixedSalary: number;
+}
+
+/** POST /ael/salary/calculate/other 回應：二代健保金額與扣繳稅試算 */
+export interface SalaryOtherCalcResult {
+  /** 是否兼職 */
+  isPartTime: boolean;
+  /** 累積年度獎金 */
+  totalYearBonus: number;
+  /** 扣繳倍率 */
+  rateValue: number;
+  /** 二代健保計算值 */
+  nhiAmount: number;
+  /** 扣繳稅款 */
+  taxWithheldSum: number;
+}
+
+/**
+ * 各類扣繳所得類別代號；薪資情境固定用 '50'。完整代碼表（比對姊妹專案 EASYTAX 規格取得，
+ * 本專案 calculate/rateValue 的 enum 只開放其中 5 碼）：
+ * 50=薪資, 9A=執行業務, 9B=稿費, 51=租金, 52=非固定薪資(暫定), 53=權利金, 91=中獎獎金,
+ * 92=其他所得, 93=退職所得, 97=受贈所得, 5B=其他利息
+ */
+export type SalaryIncomeCode = '50' | '9A' | '9B' | '51' | '52';
+/** 居住者身分代碼：0＝本國人、1＝外國人滿183天（皆視為居住者，費率相同）、2＝外國人未滿183天（非居住者） */
+export type ResidencyCode = 0 | 1 | 2;
+/** 0＝扣繳稅款、1＝二代健保（比對姊妹專案 EASYTAX 規格確認） */
+export type ComponentCode = 0 | 1;
+
+/** POST /ael/salary/calculate/rateValue 請求體 */
+export interface SalaryRateValueBody {
+  salary: number;
+  incomeCode: SalaryIncomeCode;
+  residencyCode: ResidencyCode;
+  componentCode: ComponentCode;
+  /**
+   * 西元年（2026-09-10 後端已改為西元，會拒絕民國值：傳民國年回
+   * `errorCode 0003「paymentYear/paymentMonth 無效（paymentYear 須為西元）」`，已實測確認）。
+   * OpenAPI 文件字面上仍寫「民國年」，是文件沒跟著更新，不是行為，以實測為準。
+   */
+  paymentYear: number;
+  paymentMonth: number;
+}
+
+/** POST /ael/salary/calculate/rateValue 回應 */
+export interface SalaryRateValueResult {
+  rateValue: number;
+}
+
+/**
+ * 繳款書種類（GET/DELETE /ael/salary/pdf 的 type 參數）：1＝薪資所得扣繳稅額繳款書、
+ * 2＝二代健保繳款書、8＝兼職所得二代健保繳款書。本期只串接 1、2（見 salary.ts 開頭註解）。
+ */
+export type SalaryDocumentType = 1 | 2 | 8;
+
+/**
+ * GET /ael/salary/pdf 回應單筆。
+ * ⚠️ 年制為民國（2026-09-10 實測＋規格確認），這批繳款書端點尚未跟上其餘端點的西元化，
+ * api/salary.ts 對外仍統一收西元、函式內部轉換，呼叫端不需關心。
+ */
+export interface SalaryDocumentDto {
+  uuid: string;
+  pdfFileUrl: string | null;
+  updateTime: string;
+  year: number;
+  month: number;
+  day: number;
+}
+
+/** POST /ael/salary/insurance/download/rateValue、download/healthInsurance 共用回應結構 */
+export interface GenerateSalaryDocumentResult {
+  acUuid: string;
+  pdfFileUrl: string;
+  pdfUuid: string;
+  year: number;
+  month: number;
+}
+
+/** POST /ael/salary/insurance/download/rateValue 請求體（不含 acUuid，由 salary.ts 自動帶入）；年制：民國 */
+export interface GenerateWithholdingDocumentBody {
+  incomeYear: number;
+  incomeMonth: number;
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  /** 是否已超過繳納期限（發薪日次月 10 日），由前端依目前日期自行判斷 */
+  isOverDeadline: boolean;
+}
+
+/** POST /ael/salary/insurance/download/healthInsurance 請求體（不含 acUuid，由 salary.ts 自動帶入）；年制：民國 */
+export interface GenerateHealthInsuranceDocumentBody {
+  /** 應繳補充保險費（本月二代健保金額總計） */
+  supplementaryInsuranceFee: number;
+  year: number;
+  month: number;
+}
+
+/**
+ * POST /ael/salary/insurance/download/parttime 請求體（不含 acUuid，由 salary.ts 自動帶入）；年制：民國。
+ * ⚠️ 參數名雖叫 `salary`，語意實際是「該月兼職（健保無投保）員工的二代健保金額加總」，
+ * 跟 download/healthInsurance 的 `supplementaryInsuranceFee` 是同一種東西、只是篩選對象不同
+ * （比對姊妹專案 EASYTAX 的 `getParttimeHealthInsuranceApiTotal` 邏輯確認，不是真的送薪資金額）。
+ */
+export interface GenerateParttimeDocumentBody {
+  year: number;
+  month: number;
+  /** 兼職員工二代健保金額加總（>0） */
+  salary: number;
 }

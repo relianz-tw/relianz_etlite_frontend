@@ -4,6 +4,7 @@ import Label from '@/components/ui/Label';
 import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { fmtCurrency } from '@/lib/utils';
+import { RefreshCw } from 'lucide-react';
 import { calculatePayable, paymentDateOf, withPaymentDate } from '../calc';
 import type { PayrollItem } from '../types';
 
@@ -11,9 +12,15 @@ interface PayrollMobileCardsProps {
   items: PayrollItem[];
   onChange: (items: PayrollItem[]) => void;
   readOnly?: boolean;
+  /** 目前正在重新試算的員工 id，用於該卡片按鈕顯示載入中 */
+  recalculatingEmployeeId?: number | null;
+  /** employeeId → 試算失敗訊息 */
+  rowCalcErrors?: Record<number, string>;
+  /** 清除該卡片手動覆寫並重新呼叫試算端點 */
+  onRecalculateRow?: (employeeId: number) => void;
 }
 
-function updateItem(items: PayrollItem[], employeeId: string, patch: Partial<PayrollItem>): PayrollItem[] {
+function updateItem(items: PayrollItem[], employeeId: number, patch: Partial<PayrollItem>): PayrollItem[] {
   return items.map(item => (item.employeeId === employeeId ? { ...item, ...patch } : item));
 }
 
@@ -31,7 +38,7 @@ const FIELD_LABELS: { key: keyof PayrollItem; label: string; deduction?: boolean
 ];
 
 /** 手機版薪資明細卡片，欄位順序與桌機表格一致，供 < nav 斷點顯示 */
-export default function PayrollMobileCards({ items, onChange, readOnly = false }: PayrollMobileCardsProps) {
+export default function PayrollMobileCards({ items, onChange, readOnly = false, recalculatingEmployeeId, rowCalcErrors, onRecalculateRow }: PayrollMobileCardsProps) {
   return (
     <div className="flex flex-col gap-4 nav:hidden">
       {items.map(item => (
@@ -40,6 +47,20 @@ export default function PayrollMobileCards({ items, onChange, readOnly = false }
             <span className="font-semibold text-neutral-dark">{item.name}</span>
             <span className="font-mono text-xs text-neutral-mid">{item.idNumber}</span>
           </div>
+          {onRecalculateRow && (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => onRecalculateRow(item.employeeId)}
+                disabled={readOnly || recalculatingEmployeeId === item.employeeId}
+                className="flex items-center gap-1 text-xs text-brand-blue hover:underline disabled:cursor-not-allowed disabled:text-neutral-mid disabled:no-underline"
+              >
+                <RefreshCw size={12} className={recalculatingEmployeeId === item.employeeId ? 'animate-spin' : undefined} />
+                重新試算五項試算欄位
+              </button>
+              {rowCalcErrors?.[item.employeeId] && <p className="mt-1 text-[11px] text-neutral-mid">{rowCalcErrors[item.employeeId]}</p>}
+            </div>
+          )}
 
           <div className="mb-3">
             <Label>給薪日期</Label>

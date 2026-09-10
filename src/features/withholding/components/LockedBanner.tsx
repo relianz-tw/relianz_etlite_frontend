@@ -23,7 +23,7 @@ export default function LockedBanner({ className = '' }: { className?: string })
         className="flex items-center gap-1 text-xs text-neutral-mid underline decoration-dotted hover:text-neutral-dark"
       >
         {isLocked ? <LockOpen size={12} /> : <Lock size={12} />}
-        （示範）切換扣繳鎖定狀態
+        （示範，尚未串接後端）切換扣繳鎖定狀態
       </button>
     </div>
   );

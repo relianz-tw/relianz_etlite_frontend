@@ -19,7 +19,6 @@ import Field from '../components/Field';
 import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
 import { NATIONALITY_OPTIONS, parseNationality, SERVICE_TYPE_OPTIONS } from './data';
-import { setLaborOrderCode } from './localExtras';
 import type { LaborNationalityCode, LaborServiceType } from './types';
 
 function todayParts(): { year: number; month: number; day: number } {
@@ -149,10 +148,6 @@ export default function LaborFormView() {
         paymentMonth: paymentDate.getMonth() + 1,
         paymentDay: paymentDate.getDate(),
       });
-      // 列表 API 尚未回傳 orderCode，先暫存讓自己剛建立的這筆立刻能顯示交易編號
-      if (result?.labourUuid && result?.orderCode) {
-        setLaborOrderCode(result.labourUuid, result.orderCode);
-      }
       if (rememberProvider) {
         await saveLabourProvider({
           name: name.trim(),

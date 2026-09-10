@@ -181,7 +181,7 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
             </div>
           </SectionCard>
 
-          <LaborPdfManager record={record} onChange={refresh} />
+          <LaborPdfManager record={record} />
 
           <div className="flex items-center justify-between">
             <Button variant="danger" icon={Trash2} disabled title="刪除功能尚未串接後端 API">

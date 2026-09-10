@@ -1,7 +1,6 @@
 import type { LabourFormDto } from '@/api/types';
-import { getLaborOrderCode } from './localExtras';
 import type { LaborLocalExtras } from './localExtras';
-import type { LaborNationalityCode, LaborRecord, LaborServiceType, NhiDeclareStatus } from './types';
+import type { LaborNationalityCode, LaborRecord, LaborServiceType } from './types';
 
 export const SERVICE_TYPE_OPTIONS: { value: LaborServiceType; label: string; hint: string }[] = [
   { value: '50', label: '兼職 / 臨時人員 (50)', hint: '例：一般約聘員工或臨時人員，固定薪資員工無需填寫勞報單' },
@@ -42,18 +41,6 @@ export function serviceTypeLabel(serviceType: string): string {
   return SERVICE_TYPE_OPTIONS.find(o => o.value === serviceType)?.label ?? serviceType;
 }
 
-const NHI_DECLARE_STATUS_TEXT: Record<NhiDeclareStatus, string> = {
-  0: '取消申報',
-  1: '已受理',
-  2: '系統入檔中',
-  3: '入檔成功',
-  4: '入檔失敗',
-};
-
-export function nhiDeclareStatusText(status: NhiDeclareStatus): string {
-  return NHI_DECLARE_STATUS_TEXT[status];
-}
-
 /**
  * 對外免登入簽署頁連結；ic 帶入所得類別代號（GET /ael/labour 詳情／簽署頁查詢需要），
  * basePath '/etlite' 對齊 next.config.js 設定。
@@ -75,7 +62,7 @@ export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtra
   return {
     uuid: dto.labourUuid,
     withholdingId: dto.withholdingId ?? '',
-    orderCode: dto.orderCode || getLaborOrderCode(dto.labourUuid),
+    orderCode: dto.orderCode ?? '',
     name: dto.name,
     idNumber: dto.identifyNumber,
     phone: dto.phone,
@@ -101,6 +88,12 @@ export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtra
     countryName: dto.countryName,
     code: dto.code,
     createTime: dto.createTime,
+    isRemitWithholding: dto.isRemitWithholding,
+    withholdingRemitDate: dto.withholdingRemitDate ?? '',
+    isRemitNhi: dto.isRemitNhi,
+    nhiRemitDate: dto.nhiRemitDate ?? '',
+    isNhiDeclare: dto.isNhiDeclare,
+    nhiDeclareDate: dto.nhiDeclareDate ?? '',
     ...extras,
   };
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { createEmployee, deleteEmployee, updateEmployee, uploadEmployeeIdCard } from '@/api/employee';
+import type { InsuranceGradeDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -8,14 +10,16 @@ import SectionCard from '@/components/ui/SectionCard';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
+import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Field from '../components/Field';
-import { LABOR_GRADES, LABOR_PENSION_GRADES, NHI_GRADES, VOLUNTARY_PENSION_RATES } from './data';
-import { addEmployee, deleteEmployee, getEmployee, updateEmployee } from './mockStore';
+import SignImageUpload from '../labor/components/SignImageUpload';
+import { findGradeByAmount, gradeLabel, isGradeBelowMinAmount, toSaveEmployeeBody, VOLUNTARY_PENSION_RATES } from './data';
 import type { Employee, EmploymentStatus } from './types';
+import { useEmployee, useInsuranceGrades, useNhiHeadMinGrade } from './useEmployees';
 
 const EMPTY: Omit<Employee, 'id'> = {
   name: '',
@@ -23,16 +27,16 @@ const EMPTY: Omit<Employee, 'id'> = {
   jobTitle: '',
   phoneNumber: '',
   email: '',
+  idCardFront: '',
+  idCardBack: '',
   householdAddress: '',
   contactAddress: '',
-  nhiGradeId: NHI_GRADES[1].id,
-  hasDependents: false,
+  nhiLevelId: null,
   nhiDependents: 0,
-  laborGradeId: LABOR_GRADES[1].id,
+  laborLevelId: null,
   laborInsuranceStartDate: '',
-  hasVoluntaryPension: false,
   voluntaryPensionRate: 0,
-  laborPensionGradeId: LABOR_PENSION_GRADES[0].id,
+  laborPensionLevelId: null,
   onboardDate: '',
   status: 'active',
   quitDate: '',
@@ -40,8 +44,7 @@ const EMPTY: Omit<Employee, 'id'> = {
 };
 
 interface EmployeeFormViewProps {
-  /** 提供時為編輯模式，內部依此 id 從 mockStore 讀取員工資料（不由外層 Server Component 傳入完整物件，
-   *  因假資料僅存於瀏覽器端記憶體，伺服器端永遠只會讀到初始種子資料） */
+  /** 提供時為編輯模式，內部依此 id 呼叫 API 讀取員工資料 */
   employeeId?: string;
 }
 
@@ -57,33 +60,91 @@ function fromDate(date: Date | undefined): string {
   return `${y}-${m}-${d}`;
 }
 
+function gradeOptions(grades: InsuranceGradeDto[]) {
+  return grades.map(g => (
+    <option key={g.id} value={String(g.id)}>
+      {gradeLabel(g)}
+    </option>
+  ));
+}
+
 export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) {
   const router = useRouter();
-  const employee = employeeId ? getEmployee(employeeId) : undefined;
-  const isEdit = Boolean(employee);
-  const [form, setForm] = useState<Omit<Employee, 'id'>>(employee ? { ...employee } : EMPTY);
-  const [sameAddress, setSameAddress] = useState(employee ? employee.householdAddress === employee.contactAddress : false);
+  const numericId = employeeId ? Number(employeeId) : undefined;
+  const { employee, loading, error: loadError } = useEmployee(numericId);
+  const isEdit = Boolean(numericId);
+  const year = employee?.onboardDate ? Number(employee.onboardDate.slice(0, 4)) : new Date().getFullYear();
+  const { laborGrades, laborPensionGrades, nhiGrades, loading: gradesLoading } = useInsuranceGrades(year);
+
+  const [form, setForm] = useState<Omit<Employee, 'id'>>(EMPTY);
+  // 負責人健保投保最低金額（法規：不得低於已投保員工中的最高投保金額），只在勾選負責人時查詢
+  const { minAmount: nhiHeadMinAmount } = useNhiHeadMinGrade(year, form.isHead);
+  const nhiHeadMinCompliantGrade = form.isHead && nhiHeadMinAmount !== null ? findGradeByAmount(nhiGrades, nhiHeadMinAmount) : undefined;
+  const nhiGradeOptionsSource =
+    form.isHead && nhiHeadMinAmount !== null ? nhiGrades.filter(g => g.grade === 0 || !isGradeBelowMinAmount(g, nhiHeadMinAmount)) : nhiGrades;
+
+  // 負責人最低金額載入完成、或使用者切換為負責人時：若目前健保級距低於門檻，自動跳轉到最低合規級距
+  useEffect(() => {
+    if (!form.isHead || nhiHeadMinAmount === null || nhiGrades.length === 0) return;
+    const current = nhiGrades.find(g => g.id === form.nhiLevelId);
+    if (current && current.grade !== 0 && isGradeBelowMinAmount(current, nhiHeadMinAmount)) {
+      const compliant = findGradeByAmount(nhiGrades, nhiHeadMinAmount);
+      if (compliant) setForm(prev => ({ ...prev, nhiLevelId: compliant.id }));
+    }
+  }, [form.isHead, form.nhiLevelId, nhiHeadMinAmount, nhiGrades]);
+
+  const [initialized, setInitialized] = useState(false);
+  const [sameAddress, setSameAddress] = useState(false);
+  const [hasDependents, setHasDependents] = useState(false);
+  const [hasVoluntaryPension, setHasVoluntaryPension] = useState(false);
+  const [idCardFrontFile, setIdCardFrontFile] = useState<File | null>(null);
+  const [idCardBackFile, setIdCardBackFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  if (employeeId && !employee) {
+  // 編輯模式資料載入完成後，用實際員工資料初始化表單 local state（僅執行一次，避免覆蓋使用者輸入）
+  useEffect(() => {
+    if (!isEdit || !employee || initialized) return;
+    setForm({ ...employee });
+    setSameAddress(employee.householdAddress === employee.contactAddress);
+    setHasDependents(employee.nhiDependents > 0);
+    setHasVoluntaryPension(employee.voluntaryPensionRate > 0);
+    setInitialized(true);
+  }, [isEdit, employee, initialized]);
+
+  if (isEdit && loading) {
+    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">載入中…</div>;
+  }
+
+  if (isEdit && (loadError || !employee)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">
-        找不到此員工資料
+        {loadError || '找不到此員工資料'}
       </div>
     );
   }
 
   const update = <K extends keyof Employee>(key: K, value: Employee[K]) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const laborUninsured = LABOR_GRADES.find(g => g.id === form.laborGradeId)?.grade === 0;
+  // 級距表本身含「無投保」選項（grade === 0，非固定 id），故用查表判斷而非直接比對 null
+  const laborUninsured = form.laborLevelId === null || laborGrades.find(g => g.id === form.laborLevelId)?.grade === 0;
 
-  const handleSubmit = () => {
-    if (!form.name.trim() || !form.idNumber.trim() || !form.jobTitle.trim() || !form.householdAddress.trim() || !form.onboardDate) {
+  const handleSubmit = async () => {
+    if (
+      !form.name.trim() ||
+      !form.idNumber.trim() ||
+      !form.jobTitle.trim() ||
+      !form.householdAddress.trim() ||
+      !form.onboardDate ||
+      !form.idCardFront ||
+      !form.idCardBack
+    ) {
       setError('請填寫所有必填欄位');
       return;
     }
-    if (form.hasDependents && form.nhiDependents < 1) {
+    if (hasDependents && form.nhiDependents < 1) {
       setError('眷屬人數至少為 1');
       return;
     }
@@ -91,18 +152,66 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
       setError('請填寫離職日期');
       return;
     }
-    if (isEdit && employee) {
-      updateEmployee(employee.id, form);
-    } else {
-      addEmployee(form);
+    setError('');
+    setSubmitting(true);
+    try {
+      const body = toSaveEmployeeBody(form, { laborGrades, laborPensionGrades, nhiGrades });
+      if (isEdit && numericId) {
+        await updateEmployee({ ...body, id: numericId });
+      } else {
+        await createEmployee(body);
+      }
+      router.push('/withholding/salary/employee');
+    } catch (err) {
+      // 後端「XXX 必填」的驗證錯誤會夾帶欄位英文名稱，統一改顯示通用訊息避免技術字眼外洩
+      if (err instanceof ApiError && /必填/.test(err.message)) {
+        setError('有欄位尚未填寫');
+      } else {
+        setError(getFriendlyErrorMessage(err));
+      }
+    } finally {
+      setSubmitting(false);
     }
-    router.push('/withholding/salary/employee');
   };
 
-  const handleDelete = () => {
-    if (!employee) return;
-    deleteEmployee(employee.id);
-    router.push('/withholding/salary/employee');
+  const handleDelete = async () => {
+    if (!numericId) return;
+    setDeleting(true);
+    try {
+      await deleteEmployee(numericId);
+      router.push('/withholding/salary/employee');
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err));
+      setDeleting(false);
+    }
+  };
+
+  const handleIdCardFrontChange = async (file: File | null) => {
+    setIdCardFrontFile(file);
+    if (!file) {
+      update('idCardFront', '');
+      return;
+    }
+    try {
+      const result = await uploadEmployeeIdCard(file);
+      update('idCardFront', result.img);
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err, '身分證正面上傳失敗'));
+    }
+  };
+
+  const handleIdCardBackChange = async (file: File | null) => {
+    setIdCardBackFile(file);
+    if (!file) {
+      update('idCardBack', '');
+      return;
+    }
+    try {
+      const result = await uploadEmployeeIdCard(file);
+      update('idCardBack', result.img);
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err, '身分證反面上傳失敗'));
+    }
   };
 
   return (
@@ -136,6 +245,21 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
             </div>
           </SectionCard>
 
+          <SectionCard title="身分證影本">
+            <div className="grid grid-cols-1 gap-4 nav:grid-cols-2">
+              <SignImageUpload
+                title="身分證正面"
+                onFileChange={handleIdCardFrontChange}
+                hasExistingFile={isEdit && Boolean(employee?.idCardFront) && !idCardFrontFile}
+              />
+              <SignImageUpload
+                title="身分證反面"
+                onFileChange={handleIdCardBackChange}
+                hasExistingFile={isEdit && Boolean(employee?.idCardBack) && !idCardBackFile}
+              />
+            </div>
+          </SectionCard>
+
           <SectionCard title="地址">
             <div className="grid grid-cols-1 gap-4 nav:grid-cols-2">
               <Field label="戶籍地址" required>
@@ -162,16 +286,23 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
             </div>
           </SectionCard>
 
-          <SectionCard title="保險投保設定">
+          <SectionCard title="保險投保設定" action={gradesLoading ? <span className="text-xs font-normal text-neutral-mid">級距載入中…</span> : undefined}>
             <div className="grid grid-cols-1 gap-4 nav:grid-cols-2">
               <Field label="健保投保金額" required>
-                <Select widthClassName="w-full" value={String(form.nhiGradeId)} onValueChange={v => update('nhiGradeId', Number(v))}>
-                  {NHI_GRADES.map(g => (
-                    <option key={g.id} value={String(g.id)}>
-                      {g.grade === 0 ? '無投保' : `$${g.salaryMax?.toLocaleString('en-US')}`}
-                    </option>
-                  ))}
+                <Select
+                  widthClassName="w-full"
+                  value={form.nhiLevelId === null ? '' : String(form.nhiLevelId)}
+                  onValueChange={v => update('nhiLevelId', v === '' ? null : Number(v))}
+                >
+                  {gradeOptions(nhiGradeOptionsSource)}
                 </Select>
+                {form.isHead && (
+                  <p className="mt-1.5 text-xs text-neutral-mid">
+                    負責人之健保投保金額，不得低於已投保員工中的最高投保金額
+                    {nhiHeadMinCompliantGrade &&
+                      `，目前最低必須為 ${nhiHeadMinCompliantGrade.salaryMax === null ? `$${nhiHeadMinCompliantGrade.salaryMin.toLocaleString('en-US')} 以上` : `$${nhiHeadMinCompliantGrade.salaryMax.toLocaleString('en-US')}`}`}
+                  </p>
+                )}
               </Field>
               <Field label="有無健保投保眷屬" required>
                 <SegmentedControl
@@ -179,11 +310,15 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
                     { value: 'yes', label: '有扶養親屬' },
                     { value: 'no', label: '無扶養親屬' },
                   ]}
-                  value={form.hasDependents ? 'yes' : 'no'}
-                  onChange={v => update('hasDependents', v === 'yes')}
+                  value={hasDependents ? 'yes' : 'no'}
+                  onChange={v => {
+                    const next = v === 'yes';
+                    setHasDependents(next);
+                    if (!next) update('nhiDependents', 0);
+                  }}
                 />
               </Field>
-              {form.hasDependents && (
+              {hasDependents && (
                 <Field label="眷屬人數" required>
                   <TextInput
                     type="number"
@@ -195,12 +330,12 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
               )}
 
               <Field label="勞保投保金額" required>
-                <Select widthClassName="w-full" value={String(form.laborGradeId)} onValueChange={v => update('laborGradeId', Number(v))}>
-                  {LABOR_GRADES.map(g => (
-                    <option key={g.id} value={String(g.id)}>
-                      {g.grade === 0 ? '無投保' : `$${g.salaryMax?.toLocaleString('en-US')}`}
-                    </option>
-                  ))}
+                <Select
+                  widthClassName="w-full"
+                  value={form.laborLevelId === null ? '' : String(form.laborLevelId)}
+                  onValueChange={v => update('laborLevelId', v === '' ? null : Number(v))}
+                >
+                  {gradeOptions(laborGrades)}
                 </Select>
               </Field>
               {!laborUninsured && (
@@ -219,15 +354,16 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
                     { value: 'yes', label: '有自提' },
                     { value: 'no', label: '無自提' },
                   ]}
-                  value={form.hasVoluntaryPension ? 'yes' : 'no'}
+                  value={hasVoluntaryPension ? 'yes' : 'no'}
                   onChange={v => {
                     const has = v === 'yes';
-                    update('hasVoluntaryPension', has);
+                    setHasVoluntaryPension(has);
                     update('voluntaryPensionRate', has ? 1 : 0);
+                    if (!has) update('laborPensionLevelId', null);
                   }}
                 />
               </Field>
-              {form.hasVoluntaryPension && (
+              {hasVoluntaryPension && (
                 <>
                   <Field label="自提比例" required>
                     <Select widthClassName="w-full" value={String(form.voluntaryPensionRate)} onValueChange={v => update('voluntaryPensionRate', Number(v))}>
@@ -239,12 +375,12 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
                     </Select>
                   </Field>
                   <Field label="勞工退休金月提投保金額" required helper="勞退投保金額不得低於其勞保投保金額">
-                    <Select widthClassName="w-full" value={String(form.laborPensionGradeId)} onValueChange={v => update('laborPensionGradeId', Number(v))}>
-                      {LABOR_PENSION_GRADES.map(g => (
-                        <option key={g.id} value={String(g.id)}>
-                          {`$${g.salaryMax?.toLocaleString('en-US')}`}
-                        </option>
-                      ))}
+                    <Select
+                      widthClassName="w-full"
+                      value={form.laborPensionLevelId === null ? '' : String(form.laborPensionLevelId)}
+                      onValueChange={v => update('laborPensionLevelId', v === '' ? null : Number(v))}
+                    >
+                      {gradeOptions(laborPensionGrades.filter(g => g.grade !== 0))}
                     </Select>
                   </Field>
                 </>
@@ -284,8 +420,8 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
 
           <div className="flex items-center justify-between">
             {isEdit ? (
-              <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)}>
-                刪除員工
+              <Button variant="danger" icon={Trash2} onClick={() => setDeleteOpen(true)} disabled={submitting || deleting}>
+                {deleting ? '刪除中…' : '刪除員工'}
               </Button>
             ) : (
               <span />
@@ -294,7 +430,9 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
               <Link href="/withholding/salary/employee" className="inline-flex">
                 <Button variant="outline">取消</Button>
               </Link>
-              <Button onClick={handleSubmit}>{isEdit ? '更新員工' : '新增員工'}</Button>
+              <Button onClick={handleSubmit} disabled={submitting}>
+                {submitting ? '送出中…' : isEdit ? '更新員工' : '新增員工'}
+              </Button>
             </div>
           </div>
         </div>

@@ -1,224 +1,273 @@
 'use client';
 
-import Badge from '@/components/ui/Badge';
+import { deleteSalaryDocument, fetchSalaryDocuments, generateHealthInsuranceDocument, generateParttimeDocument, generateWithholdingDocument } from '@/api/salary';
+import type { SalaryDocumentDto } from '@/api/types';
 import Button from '@/components/ui/Button';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { fmtCurrency } from '@/lib/utils';
-import { useState } from 'react';
-import { useLock } from '../../components/LockContext';
-import FileListSection from '../../components/FileListSection';
-import MockFilePreviewModal from '../../components/MockFilePreviewModal';
-import PaymentProofDialog from '../../components/PaymentProofDialog';
-import { createMockFile, type MockFile } from '../../components/mockFile';
-import { getPayrollMonthDocs, updatePayrollMonthDocs } from '../mockStore';
+import { getFriendlyErrorMessage } from '@/lib/errors';
+import { Eye, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { isNhiUninsured } from '../data';
 import type { PayrollItem } from '../types';
-import HealthInsuranceConfirmDialog from './HealthInsuranceConfirmDialog';
-import TaxWithholdingConfirmDialog from './TaxWithholdingConfirmDialog';
+import { useInsuranceGrades } from '../useEmployees';
 
 interface SalaryPdfManagerProps {
+  /** 所得歸屬年（西元，來自 URL） */
   year: number;
   month: number;
   items: PayrollItem[];
+  readOnly: boolean;
 }
 
-const DECLARE_LABEL: Record<'not_declared' | 'partial' | 'all', string> = {
-  not_declared: '全部申報',
-  partial: '部分申報',
-  all: '已申報',
-};
+// ⚠️ .env.production 目前尚未設定此值（見 .env.dev／.env.development／.env.staging），正式環境上線前需補上
+const IMG_BASE_URL = process.env.NEXT_PUBLIC_IMG_URL ?? '';
 
-export default function SalaryPdfManager({ year, month, items }: SalaryPdfManagerProps) {
-  const { isLocked } = useLock();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
-  void tick;
+function documentUrl(pdfFileUrl: string): string {
+  return pdfFileUrl.startsWith('http') ? pdfFileUrl : `${IMG_BASE_URL}/${pdfFileUrl}`;
+}
 
-  const docs = getPayrollMonthDocs(year, month);
+/**
+ * 挑出最多員工共用的給薪日期，供產生扣繳繳款書使用（後端此端點一次只收一組給薪日期，
+ * 不支援依日期分組各產一份）。給薪日期不一致時，少數人員的日期不會反映在繳款書上，
+ * 這是刻意簡化的範圍：多組給薪日期各自產生對應繳款書屬於較大的功能擴充，本期未做。
+ */
+function pickPaymentDate(items: PayrollItem[]): { year: number; month: number; day: number } | null {
+  const counts = new Map<string, { year: number; month: number; day: number; count: number }>();
+  items.forEach(item => {
+    if (!item.paymentYear || !item.paymentMonth || !item.paymentDay) return;
+    const key = `${item.paymentYear}-${item.paymentMonth}-${item.paymentDay}`;
+    const entry = counts.get(key) ?? { year: item.paymentYear, month: item.paymentMonth, day: item.paymentDay, count: 0 };
+    entry.count += 1;
+    counts.set(key, entry);
+  });
+  let best: { year: number; month: number; day: number; count: number } | null = null;
+  counts.forEach(entry => {
+    if (!best || entry.count > best.count) best = entry;
+  });
+  return best;
+}
+
+/** 是否已超過扣繳稅款繳納期限（發薪日次月 10 日 23:59，比照畫面下方提醒文案） */
+function isPastWithholdingDeadline(paymentYear: number, paymentMonth: number, paymentDay: number): boolean {
+  const deadline = new Date(paymentYear, paymentMonth, 10, 23, 59, 59);
+  return new Date() > deadline;
+}
+
+function DocumentList({
+  docs,
+  onDelete,
+  deletingUuid,
+  readOnly,
+}: {
+  docs: SalaryDocumentDto[];
+  onDelete: (uuid: string) => void;
+  deletingUuid: string | null;
+  readOnly: boolean;
+}) {
+  if (docs.length === 0) return <p className="text-xs text-neutral-mid">尚未產生</p>;
+  return (
+    <ul className="flex flex-col gap-2">
+      {docs.map(doc => (
+        <li key={doc.uuid} className="flex items-center justify-between gap-3 rounded-md border border-neutral-blue-gray/20 bg-surface-cream px-3 py-2 text-xs">
+          <span className="text-neutral-mid">產生時間：{doc.updateTime}</span>
+          <div className="flex gap-1.5">
+            {doc.pdfFileUrl && IMG_BASE_URL && (
+              <a
+                href={documentUrl(doc.pdfFileUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded px-2 py-1 font-medium text-brand-blue hover:bg-brand-blue/10"
+              >
+                <Eye size={14} /> 查看
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => onDelete(doc.uuid)}
+              disabled={readOnly || deletingUuid === doc.uuid}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 font-medium text-semantic-error hover:bg-semantic-error/10 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Trash2 size={14} /> {deletingUuid === doc.uuid ? '刪除中…' : '刪除'}
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * 扣繳／二代健保繳款書產製與清單。
+ * ⚠️ 後端目前只有「產生」「查詢」「刪除」三種端點，沒有標記已繳款／已申報／上傳繳款證明的寫入端點，
+ * 這三個按鈕維持停用，待後端提供對應 API 後再串接。
+ * ⚠️ 後端產生端點本身沒有防重複產生的機制，前端靠「本月已有一份時停用產生按鈕」自行把關。
+ * ⚠️ 二代健保依員工健保是否「無投保」（見 data.ts isNhiUninsured）分成正職／兼職兩份繳款書，
+ * 兩者金額互斥加總，避免同一筆二代健保金額被重複申報（比對姊妹專案 EASYTAX 邏輯確認）。
+ */
+export default function SalaryPdfManager({ year, month, items, readOnly }: SalaryPdfManagerProps) {
   const totalWithholding = items.reduce((sum, i) => sum + i.withholding, 0);
-  const totalNhi = items.reduce((sum, i) => sum + i.secondHealthInsuranceFee, 0);
+  const { nhiGrades, loading: gradesLoading } = useInsuranceGrades(year);
+  const parttimeItems = items.filter(i => isNhiUninsured(i.nhiLevelId, nhiGrades));
+  const regularItems = items.filter(i => !isNhiUninsured(i.nhiLevelId, nhiGrades));
+  const totalNhiRegular = regularItems.reduce((sum, i) => sum + i.secondHealthInsuranceFee, 0);
+  const totalNhiParttime = parttimeItems.reduce((sum, i) => sum + i.secondHealthInsuranceFee, 0);
 
-  const [taxConfirmOpen, setTaxConfirmOpen] = useState(false);
-  const [nhiConfirmOpen, setNhiConfirmOpen] = useState(false);
-  const [taxProofOpen, setTaxProofOpen] = useState(false);
-  const [nhiProofOpen, setNhiProofOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState<MockFile | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ kind: 'withholdingFiles' | 'nhiFiles'; file: MockFile } | null>(null);
+  const [withholdingDocs, setWithholdingDocs] = useState<SalaryDocumentDto[]>([]);
+  const [nhiDocs, setNhiDocs] = useState<SalaryDocumentDto[]>([]);
+  const [parttimeDocs, setParttimeDocs] = useState<SalaryDocumentDto[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [generatingWithholding, setGeneratingWithholding] = useState(false);
+  const [generatingNhi, setGeneratingNhi] = useState(false);
+  const [generatingParttime, setGeneratingParttime] = useState(false);
+  const [withholdingError, setWithholdingError] = useState('');
+  const [nhiError, setNhiError] = useState('');
+  const [parttimeError, setParttimeError] = useState('');
+  const [deletingUuid, setDeletingUuid] = useState<string | null>(null);
 
-  const handleGenerateWithholding = () => {
-    const file = createMockFile(`${year - 1911}年${month}月 薪資扣繳稅額繳款書`, [
-      { label: '納入人數', value: `${items.filter(i => i.withholding > 0).length} 人` },
-      { label: '扣繳稅額總計', value: fmtCurrency(totalWithholding) },
+  const reloadDocs = async () => {
+    setLoadingDocs(true);
+    const [w, n, p] = await Promise.allSettled([
+      fetchSalaryDocuments({ type: 1, year, month }),
+      fetchSalaryDocuments({ type: 2, year, month }),
+      fetchSalaryDocuments({ type: 8, year, month }),
     ]);
-    updatePayrollMonthDocs(year, month, { withholdingFiles: [...docs.withholdingFiles, file] });
-    refresh();
+    setWithholdingDocs(w.status === 'fulfilled' ? w.value : []);
+    setNhiDocs(n.status === 'fulfilled' ? n.value : []);
+    setParttimeDocs(p.status === 'fulfilled' ? p.value : []);
+    setLoadingDocs(false);
   };
 
-  const handleGenerateNhi = () => {
-    const file = createMockFile(`${year - 1911}年${month}月 二代健保繳款書`, [
-      { label: '納入人數', value: `${items.filter(i => i.secondHealthInsuranceFee > 0).length} 人` },
-      { label: '二代健保金額總計', value: fmtCurrency(totalNhi) },
-    ]);
-    updatePayrollMonthDocs(year, month, { nhiFiles: [...docs.nhiFiles, file] });
-    refresh();
+  useEffect(() => {
+    void reloadDocs();
+    // 僅在切換年月時重新查詢
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month]);
+
+  const paymentDate = pickPaymentDate(items);
+
+  const handleGenerateWithholding = async () => {
+    if (!paymentDate) return;
+    setGeneratingWithholding(true);
+    setWithholdingError('');
+    try {
+      await generateWithholdingDocument({
+        incomeYear: year,
+        incomeMonth: month,
+        paymentYear: paymentDate.year,
+        paymentMonth: paymentDate.month,
+        paymentDay: paymentDate.day,
+        isOverDeadline: isPastWithholdingDeadline(paymentDate.year, paymentDate.month, paymentDate.day),
+      });
+      await reloadDocs();
+    } catch (err) {
+      setWithholdingError(getFriendlyErrorMessage(err, '產生扣繳繳款書失敗'));
+    } finally {
+      setGeneratingWithholding(false);
+    }
   };
 
-  const handleDeleteFile = () => {
-    if (!deleteTarget) return;
-    const { kind, file } = deleteTarget;
-    updatePayrollMonthDocs(year, month, { [kind]: docs[kind].filter(f => f.id !== file.id) });
-    refresh();
+  const handleGenerateNhi = async () => {
+    setGeneratingNhi(true);
+    setNhiError('');
+    try {
+      await generateHealthInsuranceDocument({ supplementaryInsuranceFee: totalNhiRegular, year, month });
+      await reloadDocs();
+    } catch (err) {
+      setNhiError(getFriendlyErrorMessage(err, '產生二代健保繳款書失敗'));
+    } finally {
+      setGeneratingNhi(false);
+    }
   };
 
-  const declareState: 'not_declared' | 'partial' | 'all' = docs.nhiDeclared ? 'all' : 'not_declared';
+  const handleGenerateParttime = async () => {
+    setGeneratingParttime(true);
+    setParttimeError('');
+    try {
+      await generateParttimeDocument({ salary: totalNhiParttime, year, month });
+      await reloadDocs();
+    } catch (err) {
+      setParttimeError(getFriendlyErrorMessage(err, '產生兼職二代健保繳款書失敗'));
+    } finally {
+      setGeneratingParttime(false);
+    }
+  };
+
+  const handleDelete = async (uuid: string) => {
+    setDeletingUuid(uuid);
+    try {
+      await deleteSalaryDocument(uuid);
+      await reloadDocs();
+    } finally {
+      setDeletingUuid(null);
+    }
+  };
 
   return (
     <div className="mt-5 flex flex-col gap-5">
-      {/* 扣繳繳款書 */}
       <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-5">
-        <div className="mb-4 flex flex-col gap-3 nav:flex-row nav:items-center nav:justify-between">
+        <div className="mb-2 flex flex-col gap-3 nav:flex-row nav:items-center nav:justify-between">
           <h3 className="text-lg font-semibold text-neutral-dark">扣繳繳款書</h3>
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              onClick={() => setTaxConfirmOpen(true)}
-              disabled={isLocked || totalWithholding === 0 || docs.withholdingFiles.length > 0 || docs.withholdingPaid}
-              title={
-                totalWithholding === 0
-                  ? '本月無需扣繳，無需產生繳款書'
-                  : docs.withholdingFiles.length > 0
-                    ? '繳款書已存在，如需重新產生請先刪除'
-                    : docs.withholdingPaid
-                      ? '已繳納，無需產生繳款書'
-                      : undefined
-              }
+              onClick={handleGenerateWithholding}
+              disabled={readOnly || generatingWithholding || withholdingDocs.length > 0 || !paymentDate}
+              title={withholdingDocs.length > 0 ? '本月已產生過，請先刪除再重新產生' : !paymentDate ? '尚無給薪日期資料，無法產生' : undefined}
             >
-              產生扣繳繳款書
+              {generatingWithholding ? '產生中，請稍候…' : '產生扣繳繳款書'}
             </Button>
-            <Button
-              size="sm"
-              variant={docs.withholdingPaid ? 'primary' : 'outline'}
-              disabled={docs.withholdingPaid || isLocked}
-              onClick={() => setTaxProofOpen(true)}
-            >
-              {totalWithholding === 0 ? '繳款狀態 - 不需繳納' : docs.withholdingPaid ? '繳款狀態 - 已繳納' : '繳款狀態 - 未繳納'}
+            <Button size="sm" variant="outline" disabled title="繳款狀態登記尚未串接後端 API">
+              繳款狀態
             </Button>
           </div>
         </div>
-
-        <div className="flex flex-col gap-4">
-          <FileListSection
-            title="扣繳繳款書"
-            files={docs.withholdingFiles}
-            emptyText={docs.withholdingProofFiles.length > 0 ? '您已繳款完畢！' : '尚未產生扣繳繳款書'}
-            onView={setPreviewFile}
-            onDelete={file => setDeleteTarget({ kind: 'withholdingFiles', file })}
-          />
-          <FileListSection
-            title="扣繳繳款證明"
-            files={docs.withholdingProofFiles}
-            emptyText="尚未上傳繳款證明"
-            onView={setPreviewFile}
-          />
-        </div>
+        <p className="mb-3 text-xs text-neutral-mid">本月扣繳稅額總計：{totalWithholding.toLocaleString('en-US')} 元</p>
+        {withholdingError && <p className="mb-3 text-xs text-semantic-error">{withholdingError}</p>}
+        {loadingDocs ? <p className="text-xs text-neutral-mid">載入中…</p> : <DocumentList docs={withholdingDocs} onDelete={handleDelete} deletingUuid={deletingUuid} readOnly={readOnly} />}
       </div>
 
-      {/* 二代健保繳款書 */}
       <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-5">
-        <div className="mb-4 flex flex-col gap-3 nav:flex-row nav:items-center nav:justify-between">
-          <h3 className="text-lg font-semibold text-neutral-dark">二代健保繳款書</h3>
+        <div className="mb-2 flex flex-col gap-3 nav:flex-row nav:items-center nav:justify-between">
+          <h3 className="text-lg font-semibold text-neutral-dark">二代健保繳款書（正職）</h3>
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
-              onClick={() => setNhiConfirmOpen(true)}
-              disabled={isLocked || totalNhi === 0 || docs.nhiFiles.length > 0 || docs.nhiPaid}
-              title={
-                totalNhi === 0
-                  ? '本月無需繳納二代健保，無需產生繳款書'
-                  : docs.nhiFiles.length > 0
-                    ? '繳款書已存在，如需重新產生請先刪除'
-                    : docs.nhiPaid
-                      ? '已繳納，無需產生繳款書'
-                      : undefined
-              }
+              onClick={handleGenerateNhi}
+              disabled={readOnly || generatingNhi || gradesLoading || nhiDocs.length > 0 || totalNhiRegular <= 0}
+              title={nhiDocs.length > 0 ? '本月已產生過，請先刪除再重新產生' : totalNhiRegular <= 0 ? '本月無二代健保金額，無需產生' : undefined}
             >
-              產生二代健保繳款書
+              {generatingNhi ? '產生中，請稍候…' : '產生二代健保繳款書'}
             </Button>
-            <Button
-              size="sm"
-              variant={docs.nhiPaid ? 'primary' : 'outline'}
-              disabled={docs.nhiPaid || isLocked}
-              onClick={() => setNhiProofOpen(true)}
-            >
-              {totalNhi === 0 ? '繳款狀態 - 不需繳納' : docs.nhiPaid ? '繳款狀態 - 已繳納' : '繳款狀態 - 未繳納'}
+            <Button size="sm" variant="outline" disabled title="繳款狀態登記尚未串接後端 API">
+              繳款狀態
             </Button>
-            {docs.nhiPaid && (
-              <Button
-                size="sm"
-                variant={docs.nhiDeclared ? 'primary' : 'outline'}
-                disabled={docs.nhiDeclared || isLocked}
-                onClick={() => {
-                  updatePayrollMonthDocs(year, month, { nhiDeclared: true });
-                  refresh();
-                }}
-              >
-                {DECLARE_LABEL[declareState]}
-              </Button>
-            )}
+            <Button size="sm" variant="outline" disabled title="申報登記尚未串接後端 API">
+              申報
+            </Button>
           </div>
         </div>
-
-        {docs.nhiDeclared && (
-          <div className="mb-4 flex items-center gap-2 rounded-md border border-brand-blue/20 bg-brand-blue/5 px-3 py-2 text-xs text-brand-blue">
-            <Badge tone="info">已申報</Badge>
-            二代健保申報已送出，如需查詢狀態請至健保署二代健保申報狀態查詢頁面。
-          </div>
-        )}
-
-        <div className="flex flex-col gap-4">
-          <FileListSection
-            title="二代健保繳款書"
-            files={docs.nhiFiles}
-            emptyText={docs.nhiProofFiles.length > 0 ? '您已繳款完畢！' : '尚未產生二代健保繳款書'}
-            onView={setPreviewFile}
-            onDelete={file => setDeleteTarget({ kind: 'nhiFiles', file })}
-          />
-          <FileListSection title="二代健保繳款證明" files={docs.nhiProofFiles} emptyText="尚未上傳繳款證明" onView={setPreviewFile} />
-        </div>
+        <p className="mb-3 text-xs text-neutral-mid">本月正職員工二代健保金額總計：{totalNhiRegular.toLocaleString('en-US')} 元</p>
+        {nhiError && <p className="mb-3 text-xs text-semantic-error">{nhiError}</p>}
+        {loadingDocs ? <p className="text-xs text-neutral-mid">載入中…</p> : <DocumentList docs={nhiDocs} onDelete={handleDelete} deletingUuid={deletingUuid} readOnly={readOnly} />}
       </div>
 
-      <TaxWithholdingConfirmDialog open={taxConfirmOpen} onClose={() => setTaxConfirmOpen(false)} onConfirm={handleGenerateWithholding} items={items} />
-      <HealthInsuranceConfirmDialog open={nhiConfirmOpen} onClose={() => setNhiConfirmOpen(false)} onConfirm={handleGenerateNhi} items={items} />
-
-      <PaymentProofDialog
-        open={taxProofOpen}
-        onClose={() => setTaxProofOpen(false)}
-        title="扣繳繳稅證明上傳"
-        onConfirm={(date, fileName) => {
-          const file = createMockFile(fileName, [{ label: '繳款日期', value: date.toLocaleDateString('zh-TW') }]);
-          updatePayrollMonthDocs(year, month, { withholdingPaid: true, withholdingProofFiles: [...docs.withholdingProofFiles, file] });
-          refresh();
-        }}
-      />
-      <PaymentProofDialog
-        open={nhiProofOpen}
-        onClose={() => setNhiProofOpen(false)}
-        title="二代健保繳費證明上傳"
-        onConfirm={(date, fileName) => {
-          const file = createMockFile(fileName, [{ label: '繳款日期', value: date.toLocaleDateString('zh-TW') }]);
-          updatePayrollMonthDocs(year, month, { nhiPaid: true, nhiProofFiles: [...docs.nhiProofFiles, file] });
-          refresh();
-        }}
-      />
-
-      <MockFilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteFile}
-        title="確定要刪除此繳款書嗎？"
-        message="此動作無法復原。"
-      />
+      <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-5">
+        <div className="mb-2 flex flex-col gap-3 nav:flex-row nav:items-center nav:justify-between">
+          <h3 className="text-lg font-semibold text-neutral-dark">二代健保繳款書（兼職）</h3>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={handleGenerateParttime}
+              disabled={readOnly || generatingParttime || gradesLoading || parttimeDocs.length > 0 || totalNhiParttime <= 0}
+              title={parttimeDocs.length > 0 ? '本月已產生過，請先刪除再重新產生' : totalNhiParttime <= 0 ? '本月無兼職員工二代健保金額，無需產生' : undefined}
+            >
+              {generatingParttime ? '產生中，請稍候…' : '產生兼職二代健保繳款書'}
+            </Button>
+          </div>
+        </div>
+        <p className="mb-3 text-xs text-neutral-mid">本月兼職（健保無投保）員工二代健保金額總計：{totalNhiParttime.toLocaleString('en-US')} 元</p>
+        {parttimeError && <p className="mb-3 text-xs text-semantic-error">{parttimeError}</p>}
+        {loadingDocs ? <p className="text-xs text-neutral-mid">載入中…</p> : <DocumentList docs={parttimeDocs} onDelete={handleDelete} deletingUuid={deletingUuid} readOnly={readOnly} />}
+      </div>
     </div>
   );
 }
