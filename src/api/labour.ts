@@ -7,6 +7,7 @@ import { COMPANY_UUID } from './config';
 import type {
   CreateLabourBody,
   CreateLabourResult,
+  DeleteLabourResult,
   LabourCalculateBody,
   LabourCalculateResult,
   LabourCountryDto,
@@ -58,6 +59,11 @@ export function createLabour(body: Omit<CreateLabourBody, 'companyUuid'>): Promi
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });
+}
+
+/** 刪除勞報單（DELETE /ael/labour，2026-09-11 後端新增） */
+export function deleteLabour(labourUuid: string): Promise<DeleteLabourResult> {
+  return apiFetch<DeleteLabourResult>(`/ael/labour${buildQuery({ companyUuid: COMPANY_UUID, labourUuid })}`, { method: 'DELETE' });
 }
 
 /** 更新勞報單基本資料，含簽署頁最後一步（PATCH /ael/labour） */

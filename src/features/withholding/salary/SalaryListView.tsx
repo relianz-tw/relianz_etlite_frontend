@@ -1,6 +1,5 @@
 'use client';
 
-import { fetchSalaryMonth } from '@/api/salary';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
@@ -13,7 +12,6 @@ import { FileDown, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { mapSalaryRowsToPayrollItems } from './salaryMapper';
 import { useActiveEmployees, useAvailableYears } from './useEmployees';
 import { useDeletePayrollMonth, usePayrollYearSummaries } from './usePayroll';
 
@@ -43,7 +41,7 @@ export default function SalaryListView() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  // DELETE /ael/salary 只能刪單筆，故先撈整月薪資列取得每筆的後端主鍵，再併發逐筆刪除；非原子操作，過程可能部分失敗
+  // DELETE /ael/salary/month 為整月原子刪除（2026-09-11 後端新增），取代舊版逐筆刪除
   const handleConfirmDelete = async () => {
     if (monthToDelete === null) return;
     const month = monthToDelete;
@@ -51,22 +49,7 @@ export default function SalaryListView() {
     setBusyMonth(month);
     setMonthMessages(prev => ({ ...prev, [month]: '' }));
     try {
-      const monthResult = await fetchSalaryMonth({ year, month });
-      const mapped = mapSalaryRowsToPayrollItems(monthResult.byPaymentDate, activeEmployees);
-      const rowIds = [...mapped.rowIdByEmployeeId.values()];
-      const unresolvedCount = mapped.items.length - rowIds.length;
-
-      if (rowIds.length === 0) {
-        setMonthMessages(prev => ({ ...prev, [month]: unresolvedCount > 0 ? '後端未回傳薪資列 id，暫無法刪除' : '' }));
-        return;
-      }
-
-      const result = await deleteMonth(rowIds);
-
-      const parts: string[] = [];
-      if (result.failed > 0) parts.push(`已刪除 ${result.succeeded} 筆，${result.failed} 筆失敗`);
-      if (unresolvedCount > 0) parts.push(`另有 ${unresolvedCount} 筆缺少後端 id 無法刪除`);
-      setMonthMessages(prev => ({ ...prev, [month]: parts.join('；') }));
+      await deleteMonth(year, month);
       reload();
     } catch (err) {
       setMonthMessages(prev => ({ ...prev, [month]: getFriendlyErrorMessage(err, '刪除失敗') }));
@@ -193,9 +176,9 @@ export default function SalaryListView() {
         title="確認刪除薪資明細"
         message={
           <>
-            將逐筆刪除 {monthToDelete} 月的所有薪資明細（共 {monthToDelete !== null ? (counts[monthToDelete] ?? 0) : 0} 筆），非單一操作，過程中若部分失敗會於卡片上顯示結果。
+            將刪除 {monthToDelete} 月的所有薪資明細（共 {monthToDelete !== null ? (counts[monthToDelete] ?? 0) : 0} 筆）。
             <br />
-            <span className="font-semibold text-semantic-error">已刪除的部分無法復原。</span>
+            <span className="font-semibold text-semantic-error">刪除後無法復原。</span>
           </>
         }
       />

@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteSalaryRow, fetchAllSalary, fetchSalaryDeclareMonth, fetchSalaryMonth, saveSalaryRow } from '@/api/salary';
+import { deleteSalaryMonth, fetchAllSalary, fetchSalaryDeclareMonth, fetchSalaryMonth, saveSalaryRow } from '@/api/salary';
 import type { SaveSalaryBody } from '@/api/types';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,8 +11,6 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export interface UsePayrollMonthResult {
   items: PayrollItem[];
-  /** employeeId → 後端薪資列主鍵，供刪除使用 */
-  rowIdByEmployeeId: Map<number, number>;
   /** 後端已有薪資列的員工 id；不在此集合中的在職員工視為本月尚未新增 */
   existingEmployeeIds: Set<number>;
   missingFieldsByEmployee: Map<number, string[]>;
@@ -28,7 +26,6 @@ export interface UsePayrollMonthResult {
  */
 export function usePayrollMonth(year: number, month: number, activeEmployees: Employee[], activeEmployeesLoading: boolean): UsePayrollMonthResult {
   const [items, setItems] = useState<PayrollItem[]>([]);
-  const [rowIdByEmployeeId, setRowIdByEmployeeId] = useState<Map<number, number>>(new Map());
   const [missingFieldsByEmployee, setMissingFieldsByEmployee] = useState<Map<number, string[]>>(new Map());
   const [droppedRowCount, setDroppedRowCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -45,7 +42,6 @@ export function usePayrollMonth(year: number, month: number, activeEmployees: Em
         if (cancelled) return;
         const mapped = mapSalaryRowsToPayrollItems(result.byPaymentDate, activeEmployees);
         setItems(mapped.items);
-        setRowIdByEmployeeId(mapped.rowIdByEmployeeId);
         setMissingFieldsByEmployee(mapped.missingFieldsByEmployee);
         setDroppedRowCount(mapped.droppedRowCount);
         if (mapped.unmappedKeys.length > 0) {
@@ -70,7 +66,6 @@ export function usePayrollMonth(year: number, month: number, activeEmployees: Em
 
   return {
     items,
-    rowIdByEmployeeId,
     existingEmployeeIds,
     missingFieldsByEmployee,
     droppedRowCount,
@@ -210,21 +205,15 @@ export function useSavePayrollMonth(): { save: (rows: SaveSalaryRowInput[]) => P
   return { save, saving };
 }
 
-export interface DeletePayrollMonthResult {
-  succeeded: number;
-  failed: number;
-}
-
-/** 批次刪除一個月的薪資列（取代 mockStore.deletePayrollMonth）；DELETE 端點只能刪單筆，故逐筆併發送出 */
-export function useDeletePayrollMonth(): { deleteMonth: (rowIds: number[]) => Promise<DeletePayrollMonthResult>; deleting: boolean } {
+/** 整月批次刪除薪資列（DELETE /ael/salary/month，2026-09-11 後端新增，原子操作，取代舊版逐筆刪除） */
+export function useDeletePayrollMonth(): { deleteMonth: (year: number, month: number) => Promise<number>; deleting: boolean } {
   const [deleting, setDeleting] = useState(false);
 
-  const deleteMonth = async (rowIds: number[]): Promise<DeletePayrollMonthResult> => {
+  const deleteMonth = async (year: number, month: number): Promise<number> => {
     setDeleting(true);
     try {
-      const settled = await Promise.allSettled(rowIds.map(id => deleteSalaryRow(id)));
-      const succeeded = settled.filter(r => r.status === 'fulfilled').length;
-      return { succeeded, failed: settled.length - succeeded };
+      const result = await deleteSalaryMonth({ year, month });
+      return result.deletedCount;
     } finally {
       setDeleting(false);
     }

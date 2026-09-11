@@ -17,6 +17,7 @@ import { COMPANY_UUID } from './config';
 import type {
   AllSalaryResult,
   AllSalarySummaryDto,
+  DeleteSalaryMonthResult,
   DeleteSalaryResult,
   GenerateHealthInsuranceDocumentBody,
   GenerateParttimeDocumentBody,
@@ -64,9 +65,17 @@ export function saveSalaryRow(body: Omit<SaveSalaryBody, 'companyUuid'>): Promis
   });
 }
 
-/** 刪除單筆薪資列（DELETE /ael/salary）；id 為單筆薪資列主鍵，不是整月 */
-export function deleteSalaryRow(id: number): Promise<DeleteSalaryResult> {
-  return apiFetch<DeleteSalaryResult>(`/ael/salary${buildQuery({ id })}`, { method: 'DELETE' });
+/**
+ * 刪除單筆薪資列（DELETE /ael/salary，query 參數 uuid，2026-09-11 由 id 改為 uuid，實測確認）。
+ * ⚠️ 主線改用 deleteSalaryMonth 整月刪除，此函式目前無呼叫端，先封裝備用。
+ */
+export function deleteSalaryRow(uuid: string): Promise<DeleteSalaryResult> {
+  return apiFetch<DeleteSalaryResult>(`/ael/salary${buildQuery({ uuid })}`, { method: 'DELETE' });
+}
+
+/** 整月批次刪除薪資列（DELETE /ael/salary/month，2026-09-11 後端新增，原子操作；年制西元，未正式文件化，依同系列端點慣例假設） */
+export function deleteSalaryMonth(params: { year: number; month: number }): Promise<DeleteSalaryMonthResult> {
+  return apiFetch<DeleteSalaryMonthResult>(`/ael/salary/month${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`, { method: 'DELETE' });
 }
 
 /** 單月四個統計數字，由後端計算完成（GET /ael/salary/declare/month，西元年月） */

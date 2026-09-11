@@ -1,27 +1,34 @@
 'use client';
 
-import { getLabourDetail } from '@/api/labour';
+import { deleteLabour, getLabourDetail } from '@/api/labour';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SectionCard from '@/components/ui/SectionCard';
 import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Backpack, BookOpen, ChevronLeft, FileText, Trash2, User } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Field from '../components/Field';
 import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
 import LaborPdfManager from './components/LaborPdfManager';
-import TagChipsField from './components/TagChipsField';
 import { mapLabourDtoToRecord, nationalityLabel, serviceTypeLabel, signLinkFor } from './data';
-import { addProject, addTag, getLaborLocalExtras, listAllProjects, listAllTags, updateLaborLocalExtras } from './localExtras';
 import type { LaborRecord } from './types';
 
 function rocDate(year: number, month: number, day: number): string {
   return `${year - 1911}/${month}/${day}`;
 }
+
+/** 標籤／專案後端尚無對應 API，統一標記提醒（比照帳簿模組 TransactionMetaCard 的做法） */
+const NOT_WIRED_BADGE = (
+  <Badge tone="neutral" variant="muted">
+    尚未串接
+  </Badge>
+);
 
 interface LaborDetailViewProps {
   uuid: string;
@@ -29,12 +36,15 @@ interface LaborDetailViewProps {
 }
 
 export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewProps) {
+  const router = useRouter();
   const { isLocked } = useLock();
   const [record, setRecord] = useState<LaborRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +53,7 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
     getLabourDetail({ labourUuid: uuid, incomeCode })
       .then(dto => {
         if (cancelled) return;
-        setRecord(mapLabourDtoToRecord(dto, getLaborLocalExtras(dto.labourUuid)));
+        setRecord(mapLabourDtoToRecord(dto));
       })
       .catch(err => {
         if (!cancelled) setError(getFriendlyErrorMessage(err));
@@ -54,9 +64,7 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
     return () => {
       cancelled = true;
     };
-  }, [uuid, incomeCode, reloadKey]);
-
-  const refresh = () => setReloadKey(k => k + 1);
+  }, [uuid, incomeCode]);
 
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">載入中…</div>;
@@ -72,6 +80,18 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
     await navigator.clipboard.writeText(signLinkFor(record.uuid, record.serviceType));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteLabour(record.uuid);
+      router.push('/withholding/labor');
+    } catch (err) {
+      setDeleteError(getFriendlyErrorMessage(err, '刪除失敗'));
+      setDeleting(false);
+    }
   };
 
   return (
@@ -138,29 +158,12 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
                   <TextInput disabled value={rocDate(record.paymentYear, record.paymentMonth, record.paymentDay)} />
                 </Field>
               </div>
-              <TagChipsField
-                label="標籤"
-                prefix="#"
-                value={record.tags}
-                onChange={next => {
-                  updateLaborLocalExtras(record.uuid, { tags: next });
-                  refresh();
-                }}
-                options={listAllTags()}
-                onCreateNew={addTag}
-              />
-              <TagChipsField
-                label="專案"
-                prefix="@"
-                value={record.projects}
-                onChange={next => {
-                  updateLaborLocalExtras(record.uuid, { projects: next });
-                  refresh();
-                }}
-                options={listAllProjects()}
-                onCreateNew={addProject}
-              />
-              <p className="text-xs text-neutral-mid">標籤／專案尚未串接後端 API，暫存於瀏覽器記憶體，重新整理頁面會重置。</p>
+              <Field label="標籤" badge={NOT_WIRED_BADGE}>
+                <TextInput disabled placeholder="尚未串接後端 API" value="" />
+              </Field>
+              <Field label="專案" badge={NOT_WIRED_BADGE}>
+                <TextInput disabled placeholder="尚未串接後端 API" value="" />
+              </Field>
             </div>
           </SectionCard>
 
@@ -183,9 +186,11 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
 
           <LaborPdfManager record={record} />
 
+          {deleteError && <p className="text-sm text-semantic-error">{deleteError}</p>}
+
           <div className="flex items-center justify-between">
-            <Button variant="danger" icon={Trash2} disabled title="刪除功能尚未串接後端 API">
-              刪除
+            <Button variant="danger" icon={Trash2} disabled={isLocked || deleting} onClick={() => setConfirmDeleteOpen(true)}>
+              {deleting ? '刪除中…' : '刪除'}
             </Button>
             <Link href={`/withholding/labor/${record.uuid}/doc?ic=${record.serviceType}`} className="inline-flex">
               <Button variant="outline" icon={FileText}>
@@ -195,6 +200,20 @@ export default function LaborDetailView({ uuid, incomeCode }: LaborDetailViewPro
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={handleDelete}
+        title="確認刪除勞報單"
+        message={
+          <>
+            將刪除「{record.name}」這筆勞報單資料。
+            <br />
+            <span className="font-semibold text-semantic-error">刪除後無法復原。</span>
+          </>
+        }
+      />
     </div>
   );
 }

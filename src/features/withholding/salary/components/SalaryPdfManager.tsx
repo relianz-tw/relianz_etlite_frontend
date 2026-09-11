@@ -99,7 +99,9 @@ function DocumentList({
  * 扣繳／二代健保繳款書產製與清單。
  * ⚠️ 後端目前只有「產生」「查詢」「刪除」三種端點，沒有標記已繳款／已申報／上傳繳款證明的寫入端點，
  * 這三個按鈕維持停用，待後端提供對應 API 後再串接。
- * ⚠️ 後端產生端點本身沒有防重複產生的機制，前端靠「本月已有一份時停用產生按鈕」自行把關。
+ * ⚠️ 後端已確認（2026-09-11）三支產生端點的去重機制不同：扣繳繳款書（type 1）**每次都新建一筆**，
+ * 沒有去重／鎖，故前端仍靠「本月已有一份時停用產生按鈕」自行把關；二代健保／兼職二代健保繳款書
+ * （type 2／8）則是 **Upsert**（同公司＋年月＋type 覆寫），本月已有一份時仍可放心重新產生。
  * ⚠️ 二代健保依員工健保是否「無投保」（見 data.ts isNhiUninsured）分成正職／兼職兩份繳款書，
  * 兩者金額互斥加總，避免同一筆二代健保金額被重複申報（比對姊妹專案 EASYTAX 邏輯確認）。
  */
@@ -232,10 +234,10 @@ export default function SalaryPdfManager({ year, month, items, readOnly }: Salar
             <Button
               size="sm"
               onClick={handleGenerateNhi}
-              disabled={readOnly || generatingNhi || gradesLoading || nhiDocs.length > 0 || totalNhiRegular <= 0}
-              title={nhiDocs.length > 0 ? '本月已產生過，請先刪除再重新產生' : totalNhiRegular <= 0 ? '本月無二代健保金額，無需產生' : undefined}
+              disabled={readOnly || generatingNhi || gradesLoading || totalNhiRegular <= 0}
+              title={totalNhiRegular <= 0 ? '本月無二代健保金額，無需產生' : undefined}
             >
-              {generatingNhi ? '產生中，請稍候…' : '產生二代健保繳款書'}
+              {generatingNhi ? '產生中，請稍候…' : nhiDocs.length > 0 ? '重新產生二代健保繳款書' : '產生二代健保繳款書'}
             </Button>
             <Button size="sm" variant="outline" disabled title="繳款狀態登記尚未串接後端 API">
               繳款狀態
@@ -257,10 +259,10 @@ export default function SalaryPdfManager({ year, month, items, readOnly }: Salar
             <Button
               size="sm"
               onClick={handleGenerateParttime}
-              disabled={readOnly || generatingParttime || gradesLoading || parttimeDocs.length > 0 || totalNhiParttime <= 0}
-              title={parttimeDocs.length > 0 ? '本月已產生過，請先刪除再重新產生' : totalNhiParttime <= 0 ? '本月無兼職員工二代健保金額，無需產生' : undefined}
+              disabled={readOnly || generatingParttime || gradesLoading || totalNhiParttime <= 0}
+              title={totalNhiParttime <= 0 ? '本月無兼職員工二代健保金額，無需產生' : undefined}
             >
-              {generatingParttime ? '產生中，請稍候…' : '產生兼職二代健保繳款書'}
+              {generatingParttime ? '產生中，請稍候…' : parttimeDocs.length > 0 ? '重新產生兼職二代健保繳款書' : '產生兼職二代健保繳款書'}
             </Button>
           </div>
         </div>

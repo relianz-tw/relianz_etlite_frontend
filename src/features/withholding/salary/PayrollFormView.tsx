@@ -205,8 +205,7 @@ export default function PayrollFormView() {
   const runOtherCalc = async (employeeId: number) => {
     const item = itemsRef.current.find(i => i.employeeId === employeeId);
     if (!item) return;
-    const amount = item.fixedSalary + item.nonFixedSalary;
-    if (amount <= 0 || !item.paymentYear || !item.paymentMonth || !item.paymentDay) return;
+    if (item.fixedSalary + item.nonFixedSalary <= 0 || !item.paymentYear || !item.paymentMonth || !item.paymentDay) return;
 
     const seq = (otherCalcSeqRef.current.get(employeeId) ?? 0) + 1;
     otherCalcSeqRef.current.set(employeeId, seq);
@@ -218,7 +217,10 @@ export default function PayrollFormView() {
     });
 
     try {
-      const result = await calculateSalaryOther({ employeeId, year, month, amount, salary: item.fixedSalary, nonFixedSalary: item.nonFixedSalary });
+      // amount＝本次計入二代健保的「獎金片段」，後端已確認不等於 fixedSalary+nonFixedSalary（會把固定薪也
+      // 灌進二代健保費基，金額算高）；畫面上「非固定薪資」對應「三節/年終/績效/補貼等」獎金性質欄位，
+      // 故整筆送出，見 SalaryOtherCalcBody 型別註解
+      const result = await calculateSalaryOther({ employeeId, year, month, amount: item.nonFixedSalary, salary: item.fixedSalary, nonFixedSalary: item.nonFixedSalary });
       if (otherCalcSeqRef.current.get(employeeId) !== seq) return; // 回應已過期（使用者又改過），丟棄避免覆蓋新輸入
       setItems(prev =>
         prev.map(row => {

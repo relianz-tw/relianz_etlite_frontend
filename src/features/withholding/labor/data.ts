@@ -1,5 +1,4 @@
 import type { LabourFormDto } from '@/api/types';
-import type { LaborLocalExtras } from './localExtras';
 import type { LaborNationalityCode, LaborRecord, LaborServiceType } from './types';
 
 export const SERVICE_TYPE_OPTIONS: { value: LaborServiceType; label: string; hint: string }[] = [
@@ -57,8 +56,8 @@ export function toYyyymmdd(date: Date): string {
   return `${yyyy}${mm}${dd}`;
 }
 
-/** API DTO → 畫面用 LaborRecord；標籤／繳款書等後端無 API 的欄位由呼叫端另外併入 extras（見 localExtras.ts） */
-export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtras): LaborRecord {
+/** API DTO → 畫面用 LaborRecord */
+export function mapLabourDtoToRecord(dto: LabourFormDto): LaborRecord {
   return {
     uuid: dto.labourUuid,
     withholdingId: dto.withholdingId ?? '',
@@ -94,6 +93,5 @@ export function mapLabourDtoToRecord(dto: LabourFormDto, extras: LaborLocalExtra
     nhiRemitDate: dto.nhiRemitDate ?? '',
     isNhiDeclare: dto.isNhiDeclare,
     nhiDeclareDate: dto.nhiDeclareDate ?? '',
-    ...extras,
   };
 }

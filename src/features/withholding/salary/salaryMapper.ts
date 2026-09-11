@@ -38,7 +38,12 @@ const FIELD_ALIASES: { key: AmountField; aliases: string[]; label: string }[] = 
   { key: 'secondHealthInsuranceFee', aliases: ['secondHealthInsuranceFee', 'second_health_insurance_fee'], label: '二代健保' },
 ];
 
-/** 前端 PayrollItem 金額欄位 ↔ 後端「POST 存入原值」欄位 ↔「依員工目前級距即時算出」的參考欄位，優先序：前者 */
+/**
+ * 前端 PayrollItem 金額欄位 ↔ 後端「POST 存入原值」欄位 ↔「依員工目前級距即時算出」的參考欄位，優先序：前者。
+ * 後端已確認此優先序方向正確（2026-09-11）：healthInsurance 為員工負擔（負責人另內含公司＋政府份），
+ * nhiEmployeeAmount 僅 EmployeeAmount×(眷屬+1)、不含公司/政府份，兩者語意不同不能互換，
+ * 負責人的話兩欄可能不一致，一律以 healthInsurance（存檔試算值）為準。
+ */
 const DUAL_SOURCE_FIELDS: { key: 'laborEmployeeAmount' | 'nhiEmployeeAmount'; primary: string[]; fallback: string[]; label: string }[] = [
   { key: 'laborEmployeeAmount', primary: ['laborInsurance', 'labor_insurance'], fallback: ['laborEmployeeAmount', 'labor_employee_amount'], label: '勞保費(員工)' },
   { key: 'nhiEmployeeAmount', primary: ['healthInsurance', 'health_insurance'], fallback: ['nhiEmployeeAmount', 'nhi_employee_amount'], label: '健保費(員工)' },
@@ -68,8 +73,6 @@ function parsePaymentDateKey(key: string): { paymentYear: number; paymentMonth: 
 
 export interface MapSalaryRowsResult {
   items: PayrollItem[];
-  /** employeeId → 後端薪資列主鍵，供刪除／後續更新使用；後端未回傳 id 的列不會出現在此表 */
-  rowIdByEmployeeId: Map<number, number>;
   /** employeeId → 取不到值、已以 0 顯示的欄位中文名清單 */
   missingFieldsByEmployee: Map<number, string[]>;
   /** 需留意的資料落差（如 laborInsurance／laborEmployeeAmount 不一致、無法辨識的給付日 key），供 dev 環境提示用 */
@@ -80,15 +83,15 @@ export interface MapSalaryRowsResult {
 
 /**
  * 將 GET /ael/salary 的 { 給付日YYYYMMDD: SalaryRowDto[] } 攤平成畫面用 PayrollItem[]。
- * 內層 schema 後端未定義（見 SalaryRowDto 型別註解），故全程採防禦性別名探測：
+ * 內層 schema 雖已正式文件化（見 SalaryRowDto 型別註解），仍維持防禦性別名探測，避免日後欄位命名
+ * 再變動時整批壞掉（本次的 id→uuid 主鍵變更就是活生生的例子）：
  * - 取不到的金額欄位仍以 0 填入（滿足 PayrollItem 型別必填），但同時記錄在 missingFieldsByEmployee，
  *   事實不被隱藏，交由呼叫端在畫面上提示。
- * - name／idNumber 一律以 employeeId 對照在職員工清單取得，不信任 row 內容
- *   （example 中的 row 根本沒有身分證字號欄位）；對照不到時視為已離職員工，仍保留該列並標記。
+ * - name／idNumber 一律以 employeeId 對照在職員工清單取得，不直接信任 row 內容（row 雖然現在也帶員工
+ *   快照欄位，但可能是建立當下的舊值）；對照不到時視為已離職員工，仍保留該列並標記。
  */
 export function mapSalaryRowsToPayrollItems(byPaymentDate: Record<string, SalaryRowDto[]>, activeEmployees: Employee[]): MapSalaryRowsResult {
   const employeeById = new Map(activeEmployees.map(e => [e.id, e]));
-  const rowIdByEmployeeId = new Map<number, number>();
   const missingFieldsByEmployee = new Map<number, string[]>();
   const unmappedKeys = new Set<string>();
   let droppedRowCount = 0;
@@ -111,9 +114,6 @@ export function mapSalaryRowsToPayrollItems(byPaymentDate: Record<string, Salary
         droppedRowCount += 1;
         continue;
       }
-
-      const rowId = pickNumber(row, 'id');
-      if (rowId !== undefined) rowIdByEmployeeId.set(employeeId, rowId);
 
       const missing: string[] = [];
       const values = {} as Record<AmountField, number>;
@@ -169,5 +169,5 @@ export function mapSalaryRowsToPayrollItems(byPaymentDate: Record<string, Salary
     }
   }
 
-  return { items, rowIdByEmployeeId, missingFieldsByEmployee, unmappedKeys: [...unmappedKeys], droppedRowCount };
+  return { items, missingFieldsByEmployee, unmappedKeys: [...unmappedKeys], droppedRowCount };
 }

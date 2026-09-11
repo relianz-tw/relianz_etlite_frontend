@@ -51,8 +51,4 @@ export interface LaborRecord {
   isNhiDeclare: boolean;
   /** 二代健保申報日期；未申報時為空字串 */
   nhiDeclareDate: string;
-
-  // 以下欄位後端尚無對應 API，暫存於前端記憶體（見 localExtras.ts），重新整理頁面會重置
-  tags: string[];
-  projects: string[];
 }

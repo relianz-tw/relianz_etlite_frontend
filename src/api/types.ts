@@ -1851,7 +1851,7 @@ export interface CreateLabourResult {
   labourUuid: string;
   /** 無票應付立帳 ledger uuid */
   ledgerUuid: string;
-  /** 交易編號；⚠️ 目前僅此建立回應會回傳，GET /ael/labour、POST /ael/labour/data/filter 尚未回這欄位 */
+  /** 交易編號（GET /ael/labour、POST /ael/labour/data/filter 現在也會回傳此欄位，見 LabourFormDto.orderCode） */
   orderCode: string;
 }
 
@@ -1909,6 +1909,13 @@ export interface UpdateLabourPaymentDateResult {
   paymentMonth: number;
   paymentDay: number;
   entryDate: string;
+}
+
+/** 刪除勞報單（DELETE /ael/labour，query 參數 companyUuid＋labourUuid，2026-09-11 後端新增，實測確認） */
+export interface DeleteLabourResult {
+  deleted: boolean;
+  labourUuid: string;
+  ledgerEntryUuid: string;
 }
 
 /**
@@ -2116,10 +2123,14 @@ export interface InsuranceGradesResult {
  */
 
 /**
- * GET /ael/salary 內層薪資列。⚠️ OpenAPI 未定義此物件的完整 schema，僅由 example 洩漏以下 key
- * （camelCase／snake_case 混用）：id、employeeId、employee_name、laborDays、voluntaryPensionAmount、
- * paymentYear、laborInsurance、laborEmployeeAmount。故刻意不寫成具名 interface（避免在型別層捏造契約），
- * 呼叫端一律透過 src/features/withholding/salary/salaryMapper.ts 的別名探測讀取。
+ * GET /ael/salary 內層薪資列。2026-09-11 後端已補上完整 schema 並實測驗證，欄位包含：
+ * `uuid`（主鍵，取代原本的 `id`，已無 `id` 欄位）、薪資金額欄位（同 SaveSalaryBody）、
+ * 員工快照欄位（`employee_name`／`idNumber`／`contactAddress` 等）、
+ * 繳款／申報狀態欄位（`isRemitWithholding`／`withholdingRemitDate`／`isRemitNhi`／`nhiRemitDate`／
+ * `isNhiDeclare`／`nhiDeclareDate`／`withholdingId`／`code`／`status`，比照勞報單但目前前端尚未使用，
+ * 見待辦）、`laborDays`、`nhiCompanyAmount`／`nhiGovernmentAmount`／`laborCompanyAmount` 等公司/政府負擔
+ * 參考值。仍維持 `Record<string, unknown>` 而非具名 interface，因 salaryMapper.ts 的別名探測策略本身就
+ * 是為了容錯欄位命名再變動而設計，改寫成強型別對現有防禦性寫法幫助有限，且會擴大這次變更範圍。
  */
 export type SalaryRowDto = Record<string, unknown>;
 
@@ -2134,7 +2145,16 @@ export interface SalaryMonthResult {
   pagination: { pageSize: number; totalSize: number };
 }
 
-/** GET /ael/salary/declare/month 回應；欄位名與 feature 層 PayrollMonthSummary 完全同名，可直接餵給畫面 */
+/**
+ * GET /ael/salary/declare/month 回應；欄位名與 feature 層 PayrollMonthSummary 完全同名，可直接餵給畫面。
+ * 後端已確認（2026-09-11）四欄公式：
+ * - declareSalaryTotal ＝ Σ(固定+非固定+自訂加項−請假−勞退自提−自訂減項)
+ * - payableSalaryTotal ＝ Σ(已存的 totalSalary，即實付合計)
+ * - fixedSalaryTotal   ＝ Σ(固定薪資−請假)
+ * - nonFixedSalaryTotal ＝ Σ(非固定薪資)
+ * 申報薪資總額（declareSalaryTotal）會扣勞退自提、含自訂加減項；加班費/伙食費/勞健保/扣繳稅/二代健保
+ * 皆不進這四欄的加減。
+ */
 export interface SalaryDeclareMonthResult {
   declareSalaryTotal: number;
   payableSalaryTotal: number;
@@ -2142,7 +2162,10 @@ export interface SalaryDeclareMonthResult {
   nonFixedSalaryTotal: number;
 }
 
-/** GET /ael/salary/allsalary 回應中的年度彙總；⚠️ 各欄語意（是否含自訂項目等）待後端確認 */
+/**
+ * GET /ael/salary/allsalary 回應中的年度彙總。後端已確認（2026-09-11）：`year`／`paymentYear` 參數皆可用、
+ * 皆為西元；summary 只有全年加總，沒有逐月拆分欄位，前端仍需另外呼叫 declare/month 取得月統計。
+ */
 export interface AllSalarySummaryDto {
   totalCount: number;
   totalFixedSalary: number;
@@ -2189,13 +2212,13 @@ export interface SaveSalaryBody {
   mealAllowance?: number;
   /** 請假/遲到/早退 */
   attendanceDeduction?: number;
-  /** 退休金（勞退自提） */
+  /** 勞退自提金額（後端已確認，2026-09-11：與 GET 回應虛擬欄位 voluntaryPensionAmount 同一概念，此欄位入 DB、後者為即時重算不存表） */
   volPension?: number;
   /** 薪資扣繳 */
   taxWithheld?: number;
-  /** 勞保 */
+  /** 勞保（員工負擔，入 DB；GET 回應另有 laborEmployeeAmount 虛擬參考值，優先採用此欄位） */
   laborInsurance?: number;
-  /** 健保 */
+  /** 健保（員工負擔，入 DB；負責人會再內含公司＋政府份，GET 回應另有 nhiEmployeeAmount 虛擬參考值僅算員工×眷屬人數，優先採用此欄位） */
   healthInsurance?: number;
   /** 總金額 */
   totalSalary?: number;
@@ -2216,16 +2239,30 @@ export interface SaveSalaryBody {
  * JS 引擎實務上會保留，但不是 JSON 規格保證的行為）。
  */
 
-/** POST /ael/salary 回應 */
+/**
+ * POST /ael/salary 回應。
+ * ⚠️ 2026-09-11 後端已將薪資列主鍵由數字 `id` 改為 `uuid`（實測確認，GET /ael/salary 內層列與
+ * DELETE /ael/salary 皆同步改用 `uuid`，不再有 `id` 欄位），新增 `ledgerEntryUuid`（對應的日記帳分錄
+ * uuid）、`orderCode`（交易編號，格式同勞報單 `TX-...`，代表薪資列現在也會產生對應的帳簿分錄）。
+ */
 export interface SaveSalaryResult {
   message: string;
   action: 'create' | 'update';
-  id: number;
+  uuid: string;
+  ledgerEntryUuid: string;
+  orderCode: string;
 }
 
-/** DELETE /ael/salary 回應；id 為 etlite_salary.id（單筆薪資列主鍵），非 companyUuid+id 組合 */
+/** DELETE /ael/salary 回應（單筆，帶 uuid 查詢參數；2026-09-11 由 id 改為 uuid，實測確認） */
 export interface DeleteSalaryResult {
   deleted: boolean;
+  uuid: string;
+}
+
+/** DELETE /ael/salary/month 回應（整月批次刪除，2026-09-11 後端新增，實測確認：companyUuid+year+month 皆必填，年制西元） */
+export interface DeleteSalaryMonthResult {
+  deletedCount: number;
+  deletedUuids: string[];
 }
 
 /** POST /ael/salary/calculate/insurance 請求體 */
@@ -2249,8 +2286,14 @@ export interface SalaryInsuranceCalcResult {
 
 /**
  * POST /ael/salary/calculate/other 請求體。
- * ⚠️ 姊妹專案 EASYTAX 對應端點只吃 employeeId／companyUuid／year／month 四個參數，
- * 沒有 amount／salary／nonFixedSalary，無法比對確認這三者語意，仍待後端回覆。
+ * 後端已確認（2026-09-11）三個金額參數各自獨立，不可互相替代：
+ * - `salary`：查二代健保費率門檻；兼職時與 `amount` 加總成月薪；固定對應扣繳所得碼 50。
+ * - `nonFixedSalary`：只用來算扣繳所得碼 52 的稅款，不計入二代健保年度累計（YTD）／費基。
+ * - `amount`：本次要計入二代健保的「獎金片段」，會併入 `totalYearBonus`；
+ *   正職費基＝`min(max(0, YTD+amount−投保金額×4), amount)`，兼職費基＝`salary+amount`。
+ *   ⚠️ 應對齊「這次要當獎金計入二代健保」的部分，通常 ≈ 本次 `nonFixedSalary`（若整筆非固定薪資
+ *   都當獎金）；**不可傳 `fixedSalary + nonFixedSalary`**，否則固定薪也會灌進二代健保費基，
+ *   金額會算高（前端曾經這樣傳，已修正，見 PayrollFormView.tsx runOtherCalc）。
  */
 export interface SalaryOtherCalcBody {
   employeeId: number;
@@ -2273,7 +2316,7 @@ export interface SalaryOtherCalcResult {
   rateValue: number;
   /** 二代健保計算值 */
   nhiAmount: number;
-  /** 扣繳稅款 */
+  /** 扣繳稅款（本次給付，非年度累計；後端已確認：`round(salary×rate50) + round(nonFixedSalary×rate52)`） */
   taxWithheldSum: number;
 }
 

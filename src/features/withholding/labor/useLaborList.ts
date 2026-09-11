@@ -5,7 +5,6 @@ import type { LabourDateDto, LabourFilterBody, LabourFormDto } from '@/api/types
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useMemo, useState } from 'react';
 import { mapLabourDtoToRecord } from './data';
-import { getLaborLocalExtras } from './localExtras';
 import type { LaborRecord } from './types';
 
 export type SignFilter = 'all' | 'signed' | 'unsigned';
@@ -113,7 +112,7 @@ export function useLaborList({ year, month, signFilter, filters, enabled = true 
   }, [enabled, year, month, signFilter, filtersKey, reloadKey]);
 
   const records = useMemo(
-    () => dtos.map(dto => ({ ...mapLabourDtoToRecord(dto, getLaborLocalExtras(dto.labourUuid)), ...localPatches[dto.labourUuid] })),
+    () => dtos.map(dto => ({ ...mapLabourDtoToRecord(dto), ...localPatches[dto.labourUuid] })),
     [dtos, localPatches],
   );
 
