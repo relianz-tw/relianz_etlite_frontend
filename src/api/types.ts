@@ -2412,3 +2412,23 @@ export interface GenerateParttimeDocumentBody {
   /** 兼職員工二代健保金額加總（>0） */
   salary: number;
 }
+
+/**
+ * GET /ael/withholding/insurance/burdenSummary 回應（公司行號負擔二代健保）。
+ * ⚠️ 年制：民國（比照 burdenSummary 系列端點的 x-apidog 範例，皆為民國年），api 層對外收西元、內部轉換。
+ */
+export interface NhiBurdenSummaryDto {
+  uuid: string;
+  companyUuid: string;
+  year: number;
+  month: number;
+  /** 受僱者投保金額總額，使用者依健保局保險費計算表填寫 */
+  totalInsuredAmount: number;
+}
+
+/** POST /ael/withholding/insurance/burdenSummary 請求體（不含 companyUuid，由 api 層自動帶入）；對外收西元年，api 層轉民國 */
+export interface SaveNhiBurdenSummaryBody {
+  year: number;
+  month: number;
+  totalInsuredAmount: number;
+}

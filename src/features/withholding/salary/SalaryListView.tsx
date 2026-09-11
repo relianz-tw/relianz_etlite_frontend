@@ -1,6 +1,7 @@
 'use client';
 
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import MoneyInput from '@/components/ui/MoneyInput';
 import Select from '@/components/ui/Select';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
@@ -11,8 +12,9 @@ import { fmtCurrency } from '@/lib/utils';
 import { FileDown, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useActiveEmployees, useAvailableYears } from './useEmployees';
+import { useNhiBurdenSummaries } from './useNhiBurden';
 import { useDeletePayrollMonth, usePayrollYearSummaries } from './usePayroll';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -31,9 +33,50 @@ export default function SalaryListView() {
   const { summaries, counts, monthErrors, reload } = usePayrollYearSummaries(year);
   const { deleteMonth } = useDeletePayrollMonth();
 
+  // 只對有薪資資料的月份查詢公司行號負擔二代健保投保總額，避免年度 12 個月都打空查詢
+  const monthsWithData = useMemo(() => Object.keys(counts).map(Number), [counts]);
+  const { burdens, save: saveBurden, reset: resetBurden, savingMonth } = useNhiBurdenSummaries(year, monthsWithData);
+
   const [monthToDelete, setMonthToDelete] = useState<number | null>(null);
   const [busyMonth, setBusyMonth] = useState<number | null>(null);
   const [monthMessages, setMonthMessages] = useState<Record<number, string>>({});
+
+  const [editingBurdenMonth, setEditingBurdenMonth] = useState<number | null>(null);
+  const [burdenDraft, setBurdenDraft] = useState(0);
+  const [burdenResetMonth, setBurdenResetMonth] = useState<number | null>(null);
+  const [burdenMessages, setBurdenMessages] = useState<Record<number, string>>({});
+
+  const handleStartBurdenEdit = (month: number) => {
+    setEditingBurdenMonth(month);
+    setBurdenDraft(burdens[month]?.totalInsuredAmount ?? 0);
+    setBurdenMessages(prev => ({ ...prev, [month]: '' }));
+  };
+
+  const handleCancelBurdenEdit = () => setEditingBurdenMonth(null);
+
+  const handleSaveBurden = async (month: number) => {
+    if (burdenDraft > 100_000_000) {
+      setBurdenMessages(prev => ({ ...prev, [month]: '金額超出合理範圍（上限 1 億）' }));
+      return;
+    }
+    try {
+      await saveBurden(year, month, burdenDraft);
+      setEditingBurdenMonth(null);
+    } catch (err) {
+      setBurdenMessages(prev => ({ ...prev, [month]: err instanceof Error ? err.message : '儲存失敗' }));
+    }
+  };
+
+  const handleConfirmResetBurden = async () => {
+    if (burdenResetMonth === null) return;
+    const month = burdenResetMonth;
+    setBurdenResetMonth(null);
+    try {
+      await resetBurden(month);
+    } catch (err) {
+      setBurdenMessages(prev => ({ ...prev, [month]: err instanceof Error ? err.message : '刪除失敗' }));
+    }
+  };
 
   const handleYearChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -51,6 +94,8 @@ export default function SalaryListView() {
     try {
       await deleteMonth(year, month);
       reload();
+      // 一併清掉當月公司行號負擔二代健保投保總額紀錄；失敗不阻斷薪資刪除流程
+      resetBurden(month).catch(() => {});
     } catch (err) {
       setMonthMessages(prev => ({ ...prev, [month]: getFriendlyErrorMessage(err, '刪除失敗') }));
     } finally {
@@ -100,13 +145,18 @@ export default function SalaryListView() {
             const isBusy = busyMonth === month;
             const message = monthMessages[month];
 
+            const burden = burdens[month];
+            const isEditingBurden = editingBurdenMonth === month;
+            const isSavingBurden = savingMonth === month;
+            const burdenMessage = burdenMessages[month];
+
             return (
               <div key={month} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-neutral-dark">{month} 月</h3>
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/withholding/salary/payroll?year=${year}&month=${month}`} className="inline-flex">
-                      <Button size="sm" variant="outline" icon={allFilled ? Pencil : Plus} disabled={isLocked && !allFilled}>
+                      <Button size="sm" variant="outline" icon={allFilled ? Pencil : Plus} disabled={(isLocked && !allFilled) || activeEmployees.length === 0}>
                         {buttonLabel}
                       </Button>
                     </Link>
@@ -123,7 +173,7 @@ export default function SalaryListView() {
 
                 {hasData ? (
                   summary ? (
-                    <div className="grid grid-cols-1 gap-4 nav:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 nav:grid-cols-3">
                       <div className="space-y-4 rounded-lg border border-brand-blue/20 bg-brand-blue/5 p-5">
                         <div>
                           <div className="mb-1 flex items-center justify-between">
@@ -153,13 +203,81 @@ export default function SalaryListView() {
                           <div className="font-mono text-2xl font-semibold tracking-wider text-brand-blue">{fmtCurrency(summary.nonFixedSalaryTotal)}</div>
                         </div>
                       </div>
+                      <div className="space-y-3 rounded-lg border border-brand-tan/30 bg-surface-warm p-5">
+                        <div>
+                          <div className="mb-1 text-sm font-medium text-neutral-dark">公司行號負擔二代健保</div>
+                          <div className="mb-2 text-xs text-neutral-mid">
+                            {burden
+                              ? '單位必須要在當月月底前完成繳納'
+                              : '請依照您從健保局所收到的『薪資支付月份』【保險費計算表】下方所記載之【受僱者投保金額總額共】填寫。例：如一月薪資為二月五號支付，請使用二月健保局保險費計算表。'}
+                          </div>
+                        </div>
+
+                        {isEditingBurden ? (
+                          <div className="space-y-2">
+                            <MoneyInput value={burdenDraft} onChange={setBurdenDraft} />
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="primary" disabled={isSavingBurden} onClick={() => handleSaveBurden(month)}>
+                                {isSavingBurden ? '儲存中…' : '儲存'}
+                              </Button>
+                              <Button size="sm" variant="ghost" disabled={isSavingBurden} onClick={handleCancelBurdenEdit}>
+                                取消
+                              </Button>
+                              {burden && (
+                                <Button size="sm" variant="danger" icon={Trash2} disabled={isSavingBurden} onClick={() => setBurdenResetMonth(month)}>
+                                  重置
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ) : burden ? (
+                          <div className="space-y-3">
+                            <div>
+                              <div className="mb-1 flex items-center justify-between">
+                                <div className="text-xs text-neutral-mid">受僱者投保總額</div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartBurdenEdit(month)}
+                                  disabled={isLocked}
+                                  title="修正受僱者投保總額"
+                                  className="text-neutral-mid hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-45"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
+                              <div className="font-mono text-xl font-semibold tracking-wider text-neutral-dark">{fmtCurrency(burden.totalInsuredAmount)}</div>
+                            </div>
+                            <div className="border-t border-brand-tan/30" />
+                            <div>
+                              <div className="mb-1 text-xs text-neutral-mid">應繳納</div>
+                              <div className="text-sm text-neutral-mid">— 待後端提供計算 API</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" icon={Plus} disabled={isLocked} onClick={() => handleStartBurdenEdit(month)}>
+                            輸入受僱者投保總額
+                          </Button>
+                        )}
+
+                        {burdenMessage && <p className="text-xs text-semantic-error">{burdenMessage}</p>}
+                      </div>
                     </div>
                   ) : (
                     <div className="py-8 text-center text-sm text-neutral-mid">{monthErrors[month] || '統計載入中…'}</div>
                   )
                 ) : (
                   <div className="py-8 text-center">
-                    <div className="text-neutral-mid">{activeEmployees.length === 0 ? '這月份尚未有員工入職' : '該月份尚未建立薪資明細'}</div>
+                    {activeEmployees.length === 0 ? (
+                      <div className="text-xs text-neutral-mid">
+                        尚未有員工，請先至
+                        <Link href="/withholding/salary/employee" className="mx-1 text-brand-blue hover:underline">
+                          員工列表
+                        </Link>
+                        新增員工
+                      </div>
+                    ) : (
+                      <div className="text-xs text-neutral-mid">該月份尚未建立薪資明細</div>
+                    )}
                     {missingCount > 0 && <div className="mt-2 text-[11px] text-neutral-mid">目前還有 {missingCount} 位在職員工尚未新增薪資明細</div>}
                   </div>
                 )}
@@ -177,6 +295,20 @@ export default function SalaryListView() {
         message={
           <>
             將刪除 {monthToDelete} 月的所有薪資明細（共 {monthToDelete !== null ? (counts[monthToDelete] ?? 0) : 0} 筆）。
+            <br />
+            <span className="font-semibold text-semantic-error">刪除後無法復原。</span>
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={burdenResetMonth !== null}
+        onClose={() => setBurdenResetMonth(null)}
+        onConfirm={handleConfirmResetBurden}
+        title="確認重置投保總額"
+        message={
+          <>
+            將刪除 {burdenResetMonth} 月的受僱者投保金額總額紀錄，該月將回到「尚未設定」。
             <br />
             <span className="font-semibold text-semantic-error">刪除後無法復原。</span>
           </>
