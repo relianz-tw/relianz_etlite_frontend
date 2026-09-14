@@ -1,14 +1,13 @@
 'use client';
 
-// 後端 range API 上線後替換為非同步 fetch 版本：
-//   const result = await fetchJournalOverview({ dateFrom, dateTo, page, pageSize });
-//   return { items: result.items, total: result.total, loading: false, error: '' };
-// 期望 endpoint: GET /ael/ledger/entries/dailyDetail/filter?companyUuid=&dateFrom=&dateTo=&page=&pageSize=
-// 期望回傳: { total: number; page: number; pageSize: number; items: DailyDetailLineDto[] }
-
+import { fetchJournalCenter } from '@/api/ledger';
 import type { DailyDetailLineDto } from '@/api/types';
-import { useMemo, useState } from 'react';
-import { MOCK_JOURNAL_LINES } from './mockJournalData';
+import { getFriendlyErrorMessage } from '@/lib/errors';
+import { useEffect, useMemo, useState } from 'react';
+
+// GET /ael/ledger/daily 的 dateFrom/dateTo 為必填，不限日期時改送涵蓋全部的寬區間
+const UNLIMITED_DATE_FROM = '19110101';
+const UNLIMITED_DATE_TO = '29991231';
 
 export interface UseJournalOverviewParams {
   dateFrom: string;
@@ -24,27 +23,58 @@ export interface UseJournalOverviewResult {
   loading: boolean;
   error: string;
   reload: () => void;
+  /** 列表內就地更新單筆摘要，不重打整頁 */
+  patchLineSummary: (lineUuid: string, summary: string, updateBy: number) => void;
 }
 
-/** 日記帳總覽資料取得；目前走 mock（同步），後端 range API 上線後換成非同步 fetch + useState/useEffect */
+/** 日記帳中心列表資料取得（GET /ael/ledger/daily） */
 export function useJournalOverview({ dateFrom, dateTo, unlimitedDate, page, pageSize = 10 }: UseJournalOverviewParams): UseJournalOverviewResult {
+  const [dtos, setDtos] = useState<DailyDetailLineDto[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [localPatches, setLocalPatches] = useState<Record<string, Partial<DailyDetailLineDto>>>({});
 
-  const allFiltered = useMemo(() => {
-    // reloadKey 作為強制重算的隱式依賴（正式 API 上線後 reload 會重打 fetch）
-    void reloadKey;
-    if (unlimitedDate) return MOCK_JOURNAL_LINES;
-    return MOCK_JOURNAL_LINES.filter(line => {
-      // rocDate 民國 YYYMMDD → 西元 YYYYMMDD，與 dateFrom/dateTo 同格式比較
-      const rocYear = parseInt(line.rocDate.slice(0, 3), 10);
-      const yyyymmdd = `${rocYear + 1911}${line.rocDate.slice(3)}`;
-      return yyyymmdd >= dateFrom && yyyymmdd <= dateTo;
-    });
-  }, [dateFrom, dateTo, unlimitedDate, reloadKey]);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    fetchJournalCenter({
+      dateFrom: unlimitedDate ? UNLIMITED_DATE_FROM : dateFrom,
+      dateTo: unlimitedDate ? UNLIMITED_DATE_TO : dateTo,
+      page,
+      count: pageSize,
+    })
+      .then(result => {
+        if (cancelled) return;
+        setDtos(result.items);
+        setTotal(result.total);
+        setLocalPatches({});
+      })
+      .catch(err => {
+        if (!cancelled) setError(getFriendlyErrorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo, unlimitedDate, page, pageSize, reloadKey]);
 
-  const start = (page - 1) * pageSize;
-  const items = allFiltered.slice(start, start + pageSize);
-  const total = allFiltered.length;
+  const items = useMemo(
+    () => dtos.map(dto => ({ ...dto, ...localPatches[dto.lineUuid] })),
+    [dtos, localPatches],
+  );
 
-  return { items, total, loading: false, error: '', reload: () => setReloadKey(k => k + 1) };
+  return {
+    items,
+    total,
+    loading,
+    error,
+    reload: () => setReloadKey(k => k + 1),
+    patchLineSummary: (lineUuid, summary, updateBy) =>
+      setLocalPatches(prev => ({ ...prev, [lineUuid]: { ...prev[lineUuid], summary, updateBy } })),
+  };
 }

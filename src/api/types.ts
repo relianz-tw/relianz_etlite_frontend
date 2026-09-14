@@ -1485,6 +1485,31 @@ export interface DailyDetailLineDto {
   createdDate: string;
   /** 同傳票內列排序 */
   sortOrder: number;
+  /** 摘要異動來源：0 系統／1 手動改／2 純手動；GET /ael/ledger/entries/dailyDetail 不保證回傳 */
+  updateBy?: number;
+}
+
+/** GET /ael/ledger/daily 回應 data（日記帳中心列表查詢） */
+export interface JournalCenterResult {
+  items: DailyDetailLineDto[];
+  total: number;
+  page: number;
+  count: number;
+}
+
+/** PATCH /ael/ledger/daily/summary body（修改分錄摘要） */
+export interface UpdateEntrySummaryBody {
+  companyUuid: string;
+  /** 分錄行 uuid，即列表的 lineUuid */
+  ledgerEntryLinesUuid: string;
+  summary: string;
+}
+
+/** PATCH /ael/ledger/daily/summary 回應 data */
+export interface UpdateEntrySummaryResult {
+  lineUuid: string;
+  summary: string;
+  updateBy: number;
 }
 
 /** GET /ael/ledger/entries/dailyDetail 回應 data */
@@ -2076,7 +2101,7 @@ export interface EmployeeListResult {
   pagination: { page: number; pageSize: number; totalSize: number };
 }
 
-/** 上傳員工身分證（POST /ael/employees/upload）回應 data */
+/** 上傳員工身分證（POST /ael/employee/upload）回應 data */
 export interface EmployeeIdCardUploadResult {
   /** GCS object path，直接存入 idCardFront／idCardBack */
   img: string;
@@ -2431,4 +2456,39 @@ export interface SaveNhiBurdenSummaryBody {
   year: number;
   month: number;
   totalInsuredAmount: number;
+}
+
+/** POST /ael/withholding/healthInsurance/calculate/month 回應（計算並新增當月公司負擔差額）；年制：民國 */
+export interface NhiBurdenCalculateResult {
+  /** 應繳納金額（公司需補繳差額） */
+  calculateMonthlyRemain: number;
+  sumSalary: number;
+  sumInsured: number;
+}
+
+/**
+ * GET /ael/withholding/healthInsurance/company/pdf 回應（查詢已產生的公司負擔二代健保繳費書 URL）。
+ * ⚠️ 欄位為 snake_case，跟同系列其他端點（含下方 POST 的回應）慣用 camelCase 不同，後端原樣如此。
+ */
+export interface NhiBurdenPdfUrlDto {
+  ac_uuid: string;
+  year: number;
+  month: number;
+  pdf_url: string;
+}
+
+/** POST /ael/withholding/download/healthInsurance/company/pdf 請求體（不含 acUuid，由 api 層自動帶入）；年制：民國 */
+export interface GenerateNhiBurdenPdfBody {
+  year: number;
+  month: number;
+  /** 須 >0 且等於 calculateMonthlyRemain（後端會驗證） */
+  amount: number;
+}
+
+/** POST /ael/withholding/download/healthInsurance/company/pdf 回應 */
+export interface NhiBurdenPdfDto {
+  acUuid: string;
+  pdfFileUrl: string;
+  year: number;
+  month: number;
 }

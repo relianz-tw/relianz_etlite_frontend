@@ -1,5 +1,6 @@
 'use client';
 
+import { updateEntrySummary } from '@/api/ledger';
 import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import ReconDateFilter from '@/features/reconciliation/components/ReconDateFilter';
@@ -9,7 +10,7 @@ import { groupJournalLinesByDate } from './journalGrouping';
 import JournalOverviewList from './JournalOverviewList';
 import { useJournalOverview } from './useJournalOverview';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 function toYyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -30,7 +31,7 @@ export default function JournalOverviewView() {
   const [unlimitedDate, setUnlimitedDate] = useState(true);
   const [page, setPage] = useState(1);
 
-  const { items, total, loading, error } = useJournalOverview({
+  const { items, total, loading, error, patchLineSummary } = useJournalOverview({
     dateFrom,
     dateTo,
     unlimitedDate,
@@ -40,6 +41,11 @@ export default function JournalOverviewView() {
 
   const groups = useMemo(() => groupJournalLinesByDate(items), [items]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const handleSaveSummary = async (lineUuid: string, summary: string) => {
+    const result = await updateEntrySummary({ ledgerEntryLinesUuid: lineUuid, summary });
+    patchLineSummary(result.lineUuid, result.summary, result.updateBy);
+  };
 
   const handleApplyDate = (from: string, to: string) => {
     setDateFrom(from);
@@ -96,7 +102,7 @@ export default function JournalOverviewView() {
               {unlimitedDate ? '尚無會計分錄' : '此期間無會計分錄'}
             </div>
           ) : (
-            <JournalOverviewList groups={groups} />
+            <JournalOverviewList groups={groups} onSaveSummary={handleSaveSummary} />
           )}
         </div>
 

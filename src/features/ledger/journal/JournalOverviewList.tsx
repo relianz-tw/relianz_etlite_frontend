@@ -1,23 +1,104 @@
 'use client';
 
-import type { DailyDetailLineDto } from '@/api/types';
+import Button from '@/components/ui/Button';
+import Textarea from '@/components/ui/Textarea';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { Fragment, useState } from 'react';
 import type { JournalDateGroup } from './journalGrouping';
 
 const thClass = 'px-3 py-2.5 text-left text-xs font-semibold text-neutral-mid whitespace-nowrap';
 const tdClass = 'px-3 py-2 text-sm text-neutral-dark whitespace-nowrap';
+// 摘要欄位可能多行（編輯態為 textarea），不套用 nowrap，並讓多行內容從頂部對齊
+const summaryTdClass = 'px-3 py-2 text-sm text-neutral-dark align-top';
 
 /** 民國 YYYMMDD → YYY/MM/DD */
 const fmtRocDate = (d: string) => `${d.slice(0, 3)}/${d.slice(3, 5)}/${d.slice(5, 7)}`;
 
 interface JournalOverviewListProps {
   groups: JournalDateGroup[];
+  /** 儲存分錄摘要（PATCH /ael/ledger/daily/summary），失敗時 throw 由呼叫端顯示錯誤 */
+  onSaveSummary: (lineUuid: string, summary: string) => Promise<void>;
+}
+
+/** 摘要欄位 inline 編輯；點擊進入編輯，需按「儲存」才會送出，Esc 或「取消」放棄變更 */
+function SummaryCell({ lineUuid, summary, onSaveSummary }: { lineUuid: string; summary: string; onSaveSummary: JournalOverviewListProps['onSaveSummary'] }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(summary);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const startEdit = () => {
+    setDraft(summary);
+    setError('');
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setError('');
+  };
+
+  const commit = async () => {
+    if (draft === summary) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onSaveSummary(lineUuid, draft);
+      setEditing(false);
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={startEdit}
+        title={summary || '點擊編輯摘要'}
+        className="line-clamp-2 block w-full max-w-[360px] whitespace-normal break-words rounded px-1 py-0.5 text-left hover:bg-surface-cream"
+      >
+        {summary || <span className="text-neutral-mid">（無摘要）</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-[360px]">
+      <Textarea
+        autoFocus
+        rows={3}
+        value={draft}
+        disabled={saving}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') cancelEdit();
+        }}
+        className="text-sm"
+      />
+      <div className="mt-1.5 flex items-center gap-2">
+        <Button size="sm" variant="primary" disabled={saving} onClick={commit}>
+          {saving ? '儲存中…' : '儲存'}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={saving} onClick={cancelEdit}>
+          取消
+        </Button>
+      </div>
+      {error && <p className="mt-1 text-xs text-semantic-error">{error}</p>}
+    </div>
+  );
 }
 
 /** 桌機版：一個大 table，日期 group header 用 colSpan=7 的 tr 插入；手機版：flex div 流 */
-export default function JournalOverviewList({ groups }: JournalOverviewListProps) {
+export default function JournalOverviewList({ groups, onSaveSummary }: JournalOverviewListProps) {
   return (
     <>
       {/* 桌機版 */}
@@ -36,9 +117,9 @@ export default function JournalOverviewList({ groups }: JournalOverviewListProps
           </thead>
           <tbody>
             {groups.map((group, gIdx) => (
-              <>
+              <Fragment key={group.dateKey}>
                 {/* 日期分組標頭列 */}
-                <tr key={`header-${group.dateKey}`} className={gIdx > 0 ? 'border-t border-neutral-blue-gray/30' : ''}>
+                <tr className={gIdx > 0 ? 'border-t border-neutral-blue-gray/30' : ''}>
                   <td colSpan={7} className="bg-surface-off-white px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="h-4 w-[3px] shrink-0 rounded-full bg-brand-blue" />
@@ -49,7 +130,7 @@ export default function JournalOverviewList({ groups }: JournalOverviewListProps
 
                 {/* 該日期的傳票分錄行 */}
                 {group.vouchers.map(voucher =>
-                  voucher.lines.map((line: DailyDetailLineDto, lineIdx: number) => {
+                  voucher.lines.map((line, lineIdx) => {
                     const isFirst = lineIdx === 0;
                     return (
                       <tr
@@ -59,7 +140,9 @@ export default function JournalOverviewList({ groups }: JournalOverviewListProps
                         <td className={tdClass}>{isFirst ? fmtRocDate(line.rocDate) : ''}</td>
                         <td className={`${tdClass} font-mono`}>{isFirst ? line.voucherNo : ''}</td>
                         <td className={tdClass}>{line.subjectName}</td>
-                        <td className={`${tdClass} max-w-[200px] truncate`} title={line.summary}>{line.summary}</td>
+                        <td className={summaryTdClass} onClick={e => e.stopPropagation()}>
+                          <SummaryCell lineUuid={line.lineUuid} summary={line.summary} onSaveSummary={onSaveSummary} />
+                        </td>
                         <td className={`${tdClass} text-right font-mono tabular-nums`}>
                           {line.debitCredit === '1' ? fmtCurrency(line.amount) : ''}
                         </td>
@@ -81,7 +164,7 @@ export default function JournalOverviewList({ groups }: JournalOverviewListProps
                     );
                   }),
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -124,9 +207,7 @@ export default function JournalOverviewList({ groups }: JournalOverviewListProps
                         <div key={line.lineUuid} className="flex items-start justify-between gap-2 py-1.5">
                           <div className="flex min-w-0 flex-col">
                             <span className="text-sm font-medium text-neutral-dark">{line.subjectName}</span>
-                            {line.summary && (
-                              <span className="text-xs text-neutral-mid truncate">{line.summary}</span>
-                            )}
+                            <SummaryCell lineUuid={line.lineUuid} summary={line.summary} onSaveSummary={onSaveSummary} />
                           </div>
                           <span
                             className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${

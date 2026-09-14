@@ -12,6 +12,7 @@ import type {
   DailyDetailResult,
   EntryDetailResult,
   InvoiceOriginResult,
+  JournalCenterResult,
   ManualSettleResult,
   PayablesFilterBody,
   PayablesFilterResult,
@@ -33,6 +34,8 @@ import type {
   SettleReceivablePreviewResult,
   SettleReceivableSummaryBody,
   SettleReceivableSummaryResult,
+  UpdateEntrySummaryBody,
+  UpdateEntrySummaryResult,
 } from './types';
 
 export function createPayable(body: Omit<CreatePayableBody, 'companyUuid'>): Promise<unknown> {
@@ -183,6 +186,26 @@ export function fetchSettleEventList(params: {
   return apiFetch<SettleEventListResult>(
     `/ael/ledger/settle/event/list${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`,
   );
+}
+
+/** 日記帳中心列表（GET /ael/ledger/daily）；dateFrom/dateTo 為必填 */
+export function fetchJournalCenter(params: {
+  dateFrom: string;
+  dateTo: string;
+  page: number;
+  count: number;
+}): Promise<JournalCenterResult> {
+  return apiFetch<JournalCenterResult>(
+    `/ael/ledger/daily${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`,
+  );
+}
+
+/** 修改分錄摘要（PATCH /ael/ledger/daily/summary） */
+export function updateEntrySummary(body: Omit<UpdateEntrySummaryBody, 'companyUuid'>): Promise<UpdateEntrySummaryResult> {
+  return apiFetch<UpdateEntrySummaryResult>('/ael/ledger/daily/summary', {
+    method: 'PATCH',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
+  });
 }
 
 /** 撤銷手動沖帳紀錄 */
