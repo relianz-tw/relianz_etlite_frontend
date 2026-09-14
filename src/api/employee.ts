@@ -50,11 +50,11 @@ export function deleteEmployee(id: number): Promise<null> {
   return apiFetch<null>(`/ael/employee${buildQuery({ id })}`, { method: 'DELETE' });
 }
 
-/** 上傳員工身分證（POST /ael/employees/upload，multipart/form-data） */
+/** 上傳員工身分證（POST /ael/employee/upload，multipart/form-data） */
 export function uploadEmployeeIdCard(file: File): Promise<EmployeeIdCardUploadResult> {
   const formData = new FormData();
   formData.append('img', file);
-  return apiFetch<EmployeeIdCardUploadResult>('/ael/employees/upload', { method: 'POST', body: formData });
+  return apiFetch<EmployeeIdCardUploadResult>('/ael/employee/upload', { method: 'POST', body: formData });
 }
 
 /**

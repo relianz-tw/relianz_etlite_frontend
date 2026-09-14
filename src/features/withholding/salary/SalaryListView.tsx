@@ -9,7 +9,7 @@ import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
 import WithholdingTabs from '../components/WithholdingTabs';
 import { fmtCurrency } from '@/lib/utils';
-import { FileDown, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
+import { Eye, FileDown, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -18,6 +18,13 @@ import { useNhiBurdenSummaries } from './useNhiBurden';
 import { useDeletePayrollMonth, usePayrollYearSummaries } from './usePayroll';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+// ⚠️ .env.production 目前尚未設定此值（見 .env.dev／.env.development／.env.staging，比照 SalaryPdfManager.tsx），正式環境上線前需補上
+const IMG_BASE_URL = process.env.NEXT_PUBLIC_IMG_URL ?? '';
+
+function nhiBurdenPdfUrl(pdfFileUrl: string): string {
+  return pdfFileUrl.startsWith('http') ? pdfFileUrl : `${IMG_BASE_URL}/${pdfFileUrl}`;
+}
 
 export default function SalaryListView() {
   const router = useRouter();
@@ -35,7 +42,14 @@ export default function SalaryListView() {
 
   // 只對有薪資資料的月份查詢公司行號負擔二代健保投保總額，避免年度 12 個月都打空查詢
   const monthsWithData = useMemo(() => Object.keys(counts).map(Number), [counts]);
-  const { burdens, save: saveBurden, reset: resetBurden, savingMonth } = useNhiBurdenSummaries(year, monthsWithData);
+  const {
+    burdens,
+    save: saveBurden,
+    reset: resetBurden,
+    generatePdf: generateBurdenPdf,
+    savingMonth,
+    generatingMonth: generatingBurdenPdfMonth,
+  } = useNhiBurdenSummaries(year, monthsWithData);
 
   const [monthToDelete, setMonthToDelete] = useState<number | null>(null);
   const [busyMonth, setBusyMonth] = useState<number | null>(null);
@@ -75,6 +89,15 @@ export default function SalaryListView() {
       await resetBurden(month);
     } catch (err) {
       setBurdenMessages(prev => ({ ...prev, [month]: err instanceof Error ? err.message : '刪除失敗' }));
+    }
+  };
+
+  const handleGenerateBurdenPdf = async (month: number) => {
+    setBurdenMessages(prev => ({ ...prev, [month]: '' }));
+    try {
+      await generateBurdenPdf(year, month);
+    } catch (err) {
+      setBurdenMessages(prev => ({ ...prev, [month]: err instanceof Error ? err.message : '產生繳款書失敗' }));
     }
   };
 
@@ -134,7 +157,7 @@ export default function SalaryListView() {
         </div>
 
         <div className="flex flex-col gap-5">
-          {MONTHS.map(month => {
+          {[...MONTHS].reverse().map(month => {
             const summary = summaries[month];
             const count = counts[month] ?? 0;
             const hasData = count > 0;
@@ -148,7 +171,10 @@ export default function SalaryListView() {
             const burden = burdens[month];
             const isEditingBurden = editingBurdenMonth === month;
             const isSavingBurden = savingMonth === month;
+            const isGeneratingBurdenPdf = generatingBurdenPdfMonth === month;
             const burdenMessage = burdenMessages[month];
+            const burdenAmount = burden?.amount;
+            const canGenerateBurdenPdf = !!burdenAmount && burdenAmount > 0;
 
             return (
               <div key={month} className="rounded-lg border border-neutral-blue-gray/30 bg-white p-5">
@@ -245,12 +271,40 @@ export default function SalaryListView() {
                                   <Pencil size={14} />
                                 </button>
                               </div>
-                              <div className="font-mono text-xl font-semibold tracking-wider text-neutral-dark">{fmtCurrency(burden.totalInsuredAmount)}</div>
+                              <div className="font-mono text-xl font-semibold tracking-wider text-neutral-dark">{fmtCurrency(burden.totalInsuredAmount ?? 0)}</div>
                             </div>
                             <div className="border-t border-brand-tan/30" />
                             <div>
                               <div className="mb-1 text-xs text-neutral-mid">應繳納</div>
-                              <div className="text-sm text-neutral-mid">— 待後端提供計算 API</div>
+                              {burdenAmount === undefined ? (
+                                <div className="text-sm text-neutral-mid">試算失敗，請稍後重試</div>
+                              ) : (
+                                <div className="font-mono text-xl font-semibold tracking-wider text-semantic-error">
+                                  {fmtCurrency(Math.max(0, burdenAmount))}
+                                  {burdenAmount <= 0 && <span className="ml-1 text-xs font-normal text-neutral-mid">（無需繳費）</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isLocked || isGeneratingBurdenPdf || !canGenerateBurdenPdf}
+                                title={!canGenerateBurdenPdf ? '尚無應繳納金額，無法產生繳款書' : undefined}
+                                onClick={() => handleGenerateBurdenPdf(month)}
+                              >
+                                {isGeneratingBurdenPdf ? '產生中，請稍候…' : burden.pdfUrl ? '重新產生繳款書' : '產生繳款書'}
+                              </Button>
+                              {burden.pdfUrl && IMG_BASE_URL && (
+                                <a
+                                  href={nhiBurdenPdfUrl(burden.pdfUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-brand-blue hover:bg-brand-blue/10"
+                                >
+                                  <Eye size={14} /> 查看繳款書
+                                </a>
+                              )}
                             </div>
                           </div>
                         ) : (

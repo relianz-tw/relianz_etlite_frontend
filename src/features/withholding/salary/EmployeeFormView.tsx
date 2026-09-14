@@ -132,14 +132,18 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
   const laborUninsured = form.laborLevelId === null || laborGrades.find(g => g.id === form.laborLevelId)?.grade === 0;
 
   const handleSubmit = async () => {
+    // 身分證正反面採「送出時才上傳」：編輯模式沿用既有 idCardFront／idCardBack（未換新檔），
+    // 新增模式則靠 idCardFrontFile／idCardBackFile 判斷是否已選檔，兩者尚未上傳前 form 欄位都會是空字串
+    const hasIdCardFront = Boolean(form.idCardFront) || Boolean(idCardFrontFile);
+    const hasIdCardBack = Boolean(form.idCardBack) || Boolean(idCardBackFile);
     if (
       !form.name.trim() ||
       !form.idNumber.trim() ||
       !form.jobTitle.trim() ||
       !form.householdAddress.trim() ||
       !form.onboardDate ||
-      !form.idCardFront ||
-      !form.idCardBack
+      !hasIdCardFront ||
+      !hasIdCardBack
     ) {
       setError('請填寫所有必填欄位');
       return;
@@ -154,8 +158,20 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
     }
     setError('');
     setSubmitting(true);
+
+    let idCardFront = form.idCardFront;
+    let idCardBack = form.idCardBack;
     try {
-      const body = toSaveEmployeeBody(form, { laborGrades, laborPensionGrades, nhiGrades });
+      if (idCardFrontFile) idCardFront = (await uploadEmployeeIdCard(idCardFrontFile)).img;
+      if (idCardBackFile) idCardBack = (await uploadEmployeeIdCard(idCardBackFile)).img;
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err, '身分證照片上傳失敗'));
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const body = toSaveEmployeeBody({ ...form, idCardFront, idCardBack }, { laborGrades, laborPensionGrades, nhiGrades });
       if (isEdit && numericId) {
         await updateEmployee({ ...body, id: numericId });
       } else {
@@ -186,32 +202,15 @@ export default function EmployeeFormView({ employeeId }: EmployeeFormViewProps) 
     }
   };
 
-  const handleIdCardFrontChange = async (file: File | null) => {
+  // 選檔時只暫存 File，實際呼叫 POST /ael/employee/upload 延後到按下「新增/更新員工」才做（見 handleSubmit）
+  const handleIdCardFrontChange = (file: File | null) => {
     setIdCardFrontFile(file);
-    if (!file) {
-      update('idCardFront', '');
-      return;
-    }
-    try {
-      const result = await uploadEmployeeIdCard(file);
-      update('idCardFront', result.img);
-    } catch (err) {
-      setError(getFriendlyErrorMessage(err, '身分證正面上傳失敗'));
-    }
+    if (!file) update('idCardFront', '');
   };
 
-  const handleIdCardBackChange = async (file: File | null) => {
+  const handleIdCardBackChange = (file: File | null) => {
     setIdCardBackFile(file);
-    if (!file) {
-      update('idCardBack', '');
-      return;
-    }
-    try {
-      const result = await uploadEmployeeIdCard(file);
-      update('idCardBack', result.img);
-    } catch (err) {
-      setError(getFriendlyErrorMessage(err, '身分證反面上傳失敗'));
-    }
+    if (!file) update('idCardBack', '');
   };
 
   return (

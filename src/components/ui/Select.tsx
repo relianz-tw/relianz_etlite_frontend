@@ -92,14 +92,21 @@ export default function Select({
       if (e.key === 'Escape') setOpen(false);
     };
     const close = () => setOpen(false);
+    // scroll 事件不冒泡，靠 capture 模式在 window 上攔截頁面捲動；但 capture 階段一樣會經過選單面板
+    // 自己（overflow-auto）內部的捲動，若不排除會導致選項多到需要捲動時，一捲動面板就被誤判成
+    // 「頁面捲動」而立刻關閉，使用者完全無法捲到下方選項（這次實測踩到的 bug：勞保級距選項變多後才會出現）
+    const handleScroll = (e: Event) => {
+      if (panelRef.current?.contains(e.target as Node)) return;
+      close();
+    };
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('scroll', handleScroll, true);
     window.addEventListener('resize', close);
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', handleScroll, true);
       window.removeEventListener('resize', close);
     };
   }, [open]);
