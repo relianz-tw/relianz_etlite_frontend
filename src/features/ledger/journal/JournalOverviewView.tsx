@@ -3,6 +3,7 @@
 import { updateEntrySummary } from '@/api/ledger';
 import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
+import Select from '@/components/ui/Select';
 import ReconDateFilter from '@/features/reconciliation/components/ReconDateFilter';
 import { Download } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -10,7 +11,7 @@ import { groupJournalLinesByDate } from './journalGrouping';
 import JournalOverviewList from './JournalOverviewList';
 import { useJournalOverview } from './useJournalOverview';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 function toYyyymmdd(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -30,17 +31,23 @@ export default function JournalOverviewView() {
   const [dateTo, setDateTo] = useState(today);
   const [unlimitedDate, setUnlimitedDate] = useState(true);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { items, total, loading, error, patchLineSummary } = useJournalOverview({
     dateFrom,
     dateTo,
     unlimitedDate,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
   });
 
   const groups = useMemo(() => groupJournalLinesByDate(items), [items]);
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
 
   const handleSaveSummary = async (lineUuid: string, summary: string) => {
     const result = await updateEntrySummary({ ledgerEntryLinesUuid: lineUuid, summary });
@@ -86,9 +93,21 @@ export default function JournalOverviewView() {
             onToggleUnlimitedDate={handleToggleUnlimited}
             unlimitedLabel="不限日期，顯示全部分錄"
           />
-          {!loading && !error && (
-            <span className="text-sm text-neutral-mid">共 {total} 筆</span>
-          )}
+          <div className="flex items-center gap-3">
+            {!loading && !error && (
+              <span className="text-sm text-neutral-mid">共 {total} 筆</span>
+            )}
+            <div className="flex items-center gap-2 text-sm text-neutral-mid">
+              每頁顯示：
+              <Select widthClassName="w-20" value={String(pageSize)} onValueChange={v => handlePageSizeChange(Number(v))}>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </Select>
+              筆
+            </div>
+          </div>
         </div>
 
         {/* 清單 */}

@@ -10,7 +10,7 @@ import { Fragment, useState } from 'react';
 import type { JournalDateGroup } from './journalGrouping';
 
 const thClass = 'px-3 py-2.5 text-left text-xs font-semibold text-neutral-mid whitespace-nowrap';
-const tdClass = 'px-3 py-2 text-sm text-neutral-dark whitespace-nowrap';
+const tdClass = 'px-3 py-2 text-sm text-neutral-dark whitespace-nowrap overflow-hidden truncate';
 // 摘要欄位可能多行（編輯態為 textarea），不套用 nowrap，並讓多行內容從頂部對齊
 const summaryTdClass = 'px-3 py-2 text-sm text-neutral-dark align-top';
 
@@ -97,13 +97,22 @@ function SummaryCell({ lineUuid, summary, onSaveSummary }: { lineUuid: string; s
   );
 }
 
-/** 桌機版：一個大 table，日期 group header 用 colSpan=7 的 tr 插入；手機版：flex div 流 */
+/** 桌機版：一個大 table，欄寬固定（table-fixed）；手機版：flex div 流 */
 export default function JournalOverviewList({ groups, onSaveSummary }: JournalOverviewListProps) {
   return (
     <>
       {/* 桌機版 */}
       <div className="hidden nav:block overflow-x-auto rounded-md border border-neutral-blue-gray/30 bg-white">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-[100px]" />
+            <col className="w-[140px]" />
+            <col className="w-[160px]" />
+            <col />
+            <col className="w-[140px]" />
+            <col className="w-[140px]" />
+            <col className="w-10" />
+          </colgroup>
           <thead>
             <tr className="border-b border-neutral-blue-gray/40 bg-surface-off-white">
               <th className={thClass}>傳票日期</th>
@@ -112,34 +121,28 @@ export default function JournalOverviewList({ groups, onSaveSummary }: JournalOv
               <th className={thClass}>摘要</th>
               <th className={`${thClass} text-right`}>借方金額</th>
               <th className={`${thClass} text-right`}>貸方金額</th>
-              <th className="w-10 px-2" />
+              <th className="px-2" />
             </tr>
           </thead>
           <tbody>
             {groups.map((group, gIdx) => (
               <Fragment key={group.dateKey}>
-                {/* 日期分組標頭列 */}
-                <tr className={gIdx > 0 ? 'border-t border-neutral-blue-gray/30' : ''}>
-                  <td colSpan={7} className="bg-surface-off-white px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="h-4 w-[3px] shrink-0 rounded-full bg-brand-blue" />
-                      <span className="text-[15px] font-semibold text-neutral-dark">{group.label}</span>
-                    </div>
-                  </td>
-                </tr>
-
                 {/* 該日期的傳票分錄行 */}
-                {group.vouchers.map(voucher =>
+                {group.vouchers.map((voucher, vIdx) =>
                   voucher.lines.map((line, lineIdx) => {
                     const isFirst = lineIdx === 0;
+                    // 每張傳票開頭加粗黑分隔線，區隔不同傳票；整份清單第一張傳票不需要
+                    const isNewVoucher = isFirst && !(gIdx === 0 && vIdx === 0);
                     return (
                       <tr
                         key={line.lineUuid}
-                        className="border-b border-neutral-blue-gray/15 hover:bg-brand-blue/5"
+                        className={`border-b border-neutral-blue-gray/15 hover:bg-brand-blue/5 ${
+                          isNewVoucher ? 'border-t-2 border-t-neutral-dark' : ''
+                        }`}
                       >
                         <td className={tdClass}>{isFirst ? fmtRocDate(line.rocDate) : ''}</td>
                         <td className={`${tdClass} font-mono`}>{isFirst ? line.voucherNo : ''}</td>
-                        <td className={tdClass}>{line.subjectName}</td>
+                        <td className={tdClass} title={line.subjectName}>{line.subjectName}</td>
                         <td className={summaryTdClass} onClick={e => e.stopPropagation()}>
                           <SummaryCell lineUuid={line.lineUuid} summary={line.summary} onSaveSummary={onSaveSummary} />
                         </td>
@@ -174,12 +177,6 @@ export default function JournalOverviewList({ groups, onSaveSummary }: JournalOv
       <div className="flex flex-col gap-4 nav:hidden">
         {groups.map((group, gIdx) => (
           <div key={group.dateKey} className={gIdx > 0 ? 'border-t border-neutral-blue-gray/20 pt-4' : ''}>
-            {/* 日期 group header */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="h-4 w-[3px] shrink-0 rounded-full bg-brand-blue" />
-              <span className="text-[15px] font-semibold text-neutral-dark">{group.label}</span>
-            </div>
-
             {/* 傳票卡片 */}
             <div className="flex flex-col gap-3">
               {group.vouchers.map(voucher => {
