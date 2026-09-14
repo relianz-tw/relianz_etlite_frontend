@@ -6,8 +6,7 @@ import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
 import ReconDateFilter from '@/features/reconciliation/components/ReconDateFilter';
 import { Download } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { groupJournalLinesByDate } from './journalGrouping';
+import { useState } from 'react';
 import JournalOverviewList from './JournalOverviewList';
 import { useJournalOverview } from './useJournalOverview';
 
@@ -23,7 +22,7 @@ function defaultRange() {
   return { today: toYyyymmdd(today), monthStart: toYyyymmdd(monthStart) };
 }
 
-/** 日記帳總覽頁；目前資料走 mock，後端 range API 上線後只需替換 useJournalOverview 內部邏輯 */
+/** 日記帳總覽頁 */
 export default function JournalOverviewView() {
   const { today, monthStart } = defaultRange();
 
@@ -33,7 +32,7 @@ export default function JournalOverviewView() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const { items, total, loading, error, patchLineSummary } = useJournalOverview({
+  const { vouchers, total, loading, error, patchLineSummary } = useJournalOverview({
     dateFrom,
     dateTo,
     unlimitedDate,
@@ -41,7 +40,6 @@ export default function JournalOverviewView() {
     pageSize,
   });
 
-  const groups = useMemo(() => groupJournalLinesByDate(items), [items]);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const handlePageSizeChange = (size: number) => {
@@ -95,7 +93,7 @@ export default function JournalOverviewView() {
           />
           <div className="flex items-center gap-3">
             {!loading && !error && (
-              <span className="text-sm text-neutral-mid">共 {total} 筆</span>
+              <span className="text-sm text-neutral-mid">共 {total} 筆分錄</span>
             )}
             <div className="flex items-center gap-2 text-sm text-neutral-mid">
               每頁顯示：
@@ -116,17 +114,17 @@ export default function JournalOverviewView() {
             <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
           ) : error ? (
             <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{error}</div>
-          ) : items.length === 0 ? (
+          ) : vouchers.length === 0 ? (
             <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
               {unlimitedDate ? '尚無會計分錄' : '此期間無會計分錄'}
             </div>
           ) : (
-            <JournalOverviewList groups={groups} onSaveSummary={handleSaveSummary} />
+            <JournalOverviewList vouchers={vouchers} onSaveSummary={handleSaveSummary} />
           )}
         </div>
 
         {/* 分頁 */}
-        {!loading && !error && items.length > 0 && (
+        {!loading && !error && vouchers.length > 0 && (
           <div className="mt-4">
             <Pagination page={page} totalPages={totalPages} onPageChange={p => setPage(p)} />
           </div>

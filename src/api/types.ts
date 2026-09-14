@@ -1464,6 +1464,8 @@ export interface DailyDetailLineDto {
   voucherType: string;
   /** 民國日期 YYYMMDD，例 '1150807' */
   rocDate: string;
+  /** 會計編號；公司子科目優先，否則官方代碼。僅 GET /ael/ledger/daily 回傳 */
+  subjectCode?: string;
   /** 會計科目名稱；若該筆分錄選了子科目，此欄位優先回傳子科目名稱 */
   subjectName: string;
   /** 公司自訂子科目 uuid；該筆分錄未選子科目時為 undefined */
@@ -1485,13 +1487,33 @@ export interface DailyDetailLineDto {
   createdDate: string;
   /** 同傳票內列排序 */
   sortOrder: number;
-  /** 摘要異動來源：0 系統／1 手動改／2 純手動；GET /ael/ledger/entries/dailyDetail 不保證回傳 */
+  /** 摘要異動來源：0 系統／1 手動改摘要；GET /ael/ledger/entries/dailyDetail 不保證回傳 */
   updateBy?: number;
+}
+
+/** GET /ael/ledger/daily 的單張傳票 */
+export interface JournalVoucherDto {
+  voucherNo: string;
+  rocYear: string;
+  rocDate: string;
+  /** 傳票日西元 YYYYMMDD */
+  createdDate: string;
+  voucherType: string;
+  ledgerUuid: string;
+  /** 僅關聯單一沖帳事件時帶出 */
+  settleEventUuid?: string;
+  isReverse: boolean;
+  /** 本頁內該傳票借方合計（元）；傳票跨頁時只計本頁部分 */
+  debitAmountSum: number;
+  /** 本頁內該傳票貸方合計（元）；傳票跨頁時只計本頁部分 */
+  creditAmountSum: number;
+  lines: DailyDetailLineDto[];
 }
 
 /** GET /ael/ledger/daily 回應 data（日記帳中心列表查詢） */
 export interface JournalCenterResult {
-  items: DailyDetailLineDto[];
+  vouchers: JournalVoucherDto[];
+  /** 符合條件之分錄列總數（非傳票數） */
   total: number;
   page: number;
   count: number;

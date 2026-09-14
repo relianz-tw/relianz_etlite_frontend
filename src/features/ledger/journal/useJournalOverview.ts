@@ -1,7 +1,7 @@
 'use client';
 
 import { fetchJournalCenter } from '@/api/ledger';
-import type { DailyDetailLineDto } from '@/api/types';
+import type { DailyDetailLineDto, JournalVoucherDto } from '@/api/types';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -18,7 +18,7 @@ export interface UseJournalOverviewParams {
 }
 
 export interface UseJournalOverviewResult {
-  items: DailyDetailLineDto[];
+  vouchers: JournalVoucherDto[];
   total: number;
   loading: boolean;
   error: string;
@@ -29,7 +29,7 @@ export interface UseJournalOverviewResult {
 
 /** 日記帳中心列表資料取得（GET /ael/ledger/daily） */
 export function useJournalOverview({ dateFrom, dateTo, unlimitedDate, page, pageSize = 10 }: UseJournalOverviewParams): UseJournalOverviewResult {
-  const [dtos, setDtos] = useState<DailyDetailLineDto[]>([]);
+  const [dtos, setDtos] = useState<JournalVoucherDto[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,7 +48,7 @@ export function useJournalOverview({ dateFrom, dateTo, unlimitedDate, page, page
     })
       .then(result => {
         if (cancelled) return;
-        setDtos(result.items);
+        setDtos(result.vouchers);
         setTotal(result.total);
         setLocalPatches({});
       })
@@ -63,13 +63,20 @@ export function useJournalOverview({ dateFrom, dateTo, unlimitedDate, page, page
     };
   }, [dateFrom, dateTo, unlimitedDate, page, pageSize, reloadKey]);
 
-  const items = useMemo(
-    () => dtos.map(dto => ({ ...dto, ...localPatches[dto.lineUuid] })),
+  // 套上本地摘要修改，並依 sortOrder 排序（API 回傳的 lines 順序不保證）
+  const vouchers = useMemo(
+    () =>
+      dtos.map(voucher => ({
+        ...voucher,
+        lines: [...voucher.lines]
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map(line => ({ ...line, ...localPatches[line.lineUuid] })),
+      })),
     [dtos, localPatches],
   );
 
   return {
-    items,
+    vouchers,
     total,
     loading,
     error,
