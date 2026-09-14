@@ -4,7 +4,7 @@ import type { DonutSlice } from '@/components/ui/charts/DonutChart';
 import { fmtCurrency } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
-import type { ChannelShareDatum } from '../../summary';
+import { formatRangeLabel, type ChannelShareDatum } from '../../summary';
 import type { Side } from '../../types';
 import SummaryCardShell from './SummaryCardShell';
 
@@ -17,6 +17,8 @@ interface ChannelShareCardProps {
   side: Side;
   /** 已經 Top4 + 其他、已配色的最終資料（見 src/features/ledger/summary.ts buildTopShares） */
   shares: ChannelShareDatum[];
+  /** 與 shares 同一份資料涵蓋的區間（chartRange），供卡片標示資料期間 */
+  range: { from: string; to: string };
   loading: boolean;
   selectedUuid: string | null;
   /** 點「其他」不觸發（見 ChannelShareDatum.selectable）；再點同一項傳 null 清除 */
@@ -25,7 +27,7 @@ interface ChannelShareCardProps {
 
 const LABEL: Record<Side, string> = { sales: '銷售管道佔比', purchase: '廠商佔比' };
 
-export default function ChannelShareCard({ side, shares, loading, selectedUuid, onSelect }: ChannelShareCardProps) {
+export default function ChannelShareCard({ side, shares, range, loading, selectedUuid, onSelect }: ChannelShareCardProps) {
   const slices: DonutSlice[] = useMemo(() => shares.map(s => ({ key: s.uuid, label: s.label, value: s.value, color: s.color })), [shares]);
 
   const handleSelect = (slice: DonutSlice) => {
@@ -35,7 +37,7 @@ export default function ChannelShareCard({ side, shares, loading, selectedUuid, 
   };
 
   return (
-    <SummaryCardShell span={3} label={LABEL[side]}>
+    <SummaryCardShell span={3} label={LABEL[side]} period={formatRangeLabel(range.from, range.to)}>
       {loading ? (
         // 不給固定 height，改由 flex-1 撐滿卡片剩餘高度，避免卡片被同排的 TrendCard 拉高後底部留白
         <div className="min-h-0 flex-1 rounded-md bg-surface-cream" />

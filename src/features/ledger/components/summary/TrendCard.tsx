@@ -7,7 +7,7 @@ import { Maximize2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildTrendPoints, type TrendGranularity } from '../../summary';
+import { buildTrendPoints, formatRangeLabel, type TrendGranularity } from '../../summary';
 import type { Side } from '../../types';
 import SummaryCardShell from './SummaryCardShell';
 
@@ -28,7 +28,7 @@ interface TrendCardProps {
   /** 目前列表套用的日期篩選；用來標示選取態，無篩選時為 null */
   selectedRange: { from: string; to: string } | null;
   dailyAmounts: LedgerDailyAmount[];
-  /** 卡片頂部大數字：來自 filter API 的真實彙總（totals.primary），非圖表資料 */
+  /** 卡片頂部大數字：來自 summary API 的真實彙總（totals.transaction），非圖表資料 */
   primaryAmount: number;
   loading: boolean;
   /** 點長條寫回 dateFrom/dateTo；再點同一根傳 null 代表清除 */
@@ -36,7 +36,7 @@ interface TrendCardProps {
   detailHref: string;
 }
 
-const LABEL: Record<Side, string> = { sales: '代收金額', purchase: '代付金額' };
+const LABEL: Record<Side, string> = { sales: '交易金額', purchase: '交易金額' };
 
 export default function TrendCard({ side, range, selectedRange, dailyAmounts, primaryAmount, loading, onRangeSelect, detailHref }: TrendCardProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -79,19 +79,14 @@ export default function TrendCard({ side, range, selectedRange, dailyAmounts, pr
     <SummaryCardShell
       span={6}
       label={label}
+      period={formatRangeLabel(range.from, range.to)}
       action={
         <Link href={detailHref} aria-label={`查看${label}詳情`} className="text-neutral-mid hover:text-brand-blue">
           <Maximize2 size={16} />
         </Link>
       }
     >
-      <div className="whitespace-nowrap font-mono text-2xl font-semibold tabular-nums text-neutral-dark">{fmtCurrency(primaryAmount)}</div>
-
-      <div className="mb-2 mt-3">
-        <span className="text-[11px] text-neutral-mid">
-          {points[0]?.label} – {points[points.length - 1]?.label}
-        </span>
-      </div>
+      <div className="mb-3 whitespace-nowrap font-mono text-2xl font-semibold tabular-nums text-neutral-dark">{fmtCurrency(primaryAmount)}</div>
 
       <div ref={chartContainerRef}>
         {loading ? (

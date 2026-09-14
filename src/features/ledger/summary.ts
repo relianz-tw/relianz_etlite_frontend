@@ -9,6 +9,30 @@ import { formatYmd } from './transaction/data';
 
 export type TrendGranularity = 'day' | 'week';
 
+/**
+ * 依 date（西元 YYYYMMDD）合併多組逐日金額並加總，供趨勢柱狀圖合併「未結清」＋「已結清」
+ * 兩個口徑（分別對應 xxx/summary 與 xxx/{collected,paid}/summary）使用，
+ * 邏輯與 mergeShareEntries 合併管道／廠商佔比一致。
+ */
+export function mergeDailyAmounts(...groups: LedgerDailyAmount[][]): LedgerDailyAmount[] {
+  const merged = new Map<string, number>();
+  for (const group of groups) {
+    for (const entry of group) {
+      merged.set(entry.date, (merged.get(entry.date) ?? 0) + entry.issuedAmount);
+    }
+  }
+  return [...merged.entries()].map(([date, issuedAmount]) => ({ date, issuedAmount }));
+}
+
+/** 卡片資料期間標示，如 '8/1 – 9/30'；輸入為 ROC 'YYY/MM/DD' */
+export function formatRangeLabel(fromRoc: string, toRoc: string): string {
+  const from = parseRocDate(fromRoc);
+  const to = parseRocDate(toRoc);
+  if (!from || !to) return '';
+  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${fmt(from)} – ${fmt(to)}`;
+}
+
 export interface LedgerTrendPoint {
   /** 唯一 key，同時作為選取比對：日 → 西元 'YYYYMMDD'；週 → 'YYYYMMDD~YYYYMMDD' */
   key: string;

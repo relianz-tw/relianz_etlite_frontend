@@ -6,14 +6,16 @@ export type PurchaseSubTab = 'payable' | 'paid';
 
 /**
  * 帳簿總覽頂部 KPI 卡片數字，來自 summary API 回傳的彙總欄位（非前端計算）。
- * primary／collected 分別來自兩支不同端點（同一 side 底下的主端點／已收已付端點），
- * 口徑不同（transaction_date／entry_date），非同一份資料的兩個切分，見 useLedgerSummary 說明。
+ * 主端點（未結清原單）／已收已付端點（已結清原單）是互斥的兩批單，非同一份資料的兩個切分，
+ * 故 transaction 為前端將兩者相加得出，見 useLedgerSummary 說明。
  */
 export interface LedgerTotals {
-  /** 銷項：receivables/summary 的 issuedVoucherAmount／進項：payables/summary 的 receivedVoucherAmount */
-  primary: number;
-  /** 銷項：receivables/collected/summary 的 issuedVoucherAmount／進項：payables/paid/summary 的 receivedVoucherAmount */
-  collected: number;
+  /** 交易金額：未結清＋已結清原單憑證金額加總（含已沖帳與未沖帳） */
+  transaction: number;
+  /** 應收帳款／應付帳款：未結清原單憑證金額（銷項 receivables/summary 的 issuedVoucherAmount／進項 payables/summary 的 receivedVoucherAmount） */
+  outstanding: number;
+  /** 已收款／已付款：已結清原單憑證金額（銷項 receivables/collected/summary 的 issuedVoucherAmount／進項 payables/paid/summary 的 receivedVoucherAmount） */
+  settled: number;
 }
 
 /** 表格可排序欄位：counterparty 對應銷項 counterparty／進項 party（買受人/賣家名稱/交易敘述） */

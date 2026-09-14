@@ -72,6 +72,13 @@ function defaultChartRange(): { from: string; to: string } {
   return { from: formatRocDate(from), to: formatRocDate(to) };
 }
 
+/** 收款／付款狀況卡固定看「年初至今」，與圖表區間解耦，見 SummaryCards ytdRange 註解 */
+function ytdRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to.getFullYear(), 0, 1);
+  return { from: formatRocDate(from), to: formatRocDate(to) };
+}
+
 const SALES_SUB_TABS: { value: SalesSubTab; label: string }[] = [
   { value: 'receivable', label: '應收帳款' },
   { value: 'received', label: '已收款' },
@@ -107,6 +114,8 @@ export default function LedgerView() {
   // 因此改用 skipChartRangeSyncRef 明確標記「這次 filters.advanced 變動是點擊趨勢圖造成的」，
   // 該次一律跳過同步；只有使用者透過 FilterBar 手動輸入/清除日期時才會更新圖表區間。
   const [chartRange, setChartRange] = useState(defaultChartRange);
+  // 年初至今，僅初始化一次；不隨 filters.advanced／chartRange 變動
+  const [summaryYtdRange] = useState(ytdRange);
   const skipChartRangeSyncRef = useRef(false);
   useEffect(() => {
     if (skipChartRangeSyncRef.current) {
@@ -269,6 +278,7 @@ export default function LedgerView() {
           <SummaryCards
             side={filters.side}
             chartRange={chartRange}
+            ytdRange={summaryYtdRange}
             selectedRange={selectedRange}
             channelUuid={filters.channelUuid}
             onRangeSelect={handleTrendRangeSelect}

@@ -15,6 +15,8 @@ interface SummaryCardsProps {
   side: Side;
   /** 圖表 X 軸涵蓋的區間（ROC YYY/MM/DD），與列表日期篩選解耦，見 LedgerView 的 chartRange 註解 */
   chartRange: { from: string; to: string };
+  /** 收款／付款狀況卡涵蓋的區間（年初至今，恆定），見 LedgerView 的 ytdRange 註解 */
+  ytdRange: { from: string; to: string };
   /** 目前列表套用的日期篩選；用來標示卡片 A 的選取態，無篩選時為 null */
   selectedRange: { from: string; to: string } | null;
   channelUuid: string | null;
@@ -24,12 +26,13 @@ interface SummaryCardsProps {
 
 /**
  * 桌機三卡並列（12 欄 grid：6/3/3），手機單欄堆疊（DESIGN.md §11.5）。
- * 三張卡的數字（趨勢大數字／入帳狀況／管道佔比）皆由 useLedgerSummary 統一抓取一次，僅隨
- * side + chartRange 變動，不吃列表子分頁／篩選；入帳狀況卡本身不可點擊篩選，不需要 onSubTabSelect。
+ * 三張卡的數字（交易金額趨勢／管道佔比／收款·付款狀況）皆由 useLedgerSummary 統一抓取，僅隨
+ * side + chartRange + ytdRange 變動，不吃列表子分頁／篩選；收款·付款狀況卡本身不可點擊篩選，
+ * 不需要 onSubTabSelect。
  */
-export default function SummaryCards({ side, chartRange, selectedRange, channelUuid, onRangeSelect, onChannelSelect }: SummaryCardsProps) {
+export default function SummaryCards({ side, chartRange, ytdRange, selectedRange, channelUuid, onRangeSelect, onChannelSelect }: SummaryCardsProps) {
   const searchParams = useSearchParams();
-  const { dailyAmounts, shares, totals, loading } = useLedgerSummary(side, chartRange);
+  const { dailyAmounts, shares, totals, ytdTotals, loading } = useLedgerSummary(side, chartRange, ytdRange);
   const detailHref = withReturnParam(`/ledger/trend?side=${side}`, searchParams);
 
   // 行動版三卡改橫向 snap 捲動，一次一張；用捲動位置換算目前頁碼，供下方指示點顯示與跳頁（DESIGN.md §11.13）
@@ -60,13 +63,13 @@ export default function SummaryCards({ side, chartRange, selectedRange, channelU
           range={chartRange}
           selectedRange={selectedRange}
           dailyAmounts={dailyAmounts}
-          primaryAmount={totals?.primary ?? 0}
+          primaryAmount={totals?.transaction ?? 0}
           loading={loading}
           onRangeSelect={onRangeSelect}
           detailHref={detailHref}
         />
-        <SettlementCard side={side} totals={totals} loading={loading} />
-        <ChannelShareCard side={side} shares={shares} loading={loading} selectedUuid={channelUuid} onSelect={onChannelSelect} />
+        <ChannelShareCard side={side} shares={shares} range={chartRange} loading={loading} selectedUuid={channelUuid} onSelect={onChannelSelect} />
+        <SettlementCard side={side} totals={ytdTotals} range={ytdRange} loading={loading} />
       </div>
 
       {/* 頁面指示點：僅行動版顯示，桌機為 12 欄並列不需要 */}

@@ -26,7 +26,6 @@ export const navLinks: NavLink[] = [
     children: [
       { name: '新增交易', action: 'newTransaction', icon: 'plus' },
       { name: '帳簿總覽', path: '/ledger' },
-      { name: '日記帳總覽', path: '/ledger/journal' },
       { name: '沖帳中心', path: '/ledger/reconciliation' },
     ],
   },
@@ -48,7 +47,13 @@ export const navLinks: NavLink[] = [
       { name: '固定資產', path: '/income-tax/fixed-assets' },
     ],
   },
-  { name: '檔案紀錄', path: '/files' },
-  { name: '報表中心', path: '/reports' },
+  { name: '雲端資料夾', path: '/files' },
+  {
+    name: '報表中心',
+    path: '/reports',
+    children: [
+      { name: '日記帳總覽', path: '/ledger/journal' },
+    ],
+  },
   { name: '設定', path: '/settings' },
 ];
