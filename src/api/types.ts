@@ -807,6 +807,8 @@ export interface ReconPayableItemDto {
   orderCode: string;
   /** 交易付款日 YYYYMMDD；未入帳時為 null */
   entryDate: string | null;
+  /** 顯示／排序日 YYYY-MM-DD；remaining<0 時為最新折讓日 */
+  transactionDate: string;
   entryKind: number;
   direction: number;
   counterpartyName: string;
@@ -846,6 +848,8 @@ export interface ReconReceivableItemDto {
   orderCode: string;
   /** 交易收款日 YYYYMMDD；未入帳時為 null */
   entryDate: string | null;
+  /** 顯示／排序日 YYYY-MM-DD；remaining<0 時為最新折讓日 */
+  transactionDate: string;
   entryKind: number;
   direction: number;
   counterpartyName: string;

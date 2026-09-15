@@ -161,7 +161,7 @@ function TxnRow({
   const chevronClass = cn('shrink-0 text-neutral-blue-gray transition-transform', expanded && 'rotate-180');
   const remainingAmount = row.remainingAmount ?? row.amount;
   // 逐筆沖帳可勾選（複選，勾 1 筆走手動沖帳 API、勾多筆走 summary API，見 ReconciliationView）；匯總沖帳僅唯讀顯示拆帳狀態
-  // 負值項目（超沖退款等）也允許勾選，且進入畫面時會自動預選，讓使用者連同一起沖帳
+  // 負值項目（超沖退款等）也允許勾選，但不會自動預選，由使用者自行決定是否一併沖帳
   const isSelectable = mode === 'perTxn';
   const badge = statusBadge;
   const { detail, loading: detailLoading, error: detailError } = useLazyEntryDetail(row.uuid, expanded);

@@ -63,14 +63,9 @@ function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
   return (parseRocDate(a.date)?.getTime() ?? 0) - (parseRocDate(b.date)?.getTime() ?? 0);
 }
 
-/**
- * 開立日期＝憑證上的開立日（item.invoice.date，民國年 YYYMMDD），與 features/ledger/data.ts 的
- * issueDateFrom 相同慣例；查無憑證日期時退回 entryDate（交易收款/付款日 YYYYMMDD，未入帳時為 null，
- * 此時不顯示日期）。
- */
-function toIssueDate(invoiceDate: string, entryDate: string | null): string {
-  const date = parseRocDate(invoiceDate) ?? (entryDate ? parseApiDate(entryDate) : undefined);
-  return formatRocDate(date);
+/** 顯示日期＝API 算好的 transactionDate（YYYY-MM-DD；remaining<0 時為最新折讓日），轉為民國年 YYY/MM/DD 呈現 */
+function toDisplayDate(transactionDate: string): string {
+  return formatRocDate(parseApiDate(transactionDate));
 }
 
 /** 對帳中心銷項應收分組回應 → 攤平為統一候選交易形狀，分組鍵為 paymentChannelUuid */
@@ -80,7 +75,7 @@ export function receivableGroupsToCandidates(groups: ReconReceivableGroupDto[]):
       uuid: item.ledgerUuid,
       orderCode: item.orderCode,
       amount: item.totalAmount,
-      date: toIssueDate(item.invoice.date, item.entryDate),
+      date: toDisplayDate(item.transactionDate),
       counterparty: item.counterpartyName,
       groupUuid: item.paymentChannelUuid,
       remainingAmount: item.remainingAmount,
@@ -98,7 +93,7 @@ export function payableGroupsToCandidates(groups: ReconPayableGroupDto[]): Recon
         uuid: item.ledgerUuid,
         orderCode: item.orderCode,
         amount: item.totalAmount,
-        date: toIssueDate(item.invoice!.date, item.entryDate),
+        date: toDisplayDate(item.transactionDate),
         counterparty: item.counterpartyName,
         groupUuid: item.counterpartyUuid,
         remainingAmount: item.remainingAmount,

@@ -61,7 +61,7 @@ export interface ReconTxnRef {
   /** 交易編號，供展開面板顯示 */
   orderCode: string;
   amount: number;
-  date: string; // 民國年 YYY/MM/DD，開立日期見 data.ts 的 toIssueDate
+  date: string; // 民國年 YYY/MM/DD，來源見 data.ts 的 toDisplayDate（API transactionDate）
   /** 交易對方名稱：應收為買受人／應付為賣方，供清單欄位、展開面板顯示與交易明細頁帶入用 */
   counterparty: string;
   /** 憑證號碼（發票字軌＋發票號碼），供清單欄位與展開面板顯示 */
