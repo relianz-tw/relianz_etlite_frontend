@@ -1,5 +1,5 @@
-/** 與銀行沖帳事件關聯的帳簿交易（展開列與交易明細頁的「關聯帳簿交易」清單皆使用），
- *  由 GET /ael/ledger/entries/detail 回應對映而來（見 data.ts 的 mapEntryDetailToLinked）；
+/** 與銀行沖帳事件關聯的帳簿交易原單明細（展開列與交易明細頁的「關聯帳簿交易」清單皆使用），
+ *  直接對映 BankSettleEventDto.details（見 data.ts 的 mapDetailToLinked）；
  *  ledgerUuid 對應 /ledger/[id] 編輯頁。 */
 export interface LinkedLedgerTxn {
   ledgerUuid: string;
@@ -8,20 +8,24 @@ export interface LinkedLedgerTxn {
   side: 'sales' | 'purchase';
   /** 交易對象名稱 */
   counterpartyName: string;
-  /** 總金額 */
-  totalAmount: number;
-  /** 交易發生日（ISO 字串），查無則為 null */
-  transactionDate: string | null;
+  /** 原單金額 */
+  originAmount: number;
+  /** 交易發生日 YYYYMMDD */
+  transactionDate: string;
   /** 科目名稱 */
   subjectName: string;
-  /** 本次沖帳事件對該原單的沖帳金額；該原單的 settleEvents 內找不到對應事件時為 null */
-  eventSettleAmount: number | null;
-  /** 發票號碼（字軌＋號碼）；無發票（如未開立發票的應收/應付）時為空字串 */
-  invoiceNo: string;
+  /** 本次沖帳事件對該原單的沖帳金額（非原單累計已沖金額） */
+  amount: number;
+  /** 發票字軌＋號碼；無票為空字串 */
+  voucherNumber: string;
+  /** 該原單沖銷前剩餘金額 */
+  balanceBefore: number;
+  /** 該原單沖銷後剩餘金額 */
+  balanceAfter: number;
 }
 
 /** 銀行帳戶總覽的單筆沖帳事件（由 POST /ael/bankAccounts/transactions 回應的 BankSettleEventDto 對映，
- *  見 data.ts 的 mapSettleEventToRow）；後端僅提供沖帳事件，無逐筆累計餘額，故不含餘額欄位。 */
+ *  見 data.ts 的 mapSettleEventToRow）；沖帳事件本身無逐筆累計餘額，餘額僅存在於各筆 details 原單明細。 */
 export interface BankTxnRow {
   /** 沖帳事件 uuid，列表 key 與交易明細頁路由參數 */
   settleEventUuid: string;
@@ -49,12 +53,12 @@ export interface BankTxnRow {
   hasInvoice: boolean;
   /** 交易原單 uuid，供查詢日記帳分錄 */
   mainSettlementLedgerUuid: string;
-  /** 交易關聯單 uuid 列表，供查詢關聯帳簿交易 */
+  /** 交易關聯單 uuid 列表，供顯示「N 筆」徽章 */
   originLedgerUuids: string[];
-  /** 交易關聯單科目 id 列表，與 originLedgerUuids 同序，供反查關聯帳簿交易的科目名稱 */
-  originOfficialAccountingSubjectIds: number[];
   primaryOriginLedgerUuid: string;
   createdAt: string;
+  /** 關聯帳簿交易原單明細，與 originLedgerUuids 同序 */
+  details: LinkedLedgerTxn[];
 }
 
 /** 新增銀行提／匯款交易表單送出的資料，對應 POST /ael/bankAccounts/cashMovements body

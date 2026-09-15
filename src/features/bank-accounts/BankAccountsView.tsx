@@ -1,7 +1,7 @@
 'use client';
 
 import { listBankAccounts } from '@/api/bankAccounts';
-import type { BankAccountDto } from '@/api/types';
+import type { BankAccountDto, BankTransactionsSummaryDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import ExportRangeDialog from '@/components/ui/ExportRangeDialog';
 import Pagination from '@/components/ui/Pagination';
@@ -51,7 +51,8 @@ export default function BankAccountsView() {
   const [accountsError, setAccountsError] = useState('');
 
   const [transactions, setTransactions] = useState<BankTxnRow[]>([]);
-  const [subjectNameById, setSubjectNameById] = useState<Map<number, string>>(new Map());
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<BankTransactionsSummaryDto>({ depositTotal: 0, expenseTotal: 0 });
   const [txnLoading, setTxnLoading] = useState(false);
   const [txnError, setTxnError] = useState('');
 
@@ -106,9 +107,10 @@ export default function BankAccountsView() {
     setTxnLoading(true);
     setTxnError('');
     try {
-      const { rows, subjectNameById } = await loadBankTransactions(bankAccountUuid, effectiveDateFrom, effectiveDateTo);
+      const { rows, total, summary } = await loadBankTransactions(bankAccountUuid, effectiveDateFrom, effectiveDateTo, filters.page, PAGE_LIMIT);
       setTransactions(rows);
-      setSubjectNameById(subjectNameById);
+      setTotal(total);
+      setSummary(summary);
     } catch (err) {
       setTxnError(getFriendlyErrorMessage(err));
     } finally {
@@ -116,17 +118,18 @@ export default function BankAccountsView() {
     }
   };
 
-  // 切換帳戶或查詢期間時重新載入沖帳事件（期間篩選交給後端，一次取回全期資料供前端分頁與合計）
+  // 切換帳戶／查詢期間／頁碼時重新載入沖帳事件（分頁與存入支出合計皆交由後端計算）
   useEffect(() => {
     if (!selectedAccount) return;
     let cancelled = false;
     setTxnLoading(true);
     setTxnError('');
-    loadBankTransactions(selectedAccount.bankAccountUuid, effectiveDateFrom, effectiveDateTo)
-      .then(({ rows, subjectNameById }) => {
+    loadBankTransactions(selectedAccount.bankAccountUuid, effectiveDateFrom, effectiveDateTo, filters.page, PAGE_LIMIT)
+      .then(({ rows, total, summary }) => {
         if (cancelled) return;
         setTransactions(rows);
-        setSubjectNameById(subjectNameById);
+        setTotal(total);
+        setSummary(summary);
       })
       .catch(err => {
         if (cancelled) return;
@@ -139,14 +142,9 @@ export default function BankAccountsView() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount?.bankAccountUuid, effectiveDateFrom, effectiveDateTo]);
+  }, [selectedAccount?.bankAccountUuid, effectiveDateFrom, effectiveDateTo, filters.page]);
 
-  // 存入／支出合計僅計入未恢復（撤銷）的事件，比照帳戶餘額的實際意義
-  const depositTotal = useMemo(() => transactions.filter(r => !r.isReverse).reduce((sum, r) => sum + (r.deposit ?? 0), 0), [transactions]);
-  const expenseTotal = useMemo(() => transactions.filter(r => !r.isReverse).reduce((sum, r) => sum + (r.expense ?? 0), 0), [transactions]);
-
-  const totalPages = Math.max(1, Math.ceil(transactions.length / PAGE_LIMIT));
-  const pagedRows = transactions.slice((filters.page - 1) * PAGE_LIMIT, filters.page * PAGE_LIMIT);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
   const handlePageChange = (page: number) => {
     setExpandedId(null);
@@ -199,7 +197,7 @@ export default function BankAccountsView() {
             </div>
 
             <div className="mb-5">
-              <AccountSummaryCard account={selectedAccount} depositTotal={depositTotal} expenseTotal={expenseTotal} />
+              <AccountSummaryCard account={selectedAccount} depositTotal={summary.depositTotal} expenseTotal={summary.expenseTotal} />
             </div>
 
             <div className="mb-5">
@@ -219,19 +217,17 @@ export default function BankAccountsView() {
             ) : (
               <>
                 <TransactionTable
-                  rows={pagedRows}
-                  totalCount={transactions.length}
+                  rows={transactions}
+                  totalCount={total}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
                   detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
-                  subjectNameById={subjectNameById}
                 />
                 <TransactionCards
-                  rows={pagedRows}
+                  rows={transactions}
                   expandedId={expandedId}
                   onToggle={id => setExpandedId(prev => (prev === id ? null : id))}
                   detailHref={row => withReturnParam(`/bank-accounts/${row.settleEventUuid}?account=${selectedAccount.bankAccountUuid}`, searchParams)}
-                  subjectNameById={subjectNameById}
                 />
                 <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
               </>

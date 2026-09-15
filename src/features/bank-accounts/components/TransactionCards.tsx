@@ -6,7 +6,6 @@ import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { ChevronDown, FileSearch } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cashDirectionLabel } from '../labels';
-import { useLazyLinkedTransactions } from '../useLazyLinkedTransactions';
 import InlineLinkedTransactions from './InlineLinkedTransactions';
 import type { BankTxnRow } from '../types';
 
@@ -17,35 +16,23 @@ interface TransactionCardsProps {
   onToggle: (id: string) => void;
   /** 展開區「查看完整明細」按鈕導向的交易詳細頁網址 */
   detailHref: (row: BankTxnRow) => string;
-  /** 科目 id → 名稱對照表，供展開列關聯帳簿交易的科目名稱使用 */
-  subjectNameById: Map<number, string>;
 }
 
-/** 單張交易卡片：獨立成元件讓 useLazyLinkedTransactions 有自己的 hook 實例，
- *  避免在 .map() callback 內直接呼叫 hook 違反 Hooks 規則 */
+/** 單張交易卡片 */
 function TransactionCard({
   row,
   expanded,
   onToggle,
   detailHref,
-  subjectNameById,
 }: {
   row: BankTxnRow;
   expanded: boolean;
   onToggle: () => void;
   detailHref: string;
-  subjectNameById: Map<number, string>;
 }) {
   const router = useRouter();
   const amountLabel = row.expense != null ? '支出金額' : '存入金額';
   const amountValue = fmtCurrency(row.expense ?? row.deposit ?? 0);
-  const { items, loading, error } = useLazyLinkedTransactions(
-    row.originLedgerUuids,
-    row.originOfficialAccountingSubjectIds,
-    row.settleEventUuid,
-    subjectNameById,
-    expanded,
-  );
 
   return (
     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white">
@@ -83,7 +70,7 @@ function TransactionCard({
           </div>
           <div className="col-span-2">
             <p className="mb-1.5 text-xs font-semibold text-neutral-mid">關聯帳簿交易</p>
-            <InlineLinkedTransactions items={items} loading={loading} error={error} />
+            <InlineLinkedTransactions items={row.details} />
           </div>
           <div className="col-span-2 flex justify-end">
             <Button variant="outline" size="sm" icon={FileSearch} onClick={() => router.push(detailHref)}>
@@ -97,7 +84,7 @@ function TransactionCard({
 }
 
 /** 手機版交易明細卡片，與 TransactionTable 顯示同一份資料，點擊卡片標頭 inline 展開重點欄位 */
-export default function TransactionCards({ rows, expandedId, onToggle, detailHref, subjectNameById }: TransactionCardsProps) {
+export default function TransactionCards({ rows, expandedId, onToggle, detailHref }: TransactionCardsProps) {
   if (rows.length === 0) {
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid nav:hidden">此期間尚無交易紀錄</div>;
   }
@@ -111,7 +98,6 @@ export default function TransactionCards({ rows, expandedId, onToggle, detailHre
           expanded={expandedId === row.settleEventUuid}
           onToggle={() => onToggle(row.settleEventUuid)}
           detailHref={detailHref(row)}
-          subjectNameById={subjectNameById}
         />
       ))}
     </div>

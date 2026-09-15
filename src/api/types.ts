@@ -1601,6 +1601,36 @@ export interface BankSettleEventDto {
   /** 備註；counterpartyName 為空字串時的顯示備援 */
   memo: string | null;
   createdAt: string;
+  /** 此沖帳事件關聯的原單明細，與 originLedgerUuids 同序 */
+  details: BankSettleEventDetailDto[];
+}
+
+/** 銀行沖帳事件關聯的單筆原單明細（BankSettleEventDto.details／BankTransactionDetailResult.details） */
+export interface BankSettleEventDetailDto {
+  /** 原單交易 uuid */
+  ledgerUuid: string;
+  /** 交易編號 */
+  orderCode: string;
+  /** 0進項／1進折／2銷項／3銷折 */
+  entryType: number;
+  /** 交易對象名稱 */
+  counterpartyName: string;
+  /** 科目 id */
+  officialAccountingSubjectId: number;
+  /** 科目名稱 */
+  subjectName: string;
+  /** 交易發生日 YYYYMMDD */
+  transactionDate: string;
+  /** 發票字軌＋號碼；無票為空字串 */
+  voucherNumber: string;
+  /** 原單金額 */
+  originAmount: number;
+  /** 本事件對該原單的沖帳金額（非原單累計已沖金額） */
+  amount: number;
+  /** 該原單沖銷前剩餘金額 */
+  balanceBefore: number;
+  /** 該原單沖銷後剩餘金額 */
+  balanceAfter: number;
 }
 
 /** POST /ael/bankAccounts/transactions 回應 data */
@@ -1611,6 +1641,28 @@ export interface BankTransactionsResult {
   total: number;
   limit: number;
   page: number;
+  /** 整個查詢期間的存入／支出合計，不受 limit/page 影響 */
+  summary: BankTransactionsSummaryDto;
+}
+
+/** BankTransactionsResult.summary：整個查詢期間的存入／支出合計，排除 isReverse 的事件 */
+export interface BankTransactionsSummaryDto {
+  depositTotal: number;
+  expenseTotal: number;
+}
+
+/** GET /ael/bankAccounts/transactions/detail query */
+export interface BankTransactionDetailQuery {
+  companyUuid: string;
+  bankAccountUuid: string;
+  settleEventUuid: string;
+}
+
+/** GET /ael/bankAccounts/transactions/detail 回應 data */
+export interface BankTransactionDetailResult extends BankSettleEventDto {
+  bankAccountUuid: string;
+  /** 主原單發票圖片網址；無則 null */
+  invoicePicUrl: string | null;
 }
 
 /** POST /ael/bankAccounts/cashMovements body：建立一筆銀行直接提／匯款 */

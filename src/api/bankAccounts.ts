@@ -6,6 +6,8 @@ import { buildQuery, apiFetch } from './client';
 import { COMPANY_UUID } from './config';
 import type {
   BankAccountDto,
+  BankTransactionDetailQuery,
+  BankTransactionDetailResult,
   BankTransactionsBody,
   BankTransactionsResult,
   CashMovementBody,
@@ -32,12 +34,19 @@ export function updateBankAccount(body: Omit<UpdateBankAccountBody, 'companyUuid
   });
 }
 
-/** 拿取銀行帳戶相關沖帳事件列表；進一步瀏覽明細請搭配 fetchEntryDetail／fetchDailyDetail（@/api/ledger） */
+/** 拿取銀行帳戶相關沖帳事件列表（含關聯原單明細與期間合計）；日記帳分錄請另搭配 fetchDailyDetail（@/api/ledger） */
 export function fetchBankTransactions(body: Omit<BankTransactionsBody, 'companyUuid'>): Promise<BankTransactionsResult> {
   return apiFetch<BankTransactionsResult>('/ael/bankAccounts/transactions', {
     method: 'POST',
     body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID }),
   });
+}
+
+/** 單筆沖帳事件明細（交易明細頁用），可直接依網址參數查詢單筆，不需重查整期列表 */
+export function fetchBankTransactionDetail(params: Omit<BankTransactionDetailQuery, 'companyUuid'>): Promise<BankTransactionDetailResult> {
+  return apiFetch<BankTransactionDetailResult>(
+    `/ael/bankAccounts/transactions/detail${buildQuery({ ...params, companyUuid: COMPANY_UUID })}`,
+  );
 }
 
 /** 建立一筆銀行直接提／匯款的交易紀錄 */
