@@ -711,11 +711,11 @@ export type ReceivablesSummaryBody = Omit<ReceivablesFilterBody, 'limit' | 'page
 
 /** 帳簿總覽「代收金額」趨勢圖單日資料點 */
 export interface LedgerDailyAmount {
-  /** 西元 YYYYMMDD；口徑為憑證開立日（invoice.date），非收款日 */
+  /** 西元 YYYYMMDD；口徑與 dateFrom/dateTo 一致，應收/應付＝transaction_date，已收/已付＝entry_date */
   date: string;
   issuedAmount: number;
-  /** 當日筆數；後端尚未提供時為 undefined，UI 顯示 '—'（見帳簿總覽交易金額趨勢詳情頁表格） */
-  count?: number;
+  /** 當日母單筆數 */
+  count: number;
 }
 
 /** 帳簿總覽「銷售管道佔比」單一管道資料 */

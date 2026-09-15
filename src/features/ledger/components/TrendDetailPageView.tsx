@@ -76,11 +76,10 @@ export default function TrendDetailPageView({ side, range: initialRange, returnQ
     () =>
       outstandingPoints.map((point, i) => {
         const settled = settledPoints[i];
-        const hasCount = point.count !== undefined || settled?.count !== undefined;
         return {
           key: point.key,
           dateLabel: point.tooltipLabel,
-          count: hasCount ? (point.count ?? 0) + (settled?.count ?? 0) : undefined,
+          count: point.count + (settled?.count ?? 0),
           outstanding: point.value,
           settled: settled?.value ?? 0,
           total: point.value + (settled?.value ?? 0),
@@ -185,7 +184,7 @@ export default function TrendDetailPageView({ side, range: initialRange, returnQ
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono text-sm tabular-nums text-neutral-dark">
-                      {row.count !== undefined ? row.count.toLocaleString('en-US') : '—'}
+                      {row.count.toLocaleString('en-US')}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono text-sm tabular-nums text-neutral-dark">{fmtCurrency(row.outstanding)}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono text-sm tabular-nums text-neutral-dark">{fmtCurrency(row.settled)}</td>

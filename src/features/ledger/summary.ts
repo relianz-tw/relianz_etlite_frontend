@@ -13,22 +13,18 @@ export type TrendGranularity = 'day' | 'week' | 'month';
  * 依 date（西元 YYYYMMDD）合併多組逐日金額並加總，供趨勢柱狀圖合併「未結清」＋「已結清」
  * 兩個口徑（分別對應 xxx/summary 與 xxx/{collected,paid}/summary）使用，
  * 邏輯與 mergeShareEntries 合併管道／廠商佔比一致。
- * count（筆數）為選填欄位，僅在至少一組來源該日有提供時才加總，否則維持 undefined。
  */
 export function mergeDailyAmounts(...groups: LedgerDailyAmount[][]): LedgerDailyAmount[] {
-  const merged = new Map<string, { issuedAmount: number; count: number; hasCount: boolean }>();
+  const merged = new Map<string, { issuedAmount: number; count: number }>();
   for (const group of groups) {
     for (const entry of group) {
-      const existing = merged.get(entry.date) ?? { issuedAmount: 0, count: 0, hasCount: false };
+      const existing = merged.get(entry.date) ?? { issuedAmount: 0, count: 0 };
       existing.issuedAmount += entry.issuedAmount;
-      if (entry.count !== undefined) {
-        existing.count += entry.count;
-        existing.hasCount = true;
-      }
+      existing.count += entry.count;
       merged.set(entry.date, existing);
     }
   }
-  return [...merged.entries()].map(([date, v]) => ({ date, issuedAmount: v.issuedAmount, count: v.hasCount ? v.count : undefined }));
+  return [...merged.entries()].map(([date, v]) => ({ date, issuedAmount: v.issuedAmount, count: v.count }));
 }
 
 /** 卡片資料期間標示，如 '8/1 – 9/30'；輸入為 ROC 'YYY/MM/DD' */
@@ -48,18 +44,18 @@ export interface LedgerTrendPoint {
   /** tooltip 用的完整區間敘述（民國年），如「115/03/21 – 115/03/27」 */
   tooltipLabel: string;
   value: number;
-  /** 桶內筆數加總；桶內每一天皆缺 count（後端未提供）時為 undefined，供 UI 顯示 '—' */
-  count?: number;
+  /** 桶內筆數加總 */
+  count: number;
   /** 可直接寫進 URL 的 ROC 'YYY/MM/DD'；日檢視 from === to */
   from: string;
   to: string;
 }
 
-/** 加總一組逐日資料的 value／count；count 只要桶內任一天有值就視為「有效」，缺漏的天數以 0 併入加總 */
-function sumDays(chunk: { value: number; count?: number }[]): { value: number; count?: number } {
+/** 加總一組逐日資料的 value／count */
+function sumDays(chunk: { value: number; count: number }[]): { value: number; count: number } {
   const value = chunk.reduce((sum, d) => sum + d.value, 0);
-  const hasCount = chunk.some(d => d.count !== undefined);
-  return { value, count: hasCount ? chunk.reduce((sum, d) => sum + (d.count ?? 0), 0) : undefined };
+  const count = chunk.reduce((sum, d) => sum + d.count, 0);
+  return { value, count };
 }
 
 /**
@@ -83,11 +79,11 @@ export function buildTrendPoints(
   const amountByYmd = new Map(dailyAmounts.map(p => [p.date, p.issuedAmount]));
   const countByYmd = new Map(dailyAmounts.map(p => [p.date, p.count]));
 
-  const days: { date: Date; value: number; count?: number }[] = [];
+  const days: { date: Date; value: number; count: number }[] = [];
   for (const cursor = new Date(from); cursor.getTime() <= to.getTime(); cursor.setDate(cursor.getDate() + 1)) {
     const date = new Date(cursor);
     const ymd = formatYmd(date) ?? '';
-    days.push({ date, value: amountByYmd.get(ymd) ?? 0, count: countByYmd.get(ymd) });
+    days.push({ date, value: amountByYmd.get(ymd) ?? 0, count: countByYmd.get(ymd) ?? 0 });
   }
 
   if (granularity === 'day') {
