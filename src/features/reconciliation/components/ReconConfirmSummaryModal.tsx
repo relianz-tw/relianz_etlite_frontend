@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { fmtCurrency } from '@/lib/utils';
+import { fmtCurrencyAccounting } from '@/lib/utils';
 import ReconAllocationTable from './ReconAllocationTable';
 import type { ReconAllocationInfo, ReconSettleResult, ReconSide, ReconTxnRef } from '../types';
 
@@ -54,9 +54,9 @@ export default function ReconConfirmSummaryModal({
   const rows: { label: string; value: string; wrap: 'nowrap' | 'break'; tone?: 'error' }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' },
     { label: '本次沖帳', value: `${result.allocations.length} 筆`, wrap: 'nowrap' },
-    { label: '沖銷金額', value: fmtCurrency(result.appliedSettleAmount), wrap: 'nowrap' },
-    { label: '對帳單金額', value: fmtCurrency(result.settleAmount), wrap: 'nowrap' },
-    ...(hasDiff ? [{ label: '差額', value: fmtCurrency(diffAmount), wrap: 'nowrap' as const, tone: 'error' as const }] : []),
+    { label: '沖銷金額', value: fmtCurrencyAccounting(result.appliedSettleAmount), wrap: 'nowrap' },
+    { label: '對帳單金額', value: fmtCurrencyAccounting(result.settleAmount), wrap: 'nowrap' },
+    ...(hasDiff ? [{ label: '差額', value: fmtCurrencyAccounting(diffAmount), wrap: 'nowrap' as const, tone: 'error' as const }] : []),
   ];
 
   return (

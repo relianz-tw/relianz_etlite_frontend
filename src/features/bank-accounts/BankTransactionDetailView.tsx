@@ -149,16 +149,25 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
         ) : error ? (
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-semantic-error">{error}</div>
         ) : row ? (
-          <div className="nav:grid nav:grid-cols-[380px_1fr] nav:items-start nav:gap-8">
-            <div className="mb-5 nav:sticky nav:top-20 nav:mb-0">
-              <VoucherPreviewCard voucherImage={voucherImage} />
+          voucherImage ? (
+            <div className="nav:grid nav:grid-cols-[380px_1fr] nav:items-start nav:gap-8">
+              <div className="mb-5 nav:sticky nav:top-20 nav:mb-0">
+                <VoucherPreviewCard voucherImage={voucherImage} />
+              </div>
+              <div className="flex flex-col gap-5">
+                <BankTransactionSummaryCard row={row} counterpartyName={counterpartyName} />
+                <LinkedTransactionList items={linked} loading={linkedLoading} error={linkedError} />
+                <JournalCard lines={dailyLines} defaultOpen />
+              </div>
             </div>
-            <div className="flex flex-col gap-5">
+          ) : (
+            // 無憑證圖（多為匯總沖帳，無單一憑證可顯示）時不保留空的憑證欄位，改單欄呈現
+            <div className="flex max-w-[760px] flex-col gap-5">
               <BankTransactionSummaryCard row={row} counterpartyName={counterpartyName} />
               <LinkedTransactionList items={linked} loading={linkedLoading} error={linkedError} />
               <JournalCard lines={dailyLines} defaultOpen />
             </div>
-          </div>
+          )
         ) : null}
       </div>
     </div>

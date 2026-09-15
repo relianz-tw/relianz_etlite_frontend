@@ -124,6 +124,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 逐筆沖帳模式勾選的交易 uuid（可複選）；勾 1 筆走手動沖帳 API、勾多筆走 summary API（見上方檔案說明）
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
   const [statementAmount, setStatementAmount] = useState(0);
+  // 此單是否含折讓、退貨（僅匯總沖帳顯示）：對應匯總沖帳預覽 API 的 includeAllowance
+  const [includeAllowance, setIncludeAllowance] = useState(false);
   const [feeAmount, setFeeAmount] = useState(0);
   // 額外金額（otherDeductions）：id 以遞增計數器產生（不可用 Date.now()/Math.random()）
   const [otherDeductions, setOtherDeductions] = useState<ReconOtherDeductionRow[]>([]);
@@ -334,6 +336,10 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
   const settleAmount = statementAmount;
+  // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
+  // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用
+  const isReversed = depositAmount < 0;
+  const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
   // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
   // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過）；僅用於確認彈窗內提示，不影響是否可送出
@@ -352,6 +358,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   const resetInputs = () => {
     setStatementAmount(0);
+    setIncludeAllowance(false);
     setFeeAmount(0);
     setOtherDeductions([]);
     setPlatformFeeAmount(0);
@@ -453,15 +460,17 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 金額輸入共用驗證：對帳單金額（或沖帳金額）需大於 0、實際存入/付出不可為負、額外金額須填完整、
   // 需選收/付款日、分出對象需填完整且加總不可超過實際存入/付出金額
   const validateAmountInputs = (): string => {
-    if (statementAmount <= 0) return `請先輸入${mode === 'perTxn' ? '沖帳' : '對帳單'}金額`;
-    if (depositAmount < 0) return `實際${side === 'payable' ? '付出' : '存入'}金額不可為負，請確認銀行手續費與額外金額`;
+    if (statementAmount === 0) return `請先輸入${mode === 'perTxn' ? '沖帳' : '對帳單'}金額`;
+    // 反向沖帳（見上方 isReversed 說明）合法，僅擋下「減項把金額吃到跟輸入方向相反」這種真正的輸入錯誤
+    if (statementAmount > 0 && depositAmount < 0) return '實際存入金額不可為負，請確認銀行手續費與額外金額';
+    if (statementAmount < 0 && depositAmount > 0) return '實際付出金額不可為正，請確認銀行手續費與額外金額';
     if (otherDeductions.some(r => !r.subject?.id || !r.name.trim() || r.amount === 0)) return '請完整填寫額外金額的科目、名稱與金額';
     if (side === 'receivable' && platformFeeAmount !== 0) {
       const voucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
       if (voucherTotal !== Math.abs(platformFeeAmount)) return '電商平台扣款須選擇等值的應付憑證才能沖帳';
     }
     if (!paymentDate) return side === 'payable' ? '請先選擇付款日' : '請先選擇收款日';
-    const allocationError = validateAllocationRows(depositAmount, reconTargets.allocationRows, side);
+    const allocationError = validateAllocationRows(Math.abs(depositAmount), reconTargets.allocationRows, effectiveSide);
     if (allocationError) return allocationError;
     return '';
   };
@@ -521,6 +530,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         groupUuid: selectedGroupKey,
         ledgerUuids: mode === 'perTxn' ? Array.from(selectedUuids) : [],
         isDefault: mode !== 'perTxn',
+        // 切換只在匯總沖帳顯示，逐筆沖帳勾多筆雖然也打 preview，但畫面上沒有這個選項，一律送 false
+        includeAllowance: mode === 'perTxn' ? false : includeAllowance,
         settleAmount,
         actualAmount: depositAmount,
         feeAmount,
@@ -545,6 +556,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     if (side === 'receivable') setReceivableData(null);
     else setPayableData(null);
     setStatementAmount(0);
+    setIncludeAllowance(false);
     setFeeAmount(0);
     setOtherDeductions([]);
     setPlatformFeeAmount(0);
@@ -570,8 +582,11 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     }
   };
 
-  // 送給沖帳 API 的收付款管道：主對象自動補足金額 + 分出列，見 targets.ts 的 buildSettleChannels
-  const settleChannels = buildSettleChannels(reconTargets.options, reconTargets.primaryTargetKey, reconTargets.allocationRows, depositAmount);
+  // 送給沖帳 API 的收付款管道：主對象自動補足金額 + 分出列，見 targets.ts 的 buildSettleChannels——
+  // buildSettleChannels 內部會濾除 amount <= 0 的管道，故一律以正值（displayAmount）試算分配，
+  // 反向沖帳（isReversed）才在送出前整批反號，讓 API 收到與 depositAmount 同號的實際金額
+  const settleChannels = buildSettleChannels(reconTargets.options, reconTargets.primaryTargetKey, reconTargets.allocationRows, Math.abs(depositAmount));
+  const submitChannels = isReversed ? settleChannels.map(c => ({ ...c, amount: -c.amount })) : settleChannels;
 
   const requireSubmitReady = (): boolean => {
     if (!selectedGroupKey) return false;
@@ -586,7 +601,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       return false;
     }
     if (!paymentDate) {
-      setSubmitError(side === 'payable' ? '請先選擇付款日' : '請先選擇收款日');
+      setSubmitError(effectiveSide === 'payable' ? '請先選擇付款日' : '請先選擇收款日');
       return false;
     }
     return true;
@@ -605,7 +620,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         settleAmount,
         actualAmount: depositAmount,
         paymentDate: toYyyymmdd(paymentDate),
-        channels: settleChannels,
+        channels: submitChannels,
         feeAmount,
         otherDeductions,
         platformFeeAmount,
@@ -631,7 +646,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         settleAmount,
         actualAmount: depositAmount,
         paymentDate: toYyyymmdd(paymentDate),
-        channels: settleChannels,
+        channels: submitChannels,
         feeAmount,
         otherDeductions,
         platformFeeAmount,
@@ -651,8 +666,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const actionLabel = previewLoading ? '計算中…' : '確認沖帳';
   const actionDisabled =
     mode === 'perTxn'
-      ? previewLoading || statementAmount <= 0 || selectedUuids.size === 0 || (selectedUuids.size > 1 && !canSettle)
-      : previewLoading || statementAmount <= 0;
+      ? previewLoading || statementAmount === 0 || selectedUuids.size === 0 || (selectedUuids.size > 1 && !canSettle)
+      : previewLoading || statementAmount === 0;
   // 逐筆沖帳勾多筆但尚未選定明確管道／廠商時，提示原因而非讓使用者按下去才失敗
   const actionHint =
     mode === 'perTxn' && selectedUuids.size > 1 && !canSettle
@@ -678,6 +693,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     onClearSelection: handleClearSelection,
     amountLabel: mode === 'perTxn' ? '沖帳金額' : '對帳單金額',
     statementAmount,
+    includeAllowance,
+    onIncludeAllowanceChange: setIncludeAllowance,
     feeAmount,
     onStatementChange: handleStatementChange,
     onFeeChange: handleFeeChange,
@@ -716,8 +733,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   // 行動版底部固定操作條摘要：逐筆沖帳顯示已選筆數／金額，匯總沖帳顯示手續費／實際存入(付出)金額；
   // 兩種模式按下按鈕都只是開啟 BottomSheet，真正送出仍是面板內既有的「確認沖帳」按鈕（見 handleOpenConfirm）
-  const mobileSummaryLabel = mode === 'perTxn' ? `已選 ${selectedUuids.size} 筆` : `銀行手續費 ${fmtCurrency(feeAmount)} · 實際${side === 'payable' ? '付出' : '存入'}`;
-  const mobileSummaryValue = mode === 'perTxn' ? fmtCurrency(selectedAmount) : fmtCurrency(depositAmount);
+  const mobileSummaryLabel = mode === 'perTxn' ? `已選 ${selectedUuids.size} 筆` : `銀行手續費 ${fmtCurrency(feeAmount)} · 實際${effectiveSide === 'payable' ? '付出' : '存入'}`;
+  const mobileSummaryValue = mode === 'perTxn' ? fmtCurrency(Math.abs(selectedAmount)) : fmtCurrency(Math.abs(depositAmount));
   const mobileActionLabel = mode === 'perTxn' ? '確認金額' : `確認沖帳 · ${selectableUuids.length} 筆`;
 
   return (

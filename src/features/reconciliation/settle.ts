@@ -39,6 +39,8 @@ interface PreviewParams {
   ledgerUuids?: string[];
   /** 使用預設預覽嗎：省略時預設 true（匯總沖帳，由後端自動拆帳）；多筆沖帳須明確傳 false */
   isDefault?: boolean;
+  /** 此單是否含折讓／退貨：僅匯總沖帳顯示此切換，逐筆沖帳一律傳 false */
+  includeAllowance: boolean;
   settleAmount: number;
   /** 銷項為 depositAmount（實際存入）；進項為 paymentAmount（實際付出） */
   actualAmount: number;
@@ -64,6 +66,7 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     const res = await previewSettleReceivable({
       paymentChannelUuid: params.groupUuid,
       isDefault,
+      includeAllowance: params.includeAllowance,
       ledgerUuids,
       settleAmount: params.settleAmount,
       depositAmount: params.actualAmount,
@@ -87,6 +90,7 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
   const res = await previewSettlePayable({
     counterpartyUuid: params.groupUuid,
     isDefault,
+    includeAllowance: params.includeAllowance,
     ledgerUuids,
     settleAmount: params.settleAmount,
     paymentAmount: params.actualAmount,

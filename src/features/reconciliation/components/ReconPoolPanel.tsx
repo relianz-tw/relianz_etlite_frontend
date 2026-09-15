@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import MoneyInput from '@/components/ui/MoneyInput';
 import OtherDeductionsEditor, { type OtherDeductionRow } from '@/components/ui/OtherDeductionsEditor';
 import DatePicker from '@/components/ui/DatePicker';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
 import { cn, fmtCurrency } from '@/lib/utils';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
@@ -12,6 +13,12 @@ import ReconTargetAllocation from './ReconTargetAllocation';
 
 /** 額外金額單列：對應預覽 API 的 otherDeductions 項目，沿用共用元件的型別 */
 export type ReconOtherDeductionRow = OtherDeductionRow;
+
+/** 「此單是否含折讓、退貨」切換選項：對應匯總沖帳預覽 API 的 includeAllowance */
+const ALLOWANCE_OPTIONS = [
+  { value: 'no', label: '不含' },
+  { value: 'yes', label: '含' },
+] as const;
 
 interface ReconPoolPanelProps {
   mode: ReconMode;
@@ -31,6 +38,9 @@ interface ReconPoolPanelProps {
   /** 金額欄位標題：匯總沖帳為「對帳單金額」，逐筆沖帳為「沖帳金額」 */
   amountLabel: string;
   statementAmount: number;
+  /** 此單是否含折讓、退貨（僅匯總沖帳顯示）：對應匯總沖帳預覽 API 的 includeAllowance */
+  includeAllowance: boolean;
+  onIncludeAllowanceChange: (value: boolean) => void;
   feeAmount: number;
   onStatementChange: (value: number) => void;
   onFeeChange: (value: number) => void;
@@ -96,6 +106,8 @@ export default function ReconPoolPanel({
   onClearSelection,
   amountLabel,
   statementAmount,
+  includeAllowance,
+  onIncludeAllowanceChange,
   feeAmount,
   onStatementChange,
   onFeeChange,
@@ -130,11 +142,15 @@ export default function ReconPoolPanel({
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
-  const isDepositNegative = depositAmount < 0;
-  const dateLabel = side === 'payable' ? '付款日' : '收款日';
+  // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
+  // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值），見 DESIGN.md「Reversed Settlement Panel」
+  const isReversed = depositAmount < 0;
+  const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
+  const displayAmount = Math.abs(depositAmount);
+  const dateLabel = effectiveSide === 'payable' ? '付款日' : '收款日';
 
   return (
-    <div className="rounded-lg border-[1.5px] border-brand-blue bg-white p-4">
+    <div className={cn('rounded-lg border-[1.5px] p-4', isReversed ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white')}>
       {!hideHeader && (
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-[15px] font-semibold text-neutral-dark">
@@ -143,7 +159,7 @@ export default function ReconPoolPanel({
           </span>
           {mode === 'perTxn' && selectedCount > 0 && (
             <span className="shrink-0 text-xs font-medium text-neutral-mid">
-              {selectedCount} 筆 · {fmtCurrency(selectedAmount)}
+              {selectedCount} 筆 · {fmtCurrency(Math.abs(selectedAmount))}
             </span>
           )}
         </div>
@@ -157,15 +173,23 @@ export default function ReconPoolPanel({
         </div>
       )}
 
-      <div className="mt-4 flex flex-col gap-1.5 border-t border-neutral-blue-gray/20 pt-3">
-        <label className="text-sm text-neutral-dark">{amountLabel}</label>
-        <MoneyInput value={statementAmount} onChange={onStatementChange} disabled={amountDisabled} />
-        {amountDisabled ? (
-          <p className="text-xs text-neutral-mid">請先於左側清單勾選交易</p>
-        ) : (
-          mode === 'perTxn' &&
-          selectedCount > 0 && <p className="text-xs text-neutral-mid">已自動帶入所選{side === 'payable' ? '待付' : '待收'}總額，可修改</p>
+      <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
+        {mode === 'summary' && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm text-neutral-dark">此單是否含折讓、退貨</span>
+            <SegmentedControl options={[...ALLOWANCE_OPTIONS]} value={includeAllowance ? 'yes' : 'no'} onChange={v => onIncludeAllowanceChange(v === 'yes')} />
+          </div>
         )}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm text-neutral-dark">{amountLabel}</label>
+          <MoneyInput value={statementAmount} onChange={onStatementChange} disabled={amountDisabled} />
+          {amountDisabled ? (
+            <p className="text-xs text-neutral-mid">請先於左側清單勾選交易</p>
+          ) : (
+            mode === 'perTxn' &&
+            selectedCount > 0 && <p className="text-xs text-neutral-mid">已自動帶入所選{side === 'payable' ? '待付' : '待收'}總額，可修改</p>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 flex flex-col gap-3">
@@ -218,12 +242,9 @@ export default function ReconPoolPanel({
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">
-        <span className="font-semibold text-neutral-dark">{side === 'payable' ? '實際付出金額' : '實際存入金額'}</span>
-        <span className={cn('font-mono text-base font-semibold tabular-nums', isDepositNegative ? 'text-semantic-error' : 'text-neutral-dark')}>
-          {fmtCurrency(depositAmount)}
-        </span>
+        <span className="font-semibold text-neutral-dark">{effectiveSide === 'payable' ? '實際付出金額' : '實際存入金額'}</span>
+        <span className="font-mono text-base font-semibold tabular-nums text-neutral-dark">{fmtCurrency(displayAmount)}</span>
       </div>
-      {isDepositNegative && <p className="mt-1 text-right text-xs text-semantic-error">實際{side === 'payable' ? '付出' : '存入'}金額不可為負，請確認銀行手續費與額外金額</p>}
 
       {showActionArea && (
         <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
@@ -233,8 +254,8 @@ export default function ReconPoolPanel({
           </div>
 
           <ReconTargetAllocation
-            side={side}
-            depositAmount={depositAmount}
+            side={effectiveSide}
+            depositAmount={displayAmount}
             options={targetOptions}
             optionsLoading={targetsLoading}
             optionsError={targetsError}
@@ -244,7 +265,6 @@ export default function ReconPoolPanel({
             onAddRow={onAddAllocationRow}
             onRemoveRow={onRemoveAllocationRow}
             onChangeRow={onChangeAllocationRow}
-            disabled={isDepositNegative}
           />
 
           <div className="flex flex-col items-stretch">

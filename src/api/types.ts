@@ -1060,6 +1060,8 @@ export interface SettleReceivablePreviewBody {
   paymentChannelUuid: string;
   /** 使用預設預覽嗎：true 由後端依 transaction_date 由舊到新自動拆帳（匯總沖帳）；false 僅預覽 ledgerUuids 指定的原單（多筆沖帳） */
   isDefault: boolean;
+  /** 此單是否含折讓／退貨：true 時後端自動拆帳會納入折讓性質的原單 */
+  includeAllowance: boolean;
   /** 要預覽匯總沖帳的自選 uuid 列表；isDefault=true 時傳空陣列 */
   ledgerUuids: string[];
   /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
@@ -1083,6 +1085,8 @@ export interface SettlePayablePreviewBody {
   counterpartyUuid: string;
   /** 使用預設預覽嗎：true 由後端依 transaction_date 由舊到新自動拆帳（匯總沖帳）；false 僅預覽 ledgerUuids 指定的原單（多筆沖帳） */
   isDefault: boolean;
+  /** 此單是否含折讓／退貨：true 時後端自動拆帳會納入折讓性質的原單 */
+  includeAllowance: boolean;
   /** 要預覽匯總沖帳的自選 uuid 列表；isDefault=true 時傳空陣列 */
   ledgerUuids: string[];
   /** 本次匯總沖帳總額（元）；依 transaction_date／created_at 由舊到新拆帳，超沖加在最後一筆 */
@@ -1119,6 +1123,8 @@ interface SettlePreviewResultBase {
   balanceAfter: number;
   /** 拆帳前各原單 remaining 合計 */
   totalBeforeRemaining: number;
+  /** 此單是否含折讓／退貨：請求欄位回填 */
+  includeAllowance?: boolean;
 }
 
 /** POST /ael/ledger/reconciliation/receivables/settle/preview 回應 */

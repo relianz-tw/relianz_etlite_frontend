@@ -66,9 +66,10 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
       {item.details.map(d => (
         <div key={d.ledgerUuid} className="flex flex-col gap-1 px-3 py-2 text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-neutral-dark">
-              {formatYyyymmddRoc(d.voucherDate)}
-              {d.voucherNumber && <span className="ml-2">{d.voucherNumber}</span>}
+            <span className="flex items-center gap-2 font-mono text-neutral-dark">
+              {/* 日期與傳票號碼分成獨立 flex item，避免雙擊選字時因無真實空白字元而連帶選到日期 */}
+              <span>{formatYyyymmddRoc(d.voucherDate)}</span>
+              {d.voucherNumber && <span>{d.voucherNumber}</span>}
             </span>
             <span className="flex items-center gap-2">
               <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(d.amount)}</span>

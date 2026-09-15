@@ -114,7 +114,12 @@ function TransactionRow({
         <td className={`${tdClass} truncate`} title={counterpartyLabel}>
           <span className="inline-flex items-center gap-1.5">
             <ChevronDown size={14} className={`shrink-0 text-neutral-mid transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            {counterpartyLabel}
+            <span className="truncate">{counterpartyLabel}</span>
+            {row.originLedgerUuids.length > 1 && (
+              <Badge tone="neutral" className="shrink-0">
+                {row.originLedgerUuids.length} 筆
+              </Badge>
+            )}
           </span>
         </td>
         <td className={`${tdClass} text-right font-mono tabular-nums`}>{row.expense != null ? fmtCurrency(row.expense) : '—'}</td>

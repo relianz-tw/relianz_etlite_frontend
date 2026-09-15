@@ -17,10 +17,10 @@ async function loadSubjectNameMap(): Promise<Map<number, string>> {
 
 /** 交易對象顯示文字：優先取廠商名稱，取不到（空字串）則回退備註，兩者皆空再用
  *  primaryOfficialAccountingSubjectId 反查科目名稱頂替；
- *  關聯多筆帳簿交易時（originLedgerUuids 超過一筆）在文字後補「等」，提示還有其他關聯交易 */
+ *  關聯多筆帳簿交易時改由畫面端依 originLedgerUuids.length 顯示「N 筆」徽章（見 TransactionTable/Cards），
+ *  這裡不再附加「等」字，避免語意模糊 */
 function resolveCounterpartyLabel(item: BankSettleEventDto, subjectNameById: Map<number, string>): string {
-  const base = item.counterpartyName || item.memo || subjectNameById.get(item.primaryOfficialAccountingSubjectId) || '—';
-  return item.originLedgerUuids.length > 1 && base !== '—' ? `${base}等` : base;
+  return item.counterpartyName || item.memo || subjectNameById.get(item.primaryOfficialAccountingSubjectId) || '—';
 }
 
 function mapSettleEventToRow(item: BankSettleEventDto, subjectNameById: Map<number, string>): BankTxnRow {

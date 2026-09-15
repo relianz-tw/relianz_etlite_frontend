@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { fmtCurrencyAccounting, formatYyyymmddRoc } from '@/lib/utils';
 import ReconAllocationTable from './ReconAllocationTable';
 import type { ReconAllocationInfo, ReconSettleResult, ReconSide } from '../types';
 
@@ -26,10 +26,10 @@ export default function ReconSettleResultModal({ open, side, groupLabel, result,
   // 沖前/沖後餘額僅匯總／多筆沖帳（settle/summary API）才有；逐筆沖帳勾 1 筆走手動沖帳 API 無此概念，故留空時整列略過
   const summaryRows: { label: string; value: string; wrap: 'nowrap' | 'break' }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' as const },
-    { label: '沖帳總額', value: fmtCurrency(result.appliedSettleAmount), wrap: 'nowrap' as const },
+    { label: '沖帳總額', value: fmtCurrencyAccounting(result.appliedSettleAmount), wrap: 'nowrap' as const },
     { label: '有沖帳筆數', value: `${result.allocations.length} 筆`, wrap: 'nowrap' as const },
-    { label: result.balanceBefore !== undefined ? '沖前餘額' : '', value: fmtCurrency(result.balanceBefore ?? 0), wrap: 'nowrap' as const },
-    { label: result.balanceAfter !== undefined ? '沖後餘額' : '', value: fmtCurrency(result.balanceAfter ?? 0), wrap: 'nowrap' as const },
+    { label: result.balanceBefore !== undefined ? '沖前餘額' : '', value: fmtCurrencyAccounting(result.balanceBefore ?? 0), wrap: 'nowrap' as const },
+    { label: result.balanceAfter !== undefined ? '沖後餘額' : '', value: fmtCurrencyAccounting(result.balanceAfter ?? 0), wrap: 'nowrap' as const },
     {
       label: result.paymentDate ? (side === 'receivable' ? '收款日' : '付款日') : '',
       value: result.paymentDate ? formatYyyymmddRoc(result.paymentDate) : '',

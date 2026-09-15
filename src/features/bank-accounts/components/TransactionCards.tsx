@@ -55,7 +55,14 @@ function TransactionCard({
           <Badge tone={row.cashDirection === 0 ? 'success' : 'error'}>{cashDirectionLabel(row.cashDirection)}</Badge>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm text-neutral-dark">{row.counterpartyLabel}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm text-neutral-dark">{row.counterpartyLabel}</span>
+            {row.originLedgerUuids.length > 1 && (
+              <Badge tone="neutral" className="shrink-0">
+                {row.originLedgerUuids.length} 筆
+              </Badge>
+            )}
+          </span>
           <ChevronDown size={16} className={`shrink-0 text-neutral-mid transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
         <div className="flex items-center justify-end gap-2 text-xs text-neutral-mid">

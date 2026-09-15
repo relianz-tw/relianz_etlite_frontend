@@ -9,6 +9,9 @@ export function cn(...inputs: ClassValue[]) {
 /** 金額格式化：統一加上 $ 與千分位，供各頁面金額顯示使用 */
 export const fmtCurrency = (n: number) => `$${n.toLocaleString('en-US')}`;
 
+/** 會計慣用負值表示法：-6300 → ($6,300)、6300 → $6,300。用於沖帳彈窗等以表格比對金額的場景 */
+export const fmtCurrencyAccounting = (n: number) => (n < 0 ? `($${Math.abs(n).toLocaleString('en-US')})` : fmtCurrency(n));
+
 /** 後端 YYYYMMDD 或 ISO 日期時間字串轉為民國年 YYY/MM/DD 顯示，與帳簿/沖帳其餘頁面的日期格式一致；
  *  空字串或格式皆不符時原樣回傳 */
 export function formatYyyymmddRoc(value: string): string {

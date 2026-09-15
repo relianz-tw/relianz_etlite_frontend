@@ -596,6 +596,26 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 對應元件：`src/features/reconciliation/components/ReconTargetAllocation.tsx`、
 `src/features/reconciliation/components/ReconTargetSelect.tsx`。
 
+### Reversed Settlement Panel（負值／反向沖帳面板）
+
+用途：沖帳金額面板（見上方 Allocation Row 所屬的 `ReconPoolPanel`）算出的實際存入／付出金額為負時
+（如逐筆沖帳勾到退款、折讓性質的負值交易），代表方向反了——應收側變成要付出、應付側變成要收入。
+此時不視為錯誤擋下，而是整個面板翻面呈現，讓使用者用原本方向操作即可送出。
+
+```
+外框：border-[1.5px] border-brand-tan（#BE9F86）＋ bg-brand-tan/5，取代平常的 border-brand-blue ＋ bg-white
+  （友善棕是系統內唯一的暖色 accent，與城信藍成對比，明確標示「非常態」但不誤讀為錯誤）
+
+方向翻轉：所有方向性文字改用「實際 side」而非原始 side——
+  實際存入金額 ↔ 實際付出金額、收款日 ↔ 付款日、收款方式 ↔ 付款方式
+金額顯示：一律取絕對值（正值），不出現負號；分出對象分配（Allocation Row）同樣收正值＋翻轉後的方向
+```
+對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`。
+
+負值金額若需在表格／彈窗內與正值並列比對（非上述整面翻轉的情境），改用會計慣用括號表示法而非負號，
+如 `-6300` 顯示為 `($6,300)`；對應 `src/lib/utils.ts` 的 `fmtCurrencyAccounting`，
+適用於沖帳確認彈窗與結果彈窗的逐筆拆帳明細表。
+
 ### Subject Picker（分頁式科目選擇器）
 
 用途：科目數量較多、使用者不熟悉科目代碼的情境（如銀行新增交易），在既有的單層搜尋下拉之外，
