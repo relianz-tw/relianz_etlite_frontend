@@ -72,7 +72,7 @@ export default function WithholdingTable({ rows, totalCount, pageTotals, allTota
             <th className={`${thClass} text-right`}>二代健保</th>
             <th className={`${thClass} text-right`}>支付金額</th>
             <th className={thClass}>繳款狀態</th>
-            <th className={thClass}>健保狀態</th>
+            <th className={thClass}>員工負擔二代健保狀態</th>
           </tr>
         </thead>
         <tbody>
