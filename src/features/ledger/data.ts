@@ -1,6 +1,5 @@
 import type { LedgerEntryInvoiceDto, PayableListItemDto, ReceivableListItemDto } from '@/api/types';
 import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
-import { generateDailyTrend } from '@/lib/utils';
 import type { PurchaseRow, SalesRow } from './types';
 
 export const PROJECT_NAMES = ['好長好長的專案名稱', '台北旗艦店擴建', '年度品牌重塑', ''];
@@ -85,8 +84,3 @@ export async function mapReceivableItemsToRows(items: ReceivableListItemDto[]): 
     };
   });
 }
-
-const TREND_END_DATE = '2026/03/27'; // 對齊既有假資料中最新的交易日期，趨勢圖固定顯示兩個月（62 天）每日金額
-
-export const SALES_DAILY = generateDailyTrend(0, 16000000, 0.9, TREND_END_DATE);
-export const PURCHASE_DAILY = generateDailyTrend(3, 14000000, 0.8, TREND_END_DATE);

@@ -33,7 +33,10 @@ interface SummaryCardsProps {
 export default function SummaryCards({ side, chartRange, ytdRange, selectedRange, channelUuid, onRangeSelect, onChannelSelect }: SummaryCardsProps) {
   const searchParams = useSearchParams();
   const { dailyAmounts, shares, totals, ytdTotals, loading } = useLedgerSummary(side, chartRange, ytdRange);
-  const detailHref = withReturnParam(`/ledger/trend?side=${side}`, searchParams);
+  // rangeFrom/rangeTo 帶入目前卡片的 chartRange：chartRange 不一定存在於網址上（如點長條圖選取時
+  // 會跳過同步，見 LedgerView 的 skipChartRangeSyncRef 註解），故詳情頁的區間須由此明確傳遞，不可依賴 URL 重新推導
+  const detailQuery = new URLSearchParams({ side, rangeFrom: chartRange.from, rangeTo: chartRange.to });
+  const detailHref = withReturnParam(`/ledger/trend?${detailQuery.toString()}`, searchParams);
 
   // 行動版三卡改橫向 snap 捲動，一次一張；用捲動位置換算目前頁碼，供下方指示點顯示與跳頁（DESIGN.md §11.13）
   const scrollRef = useRef<HTMLDivElement>(null);

@@ -7,21 +7,28 @@ import { formatRocDate, parseRocDate } from '@/components/ui/DatePicker';
 import { CATEGORICAL_SERIES, OTHER_SERIES_COLOR } from '@/components/ui/charts/chartTheme';
 import { formatYmd } from './transaction/data';
 
-export type TrendGranularity = 'day' | 'week';
+export type TrendGranularity = 'day' | 'week' | 'month';
 
 /**
  * 依 date（西元 YYYYMMDD）合併多組逐日金額並加總，供趨勢柱狀圖合併「未結清」＋「已結清」
  * 兩個口徑（分別對應 xxx/summary 與 xxx/{collected,paid}/summary）使用，
  * 邏輯與 mergeShareEntries 合併管道／廠商佔比一致。
+ * count（筆數）為選填欄位，僅在至少一組來源該日有提供時才加總，否則維持 undefined。
  */
 export function mergeDailyAmounts(...groups: LedgerDailyAmount[][]): LedgerDailyAmount[] {
-  const merged = new Map<string, number>();
+  const merged = new Map<string, { issuedAmount: number; count: number; hasCount: boolean }>();
   for (const group of groups) {
     for (const entry of group) {
-      merged.set(entry.date, (merged.get(entry.date) ?? 0) + entry.issuedAmount);
+      const existing = merged.get(entry.date) ?? { issuedAmount: 0, count: 0, hasCount: false };
+      existing.issuedAmount += entry.issuedAmount;
+      if (entry.count !== undefined) {
+        existing.count += entry.count;
+        existing.hasCount = true;
+      }
+      merged.set(entry.date, existing);
     }
   }
-  return [...merged.entries()].map(([date, issuedAmount]) => ({ date, issuedAmount }));
+  return [...merged.entries()].map(([date, v]) => ({ date, issuedAmount: v.issuedAmount, count: v.hasCount ? v.count : undefined }));
 }
 
 /** 卡片資料期間標示，如 '8/1 – 9/30'；輸入為 ROC 'YYY/MM/DD' */
@@ -34,24 +41,34 @@ export function formatRangeLabel(fromRoc: string, toRoc: string): string {
 }
 
 export interface LedgerTrendPoint {
-  /** 唯一 key，同時作為選取比對：日 → 西元 'YYYYMMDD'；週 → 'YYYYMMDD~YYYYMMDD' */
+  /** 唯一 key，同時作為選取比對：日 → 西元 'YYYYMMDD'；週 → 'YYYYMMDD~YYYYMMDD'；月 → 'YYYYMM' */
   key: string;
-  /** X 軸標籤：'3/27' */
+  /** X 軸標籤：日/週為 '3/27'，月為 ROC '115/03' */
   label: string;
   /** tooltip 用的完整區間敘述（民國年），如「115/03/21 – 115/03/27」 */
   tooltipLabel: string;
   value: number;
+  /** 桶內筆數加總；桶內每一天皆缺 count（後端未提供）時為 undefined，供 UI 顯示 '—' */
+  count?: number;
   /** 可直接寫進 URL 的 ROC 'YYY/MM/DD'；日檢視 from === to */
   from: string;
   to: string;
 }
 
+/** 加總一組逐日資料的 value／count；count 只要桶內任一天有值就視為「有效」，缺漏的天數以 0 併入加總 */
+function sumDays(chunk: { value: number; count?: number }[]): { value: number; count?: number } {
+  const value = chunk.reduce((sum, d) => sum + d.value, 0);
+  const hasCount = chunk.some(d => d.count !== undefined);
+  return { value, count: hasCount ? chunk.reduce((sum, d) => sum + (d.count ?? 0), 0) : undefined };
+}
+
 /**
- * 依 ROC 起訖展開逐日/逐週趨勢點。
+ * 依 ROC 起訖展開逐日/逐週/逐月趨勢點。
  * dailyAmounts 的 date 為西元 YYYYMMDD，缺漏日期補 0
  * （趨勢圖不可跳過無交易的日子，否則長條間距失真）。
  * 週檢視自 rangeFrom 起每 7 天一組，最後一組可能不足 7 天，
  * 與既有 src/components/ui/TrendChart.tsx 的 toWeekly 分組方式一致。
+ * 月檢視依真實 Date 的年＋月分組（非字串切割），正確處理跨年區間。
  */
 export function buildTrendPoints(
   rangeFrom: string,
@@ -64,44 +81,80 @@ export function buildTrendPoints(
   if (!from || !to || from.getTime() > to.getTime()) return [];
 
   const amountByYmd = new Map(dailyAmounts.map(p => [p.date, p.issuedAmount]));
+  const countByYmd = new Map(dailyAmounts.map(p => [p.date, p.count]));
 
-  const days: { date: Date; value: number }[] = [];
+  const days: { date: Date; value: number; count?: number }[] = [];
   for (const cursor = new Date(from); cursor.getTime() <= to.getTime(); cursor.setDate(cursor.getDate() + 1)) {
     const date = new Date(cursor);
-    days.push({ date, value: amountByYmd.get(formatYmd(date) ?? '') ?? 0 });
+    const ymd = formatYmd(date) ?? '';
+    days.push({ date, value: amountByYmd.get(ymd) ?? 0, count: countByYmd.get(ymd) });
   }
 
   if (granularity === 'day') {
-    return days.map(({ date, value }) => {
+    return days.map(({ date, value, count }) => {
       const roc = formatRocDate(date);
       return {
         key: formatYmd(date) ?? roc,
         label: `${date.getMonth() + 1}/${date.getDate()}`,
         tooltipLabel: roc,
         value,
+        count,
         from: roc,
         to: roc,
       };
     });
   }
 
-  const weeks: LedgerTrendPoint[] = [];
-  for (let i = 0; i < days.length; i += 7) {
-    const chunk = days.slice(i, i + 7);
+  if (granularity === 'week') {
+    const weeks: LedgerTrendPoint[] = [];
+    for (let i = 0; i < days.length; i += 7) {
+      const chunk = days.slice(i, i + 7);
+      const first = chunk[0].date;
+      const last = chunk[chunk.length - 1].date;
+      const fromRoc = formatRocDate(first);
+      const toRoc = formatRocDate(last);
+      weeks.push({
+        key: `${formatYmd(first)}~${formatYmd(last)}`,
+        label: `${first.getMonth() + 1}/${first.getDate()}`,
+        tooltipLabel: fromRoc === toRoc ? fromRoc : `${fromRoc} – ${toRoc}`,
+        ...sumDays(chunk),
+        from: fromRoc,
+        to: toRoc,
+      });
+    }
+    return weeks;
+  }
+
+  // 月檢視：掃描逐日資料，year+month 改變時切一個新桶
+  const months: LedgerTrendPoint[] = [];
+  let chunkStart = 0;
+  for (let i = 1; i <= days.length; i++) {
+    const sameMonth =
+      i < days.length && days[i].date.getFullYear() === days[chunkStart].date.getFullYear() && days[i].date.getMonth() === days[chunkStart].date.getMonth();
+    if (sameMonth) continue;
+    const chunk = days.slice(chunkStart, i);
     const first = chunk[0].date;
     const last = chunk[chunk.length - 1].date;
     const fromRoc = formatRocDate(first);
     const toRoc = formatRocDate(last);
-    weeks.push({
-      key: `${formatYmd(first)}~${formatYmd(last)}`,
-      label: `${first.getMonth() + 1}/${first.getDate()}`,
+    months.push({
+      key: `${first.getFullYear()}${String(first.getMonth() + 1).padStart(2, '0')}`,
+      label: `${first.getFullYear() - 1911}/${String(first.getMonth() + 1).padStart(2, '0')}`,
       tooltipLabel: fromRoc === toRoc ? fromRoc : `${fromRoc} – ${toRoc}`,
-      value: chunk.reduce((sum, d) => sum + d.value, 0),
+      ...sumDays(chunk),
       from: fromRoc,
       to: toRoc,
     });
+    chunkStart = i;
   }
-  return weeks;
+  return months;
+}
+
+/** 圖表 X 軸的預設區間：今天往前推 62 天。供帳簿總覽卡片與趨勢詳情頁共用預設值 */
+export function defaultChartRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to.getTime() - 61 * 86_400_000);
+  return { from: formatRocDate(from), to: formatRocDate(to) };
 }
 
 /** 「其他」彙總項的 uuid 值；第五名以後的項目彙總於此，不可用於篩選 */

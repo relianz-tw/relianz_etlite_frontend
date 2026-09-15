@@ -714,6 +714,8 @@ export interface LedgerDailyAmount {
   /** 西元 YYYYMMDD；口徑為憑證開立日（invoice.date），非收款日 */
   date: string;
   issuedAmount: number;
+  /** 當日筆數；後端尚未提供時為 undefined，UI 顯示 '—'（見帳簿總覽交易金額趨勢詳情頁表格） */
+  count?: number;
 }
 
 /** 帳簿總覽「銷售管道佔比」單一管道資料 */

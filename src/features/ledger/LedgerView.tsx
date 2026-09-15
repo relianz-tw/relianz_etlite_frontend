@@ -20,6 +20,7 @@ import LedgerCards from './components/LedgerCards';
 import LedgerTable from './components/LedgerTable';
 import SummaryCards from './components/SummaryCards';
 import { mapPayableItemsToRows, mapReceivableItemsToRows } from './data';
+import { defaultChartRange } from './summary';
 import { formatYmd } from './transaction/data';
 import type { AdvancedFilter, PurchaseSubTab, PurchaseRow, QuickSearchField, SalesRow, SalesSubTab, Side, SortKey, SortState } from './types';
 import { buildLedgerQueryString, defaultSubTabForSide, DEFAULT_SORT, parseLedgerFilters } from './urlState';
@@ -63,13 +64,6 @@ function buildFilterBody(
     // 帳簿總覽「銷售管道／廠商佔比」卡片下鑽篩選；彙總數字（totals）由後端一併套用此條件重算
     ...(channelUuid ? (side === 'sales' ? { paymentChannelUuid: channelUuid } : { counterpartyUuid: channelUuid }) : {}),
   };
-}
-
-/** 圖表 X 軸的預設區間：今天往前推 62 天，天數對齊既有假趨勢資料的展示長度 */
-function defaultChartRange(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to.getTime() - 61 * 86400000);
-  return { from: formatRocDate(from), to: formatRocDate(to) };
 }
 
 /** 收款／付款狀況卡固定看「年初至今」，與圖表區間解耦，見 SummaryCards ytdRange 註解 */
