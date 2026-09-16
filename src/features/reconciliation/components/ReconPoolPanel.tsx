@@ -176,7 +176,7 @@ export default function ReconPoolPanel({
       <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
         {mode === 'summary' && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm text-neutral-dark">此單是否含折讓、退貨</span>
+            <span className="text-sm text-neutral-dark">此對帳單是否含折讓、退貨</span>
             <SegmentedControl options={[...ALLOWANCE_OPTIONS]} value={includeAllowance ? 'yes' : 'no'} onChange={v => onIncludeAllowanceChange(v === 'yes')} />
           </div>
         )}

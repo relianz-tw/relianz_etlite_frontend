@@ -189,8 +189,15 @@ function TxnRow({
           {showStatusColumn &&
             (isSelectable ? <SelectCircle checked={selected} onToggle={onToggleSelect} /> : <StatusCircle allocation={allocation} />)}
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
-              {row.voucherNumber || '—'}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono text-sm font-semibold text-neutral-dark" title={row.voucherNumber}>
+                {row.voucherNumber || '—'}
+              </span>
+              {row.isOverAllowance && (
+                <Badge tone="info" variant="muted">
+                  折讓
+                </Badge>
+              )}
             </span>
             <span className="block truncate text-xs text-neutral-mid" title={row.counterparty}>
               {row.counterparty || '—'}
@@ -240,8 +247,15 @@ function TxnRow({
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date || '—'}</span>
           <div className="flex w-48 min-w-0 shrink-0 flex-col">
-            <span className="truncate font-mono font-semibold text-neutral-dark" title={row.voucherNumber}>
-              {row.voucherNumber || '—'}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono font-semibold text-neutral-dark" title={row.voucherNumber}>
+                {row.voucherNumber || '—'}
+              </span>
+              {row.isOverAllowance && (
+                <Badge tone="info" variant="muted">
+                  折讓
+                </Badge>
+              )}
             </span>
             <span className="truncate text-xs text-neutral-mid" title={row.counterparty}>
               {row.counterparty || '—'}

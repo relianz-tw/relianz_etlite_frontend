@@ -57,6 +57,8 @@ export interface ReconCandidate {
   remainingAmount?: number;
   /** 憑證號碼（發票字軌＋發票號碼），供確認沖帳／沖帳結果彈窗顯示（沖帳 API 本身不回傳此欄位，需反查候選清單） */
   voucherNumber: string;
+  /** 是否為折讓單，true 時清單需在憑證號碼旁加註「折讓單」標籤 */
+  isOverAllowance: boolean;
 }
 
 function byDate(a: ReconTxnRef, b: ReconTxnRef): number {
@@ -80,6 +82,7 @@ export function receivableGroupsToCandidates(groups: ReconReceivableGroupDto[]):
       groupUuid: item.paymentChannelUuid,
       remainingAmount: item.remainingAmount,
       voucherNumber: item.invoice.voucherNumber,
+      isOverAllowance: item.isOverAllowance,
     })),
   );
 }
@@ -98,6 +101,7 @@ export function payableGroupsToCandidates(groups: ReconPayableGroupDto[]): Recon
         groupUuid: item.counterpartyUuid,
         remainingAmount: item.remainingAmount,
         voucherNumber: item.invoice!.voucherNumber,
+        isOverAllowance: item.isOverAllowance,
       })),
   );
 }
@@ -112,6 +116,7 @@ function toTxnRef(candidate: ReconCandidate): ReconTxnRef {
     voucherNumber: candidate.voucherNumber,
     channelUuid: candidate.groupUuid,
     remainingAmount: candidate.remainingAmount,
+    isOverAllowance: candidate.isOverAllowance,
   };
 }
 

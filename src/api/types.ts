@@ -830,6 +830,8 @@ export interface ReconPayableItemDto {
   companyAccountingSubjectUuid?: string;
   createdAt: string;
   invoice: ReconInvoiceDto;
+  /** 是否為折讓單，true 時清單需在憑證號碼旁加註「折讓單」標籤 */
+  isOverAllowance: boolean;
 }
 
 /** 對帳中心進項應付分組（依廠商） */
@@ -872,6 +874,8 @@ export interface ReconReceivableItemDto {
   companyAccountingSubjectUuid?: string;
   createdAt: string;
   invoice: ReconInvoiceDto;
+  /** 是否為折讓單，true 時清單需在憑證號碼旁加註「折讓單」標籤 */
+  isOverAllowance: boolean;
 }
 
 /** 對帳中心銷項應收分組（依銷售管道） */
