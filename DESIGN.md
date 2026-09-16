@@ -616,6 +616,10 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 如 `-6300` 顯示為 `($6,300)`；對應 `src/lib/utils.ts` 的 `fmtCurrencyAccounting`，
 適用於沖帳確認彈窗與結果彈窗的逐筆拆帳明細表。
 
+反向沖帳時，確認彈窗／結果彈窗一併翻面：金額移動類欄位（沖銷金額、對帳單金額、沖帳總額、
+本次付款）一律取絕對值；餘額類欄位（應收金額、付款餘額、沖前／沖後餘額）維持會計括號表示法，
+讓使用者看得出原單方向。對應 `src/features/reconciliation/settle.ts` 的 `isReversedSettleResult`。
+
 ### Subject Picker（分頁式科目選擇器）
 
 用途：科目數量較多、使用者不熟悉科目代碼的情境（如銀行新增交易），在既有的單層搜尋下拉之外，

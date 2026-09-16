@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { fmtCurrencyAccounting } from '@/lib/utils';
 import ReconAllocationTable from './ReconAllocationTable';
+import { isReversedSettleResult } from '../settle';
 import type { ReconAllocationInfo, ReconSettleResult, ReconSide, ReconTxnRef } from '../types';
 
 interface ReconConfirmSummaryModalProps {
@@ -50,12 +51,17 @@ export default function ReconConfirmSummaryModal({
 
   const platformFeeVoucherTotal = platformFeeVouchers.reduce((sum, v) => sum + v.amount, 0);
 
+  // 反向沖帳（見 settle.ts 的 isReversedSettleResult）：金額移動類欄位（沖銷金額／對帳單金額）
+  // 取絕對值顯示，方向已由「反向沖帳」提示文字表達，不再帶負號
+  const reversed = isReversedSettleResult(result);
+  const fmtMoved = (n: number) => fmtCurrencyAccounting(reversed ? Math.abs(n) : n);
+
   // 管道／廠商名稱長度不定，允許斷行；其餘皆為固定格式的筆數與金額，維持不換行
   const rows: { label: string; value: string; wrap: 'nowrap' | 'break'; tone?: 'error' }[] = [
     { label: side === 'receivable' ? '銷售管道' : '廠商', value: groupLabel, wrap: 'break' },
     { label: '本次沖帳', value: `${result.allocations.length} 筆`, wrap: 'nowrap' },
-    { label: '沖銷金額', value: fmtCurrencyAccounting(result.appliedSettleAmount), wrap: 'nowrap' },
-    { label: '對帳單金額', value: fmtCurrencyAccounting(result.settleAmount), wrap: 'nowrap' },
+    { label: '沖銷金額', value: fmtMoved(result.appliedSettleAmount), wrap: 'nowrap' },
+    { label: '對帳單金額', value: fmtMoved(result.settleAmount), wrap: 'nowrap' },
     ...(hasDiff ? [{ label: '差額', value: fmtCurrencyAccounting(diffAmount), wrap: 'nowrap' as const, tone: 'error' as const }] : []),
   ];
 
@@ -80,7 +86,7 @@ export default function ReconConfirmSummaryModal({
       )}
 
       <div className="mt-4">
-        <ReconAllocationTable allocations={result.allocations} side={side} allocationInfoByUuid={allocationInfoByUuid} />
+        <ReconAllocationTable allocations={result.allocations} side={side} allocationInfoByUuid={allocationInfoByUuid} reversed={reversed} />
       </div>
 
       {platformFeeVouchers.length > 0 && (

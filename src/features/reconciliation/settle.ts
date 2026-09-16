@@ -15,6 +15,14 @@ import type { ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 /** 電商平台扣款佐證憑證的沖帳科目名稱，用於查出對應官方科目 id（見 submitPlatformFeeVoucherSettles） */
 const PLATFORM_FEE_SUBJECT_VALUE = '電商平台費';
 
+/**
+ * 反向沖帳判定（顯示用）：對帳單金額或實際存入／付出金額為負，代表本次金流方向與
+ * 目前 side 相反（見 ReconciliationView 的 isReversed、DESIGN.md「Reversed Settlement Panel」）。
+ * 供確認／結果彈窗判斷金額要不要翻面顯示；不能改用 ReconciliationView 的 isReversed ——
+ * finalizeSettle 會先把 statementAmount 歸零才開結果彈窗，那時 state 已經算不出方向了。
+ */
+export const isReversedSettleResult = (r: ReconSettleResult) => r.settleAmount < 0 || r.actualAmount < 0;
+
 /** 應收側 ecommercePlatformFee 物件：UI 帶號（負）輸入，API 欄位語意為正的金額，故反號；僅應收 API 支援此欄位 */
 function toEcommercePlatformFee(platformFeeAmount: number): SettleEcommercePlatformFee {
   return { feeAmount: -platformFeeAmount };
