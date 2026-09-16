@@ -56,12 +56,16 @@ function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>):
   return channelNameByUuid.get(row.channelUuid) ?? '未知';
 }
 
-/** 桌機交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排 */
+/** 桌機交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排；
+ *  負值（超沖／折讓）依會計慣例改用括號包住 $ 與數字，不出現負號 */
 function AmountCell({ amount }: { amount: number }) {
+  const negative = amount < 0;
   return (
     <span className="flex w-28 shrink-0 items-baseline justify-end gap-0.5 font-mono tabular-nums text-neutral-dark">
+      {negative && <span className="text-neutral-mid">(</span>}
       <span className="text-neutral-mid">$</span>
-      <span>{amount.toLocaleString('en-US')}</span>
+      <span>{Math.abs(amount).toLocaleString('en-US')}</span>
+      {negative && <span className="text-neutral-mid">)</span>}
     </span>
   );
 }

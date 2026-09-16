@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { fmtCurrencyAccounting } from '@/lib/utils';
+import { fmtCurrency } from '@/lib/utils';
 import ReconAllocationTable from './ReconAllocationTable';
 import { isReversedSettleResult } from '../settle';
 import type { ReconAllocationInfo, ReconSettleResult, ReconSide, ReconTxnRef } from '../types';
@@ -54,7 +54,7 @@ export default function ReconConfirmSummaryModal({
   // 反向沖帳（見 settle.ts 的 isReversedSettleResult）：金額移動類欄位（沖銷金額／對帳單金額）
   // 取絕對值顯示，方向已由「反向沖帳」提示文字表達，不再帶負號
   const reversed = isReversedSettleResult(result);
-  const fmtMoved = (n: number) => fmtCurrencyAccounting(reversed ? Math.abs(n) : n);
+  const fmtMoved = (n: number) => fmtCurrency(reversed ? Math.abs(n) : n);
 
   // 管道／廠商名稱長度不定，允許斷行；其餘皆為固定格式的筆數與金額，維持不換行
   const rows: { label: string; value: string; wrap: 'nowrap' | 'break'; tone?: 'error' }[] = [
@@ -62,7 +62,7 @@ export default function ReconConfirmSummaryModal({
     { label: '本次沖帳', value: `${result.allocations.length} 筆`, wrap: 'nowrap' },
     { label: '沖銷金額', value: fmtMoved(result.appliedSettleAmount), wrap: 'nowrap' },
     { label: '對帳單金額', value: fmtMoved(result.settleAmount), wrap: 'nowrap' },
-    ...(hasDiff ? [{ label: '差額', value: fmtCurrencyAccounting(diffAmount), wrap: 'nowrap' as const, tone: 'error' as const }] : []),
+    ...(hasDiff ? [{ label: '差額', value: fmtCurrency(diffAmount), wrap: 'nowrap' as const, tone: 'error' as const }] : []),
   ];
 
   return (
@@ -98,18 +98,12 @@ export default function ReconConfirmSummaryModal({
                 <span className="min-w-0 truncate text-neutral-dark">
                   {v.date} · {v.voucherNumber || '無憑證號碼'} · {v.counterparty}
                 </span>
-                <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">
-                  <span className="text-neutral-mid">$</span>
-                  {v.amount.toLocaleString('en-US')}
-                </span>
+                <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">{fmtCurrency(v.amount)}</span>
               </div>
             ))}
             <div className="flex items-center justify-between gap-4 border-t border-neutral-blue-gray/30 pt-2 text-sm font-semibold">
               <span className="text-neutral-mid">合計</span>
-              <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">
-                <span className="text-neutral-mid">$</span>
-                {platformFeeVoucherTotal.toLocaleString('en-US')}
-              </span>
+              <span className="flex shrink-0 items-baseline gap-0.5 font-mono tabular-nums text-neutral-dark">{fmtCurrency(platformFeeVoucherTotal)}</span>
             </div>
           </div>
         </div>

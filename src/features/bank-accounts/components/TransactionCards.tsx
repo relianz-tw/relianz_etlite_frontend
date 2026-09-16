@@ -54,7 +54,7 @@ function TransactionCard({
         </div>
         <div className="flex items-center justify-end gap-2 text-xs text-neutral-mid">
           <span className="shrink-0 font-mono tabular-nums">
-            {row.expense != null ? `-${fmtCurrency(row.expense)}` : `+${fmtCurrency(row.deposit ?? 0)}`}
+            {row.expense != null ? fmtCurrency(-row.expense) : fmtCurrency(row.deposit ?? 0)}
           </span>
         </div>
       </button>

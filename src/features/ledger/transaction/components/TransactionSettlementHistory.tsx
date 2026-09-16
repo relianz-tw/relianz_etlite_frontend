@@ -48,7 +48,7 @@ export default function TransactionSettlementHistory({ buyOrSell, settleEvents, 
             {deduction !== 0 && (
               <div className="flex items-center justify-between text-sm text-neutral-mid">
                 <span>手續費及額外金額</span>
-                <span className="font-mono font-semibold tabular-nums text-neutral-dark">-{fmtCurrency(deduction)}</span>
+                <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(-deduction)}</span>
               </div>
             )}
             <div className="flex items-center justify-between border-t border-neutral-blue-gray/20 pt-1.5 text-sm text-neutral-mid">

@@ -1,7 +1,7 @@
 'use client';
 
 import Badge from '@/components/ui/Badge';
-import { fmtCurrencyAccounting, formatYyyymmddRoc } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 import { getSettlementStatusBadge } from '@/lib/settlementStatus';
 import type { SettleLedgerAllocation } from '@/api/types';
 import type { ReconAllocationInfo, ReconSide } from '../types';
@@ -26,7 +26,7 @@ const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 export default function ReconAllocationTable({ allocations, side, allocationInfoByUuid, reversed = false }: ReconAllocationTableProps) {
   const counterpartyLabel = side === 'payable' ? '賣方' : '買受人';
   // 反向沖帳時「本次付款」是本次實際移動的金額，方向已由外層彈窗翻面表達，不再帶負號
-  const fmtSettleAmount = (n: number) => fmtCurrencyAccounting(reversed ? Math.abs(n) : n);
+  const fmtSettleAmount = (n: number) => fmtCurrency(reversed ? Math.abs(n) : n);
 
   return (
     <>
@@ -55,7 +55,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-neutral-mid">應收金額</span>
-                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrencyAccounting(a.beforeRemaining)}</span>
+                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(a.beforeRemaining)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-neutral-mid">本次付款</span>
@@ -63,7 +63,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-neutral-mid">付款餘額</span>
-                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrencyAccounting(a.afterRemaining)}</span>
+                  <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(a.afterRemaining)}</span>
                 </div>
               </div>
             </div>
@@ -96,9 +96,9 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
                   <td className={`${tdClass} font-mono`}>{info?.voucherNumber || '—'}</td>
                   <td className={tdClass}>{info?.counterparty || '—'}</td>
                   <td className={`${tdClass} font-mono`}>{a.transactionDate ? formatYyyymmddRoc(a.transactionDate) : '—'}</td>
-                  <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrencyAccounting(a.beforeRemaining)}</td>
+                  <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(a.beforeRemaining)}</td>
                   <td className={`${tdClass} text-right font-mono tabular-nums font-semibold`}>{fmtSettleAmount(a.settleAmount)}</td>
-                  <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrencyAccounting(a.afterRemaining)}</td>
+                  <td className={`${tdClass} text-right font-mono tabular-nums`}>{fmtCurrency(a.afterRemaining)}</td>
                   <td className={tdClass}>
                     <Badge tone={badge.tone} variant="muted">
                       {badge.label}

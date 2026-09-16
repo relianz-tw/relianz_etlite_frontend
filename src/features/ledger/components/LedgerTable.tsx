@@ -29,12 +29,20 @@ type LedgerTableProps = {
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
-/** 交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排 */
+/** 交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排；
+ *  負值（折讓等）依會計慣例改用括號包住 $ 與數字，不出現負號 */
 function AmountCell({ amount, className = '' }: { amount: number; className?: string }) {
+  const negative = amount < 0;
   return (
     <span className={cn('flex items-center justify-between font-mono tabular-nums', className)}>
-      <span className="text-neutral-mid">$</span>
-      <span>{amount.toLocaleString('en-US')}</span>
+      <span className="flex items-baseline gap-0.5">
+        {negative && <span className="text-neutral-mid">(</span>}
+        <span className="text-neutral-mid">$</span>
+      </span>
+      <span className="flex items-baseline">
+        {Math.abs(amount).toLocaleString('en-US')}
+        {negative && <span className="text-neutral-mid">)</span>}
+      </span>
     </span>
   );
 }

@@ -33,9 +33,11 @@ function targetSummary(targetNames: string[]): string {
 
 /** 桌機列金額欄：$ 與數字貼在一起靠欄位右緣顯示（同一欄每列右緣仍對齊成直排），
  *  不把 $ 單獨貼在欄位左緣——一列有多個金額欄並排時，$ 離數字太遠會讓版面看起來斷開、不像同一組金額；
- *  一律不顯示負號，無金額時顯示 0（比照其他金額欄格式，不特別弱化）。
+ *  負值（超沖／折讓）依會計慣例改用括號包住 $ 與數字，不出現負號，無金額時顯示 0（比照其他金額欄格式，不特別弱化）。
  *  emphasis 用於本列唯一的主要數值欄（沖帳金額），僅以深淺色區分主次，字級與字重三欄一致 */
 function DeskAmountCell({ amount, emphasis }: { amount: number; emphasis?: boolean }) {
+  const negative = amount < 0;
+  const signClass = emphasis ? 'text-neutral-mid' : 'text-neutral-blue-gray';
   return (
     <span
       className={cn(
@@ -43,8 +45,10 @@ function DeskAmountCell({ amount, emphasis }: { amount: number; emphasis?: boole
         emphasis ? 'w-24 text-neutral-dark' : 'w-20 text-neutral-mid',
       )}
     >
-      <span className={emphasis ? 'text-neutral-mid' : 'text-neutral-blue-gray'}>$</span>
+      {negative && <span className={signClass}>(</span>}
+      <span className={signClass}>$</span>
       <span>{Math.abs(amount).toLocaleString('en-US')}</span>
+      {negative && <span className={signClass}>)</span>}
     </span>
   );
 }
@@ -63,7 +67,10 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
 
   const detailPanel = expanded && (
     <div className="mt-3 max-h-[240px] divide-y divide-neutral-blue-gray/20 overflow-y-auto rounded-md border border-neutral-blue-gray/20 bg-surface-cream">
-      {item.details.map(d => (
+      {item.details.map(d => {
+        // 該原單已核銷折讓／退貨時，應收/應付金額改顯示折讓合計（折讓為負值，交由 fmtCurrency 顯示會計括號），取代原單金額
+        const displayOriginAmount = d.allowanceTotalAmount !== 0 ? d.allowanceTotalAmount : d.originAmount;
+        return (
         <div key={d.ledgerUuid} className="flex flex-col gap-1 px-3 py-2 text-xs">
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 font-mono text-neutral-dark">
@@ -72,7 +79,8 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
               {d.voucherNumber && <span>{d.voucherNumber}</span>}
             </span>
             <span className="flex items-center gap-2">
-              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(d.amount)}</span>
+              <span className="text-neutral-mid">沖前餘額</span>
+              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(d.balanceBefore)}</span>
               <Link
                 href={`/ledger/${d.ledgerUuid}?side=${isPayable ? 'purchase' : 'sales'}`}
                 target="_blank"
@@ -85,14 +93,18 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-neutral-mid">
-            <span>{isPayable ? '應付' : '應收'} {fmtCurrency(d.originAmount)}</span>
-            <span className="font-mono tabular-nums">{fmtCurrency(d.balanceAfter)}</span>
+            <span>{isPayable ? '應付' : '應收'} {fmtCurrency(displayOriginAmount)}</span>
+            <span className="flex items-center gap-2">
+              <span>沖後餘額</span>
+              <span className="font-mono tabular-nums">{fmtCurrency(d.balanceAfter)}</span>
+            </span>
           </div>
           <span className="text-neutral-mid">
             {d.counterpartyLabel}：{d.counterpartyName}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -124,7 +136,7 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
           {deduction !== 0 && (
             <div className="flex items-center justify-between text-neutral-mid">
               <span>手續費及額外金額</span>
-              <span className="font-mono font-semibold tabular-nums text-neutral-dark">-{fmtCurrency(deduction)}</span>
+              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(-deduction)}</span>
             </div>
           )}
           <div className="flex items-center justify-between border-t border-neutral-blue-gray/20 pt-1.5 text-neutral-mid">
@@ -168,7 +180,9 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
             <span className="w-14 shrink-0 text-right text-xs text-neutral-mid">{item.itemCount} 筆</span>
             <DeskAmountCell amount={item.originAmount} />
             <DeskAmountCell amount={item.settleAmount} emphasis />
-            <DeskAmountCell amount={deduction} />
+            {/* 與手機卡片的「手續費及額外金額」同義：deduction 為沖帳額減實收，代表從沖帳額中扣除的金額，
+                故取負號顯示，讓一般手續費呈現為括號（會計慣用的扣除表示法），兩種版面顯示一致 */}
+            <DeskAmountCell amount={-deduction} />
             <DeskAmountCell amount={item.cashAmount} />
             <DeskAmountCell amount={item.balanceAfter} />
             <span className="ml-3 min-w-0 flex-1 truncate text-sm text-neutral-mid" title={item.targetNames.join('、')}>
