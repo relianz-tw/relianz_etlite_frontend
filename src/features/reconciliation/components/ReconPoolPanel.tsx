@@ -38,6 +38,8 @@ interface ReconPoolPanelProps {
   /** 金額欄位標題：匯總沖帳為「對帳單金額」，逐筆沖帳為「沖帳金額」 */
   amountLabel: string;
   statementAmount: number;
+  /** 沖帳金額目前是否仍為系統依勾選交易自動帶入的值（尚未被使用者手動修改）；true 時輸入框顯示綠框＋閃電 */
+  amountAutoFilled?: boolean;
   /** 此單是否含折讓、退貨（僅匯總沖帳顯示）：對應匯總沖帳預覽 API 的 includeAllowance */
   includeAllowance: boolean;
   onIncludeAllowanceChange: (value: boolean) => void;
@@ -106,6 +108,7 @@ export default function ReconPoolPanel({
   onClearSelection,
   amountLabel,
   statementAmount,
+  amountAutoFilled = false,
   includeAllowance,
   onIncludeAllowanceChange,
   feeAmount,
@@ -148,9 +151,14 @@ export default function ReconPoolPanel({
   const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
   const displayAmount = Math.abs(depositAmount);
   const dateLabel = effectiveSide === 'payable' ? '付款日' : '收款日';
+  // 目前勾選交易本身加總即為負數（如全選退款/折讓性質交易）：這是預期中的正常狀態，不比照一般反向沖帳
+  // 整塊套用色調造成過度警示，僅在下方金額列以紅字＋提示文案說明方向判斷（見 CLAUDE 需求）
+  const isSelectedAmountNegative = mode === 'perTxn' && selectedCount > 0 && (selectedAmount ?? 0) < 0;
+  const showReversedTint = isReversed && !isSelectedAmountNegative;
+  const showNegativeSelectionHint = isReversed && isSelectedAmountNegative;
 
   return (
-    <div className={cn('rounded-lg border-[1.5px] p-4', isReversed ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white')}>
+    <div className={cn('rounded-lg border-[1.5px] p-4', showReversedTint ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white')}>
       {!hideHeader && (
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-[15px] font-semibold text-neutral-dark">
@@ -182,12 +190,17 @@ export default function ReconPoolPanel({
         )}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-neutral-dark">{amountLabel}</label>
-          <MoneyInput value={statementAmount} onChange={onStatementChange} disabled={amountDisabled} />
+          <MoneyInput
+            value={statementAmount}
+            onChange={onStatementChange}
+            disabled={amountDisabled}
+            aiFilled={mode === 'perTxn' && amountAutoFilled}
+          />
           {amountDisabled ? (
             <p className="text-xs text-neutral-mid">請先於左側清單勾選交易</p>
           ) : (
             mode === 'perTxn' &&
-            selectedCount > 0 && <p className="text-xs text-neutral-mid">已自動帶入所選{side === 'payable' ? '待付' : '待收'}總額，可修改</p>
+            selectedCount > 0 && <p className="text-xs text-neutral-mid">系統已自動帶入所有已勾選的沖帳交易總額，如有含退款會自動扣除</p>
           )}
         </div>
       </div>
@@ -241,9 +254,25 @@ export default function ReconPoolPanel({
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-neutral-blue-gray/20 pt-3 text-sm">
-        <span className="font-semibold text-neutral-dark">{effectiveSide === 'payable' ? '實際付出金額' : '實際存入金額'}</span>
-        <span className="font-mono text-base font-semibold tabular-nums text-neutral-dark">{fmtCurrency(displayAmount)}</span>
+      <div className="mt-4 border-t border-neutral-blue-gray/20 pt-3 text-sm">
+        <div className="flex items-center justify-between">
+          <span className={cn('font-semibold', isSelectedAmountNegative ? 'text-semantic-error' : 'text-neutral-dark')}>
+            {effectiveSide === 'payable' ? '實際付出金額' : '實際存入金額'}
+          </span>
+          <span
+            className={cn(
+              'font-mono text-base font-semibold tabular-nums',
+              isSelectedAmountNegative ? 'text-semantic-error' : 'text-neutral-dark',
+            )}
+          >
+            {fmtCurrency(displayAmount)}
+          </span>
+        </div>
+        {showNegativeSelectionHint && (
+          <p className="mt-1 text-xs text-semantic-error">
+            目前勾選沖帳的項目加總為負數，因此系統判斷為{effectiveSide === 'payable' ? '付出' : '收入'}
+          </p>
+        )}
       </div>
 
       {showActionArea && (

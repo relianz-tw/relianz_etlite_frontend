@@ -124,6 +124,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 逐筆沖帳模式勾選的交易 uuid（可複選）；勾 1 筆走手動沖帳 API、勾多筆走 summary API（見上方檔案說明）
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
   const [statementAmount, setStatementAmount] = useState(0);
+  // 沖帳金額是否仍為系統依勾選交易自動帶入的值（尚未被使用者手動修改），供 ReconPoolPanel 顯示綠框＋閃電提示
+  const [statementAutoFilled, setStatementAutoFilled] = useState(false);
   // 此單是否含折讓、退貨（僅匯總沖帳顯示）：對應匯總沖帳預覽 API 的 includeAllowance
   const [includeAllowance, setIncludeAllowance] = useState(false);
   const [feeAmount, setFeeAmount] = useState(0);
@@ -353,11 +355,15 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 使用者仍可事後手動修改此欄位（如部分沖帳），僅在勾選狀態變動時才會重新覆蓋；取消勾選至 0 筆時歸零
   // （金額欄位本身也會同步停用，見 poolPanelBaseProps 的 amountDisabled），避免殘留跟目前勾選不一致的金額
   useEffect(() => {
-    if (mode === 'perTxn') setStatementAmount(selectedUuids.size > 0 ? selectedAmount : 0);
+    if (mode === 'perTxn') {
+      setStatementAmount(selectedUuids.size > 0 ? selectedAmount : 0);
+      setStatementAutoFilled(selectedUuids.size > 0);
+    }
   }, [mode, selectedUuids, selectedAmount]);
 
   const resetInputs = () => {
     setStatementAmount(0);
+    setStatementAutoFilled(false);
     setIncludeAllowance(false);
     setFeeAmount(0);
     setOtherDeductions([]);
@@ -403,6 +409,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
 
   const handleStatementChange = (value: number) => {
     setStatementAmount(value);
+    setStatementAutoFilled(false);
     clearComputedState();
   };
   const handleFeeChange = (value: number) => {
@@ -693,6 +700,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     onClearSelection: handleClearSelection,
     amountLabel: mode === 'perTxn' ? '沖帳金額' : '對帳單金額',
     statementAmount,
+    amountAutoFilled: statementAutoFilled,
     includeAllowance,
     onIncludeAllowanceChange: setIncludeAllowance,
     feeAmount,
