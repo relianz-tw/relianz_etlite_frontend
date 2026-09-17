@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // onboarding 流程的憑證預覽用 react-pdf/pdfjs-dist，SSR 時需避免引入 Node.js 專用模組
+  webpack: config => {
+    config.resolve.alias.canvas = false;
+    config.resolve.alias.encoding = false;
+    return config;
+  },
   // ETLite 掛在既有 domain 的 /etlite 底下，非 root，部署路徑依賴此設定，變更需與後端一併確認。
   basePath: '/etlite',
   // 後端已開放 CORS，前端統一直接打 NEXT_PUBLIC_API_BASE_URL（見 src/api/client.ts），

@@ -10,6 +10,12 @@ const SIDEBAR_DEFAULT_WIDTH = 224;
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 400;
 
+// 不套用側欄殼層的公開頁面（免登入簽署頁、全螢幕嚮導版型等）
+const SHELL_FREE_PATH_PREFIXES = [
+  "/withholding/labor/sign", // 勞報單對外免登入簽署頁
+  "/onboarding", // 客戶開通引導流程：全螢幕嚮導版型，含 /onboarding/payment/*
+];
+
 // 側邊欄殼層：桌機固定展開（不可收合，寬度可拖曳），手機採 Overlay（浮層，由頂部列選單鈕開合）
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -21,8 +27,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     setOpen(false);
   }, [pathname]);
 
-  // 勞報單對外免登入簽署頁：無側欄／導覽的公開頁面，不套用一般殼層
-  if (pathname?.startsWith("/withholding/labor/sign")) {
+  if (SHELL_FREE_PATH_PREFIXES.some((p) => pathname?.startsWith(p))) {
     return <>{children}</>;
   }
 

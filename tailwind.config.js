@@ -38,10 +38,14 @@ const config = {
           'blue-light': '#3380B8',
           tan: '#BE9F86',
           'tan-dark': '#A88B74',
+          // 第三方品牌色例外：LINE 官方色，僅用於 onboarding 加好友按鈕
+          line: '#06C755',
         },
         semantic: {
           success: '#377456',
           'success-dark': '#2d6347',
+          // onboarding 流程左側資訊面板背景（比 success-dark 更深）
+          'success-deep': '#304833',
           'success-muted': '#CAD6BC',
           info: '#5CA8A3',
           'info-muted': '#7A7C81',

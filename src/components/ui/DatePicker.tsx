@@ -15,6 +15,8 @@ interface DatePickerProps {
   disabled?: boolean;
   /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
   aiFilled?: boolean;
+  /** 驗證失敗時為 true，邊框改為錯誤色（優先權高於 aiFilled） */
+  error?: boolean;
 }
 
 /** Date → 民國年 YYY/MM/DD */
@@ -46,7 +48,7 @@ export function parseRocDate(text: string): Date | undefined {
   return date;
 }
 
-export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false, aiFilled = false }: DatePickerProps) {
+export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false, aiFilled = false, error = false }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputText, setInputText] = useState(formatRocDate(value));
 
@@ -81,7 +83,7 @@ export default function DatePicker({ value, onChange, placeholder = '選擇日�
           className={cn(
             'flex h-10 w-full items-center gap-2 rounded-lg border-[1.5px] bg-white px-3 transition-colors',
             'focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/15',
-            aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
+            error ? 'border-semantic-error' : aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
             disabled && 'pointer-events-none bg-surface-cream',
             className,
           )}

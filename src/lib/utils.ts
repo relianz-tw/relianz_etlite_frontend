@@ -37,6 +37,20 @@ export function monthToBimonthlyPhase(month: number): number {
   return month % 2 === 0 ? month - 1 : month;
 }
 
+/** 純數字千分位格式化，不加 $ 也不用括號表負值；供繳款書等公文格式文件顯示金額使用（與 fmtCurrency 不同用途） */
+export function formatTWD(n: number | null | undefined): string {
+  if (n == null) return '—';
+  return n.toLocaleString('zh-TW');
+}
+
+/** 將 Date 物件格式化為 YYYY-MM-DD（本地時區），供 onboarding 薪資試算的給薪日期預設值等使用 */
+export function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 /** 回傳今天日期的 YYYYMMDD 字串，供需要送出此格式的 API（如銀行帳戶餘額更新日）使用 */
 export function todayYyyymmdd(): string {
   const d = new Date();

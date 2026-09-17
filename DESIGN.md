@@ -37,11 +37,13 @@ The color system centers on Relianz's **城信藍 (`#005FA2`)** as the primary b
 | Name | Hex | Semantic Role |
 |------|-----|---------------|
 | 裁切綠 | `#377456` | Success, positive states, confirmation |
+| 裁切綠深 | `#304833` | Success dark variant, onboarding 流程左側資訊面板背景 |
 | 清新綠 | `#CAD6BC` | Success muted, subtle positive backgrounds |
 | 友善綠 | `#5CA8A3` | Info / teal accent, active states |
 | 理性灰 | `#7A7C81` | Muted info, secondary interactive |
 | 友善棕 (AM) | `#84724D` | Warm dark accent, earthy emphasis |
 | 權威灰 | `#3A3830` | Near-black text, dark surfaces |
+| LINE 綠 | `#06C755` | 第三方品牌色例外，僅用於加 LINE 官方帳號好友按鈕 |
 
 ### Neutral Scale
 
@@ -764,10 +766,12 @@ Dialog 內左滑面板（桌機，於 Modal 對話框內使用）：
 
   /* === SEMANTIC — A.M. CPA fill-ins === */
   --color-success: #377456;
+  --color-success-deep: #304833;
   --color-success-muted: #CAD6BC;
   --color-info: #5CA8A3;
   --color-info-muted: #7A7C81;
   --color-warm-dark: #84724D;
+  --color-line: #06C755;
 
   /* === NEUTRAL === */
   --color-dark: #3A3830;
