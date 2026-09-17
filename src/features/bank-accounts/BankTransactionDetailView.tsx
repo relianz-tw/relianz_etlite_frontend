@@ -29,7 +29,6 @@ interface BankTransactionDetailViewProps {
 export default function BankTransactionDetailView({ transactionId, accountUuid, returnQuery }: BankTransactionDetailViewProps) {
   const [row, setRow] = useState<BankTxnRow | null>(null);
   const [voucherImage, setVoucherImage] = useState<string | null>(null);
-  const [counterpartyName, setCounterpartyName] = useState<string | null>(null);
   const [dailyLines, setDailyLines] = useState<DailyDetailLineDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,14 +45,10 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
 
     const load = async () => {
       try {
-        const { row: found, invoicePicUrl, counterpartyName: detailCounterpartyName } = await loadBankTransactionDetail(
-          accountUuid,
-          transactionId,
-        );
+        const { row: found, invoicePicUrl } = await loadBankTransactionDetail(accountUuid, transactionId);
         if (cancelled) return;
         setRow(found);
         setVoucherImage(invoicePicUrl);
-        setCounterpartyName(detailCounterpartyName || null);
 
         if (found.mainSettlementLedgerUuid) {
           fetchDailyDetail({ ledgerUuid: found.mainSettlementLedgerUuid })
@@ -88,7 +83,9 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
             <ChevronLeft size={16} />
             返回銀行帳戶總覽
           </Link>
-          <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">交易明細</h1>
+          <h1 className="mx-auto max-w-[760px] font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">
+            交易明細
+          </h1>
         </div>
 
         {loading ? (
@@ -102,15 +99,15 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
                 <VoucherPreviewCard voucherImage={voucherImage} />
               </div>
               <div className="flex flex-col gap-5">
-                <BankTransactionSummaryCard row={row} counterpartyName={counterpartyName} />
+                <BankTransactionSummaryCard row={row} />
                 <LinkedTransactionList items={row.details} />
                 <JournalCard lines={dailyLines} defaultOpen />
               </div>
             </div>
           ) : (
             // 無憑證圖（多為匯總沖帳，無單一憑證可顯示）時不保留空的憑證欄位，改單欄呈現
-            <div className="flex max-w-[760px] flex-col gap-5">
-              <BankTransactionSummaryCard row={row} counterpartyName={counterpartyName} />
+            <div className="mx-auto flex max-w-[760px] flex-col gap-5">
+              <BankTransactionSummaryCard row={row} />
               <LinkedTransactionList items={row.details} />
               <JournalCard lines={dailyLines} defaultOpen />
             </div>

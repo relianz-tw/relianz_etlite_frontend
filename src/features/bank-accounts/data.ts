@@ -34,6 +34,8 @@ function mapDetailToLinked(detail: BankSettleEventDetailDto): LinkedLedgerTxn {
 
 function mapSettleEventToRow(item: BankSettleEventDto): BankTxnRow {
   const isDeposit = item.cashDirection === 0;
+  // 交易金額改採 details 各筆 amount 加總（而非 cashAmount），取絕對值比照既有 expense/deposit 恆為正數的慣例
+  const detailsAmount = Math.abs(item.details.reduce((sum, d) => sum + d.amount, 0));
   return {
     settleEventUuid: item.settleEventUuid,
     paymentDate: item.paymentDate,
@@ -43,8 +45,8 @@ function mapSettleEventToRow(item: BankSettleEventDto): BankTxnRow {
     settleAmount: item.settleAmount,
     cashAmount: item.cashAmount,
     cashDirection: item.cashDirection,
-    expense: isDeposit ? null : item.cashAmount,
-    deposit: isDeposit ? item.cashAmount : null,
+    expense: isDeposit ? null : detailsAmount,
+    deposit: isDeposit ? detailsAmount : null,
     isReverse: item.isReverse,
     hasInvoice: item.hasInvoice,
     mainSettlementLedgerUuid: item.mainSettlementLedgerUuid,

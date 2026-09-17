@@ -27,17 +27,14 @@ export default function LinkedTransactionList({ items }: { items: LinkedLedgerTx
                   <Badge tone={item.side === 'sales' ? 'info' : 'neutral'} variant="muted">
                     {SIDE_LABEL[item.side]}
                   </Badge>
-                  <span className="font-mono text-sm font-semibold text-neutral-dark">{item.orderCode}</span>
-                  <span className="text-sm font-medium text-neutral-dark">{item.counterpartyName}</span>
+                  <span className="font-mono text-sm font-semibold text-neutral-dark">{item.voucherNumber || item.orderCode}</span>
                 </div>
                 <p className="text-xs text-neutral-mid">
-                  {item.subjectName}
-                  {item.voucherNumber && (
-                    <>
-                      ・憑證號碼 <span className="font-mono">{item.voucherNumber}</span>
-                    </>
-                  )}
+                  交易編號 <span className="font-mono">{item.orderCode}</span>
                 </p>
+                {item.counterpartyName && item.counterpartyName !== '—' && (
+                  <p className="text-xs text-neutral-mid">交易對象 {item.counterpartyName}</p>
+                )}
                 <div className="flex items-center gap-3 text-xs text-neutral-mid">
                   <span className="font-mono">{formatYyyymmddRoc(item.transactionDate)}</span>
                   <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(item.originAmount)}</span>

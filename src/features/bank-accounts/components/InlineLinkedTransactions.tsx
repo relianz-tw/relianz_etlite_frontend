@@ -1,10 +1,10 @@
 'use client';
 
-import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { fmtCurrency } from '@/lib/utils';
 import type { LinkedLedgerTxn } from '../types';
 
-/** 欄寬（交易編號/交易金額/交易對象/科目/已沖·未沖/交易日期），純文字呈現、無互動元件 */
-const COLUMN_TEMPLATE = '140px 120px 1fr 140px 160px 110px';
+/** 欄寬（交易編號/交易金額/交易對象/科目），純文字呈現、無互動元件 */
+const COLUMN_TEMPLATE = '140px 120px 1fr 140px';
 
 /**
  * 展開列／交易明細頁顯示的關聯帳簿交易清單：欄位對映 BankSettleEventDto.details（隨列表回應一起送達），
@@ -27,8 +27,6 @@ export default function InlineLinkedTransactions({ items }: { items: LinkedLedge
           <span className="text-right">交易金額</span>
           <span>交易對象</span>
           <span>科目</span>
-          <span className="text-right">本次沖帳</span>
-          <span>交易日期</span>
         </div>
         {items.map((item, i) => (
           <div
@@ -37,15 +35,11 @@ export default function InlineLinkedTransactions({ items }: { items: LinkedLedge
             style={{ gridTemplateColumns: COLUMN_TEMPLATE }}
           >
             <span className="truncate font-mono text-[13px]">{item.orderCode}</span>
-            <span className="text-right font-mono tabular-nums">{fmtCurrency(item.originAmount)}</span>
+            <span className="text-right font-mono tabular-nums">{fmtCurrency(item.amount)}</span>
             <span className="truncate" title={item.counterpartyName}>
               {item.counterpartyName}
             </span>
             <span className="truncate text-neutral-mid">{item.subjectName || '—'}</span>
-            <span className="text-right font-mono tabular-nums text-neutral-mid">
-              {fmtCurrency(item.amount)}
-            </span>
-            <span className="font-mono text-neutral-mid">{formatYyyymmddRoc(item.transactionDate)}</span>
           </div>
         ))}
       </div>
@@ -55,13 +49,11 @@ export default function InlineLinkedTransactions({ items }: { items: LinkedLedge
           <div key={item.ledgerUuid} className="flex flex-col gap-1 bg-white px-3 py-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="font-mono font-semibold text-neutral-dark">{item.orderCode}</span>
-              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(item.originAmount)}</span>
+              <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtCurrency(item.amount)}</span>
             </div>
             <span className="text-neutral-dark">{item.counterpartyName}</span>
             <div className="flex flex-wrap gap-x-3 text-neutral-mid">
               <span>{item.subjectName || '—'}</span>
-              <span>本次沖帳 {fmtCurrency(item.amount)}</span>
-              <span className="font-mono">{formatYyyymmddRoc(item.transactionDate)}</span>
             </div>
           </div>
         ))}
