@@ -1,5 +1,6 @@
 'use client';
 
+import { createRental, deleteRental, listLatestRentals, updateRental } from '@/api/withholding';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePicker from '@/components/ui/DatePicker';
@@ -9,21 +10,19 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { Backpack, ChevronLeft, MessageSquare, Paperclip, Pencil, Plus, Trash2, User, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Field from '../../components/Field';
-import FileListSection from '../../components/FileListSection';
 import LockedBanner from '../../components/LockedBanner';
 import { useLock } from '../../components/LockContext';
-import MockFilePreviewModal from '../../components/MockFilePreviewModal';
-import { createMockFile, type MockFile } from '../../components/mockFile';
-import { availableYears, calculateRentalFromActual, calculateRentalFromDeclared } from '../data';
-import { addWithholdingRecord, deleteWithholdingRecord, getWithholdingRecord, listRecentRentalRecords, updateWithholdingRecord } from '../mockStore';
-import type { WithholdingInput } from '../mockStore';
-import type { Burden, Landlord, Residency, WithholdingRecord } from '../types';
+import { availableYears, calculateRentalFromActual, calculateRentalFromDeclared, VOUCHER_TYPE_OPTIONS } from '../data';
+import { buildCreateRentalBody, mapRentalDtoToRecord } from '../mapper';
+import type { Burden, EarnerType, Landlord, VoucherType, WithholdingRecord } from '../types';
+import RentalFileManager from './RentalFileManager';
 import WithholdingPdfManager from './WithholdingPdfManager';
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -41,7 +40,7 @@ interface RentalFormFieldsProps {
   isEdit: boolean;
   initial: {
     landlordIdentity: 'individual' | 'company';
-    residency: Residency;
+    voucherType: VoucherType;
     paymentDate: Date;
     incomeYear: number;
     incomeMonth: number;
@@ -50,15 +49,14 @@ interface RentalFormFieldsProps {
     landlords: Landlord[];
     burden: Burden;
     primaryAmount: number;
-    rentalFiles: MockFile[];
     remarks: string;
   };
-  onSubmit: (data: WithholdingInput) => void;
+  onSubmit: (body: ReturnType<typeof buildCreateRentalBody>) => void;
 }
 
 function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFieldsProps) {
   const [landlordIdentity, setLandlordIdentity] = useState(initial.landlordIdentity);
-  const [residency, setResidency] = useState(initial.residency);
+  const [voucherType, setVoucherType] = useState<VoucherType>(initial.voucherType);
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(initial.paymentDate);
   const [incomeYear, setIncomeYear] = useState(initial.incomeYear);
   const [incomeMonth, setIncomeMonth] = useState(initial.incomeMonth);
@@ -71,14 +69,28 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
   const [manualDeclared, setManualDeclared] = useState<number | null>(null);
   const [manualWithholding, setManualWithholding] = useState<number | null>(null);
   const [manualNhi, setManualNhi] = useState<number | null>(null);
-  const [rentalFiles, setRentalFiles] = useState<MockFile[]>(initial.rentalFiles);
-  const [previewFile, setPreviewFile] = useState<MockFile | null>(null);
   const [remarks, setRemarks] = useState(initial.remarks);
   const [recentAddress, setRecentAddress] = useState('');
+  const [recentRecords, setRecentRecords] = useState<WithholdingRecord[]>([]);
   const [error, setError] = useState('');
 
-  const recentRecords = listRecentRentalRecords();
-  const showsFields = landlordIdentity === 'individual' && residency === 'domestic';
+  // 「快速帶入上期資料」僅新增模式需要，改串真實 API（GET /ael/withholding/rental/latest）
+  useEffect(() => {
+    if (isEdit) return;
+    let cancelled = false;
+    listLatestRentals()
+      .then(list => {
+        if (!cancelled) setRecentRecords(list.map(mapRentalDtoToRecord));
+      })
+      .catch(() => {
+        // 帶入上期資料查詢失敗僅影響此便利功能，不特別呈現錯誤訊息
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit]);
+
+  const showsFields = landlordIdentity === 'individual';
 
   let declaredAmount: number;
   let withholdingAmount: number;
@@ -119,14 +131,6 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
   const handleUpdateLandlord = (id: string, patch: Partial<Landlord>) =>
     setLandlords(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const mockFile = createMockFile(file.name, [{ label: '租賃地址', value: rentalAddress || '（尚未填寫）' }]);
-    setRentalFiles(prev => [...prev, mockFile]);
-    e.target.value = '';
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentDate) {
@@ -141,29 +145,25 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
       }
     }
 
-    onSubmit({
-      categoryCode: '51',
-      earnerType: landlordIdentity,
-      residency,
-      recipientName: showsFields ? landlords.map(l => l.name.trim()).filter(Boolean).join('、') : '',
-      recipientIdNumber: showsFields ? (landlords[0]?.idNumber.trim() ?? '') : '',
-      recipientAddress: showsFields ? (landlords[0]?.address.trim() ?? '') : '',
+    const body = buildCreateRentalBody({
+      earnerType: landlordIdentity as EarnerType,
+      voucherType,
       landlords: showsFields ? landlords.filter(l => l.name.trim()) : [],
       rentalAddress: showsFields ? rentalAddress.trim() : '',
       rentalAddressTaxId: showsFields ? rentalAddressTaxId.trim() : '',
       burden,
-      rentalFiles,
-      paymentYear: paymentDate.getFullYear(),
-      paymentMonth: paymentDate.getMonth() + 1,
-      paymentDay: paymentDate.getDate(),
-      incomeYear,
-      incomeMonth,
-      grossIncome: showsFields ? declaredAmount : 0,
+      // 畫面未提供「是否月繳」切換，一律預設為否；待有實際 UI 需求（如月繳分期）再擴充
+      isMonthlyPayment: false,
+      declaredAmount: showsFields ? declaredAmount : 0,
       withholdingAmount: showsFields ? withholdingAmount : 0,
       nhiAmount: showsFields ? nhiAmount : 0,
-      netPayment: showsFields ? actualPayment : 0,
+      actualPayment: showsFields ? actualPayment : 0,
       remarks: remarks.trim(),
+      incomeYear,
+      incomeMonth,
+      paymentDate,
     });
+    onSubmit(body);
   };
 
   return (
@@ -199,15 +199,14 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
                 onChange={setLandlordIdentity}
               />
             </Field>
-            <Field label="居住狀態" required className="nav:col-span-2">
-              <SegmentedControl
-                options={[
-                  { value: 'domestic', label: '本國人並居住滿 183 天' },
-                  { value: 'foreign', label: '外國人或居住未滿 183 天' },
-                ]}
-                value={residency}
-                onChange={setResidency}
-              />
+            <Field label="憑證類別" required>
+              <Select widthClassName="w-full" value={voucherType} onValueChange={v => setVoucherType(v as VoucherType)}>
+                {VOUCHER_TYPE_OPTIONS.map(o => (
+                  <option key={o.code} value={o.code}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="給付日期" required>
               <DatePicker value={paymentDate} onChange={handlePaymentDateChange} />
@@ -252,17 +251,11 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
 
         {!showsFields ? (
           <div className="rounded-md border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 text-sm text-neutral-dark">
-            {landlordIdentity === 'company' ? (
-              <>
-                房東為公司行號時請到{' '}
-                <Link href="/ledger" className="font-semibold text-brand-blue hover:underline">
-                  帳簿
-                </Link>{' '}
-                選擇新增進項憑證即可。
-              </>
-            ) : (
-              '系統不支援非稅籍居民申報，請自行在支付後 10 天內完成扣繳跟申報。'
-            )}
+            房東為公司行號時請到{' '}
+            <Link href="/ledger" className="font-semibold text-brand-blue hover:underline">
+              帳簿
+            </Link>{' '}
+            選擇新增進項憑證即可。
           </div>
         ) : (
           <>
@@ -367,16 +360,6 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
               </div>
             </SectionCard>
 
-            <SectionCard title="附件上傳" icon={Paperclip}>
-              <div className="flex flex-col gap-3">
-                <FileListSection title="租賃附件" files={rentalFiles} emptyText="尚未上傳附件" onView={setPreviewFile} onDelete={file => setRentalFiles(prev => prev.filter(f => f.id !== file.id))} />
-                <label className="flex h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-neutral-blue-gray/50 bg-white text-center hover:border-brand-blue">
-                  <span className="text-xs text-neutral-mid">點擊上傳附件（如租賃契約）</span>
-                  <input type="file" className="hidden" onChange={handleFileChange} />
-                </label>
-              </div>
-            </SectionCard>
-
             <SectionCard title="備註" icon={MessageSquare}>
               <Textarea value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="輸入備註說明..." />
             </SectionCard>
@@ -392,8 +375,6 @@ function RentalFormFields({ disabled, isEdit, initial, onSubmit }: RentalFormFie
           </Button>
         </div>
       )}
-
-      <MockFilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </form>
   );
 }
@@ -402,7 +383,7 @@ function buildInitial(record: WithholdingRecord | undefined) {
   if (!record) {
     return {
       landlordIdentity: 'individual' as const,
-      residency: 'domestic' as Residency,
+      voucherType: '0' as VoucherType,
       paymentDate: new Date(),
       incomeYear: availableYears()[0],
       incomeMonth: new Date().getMonth() + 1,
@@ -411,13 +392,12 @@ function buildInitial(record: WithholdingRecord | undefined) {
       landlords: [],
       burden: 'tenant' as Burden,
       primaryAmount: 0,
-      rentalFiles: [],
       remarks: '',
     };
   }
   return {
     landlordIdentity: record.earnerType === 'company' ? ('company' as const) : ('individual' as const),
-    residency: record.residency,
+    voucherType: record.voucherType,
     paymentDate: toDate(record.paymentYear, record.paymentMonth, record.paymentDay),
     incomeYear: record.incomeYear,
     incomeMonth: record.incomeMonth,
@@ -426,46 +406,57 @@ function buildInitial(record: WithholdingRecord | undefined) {
     landlords: record.landlords,
     burden: record.burden,
     primaryAmount: record.burden === 'landlord' ? record.grossIncome : record.netPayment,
-    rentalFiles: record.rentalFiles,
     remarks: record.remarks,
   };
 }
 
-export default function RentalForm({ recordId }: { recordId?: string }) {
+interface RentalFormProps {
+  recordId?: string;
+  record?: WithholdingRecord;
+  onReload: () => void;
+}
+
+export default function RentalForm({ recordId, record, onReload }: RentalFormProps) {
   const router = useRouter();
   const { isLocked } = useLock();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
-  void tick;
-
-  const record = recordId ? getWithholdingRecord(recordId) : undefined;
   const isEdit = Boolean(recordId);
 
   const [isEditing, setIsEditing] = useState(!isEdit);
   const [resetKey, setResetKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  if (recordId && !record) {
-    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">找不到此扣繳資料</div>;
-  }
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const initial = buildInitial(record);
 
-  const handleSubmit = (data: WithholdingInput) => {
-    if (record) {
-      updateWithholdingRecord(record.uuid, data);
-      setIsEditing(false);
-      refresh();
-    } else {
-      const created = addWithholdingRecord(data);
-      router.push(`/withholding/other/${created.uuid}`);
+  const handleSubmit = async (body: ReturnType<typeof buildCreateRentalBody>) => {
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      if (record) {
+        await updateRental({ ...body, withholdingSummaryUuid: record.uuid });
+        setIsEditing(false);
+        onReload();
+      } else {
+        const created = await createRental(body);
+        router.push(`/withholding/other/${created.summaryUuid}?ic=51`);
+      }
+    } catch (err) {
+      setSubmitError(getFriendlyErrorMessage(err, '儲存失敗'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!record) return;
-    deleteWithholdingRecord(record.uuid);
-    router.push('/withholding/other');
+    try {
+      await deleteRental(record.uuid);
+      router.push('/withholding/other');
+    } catch (err) {
+      setDeleteOpen(false);
+      setSubmitError(getFriendlyErrorMessage(err, '刪除失敗'));
+    }
   };
 
   const title = isEdit ? '租金扣繳詳細' : '新增租金扣繳資料';
@@ -499,12 +490,20 @@ export default function RentalForm({ recordId }: { recordId?: string }) {
         </div>
 
         <LockedBanner className="mb-5" />
+        {submitError && <p className="mb-4 text-sm text-semantic-error">{submitError}</p>}
 
-        <RentalFormFields key={`${record?.uuid ?? 'new'}-${resetKey}`} disabled={isEdit && !isEditing} isEdit={isEdit} initial={initial} onSubmit={handleSubmit} />
+        <RentalFormFields
+          key={`${record?.uuid ?? 'new'}-${resetKey}`}
+          disabled={(isEdit && !isEditing) || submitting}
+          isEdit={isEdit}
+          initial={initial}
+          onSubmit={handleSubmit}
+        />
 
         {record && !isEditing && (
           <div className="mt-5 flex flex-col gap-5">
-            <WithholdingPdfManager record={record} onChange={refresh} />
+            <RentalFileManager withholdingSummaryUuid={record.uuid} files={record.rentalFiles} />
+            <WithholdingPdfManager record={record} />
             <Button variant="danger" className="w-full" onClick={() => setDeleteOpen(true)} disabled={isLocked}>
               刪除此筆扣繳資料
             </Button>

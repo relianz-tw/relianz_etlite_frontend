@@ -2584,3 +2584,432 @@ export interface NhiBurdenPdfDto {
   year: number;
   month: number;
 }
+
+/**
+ * 各類扣繳（/ael/withholding/*，不含租金 51／薪資 50／公司負擔二代健保）DTO／請求／回應型別。
+ * ⚠️ 年制：filter 請求的 paymentYear／incomeYear 與 create/update 的 year 皆為民國年（api.md 範例確認），
+ *   api/withholding.ts 對外統一收西元、內部用 toRocYear() 換算；回應內的 summaryYear 民國／西元未標註，
+ *   待實測後補上判斷（暫視為與請求年制一致，即民國）。此為已知落差，待回報後端統一西元。
+ * ⚠️ 9 類（不含租金）回應形狀幾乎相同，共用同一介面 WithholdingOtherRecordDto，
+ *   差異欄位（practiceTypeCode／royaltyExpenseCode／otherIncomeTypeCode／giftAmount／nhiAmount）
+ *   依 CategoryCode 選用，呼叫端自行依類別判斷該讀哪個欄位，不為每類別各開一個介面。
+ */
+
+/** 各類扣繳類別代碼：51 租金、9A 執行業務、9B 稿費、53 權利金、5B 其他利息、91 中獎、93 退職、97 受贈、92 其他所得（不含 50 薪資） */
+export type WithholdingCategoryCode = '51' | '9A' | '9B' | '53' | '5B' | '91' | '93' | '97' | '92';
+
+/** 各類扣繳所得人身份代號：0 個人／1 事務所／2 公司行號 */
+export type WithholdingEarnerTypeCode = '0' | '1' | '2';
+
+/** 各類扣繳憑證類別代號：0 收據／1 租約全份／2 租金收據／3 事務所收據 */
+export type WithholdingVoucherTypeCode = '0' | '1' | '2' | '3';
+
+/** 各類扣繳碼表項目（GET /ael/withholding/code），type=1 執行業務業別／2 稿費必要費用別／3 其他所得給付項目 */
+export interface WithholdingCodeDto {
+  code: string;
+  categoryName: string;
+}
+
+/**
+ * 9 類（不含租金）filter 請求體共用形狀（POST /ael/withholding/{category}/filter）。
+ * rentAmountMin／Max 命名沿用後端既有拼字：租金列表篩 rentAmount，本組（9 類）實際篩 grossIncome／giftAmount。
+ */
+export interface WithholdingOtherFilterBody {
+  companyUuid: string;
+  /** 民國年 */
+  paymentYear?: number;
+  paymentMonth?: number;
+  /** 民國年 */
+  incomeYear?: number;
+  incomeMonth?: number;
+  /** 1 新增日期／2 所得日期／3 各類扣繳繳款日期／4 二代健保繳款日期／5 各類扣繳繳費狀態／6 二代健保繳費狀態；非法或未傳視為 1 */
+  sortType?: number;
+  isDesc?: boolean;
+  limitCount?: number;
+  page?: number;
+  name?: string;
+  withholdingId?: string;
+  rentAmountMin?: number;
+  rentAmountMax?: number;
+  withholdingAmountMin?: number;
+  withholdingAmountMax?: number;
+  paymentAmountMin?: number;
+  paymentAmountMax?: number;
+  isRemitWithholding?: boolean;
+  isRemitNhi?: boolean;
+  isNhiDeclare?: boolean;
+}
+
+/** 9 類（不含租金）單筆資料，列表篩選與 GET /ael/withholding/detail 共用 */
+export interface WithholdingOtherRecordDto {
+  uuid: string;
+  withholdingSummaryUuid: string;
+  withholdingId: string;
+  /** 二代健保申報查詢代碼 */
+  code?: string;
+  createTime: string;
+  updateTime: string;
+  earnerType: WithholdingEarnerTypeCode;
+  identityNo: string;
+  /** 事務所／公司統編；選填 */
+  taxIdNo?: string;
+  recipientName: string;
+  recipientAddress: string;
+  /** 給付總額；受贈（97）用 giftAmount 代替，此欄位不存在 */
+  grossIncome?: number;
+  /** 受贈金額；僅受贈（97）使用 */
+  giftAmount?: number;
+  netPayment: number;
+  withholdingAmount: number;
+  /** 二代健保金額；受贈（97）無此欄位 */
+  nhiAmount?: number;
+  voucherType: WithholdingVoucherTypeCode;
+  remarks: string;
+  /** 所得所屬年；年制同請求（暫視為民國，待實測確認） */
+  summaryYear: number;
+  summaryMonth: number;
+  /** 給付日，YYYY-MM-DD */
+  summaryPaymentDate: string;
+  withholdingRemitDate: string | null;
+  nhiRemitDate: string | null;
+  nhiDeclareDate: string | null;
+  isRemitWithholding: boolean;
+  isRemitNhi: boolean;
+  isNhiDeclare: boolean;
+  /** 二代健保申報狀態 0–4 */
+  status: number;
+  /** 執行業務業別代號；僅執行業務（9A）使用，對應 code type=1 */
+  practiceTypeCode?: number;
+  /** 稿費必要費用別代號 98／99；僅稿費（9B）使用，對應 code type=2 */
+  royaltyExpenseCode?: number;
+  /** 其他所得給付項目代號 82／8B／8Z；僅其他所得（92）使用，對應 code type=3 */
+  otherIncomeTypeCode?: string;
+  /** 是否來自 labour_service_form UNION；僅執行業務／稿費（9A／9B）列表項目可能帶 */
+  isLabourForm?: boolean;
+}
+
+/** 9 類（不含租金）filter 回應 data；金額加總欄位依類別存在（受贈無 nhiAmount／用 giftAmount 代替 grossIncome） */
+export interface WithholdingOtherFilterResult {
+  list: WithholdingOtherRecordDto[];
+  searchTotalGrossIncome?: number;
+  searchTotalGiftAmount?: number;
+  searchTotalWithholdingAmount: number;
+  searchTotalNhiAmount?: number;
+  searchTotalPaymentAmount: number;
+  yearlyTotalGrossIncome?: number;
+  yearlyTotalGiftAmount?: number;
+  yearlyTotalWithholdingAmount: number;
+  yearlyTotalNhiAmount?: number;
+  yearlyTotalPaymentAmount: number;
+  /** 年度筆數；⚠️ filter 回應未提供「本次搜尋」筆數，僅有此年度筆數，故列表分頁改用「是否還有下一頁」簡化判斷，不假裝算得出總頁數 */
+  yearlyTotalCount: number;
+}
+
+/**
+ * 9 類（不含租金）新增／更新共用請求體（POST／PATCH /ael/withholding/{category}）。
+ * PATCH 另需帶 withholdingSummaryUuid（見 WithholdingOtherUpdateBody）。
+ */
+export interface WithholdingOtherSaveBody {
+  companyUuid: string;
+  earnerType: WithholdingEarnerTypeCode;
+  identityNo?: string;
+  taxIdNo?: string;
+  recipientName: string;
+  recipientAddress: string;
+  grossIncome?: number;
+  giftAmount?: number;
+  netPayment: number;
+  withholdingAmount: number;
+  nhiAmount?: number;
+  voucherType: WithholdingVoucherTypeCode;
+  remarks?: string;
+  /** 所得所屬年；民國 */
+  year: number;
+  month: number;
+  /** 給付日 YYYY-MM-DD */
+  paymentDate: string;
+  isNhiDeclare?: boolean;
+  isRemitNhi?: boolean;
+  isRemitWithholding?: boolean;
+  nhiDeclareDate?: string | null;
+  nhiRemitDate?: string | null;
+  withholdingRemitDate?: string | null;
+  practiceTypeCode?: number;
+  royaltyExpenseCode?: number;
+  otherIncomeTypeCode?: string;
+}
+
+export type WithholdingOtherUpdateBody = WithholdingOtherSaveBody & { withholdingSummaryUuid: string };
+
+/** POST /ael/withholding/{category} 新增成功回應 data */
+export interface WithholdingOtherCreateResult {
+  detailUuid: string;
+  summaryUuid: string;
+}
+
+/** 租金房東（POST／PATCH /ael/withholding/rental 請求內；landlordUuid 僅回應／既有房東才有） */
+export interface RentalLandlordDto {
+  landlordUuid?: string;
+  landlordName: string;
+  landlordIdNo: string;
+  landlordAddress: string;
+}
+
+/** 租金附件（POST /ael/withholding/rental/files 上傳、隨租金 filter／detail／latest 回應內的 files） */
+export interface RentalFileDto {
+  uuid: string;
+  fileUrl: string;
+  originalFilename: string;
+  fileExt: string;
+  pdfPassword: string;
+  /** 是否主檔；租金附件固定 false */
+  isPrimary: boolean;
+  withholdingSummaryUuid: string;
+  createTime: string;
+  updateTime: string;
+}
+
+/**
+ * 租金單筆資料，filter／detail／latest 共用。
+ * ⚠️ code／status／nhiDeclareDate 僅 filter／detail 會帶，GET /rental/latest 回應不含這三欄，故標為選填。
+ */
+export interface RentalRecordDto {
+  withholdingSummaryUuid: string;
+  rentalUuid: string;
+  withholdingId?: string;
+  code?: string;
+  createTime: string;
+  updateTime: string;
+  earnerType: WithholdingEarnerTypeCode;
+  landlords: RentalLandlordDto[];
+  rentalAddress: string;
+  propertyTaxNo: string;
+  voucherType: WithholdingVoucherTypeCode;
+  isTaxInclusive: boolean;
+  isTenantAbsorbTax: boolean;
+  isTenantAbsorbNhi: boolean;
+  isMonthlyPayment: boolean;
+  monthRentAmount: number;
+  rentAmount: number;
+  paymentAmount: number;
+  withholdingAmount: number;
+  nhiAmount: number;
+  remarks: string;
+  summaryYear: number;
+  summaryMonth: number;
+  summaryPaymentDate: string;
+  paymentStartDate: string;
+  paymentEndDate: string;
+  withholdingRemitDate: string | null;
+  nhiRemitDate: string | null;
+  nhiDeclareDate?: string | null;
+  isRemitWithholding: boolean;
+  isRemitNhi: boolean;
+  isNhiDeclare: boolean;
+  isLatestRecord: boolean;
+  status?: number;
+  files: RentalFileDto[];
+}
+
+/** POST /ael/withholding/rental/filter 請求體 */
+export interface RentalFilterBody {
+  companyUuid: string;
+  paymentYear?: number;
+  paymentMonth?: number;
+  incomeYear?: number;
+  incomeMonth?: number;
+  sortType?: number;
+  isDesc?: boolean;
+  limitCount?: number;
+  page?: number;
+  name?: string;
+  withholdingId?: string;
+  rentAmountMin?: number;
+  rentAmountMax?: number;
+  withholdingAmountMin?: number;
+  withholdingAmountMax?: number;
+  paymentAmountMin?: number;
+  paymentAmountMax?: number;
+  isRemitWithholding?: boolean;
+  isRemitNhi?: boolean;
+  isNhiDeclare?: boolean;
+}
+
+/** POST /ael/withholding/rental/filter 回應 data */
+export interface RentalFilterResult {
+  list: RentalRecordDto[];
+  searchTotalRentAmount: number;
+  searchTotalWithholdingAmount: number;
+  searchTotalNhiAmount: number;
+  searchTotalPaymentAmount: number;
+  yearlyTotalRentAmount: number;
+  yearlyTotalWithholdingAmount: number;
+  yearlyTotalNhiAmount: number;
+  yearlyTotalPaymentAmount: number;
+  yearlyTotalCount: number;
+}
+
+/** POST／PATCH /ael/withholding/rental 請求體；PATCH 另需 withholdingSummaryUuid（見 UpdateRentalBody） */
+export interface CreateRentalBody {
+  companyUuid: string;
+  earnerType: WithholdingEarnerTypeCode;
+  isMonthlyPayment: boolean;
+  isNhiDeclare: boolean;
+  isRemitNhi: boolean;
+  isRemitWithholding: boolean;
+  isTaxInclusive: boolean;
+  isTenantAbsorbNhi: boolean;
+  isTenantAbsorbTax: boolean;
+  landlords: RentalLandlordDto[];
+  month: number;
+  monthRentAmount: number;
+  nhiAmount: number;
+  nhiDeclareDate: string | null;
+  nhiRemitDate: string | null;
+  paymentAmount: number;
+  paymentDate: string;
+  paymentEndDate: string;
+  paymentStartDate: string;
+  propertyTaxNo: string;
+  remarks: string;
+  rentAmount: number;
+  rentalAddress: string;
+  voucherType: WithholdingVoucherTypeCode;
+  withholdingAmount: number;
+  withholdingRemitDate: string | null;
+  /** 民國年 */
+  year: number;
+}
+
+export type UpdateRentalBody = CreateRentalBody & { withholdingSummaryUuid: string };
+
+/** POST /ael/withholding/rental 新增成功回應 data */
+export interface CreateRentalResult {
+  detailUuid: string;
+  summaryUuid: string;
+}
+
+/**
+ * 扣繳／二代健保繳款書或繳款證明記錄（GET /ael/withholding/withholding/pdf、.../healthInsurance/pdf 回應項目）。
+ * code／status 僅二代健保繳款書查詢、且有申報紀錄才附加。
+ */
+export interface WithholdingPdfDto {
+  uuid: string;
+  companyUuid: string;
+  withholdingSummaryUuid: string;
+  incomeCode: string;
+  /** 0 各類扣繳 PDF／1 二代健保 PDF */
+  type: number;
+  /** false=繳款書；true=繳款證明 */
+  isPaymentProofDoc: boolean;
+  year: number;
+  month: number;
+  day: number;
+  pdfFileUrl: string;
+  createTime: string;
+  updateTime: string;
+  code?: string;
+  status?: number;
+}
+
+/** POST /ael/withholding/download/{withholding,healthInsurance}/pdf 請求體（產生繳款書） */
+export interface GenerateWithholdingPdfBody {
+  companyUuid: string;
+  /** 50／9A／9B／51／53／91／92／93／97／5B */
+  incomeCode: string;
+  withholdingSummaryUuid: string;
+  /** 寫入 PDF 表 year；民國，同 GenerateWithholdingPdfBody.paymentYear 語意待實測確認 */
+  year: number;
+  month: number;
+  paymentYear: number;
+  paymentMonth: number;
+  paymentDay: number;
+  /** 給付所得總額，必填且不可 0 */
+  totalAmount: number;
+  isOverDeadline: boolean;
+}
+
+/** POST /ael/withholding/download/{withholding,healthInsurance}/pdf 回應 data */
+export interface GenerateWithholdingPdfResult {
+  companyUuid: string;
+  incomeCode: string;
+  isPaymentProofDoc: boolean;
+  month: number;
+  pdfFileUrl: string;
+  withholdingSummaryUuid: string;
+  year: number;
+}
+
+/** POST /ael/withholding/upload/{withholding,healthInsurance}/proof/pdf multipart 請求欄位（不含 companyUuid，由 api 層自動帶入） */
+export interface UploadWithholdingProofParams {
+  incomeCode: string;
+  withholdingSummaryUuid: string;
+  year: number;
+  month: number;
+  day?: number;
+  isLabourForm: boolean;
+  file: File;
+}
+
+/** POST /ael/withholding/{withholding,healthInsurance}/update/status 請求體 */
+export interface UpdateWithholdingStatusBody {
+  uuid: string;
+  incomeCode: string;
+  isLabourForm: boolean;
+  status: boolean;
+}
+
+/** POST /ael/withholding/{withholding,healthInsurance}/update/status 回應 data */
+export interface UpdateWithholdingStatusResult {
+  uuid: string;
+  incomeCode: string;
+  isLabourForm: boolean;
+  status: boolean;
+  updatedTable: string;
+}
+
+/** POST /ael/withholding/healthInsurance/declare 請求體（申報二代健保） */
+export interface DeclareNhiBody {
+  companyUuid: string;
+  /** 僅 50／51／9A／9B／5B */
+  incomeCode: string;
+  isLabourForm: boolean;
+  isPartTime: boolean;
+  nhiAmount: number;
+  paymentDay: number;
+  paymentMonth: number;
+  /** 民國 */
+  paymentYear: number;
+  withholdingSummaryUuid: string;
+}
+
+/** POST /ael/withholding/healthInsurance/declare 回應 data */
+export interface DeclareNhiResult {
+  code: string;
+  companyName: string;
+  csvUrl: string;
+  incomeCode: string;
+  month: number;
+  taxIdNumber: string;
+  times: number;
+  uuid: string;
+  withholdingSummaryUuid: string;
+  year: number;
+}
+
+/** GET /ael/withholding/healthInsurance/declare/checkstatus 回應 data */
+export interface CheckNhiDeclareStatusResult {
+  code: string;
+  incomeCode: string;
+  /** 更新後狀態 0–4 */
+  status: number;
+  uuid: string;
+  withholdingSummaryUuid: string;
+}
+
+/** POST /ael/withholding/healthInsurance/declare/update/status 請求體（更新申報旗標） */
+export interface UpdateNhiDeclareFlagBody {
+  incomeCode: string;
+  status: boolean;
+  uuid: string;
+}

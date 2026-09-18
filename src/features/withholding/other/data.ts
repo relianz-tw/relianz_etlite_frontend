@@ -1,4 +1,4 @@
-import type { CategoryCode, EarnerType, NhiDeclareStatus } from './types';
+import type { CategoryCode, EarnerType, NhiDeclareStatus, VoucherType } from './types';
 
 /** 各類扣繳類別完整清單，供篩選下拉與表格顯示標籤使用 */
 export const CATEGORY_OPTIONS: { code: CategoryCode; label: string }[] = [
@@ -29,25 +29,13 @@ export function categoryLabel(code: CategoryCode): string {
   return CATEGORY_OPTIONS.find(o => o.code === code)?.label ?? code;
 }
 
-/**
- * 業別代號選單，無後端「執行業務/稿費業別代號」查詢 API 時，
- * 各挑選幾個常見業別作為示範選項，待後端就緒後改為串接真實清單。
- */
-export const PRACTICE_TYPE_OPTIONS: Record<'9A' | '9B', { code: string; name: string }[]> = {
-  '9A': [
-    { code: '9A01', name: '律師' },
-    { code: '9A02', name: '會計師' },
-    { code: '9A03', name: '建築師' },
-    { code: '9A04', name: '醫師' },
-    { code: '9A99', name: '其他自由職業' },
-  ],
-  '9B': [
-    { code: '9B01', name: '版稅' },
-    { code: '9B02', name: '稿費' },
-    { code: '9B03', name: '樂譜' },
-    { code: '9B04', name: '演講鐘點費' },
-  ],
-};
+/** 憑證類別選項（GET /ael/withholding/{category} 建立/更新皆須帶 voucherType） */
+export const VOUCHER_TYPE_OPTIONS: { code: VoucherType; label: string }[] = [
+  { code: '0', label: '收據' },
+  { code: '1', label: '租約全份' },
+  { code: '2', label: '租金收據' },
+  { code: '3', label: '事務所收據' },
+];
 
 /**
  * 扣繳稅額／二代健保費簡化試算公式（無後端試算 API，比照原專案 form.config.ts 的費率常數）：

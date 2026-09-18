@@ -1,24 +1,69 @@
 'use client';
 
+import { getWithholdingDetail } from '@/api/withholding';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import GeneralForm from './components/GeneralForm';
 import RentalForm from './components/RentalForm';
-import { getWithholdingRecord } from './mockStore';
+import { mapWithholdingDetailToRecord } from './mapper';
+import type { CategoryCode, WithholdingRecord } from './types';
 
 interface WithholdingFormViewProps {
-  /** 提供時為編輯模式，內部依此 uuid 從 mockStore 讀取扣繳資料（不由外層 Server Component 傳入完整物件，
-   *  因假資料僅存於瀏覽器端記憶體，伺服器端永遠只會讀到初始種子資料） */
+  /** 提供時為編輯模式；此時網址須帶 ?ic=<類別代碼>（由列表點擊或新增流程帶入），
+   *  用於決定該打哪一支明細查詢／更新 API，見下方 categoryCode */
   recordId?: string;
 }
 
-/** 依類別代碼派發到租金專屬表單或其餘 8 類共用的通用表單；新增模式由網址 ?ic= 決定類別，編輯模式由紀錄本身決定 */
+/**
+ * 依 ?ic= 類別代碼派發到租金專屬表單或其餘 8 類共用的通用表單；
+ * 編輯模式在此統一以 GET /ael/withholding/detail 取得單筆資料後再往下傳，
+ * 不比照原專案（relianz_cashflow_frontend）撈整批列表再前端 find。
+ */
 export default function WithholdingFormView({ recordId }: WithholdingFormViewProps) {
   const searchParams = useSearchParams();
-  const record = recordId ? getWithholdingRecord(recordId) : undefined;
-  const categoryCode = record?.categoryCode ?? searchParams.get('ic');
+  const categoryCode = (searchParams.get('ic') as CategoryCode | null) ?? '9A';
+
+  const [record, setRecord] = useState<WithholdingRecord | undefined>(undefined);
+  const [loading, setLoading] = useState(Boolean(recordId));
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!recordId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    getWithholdingDetail(recordId, categoryCode)
+      .then(dto => {
+        if (!cancelled) setRecord(mapWithholdingDetailToRecord(categoryCode, dto));
+      })
+      .catch(err => {
+        if (!cancelled) setError(getFriendlyErrorMessage(err, '找不到此扣繳資料'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId, categoryCode, reloadKey]);
+
+  if (recordId && loading) {
+    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">載入中...</div>;
+  }
+  if (recordId && (error || !record)) {
+    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">{error || '找不到此扣繳資料'}</div>;
+  }
+
+  const onReload = () => setReloadKey(k => k + 1);
 
   if (categoryCode === '51') {
-    return <RentalForm recordId={recordId} />;
+    return <RentalForm recordId={recordId} record={record} onReload={onReload} />;
   }
-  return <GeneralForm recordId={recordId} />;
+  return <GeneralForm recordId={recordId} categoryCode={categoryCode} record={record} onReload={onReload} />;
 }

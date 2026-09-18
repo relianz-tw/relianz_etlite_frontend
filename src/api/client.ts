@@ -22,7 +22,7 @@ interface ApiEnvelope<T> {
 }
 
 /** 組出 query string，自動略過 undefined／空字串參數 */
-export function buildQuery(params: Record<string, string | number | undefined>): string {
+export function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === '') return;

@@ -1,12 +1,37 @@
-import type { SortDir } from '@/lib/utils';
 import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { availableYears, CATEGORY_OPTIONS } from './data';
 import type { CategoryCode } from './types';
 
-export type WithholdingSortKey = 'paymentDate' | 'grossIncome';
+/**
+ * 排序鍵對照後端 filter 的 sortType（1–6，非法或未傳視為 1）：
+ * 1 新增日期、2 所得日期、3 各類扣繳繳款日期、4 二代健保繳款日期、5 各類扣繳繳費狀態、6 二代健保繳費狀態。
+ * ⚠️ 後端未提供依「支付日期」或「所得金額」排序，故不再沿用舊版假資料時期的 paymentDate／grossIncome 排序鍵。
+ */
+export type WithholdingSortKey = 'createTime' | 'incomeDate' | 'withholdingRemitDate' | 'nhiRemitDate' | 'withholdingPaidStatus' | 'nhiPaidStatus';
+
+export const SORT_KEY_TO_TYPE: Record<WithholdingSortKey, number> = {
+  createTime: 1,
+  incomeDate: 2,
+  withholdingRemitDate: 3,
+  nhiRemitDate: 4,
+  withholdingPaidStatus: 5,
+  nhiPaidStatus: 6,
+};
+
+/** 排序鍵中文標籤，供列表頁排序下拉選單使用 */
+export const SORT_KEY_LABELS: Record<WithholdingSortKey, string> = {
+  createTime: '新增日期',
+  incomeDate: '所得日期',
+  withholdingRemitDate: '各類扣繳繳款日期',
+  nhiRemitDate: '二代健保繳款日期',
+  withholdingPaidStatus: '各類扣繳繳費狀態',
+  nhiPaidStatus: '二代健保繳費狀態',
+};
+
+export type SortDir = 'asc' | 'desc';
 
 export interface WithholdingSortState {
-  key: WithholdingSortKey | null;
+  key: WithholdingSortKey;
   dir: SortDir;
 }
 
@@ -34,12 +59,12 @@ const DEFAULT_MONTH = 0;
 const DEFAULT_CATEGORY = 'all';
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
-export const DEFAULT_SORT: WithholdingSortState = { key: null, dir: 'none' };
+export const DEFAULT_SORT: WithholdingSortState = { key: 'createTime', dir: 'desc' };
 export const EMPTY_ADVANCED: WithholdingAdvancedFilter = { minAmount: '', maxAmount: '', withholdingPaid: '', nhiPaid: '' };
 
 const VALID_CATEGORIES = new Set(CATEGORY_OPTIONS.map(o => o.code));
 const VALID_LIMITS = new Set([10, 25, 50]);
-const SORT_KEYS: WithholdingSortKey[] = ['paymentDate', 'grossIncome'];
+const SORT_KEYS: WithholdingSortKey[] = Object.keys(SORT_KEY_TO_TYPE) as WithholdingSortKey[];
 
 /**
  * 從網址查詢字串解析各類扣繳列表目前的篩選/排序/分頁狀態。任何欄位值不在合法範圍內
@@ -74,8 +99,9 @@ export function parseWithholdingFilters(searchParams: ReadonlyURLSearchParams): 
   };
 
   const sortKeyParam = searchParams.get('sortKey');
-  const sortKey = sortKeyParam && (SORT_KEYS as string[]).includes(sortKeyParam) ? (sortKeyParam as WithholdingSortKey) : null;
-  const sort: WithholdingSortState = sortKey ? { key: sortKey, dir: searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc' } : DEFAULT_SORT;
+  const sortKey = sortKeyParam && (SORT_KEYS as string[]).includes(sortKeyParam) ? (sortKeyParam as WithholdingSortKey) : DEFAULT_SORT.key;
+  const sortDirParam = searchParams.get('sortDir');
+  const sort: WithholdingSortState = { key: sortKey, dir: sortDirParam === 'asc' ? 'asc' : sortDirParam === 'desc' ? 'desc' : DEFAULT_SORT.dir };
 
   return { year, month, category, query, advanced, sort, page, limit };
 }
@@ -91,10 +117,8 @@ export function buildWithholdingQueryString(state: WithholdingFilterState): stri
   if (state.advanced.maxAmount) params.set('maxAmount', state.advanced.maxAmount);
   if (state.advanced.withholdingPaid) params.set('withholdingPaid', state.advanced.withholdingPaid);
   if (state.advanced.nhiPaid) params.set('nhiPaid', state.advanced.nhiPaid);
-  if (state.sort.key) {
-    params.set('sortKey', state.sort.key);
-    params.set('sortDir', state.sort.dir === 'desc' ? 'desc' : 'asc');
-  }
+  if (state.sort.key !== DEFAULT_SORT.key) params.set('sortKey', state.sort.key);
+  if (state.sort.dir !== DEFAULT_SORT.dir) params.set('sortDir', state.sort.dir);
   if (state.limit !== DEFAULT_LIMIT) params.set('limit', String(state.limit));
   if (state.page !== DEFAULT_PAGE) params.set('page', String(state.page));
   return params.toString();

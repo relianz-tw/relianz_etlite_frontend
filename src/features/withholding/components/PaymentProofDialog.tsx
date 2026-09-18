@@ -11,20 +11,21 @@ interface PaymentProofDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  onConfirm: (paymentDate: Date, fileName: string) => void;
+  /** paymentDate 目前僅供畫面顯示參考，實際繳款日由 record 的給付日帶入（後端上傳證明 API 未收此欄位） */
+  onConfirm: (paymentDate: Date, file: File) => void;
 }
 
-/** 上傳繳款證明彈窗：選繳款日期＋選檔案，僅記錄檔名，不做真實上傳（無後端儲存） */
+/** 上傳繳款證明彈窗：選繳款日期＋選檔案，送出真實檔案給呼叫端上傳 */
 export default function PaymentProofDialog({ open, onClose, title, onConfirm }: PaymentProofDialogProps) {
   const [date, setDate] = useState<Date | undefined>(undefined);
-  const [fileName, setFileName] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
 
   if (!open) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setFileName(file.name);
+    const picked = e.target.files?.[0];
+    if (picked) setFile(picked);
   };
 
   const handleSubmit = () => {
@@ -32,15 +33,14 @@ export default function PaymentProofDialog({ open, onClose, title, onConfirm }: 
       setError('請選擇繳款日期');
       return;
     }
-    if (!fileName) {
+    if (!file) {
       setError('請上傳繳款證明');
       return;
     }
-    onConfirm(date, fileName);
+    onConfirm(date, file);
     setDate(undefined);
-    setFileName('');
+    setFile(null);
     setError('');
-    onClose();
   };
 
   return (
@@ -54,7 +54,7 @@ export default function PaymentProofDialog({ open, onClose, title, onConfirm }: 
           <Label required>上傳繳款證明</Label>
           <label className="flex h-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-neutral-blue-gray/50 bg-white text-center hover:border-brand-blue">
             <Upload size={20} className="text-neutral-mid" />
-            <span className="text-xs text-neutral-mid">{fileName || '點擊上傳檔案（PDF、JPG、PNG）'}</span>
+            <span className="text-xs text-neutral-mid">{file?.name || '點擊上傳檔案（PDF、JPG、PNG）'}</span>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFileChange} />
           </label>
         </div>

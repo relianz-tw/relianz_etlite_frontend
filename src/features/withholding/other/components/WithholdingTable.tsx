@@ -2,55 +2,28 @@
 
 import Badge from '@/components/ui/Badge';
 import { fmtCurrency } from '@/lib/utils';
-import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { categoryLabel, nhiDeclareStatusText } from '../data';
-import type { WithholdingSortKey, WithholdingSortState } from '../urlState';
+import type { WithholdingAmountTotals } from '../useWithholdingList';
 import type { WithholdingRecord } from '../types';
 
 const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-neutral-mid';
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
+const COLS = 11;
 
 function rocDate(year: number, month: number, day: number): string {
   return `${year - 1911}/${month}/${day}`;
 }
 
-/** 可排序表頭：三態循環 none → asc → desc → none（比照營業稅中心表格） */
-function SortHeader({
-  label,
-  sortKey,
-  sort,
-  onToggle,
-}: {
-  label: string;
-  sortKey: WithholdingSortKey;
-  sort: WithholdingSortState;
-  onToggle: (key: WithholdingSortKey) => void;
-}) {
-  const active = sort.key === sortKey;
-  const Icon = active ? (sort.dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(sortKey)}
-      className={`inline-flex items-center gap-1 hover:text-brand-blue ${active ? 'text-brand-blue' : 'text-neutral-mid'}`}
-    >
-      {label}
-      <Icon size={12} className={active ? 'text-brand-blue' : 'text-neutral-blue-gray'} />
-    </button>
-  );
-}
-
 interface WithholdingTableProps {
   rows: WithholdingRecord[];
-  totalCount: number;
-  pageTotals: { grossIncome: number; withholdingAmount: number; nhiAmount: number; netPayment: number };
-  allTotals: { grossIncome: number; withholdingAmount: number; nhiAmount: number; netPayment: number };
-  sort: WithholdingSortState;
-  onSortToggle: (key: WithholdingSortKey) => void;
+  loading: boolean;
+  yearlyTotalCount: number;
+  searchTotals: WithholdingAmountTotals;
+  yearlyTotals: WithholdingAmountTotals;
 }
 
-export default function WithholdingTable({ rows, totalCount, pageTotals, allTotals, sort, onSortToggle }: WithholdingTableProps) {
+export default function WithholdingTable({ rows, loading, yearlyTotalCount, searchTotals, yearlyTotals }: WithholdingTableProps) {
   const router = useRouter();
 
   return (
@@ -62,23 +35,25 @@ export default function WithholdingTable({ rows, totalCount, pageTotals, allTota
             <th className={thClass}>類別</th>
             <th className={thClass}>所得人</th>
             <th className={thClass}>所得所屬</th>
-            <th className={thClass}>
-              <SortHeader label="支付日期" sortKey="paymentDate" sort={sort} onToggle={onSortToggle} />
-            </th>
-            <th className={`${thClass} text-right`}>
-              <SortHeader label="所得金額" sortKey="grossIncome" sort={sort} onToggle={onSortToggle} />
-            </th>
+            <th className={thClass}>支付日期</th>
+            <th className={`${thClass} text-right`}>所得金額</th>
             <th className={`${thClass} text-right`}>扣繳稅額</th>
             <th className={`${thClass} text-right`}>二代健保</th>
             <th className={`${thClass} text-right`}>支付金額</th>
             <th className={thClass}>繳款狀態</th>
-            <th className={thClass}>員工負擔二代健保狀態</th>
+            <th className={thClass}>二代健保狀態</th>
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
+          {loading ? (
             <tr>
-              <td colSpan={11} className="px-4 py-10 text-center text-sm text-neutral-mid">
+              <td colSpan={COLS} className="px-4 py-10 text-center text-sm text-neutral-mid">
+                載入中...
+              </td>
+            </tr>
+          ) : rows.length === 0 ? (
+            <tr>
+              <td colSpan={COLS} className="px-4 py-10 text-center text-sm text-neutral-mid">
                 此期間沒有更多的資料了
               </td>
             </tr>
@@ -86,7 +61,7 @@ export default function WithholdingTable({ rows, totalCount, pageTotals, allTota
             rows.map((row, i) => (
               <tr
                 key={row.uuid}
-                onClick={() => router.push(`/withholding/other/${row.uuid}`)}
+                onClick={() => router.push(`/withholding/other/${row.uuid}?ic=${row.categoryCode}`)}
                 className={`cursor-pointer border-b border-neutral-blue-gray/20 last:border-0 hover:bg-brand-blue/5 ${
                   i % 2 === 1 ? 'bg-surface-warm/30' : ''
                 }`}
@@ -120,22 +95,22 @@ export default function WithholdingTable({ rows, totalCount, pageTotals, allTota
         </tbody>
         <tfoot>
           <tr className="border-t border-neutral-blue-gray/40 bg-surface-off-white">
-            <td className={`${tdClass} text-neutral-mid`} colSpan={5}>本頁加總</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(pageTotals.grossIncome)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(pageTotals.withholdingAmount)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(pageTotals.nhiAmount)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(pageTotals.netPayment)}</td>
+            <td className={`${tdClass} text-neutral-mid`} colSpan={5}>本次搜尋加總</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(searchTotals.incomeAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(searchTotals.withholdingAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(searchTotals.nhiAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(searchTotals.netPayment)}</td>
             <td className={tdClass} />
             <td className={tdClass} />
           </tr>
           <tr className="border-t border-neutral-blue-gray/20 bg-surface-off-white">
             <td className={`${tdClass} text-neutral-mid`} colSpan={5}>
-              全部加總 <span className="font-semibold text-neutral-dark">{totalCount}</span> 筆
+              年度加總 <span className="font-semibold text-neutral-dark">{yearlyTotalCount}</span> 筆
             </td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(allTotals.grossIncome)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(allTotals.withholdingAmount)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(allTotals.nhiAmount)}</td>
-            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(allTotals.netPayment)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(yearlyTotals.incomeAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(yearlyTotals.withholdingAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(yearlyTotals.nhiAmount)}</td>
+            <td className={`${tdClass} text-right font-mono font-semibold tabular-nums`}>{fmtCurrency(yearlyTotals.netPayment)}</td>
             <td className={tdClass} />
             <td className={tdClass} />
           </tr>

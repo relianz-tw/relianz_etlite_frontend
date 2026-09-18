@@ -1,5 +1,7 @@
 'use client';
 
+import { createWithholdingOther, deleteWithholdingOther, updateWithholdingOther } from '@/api/withholding';
+import type { OtherWithholdingCategoryCode } from '@/api/withholding';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePicker from '@/components/ui/DatePicker';
@@ -9,18 +11,19 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
 import { Backpack, Briefcase, ChevronLeft, MessageSquare, Pencil, User, X } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Field from '../../components/Field';
 import LockedBanner from '../../components/LockedBanner';
 import { useLock } from '../../components/LockContext';
-import { availableYears, calculateNetPayment, calculateNhiAmount, calculateWithholdingAmount, categoryLabel, PRACTICE_TYPE_OPTIONS, showsNhi } from '../data';
-import { addWithholdingRecord, deleteWithholdingRecord, getWithholdingRecord, updateWithholdingRecord } from '../mockStore';
-import type { WithholdingInput } from '../mockStore';
-import type { CategoryCode, EarnerType } from '../types';
+import { availableYears, calculateNetPayment, calculateNhiAmount, calculateWithholdingAmount, categoryLabel, showsNhi, VOUCHER_TYPE_OPTIONS } from '../data';
+import { buildWithholdingOtherSaveBody } from '../mapper';
+import type { CategoryCode, EarnerType, VoucherType, WithholdingRecord } from '../types';
+import { useWithholdingCodes } from '../useWithholdingCodes';
 import WithholdingPdfManager from './WithholdingPdfManager';
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -32,11 +35,16 @@ function toDate(year: number, month: number, day: number): Date {
 
 interface GeneralFormFieldsProps {
   categoryCode: CategoryCode;
+  /** 新增模式才允許切換 9A/9B；編輯模式類別固定（各類別各自獨立表，PATCH 無法跨表移動資料） */
+  allowCategoryToggle: boolean;
   disabled: boolean;
   isEdit: boolean;
   initial: {
     earnerType: EarnerType;
+    voucherType: VoucherType;
     practiceTypeCode: string;
+    royaltyExpenseCode: string;
+    otherIncomeTypeCode: string;
     paymentDate: Date;
     incomeYear: number;
     incomeMonth: number;
@@ -48,14 +56,17 @@ interface GeneralFormFieldsProps {
     nhiAmount: number;
     remarks: string;
   };
-  onSubmit: (data: WithholdingInput) => void;
+  onSubmit: (categoryCode: CategoryCode, body: ReturnType<typeof buildWithholdingOtherSaveBody>) => void;
 }
 
 /** 通用扣繳表單欄位；new 模式與 disabled 切換為 false 的編輯模式共用，key 由外層依 record/resetKey 控制重新掛載以還原初始值 */
-function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit, initial, onSubmit }: GeneralFormFieldsProps) {
+function GeneralFormFields({ categoryCode: initialCategoryCode, allowCategoryToggle, disabled, isEdit, initial, onSubmit }: GeneralFormFieldsProps) {
   const [categoryCode, setCategoryCode] = useState<CategoryCode>(initialCategoryCode);
   const [earnerType, setEarnerType] = useState<EarnerType>(initial.earnerType);
+  const [voucherType, setVoucherType] = useState<VoucherType>(initial.voucherType);
   const [practiceTypeCode, setPracticeTypeCode] = useState(initial.practiceTypeCode);
+  const [royaltyExpenseCode, setRoyaltyExpenseCode] = useState(initial.royaltyExpenseCode);
+  const [otherIncomeTypeCode, setOtherIncomeTypeCode] = useState(initial.otherIncomeTypeCode);
   const [paymentDate, setPaymentDate] = useState<Date | undefined>(initial.paymentDate);
   const [incomeYear, setIncomeYear] = useState(initial.incomeYear);
   const [incomeMonth, setIncomeMonth] = useState(initial.incomeMonth);
@@ -68,6 +79,10 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
   const [manualNhi, setManualNhi] = useState<number | null>(isEdit ? initial.nhiAmount : null);
   const [remarks, setRemarks] = useState(initial.remarks);
   const [error, setError] = useState('');
+
+  const { codes: practiceCodes } = useWithholdingCodes(1);
+  const { codes: royaltyCodes } = useWithholdingCodes(2);
+  const { codes: otherIncomeCodes } = useWithholdingCodes(3);
 
   const isProfessional = PROFESSIONAL_CODES.includes(categoryCode);
   const earnerOptions: { value: EarnerType; label: string }[] = isProfessional
@@ -100,6 +115,7 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
   const handleCategoryToggle = (next: CategoryCode) => {
     setCategoryCode(next);
     setPracticeTypeCode('');
+    setRoyaltyExpenseCode('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -108,35 +124,39 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
       setError('請填寫所有必填欄位');
       return;
     }
-    if (isProfessional && !practiceTypeCode) {
+    if (isProfessional && categoryCode === '9A' && !practiceTypeCode) {
       setError('請選擇業別代號');
       return;
     }
-    onSubmit({
-      categoryCode,
+    if (isProfessional && categoryCode === '9B' && !royaltyExpenseCode) {
+      setError('請選擇必要費用別');
+      return;
+    }
+    if (categoryCode === '92' && !otherIncomeTypeCode) {
+      setError('請選擇給付項目代號');
+      return;
+    }
+
+    const body = buildWithholdingOtherSaveBody({
+      category: categoryCode as OtherWithholdingCategoryCode,
       earnerType,
-      residency: 'domestic',
-      incomeCategory: isProfessional ? (categoryCode as '9A' | '9B') : undefined,
-      practiceTypeCode: isProfessional ? practiceTypeCode : undefined,
+      voucherType,
       recipientName: recipientName.trim(),
       recipientIdNumber: recipientIdNumber.trim(),
       recipientAddress: recipientAddress.trim(),
-      landlords: [],
-      rentalAddress: '',
-      rentalAddressTaxId: '',
-      burden: 'tenant',
-      rentalFiles: [],
-      paymentYear: paymentDate.getFullYear(),
-      paymentMonth: paymentDate.getMonth() + 1,
-      paymentDay: paymentDate.getDate(),
-      incomeYear,
-      incomeMonth,
       grossIncome,
       withholdingAmount,
       nhiAmount,
       netPayment,
       remarks: remarks.trim(),
+      incomeYear,
+      incomeMonth,
+      paymentDate,
+      practiceTypeCode: categoryCode === '9A' ? practiceTypeCode : undefined,
+      royaltyExpenseCode: categoryCode === '9B' ? royaltyExpenseCode : undefined,
+      otherIncomeTypeCode: categoryCode === '92' ? otherIncomeTypeCode : undefined,
     });
+    onSubmit(categoryCode, body);
   };
 
   return (
@@ -150,7 +170,15 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
             <Field label="給付日期" required>
               <DatePicker value={paymentDate} onChange={handlePaymentDateChange} />
             </Field>
-            <div />
+            <Field label="憑證類別" required>
+              <Select widthClassName="w-full" value={voucherType} onValueChange={v => setVoucherType(v as VoucherType)}>
+                {VOUCHER_TYPE_OPTIONS.map(o => (
+                  <option key={o.code} value={o.code}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label="所得所屬年份" required>
               <Select
                 widthClassName="w-full"
@@ -209,19 +237,48 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
                       ]}
                       value={categoryCode}
                       onChange={handleCategoryToggle}
+                      disabled={!allowCategoryToggle}
                     />
                   </Field>
-                  <Field label="業別代號" required>
-                    <Select widthClassName="w-full" value={practiceTypeCode} onValueChange={setPracticeTypeCode}>
-                      <option value="">請選擇業別代號</option>
-                      {PRACTICE_TYPE_OPTIONS[categoryCode as '9A' | '9B'].map(o => (
-                        <option key={o.code} value={o.code}>
-                          {o.code} - {o.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
+                  {categoryCode === '9A' ? (
+                    <Field label="業別代號" required>
+                      <Select widthClassName="w-full" value={practiceTypeCode} onValueChange={setPracticeTypeCode}>
+                        <option value="">請選擇業別代號</option>
+                        {practiceCodes.map(o => (
+                          <option key={o.code} value={o.code}>
+                            {o.code} - {o.categoryName}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  ) : (
+                    <Field label="必要費用別" required>
+                      <Select widthClassName="w-full" value={royaltyExpenseCode} onValueChange={setRoyaltyExpenseCode}>
+                        <option value="">請選擇必要費用別</option>
+                        {royaltyCodes.map(o => (
+                          <option key={o.code} value={o.code}>
+                            {o.code} - {o.categoryName}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
                 </div>
+              </SectionCard>
+            )}
+
+            {categoryCode === '92' && (
+              <SectionCard title="給付項目" icon={Briefcase}>
+                <Field label="給付項目代號" required>
+                  <Select widthClassName="w-full" value={otherIncomeTypeCode} onValueChange={setOtherIncomeTypeCode}>
+                    <option value="">請選擇給付項目代號</option>
+                    {otherIncomeCodes.map(o => (
+                      <option key={o.code} value={o.code}>
+                        {o.code} - {o.categoryName}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               </SectionCard>
             )}
 
@@ -285,32 +342,33 @@ function GeneralFormFields({ categoryCode: initialCategoryCode, disabled, isEdit
   );
 }
 
-export default function GeneralForm({ recordId }: { recordId?: string }) {
+interface GeneralFormProps {
+  /** 提供時為編輯模式 */
+  recordId?: string;
+  categoryCode: CategoryCode;
+  /** 編輯模式下由 WithholdingFormView 讀取好傳入；新增模式為 undefined */
+  record?: WithholdingRecord;
+  onReload: () => void;
+}
+
+export default function GeneralForm({ recordId, categoryCode, record, onReload }: GeneralFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isLocked } = useLock();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
-  void tick;
-
-  const record = recordId ? getWithholdingRecord(recordId) : undefined;
   const isEdit = Boolean(recordId);
-
-  const icParam = searchParams.get('ic') as CategoryCode | null;
-  const initialCategory: CategoryCode = record?.categoryCode ?? (icParam && icParam !== '51' ? icParam : '9A');
 
   const [isEditing, setIsEditing] = useState(!isEdit);
   const [resetKey, setResetKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  if (recordId && !record) {
-    return <div className="flex min-h-screen items-center justify-center bg-surface-off-white text-sm text-neutral-mid">找不到此扣繳資料</div>;
-  }
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const initial = record
     ? {
         earnerType: record.earnerType,
+        voucherType: record.voucherType,
         practiceTypeCode: record.practiceTypeCode ?? '',
+        royaltyExpenseCode: record.royaltyExpenseCode ?? '',
+        otherIncomeTypeCode: record.otherIncomeTypeCode ?? '',
         paymentDate: toDate(record.paymentYear, record.paymentMonth, record.paymentDay),
         incomeYear: record.incomeYear,
         incomeMonth: record.incomeMonth,
@@ -324,7 +382,10 @@ export default function GeneralForm({ recordId }: { recordId?: string }) {
       }
     : {
         earnerType: 'individual' as EarnerType,
+        voucherType: '0' as VoucherType,
         practiceTypeCode: '',
+        royaltyExpenseCode: '',
+        otherIncomeTypeCode: '',
         paymentDate: new Date(),
         incomeYear: availableYears()[0],
         incomeMonth: new Date().getMonth() + 1,
@@ -337,24 +398,37 @@ export default function GeneralForm({ recordId }: { recordId?: string }) {
         remarks: '',
       };
 
-  const handleSubmit = (data: WithholdingInput) => {
-    if (record) {
-      updateWithholdingRecord(record.uuid, data);
-      setIsEditing(false);
-      refresh();
-    } else {
-      const created = addWithholdingRecord(data);
-      router.push(`/withholding/other/${created.uuid}`);
+  const handleSubmit = async (category: CategoryCode, body: ReturnType<typeof buildWithholdingOtherSaveBody>) => {
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      if (record) {
+        await updateWithholdingOther(category as OtherWithholdingCategoryCode, { ...body, withholdingSummaryUuid: record.uuid });
+        setIsEditing(false);
+        onReload();
+      } else {
+        const created = await createWithholdingOther(category as OtherWithholdingCategoryCode, body);
+        router.push(`/withholding/other/${created.summaryUuid}?ic=${category}`);
+      }
+    } catch (err) {
+      setSubmitError(getFriendlyErrorMessage(err, '儲存失敗'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!record) return;
-    deleteWithholdingRecord(record.uuid);
-    router.push('/withholding/other');
+    try {
+      await deleteWithholdingOther(categoryCode as OtherWithholdingCategoryCode, record.uuid);
+      router.push('/withholding/other');
+    } catch (err) {
+      setDeleteOpen(false);
+      setSubmitError(getFriendlyErrorMessage(err, '刪除失敗'));
+    }
   };
 
-  const title = isEdit ? `${categoryLabel(initialCategory)}扣繳詳細` : `新增${categoryLabel(initialCategory)}扣繳資料`;
+  const title = isEdit ? `${categoryLabel(categoryCode)}扣繳詳細` : `新增${categoryLabel(categoryCode)}扣繳資料`;
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -385,11 +459,13 @@ export default function GeneralForm({ recordId }: { recordId?: string }) {
         </div>
 
         <LockedBanner className="mb-5" />
+        {submitError && <p className="mb-4 text-sm text-semantic-error">{submitError}</p>}
 
         <GeneralFormFields
           key={`${record?.uuid ?? 'new'}-${resetKey}`}
-          categoryCode={initialCategory}
-          disabled={isEdit && !isEditing}
+          categoryCode={categoryCode}
+          allowCategoryToggle={!isEdit}
+          disabled={(isEdit && !isEditing) || submitting}
           isEdit={isEdit}
           initial={initial}
           onSubmit={handleSubmit}
@@ -397,7 +473,7 @@ export default function GeneralForm({ recordId }: { recordId?: string }) {
 
         {record && !isEditing && (
           <div className="mt-5 flex flex-col gap-5">
-            <WithholdingPdfManager record={record} onChange={refresh} />
+            <WithholdingPdfManager record={record} />
             <Button variant="danger" className="w-full" onClick={() => setDeleteOpen(true)} disabled={isLocked}>
               刪除此筆扣繳資料
             </Button>

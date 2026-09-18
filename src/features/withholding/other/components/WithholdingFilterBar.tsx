@@ -79,7 +79,7 @@ export default function WithholdingFilterBar({ query, onQueryChange, onSearch, a
         <div className="flex items-center gap-2.5">
           <div className="flex-1">
             <TextInput
-              placeholder="請輸入所得人姓名或扣繳編號"
+              placeholder="請輸入所得人姓名"
               value={query}
               onChange={e => onQueryChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onSearch()}
@@ -98,7 +98,7 @@ export default function WithholdingFilterBar({ query, onQueryChange, onSearch, a
       {/* 手機 */}
       <div className="flex flex-col gap-3 nav:hidden">
         <TextInput
-          placeholder="搜尋所得人姓名或扣繳編號"
+          placeholder="搜尋所得人姓名"
           value={query}
           onChange={e => onQueryChange(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onSearch()}
