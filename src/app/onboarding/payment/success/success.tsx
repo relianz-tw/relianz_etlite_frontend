@@ -273,13 +273,14 @@ export default function Success() {
         </div>
       </div>
 
-      {/* 底部按鈕（手機版 fixed，桌面版 static） */}
+      {/* 底部按鈕（手機版 fixed，桌面版 static）
+          登入機制上線前，先導向開帳精靈作為手動入口；日後改登入判斷 haveRegister 等旗標後再接手 */}
       <MobileFixedBottom className='px-4 md:flex md:justify-center'>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push(`/initialization${uuid ? `?uuid=${uuid}` : ''}`)}
           className='w-full md:max-w-lg py-3 rounded-lg bg-brand-blue text-white text-sm font-medium hover:bg-brand-blue-dark transition-colors'
         >
-          開始
+          前往開帳設定
         </button>
       </MobileFixedBottom>
     </div>

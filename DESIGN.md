@@ -541,6 +541,33 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 ```
 對應元件：`src/components/ui/StepNumber.tsx`。
 
+### Flow Stepper（流程步驟指示器）
+
+用途：跨頁面精靈式流程的整體進度提示（如開帳精靈 `/initialization`）。
+與 Step Number Badge 不同：Step Number Badge 標示「同一頁內」必須依序完成的操作區塊，
+Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、不可互相取代。
+
+```
+容器（桌機 ≥ md）：flex items-center justify-center，步驟間以連接線相連
+連接線：h-px flex-1
+  未達：bg #9AA7B9/40（neutral-blue-gray）
+  已完成（左側步驟已完成時）：bg #005FA2（brand-blue）
+
+圓點：h-8 w-8 rounded-full flex items-center justify-center，置中數字或勾勾圖示
+  已完成：bg #005FA2（brand-blue）、icon Check（lucide-react，size 16）白色、無邊框
+  當前：bg #FFFFFF、border 2px #005FA2（brand-blue）、文字 #005FA2、font-semibold
+  未達：bg #FFFFFF、border 1px #9AA7B9/50（neutral-blue-gray）、文字 #9AA7B9
+
+步驟文字：Noto Sans TC 13px，圓點下方 8px（gap-2）
+  已完成／當前：#3A3830（neutral-dark）
+  未達：#9AA7B9（neutral-blue-gray）
+```
+
+**行動版（< md）**：不顯示橫向步驟列，改用單行文字「第 2 / 4 步．公司資料」置於頁首，
+字級 13px、色 #797C80（neutral-mid），不佔額外版面高度。
+
+對應元件：`src/components/ui/Stepper.tsx`。
+
 ### Group Chip（沖帳管道／廠商選擇 chip）
 
 用途：沖帳中心「選擇銷售管道／廠商」步驟的桌機橫向 chips（見 Step Number Badge 區塊），第一項固定為
