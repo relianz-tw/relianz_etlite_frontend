@@ -7,6 +7,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
 import { cn, fmtCurrency } from '@/lib/utils';
+import { Lock } from 'lucide-react';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 import ReconTargetAllocation from './ReconTargetAllocation';
@@ -86,6 +87,9 @@ interface ReconPoolPanelProps {
 
   /** 放進 BottomSheet 時，Sheet 本身已有標題，面板內不需要再顯示一次標題列，省略時預設顯示 */
   hideHeader?: boolean;
+  /** 匯總沖帳已進入確認階段（已試算 preview 結果）：鎖定全部輸入避免看著已試算結果又改金額卻沒重算，
+   *  需改金額須先按「返回修改」清空 preview 結果 */
+  readOnly?: boolean;
 }
 
 /**
@@ -142,6 +146,7 @@ export default function ReconPoolPanel({
   onRemoveAllocationRow,
   onChangeAllocationRow,
   hideHeader = false,
+  readOnly = false,
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
@@ -158,21 +163,37 @@ export default function ReconPoolPanel({
   const showNegativeSelectionHint = isReversed && isSelectedAmountNegative;
 
   return (
-    <div className={cn('rounded-lg border-[1.5px] p-4', showReversedTint ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white')}>
+    <div
+      className={cn(
+        'rounded-lg border-[1.5px] p-4',
+        readOnly ? 'border-neutral-blue-gray/40 bg-surface-cream' : showReversedTint ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white',
+      )}
+    >
       {!hideHeader && (
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-[15px] font-semibold text-neutral-dark">
             {stepNumber !== undefined && <StepNumber value={stepNumber} />}
             {panelTitle}
           </span>
-          {mode === 'perTxn' && selectedCount > 0 && (
-            <span className="shrink-0 text-xs font-medium text-neutral-mid">
-              {selectedCount} 筆 · {fmtCurrency(Math.abs(selectedAmount))}
+          {readOnly ? (
+            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-neutral-mid">
+              <Lock size={12} />
+              金額已鎖定
             </span>
+          ) : (
+            mode === 'perTxn' &&
+            selectedCount > 0 && (
+              <span className="shrink-0 text-xs font-medium text-neutral-mid">
+                {selectedCount} 筆 · {fmtCurrency(Math.abs(selectedAmount))}
+              </span>
+            )
           )}
         </div>
       )}
 
+      {/* readOnly（匯總沖帳確認階段）鎖定全部輸入控制項，需改金額須先按「返回修改」退回輸入階段；
+          border-0 p-0 m-0 移除瀏覽器預設 fieldset 樣式，display: contents 讓子元素直接參與外層版面 */}
+      <fieldset disabled={readOnly} className="contents border-0 p-0 m-0">
       {mode === 'perTxn' && selectedCount === 0 && (
         <div className="mt-3 border-t border-neutral-blue-gray/20 pt-3">
           <div className="flex items-center justify-between gap-2 rounded-md bg-surface-cream p-3 text-sm">
@@ -305,6 +326,7 @@ export default function ReconPoolPanel({
           </div>
         </div>
       )}
+      </fieldset>
     </div>
   );
 }

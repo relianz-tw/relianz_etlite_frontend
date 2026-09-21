@@ -40,6 +40,9 @@ interface ReconTxnListProps {
   selectedUuids: Set<string>;
   /** perTxn 模式下切換單筆勾選狀態 */
   onToggleSelect: (uuid: string) => void;
+  /** 匯總沖帳確認階段：在清單右側補上「本次收款／付款」「沖後餘額」「狀態」欄；
+   *  未被分配到的列該三欄顯示「—」，讓使用者看出哪些有沖到、哪些沒有 */
+  showAllocationColumns?: boolean;
 }
 
 const HEADER_CLASS = 'text-xs font-semibold text-neutral-mid';
@@ -57,11 +60,12 @@ function channelLabel(row: ReconTxnRef, channelNameByUuid: Map<string, string>):
 }
 
 /** 桌機交易金額欄：$ 固定貼齊欄位左緣、數字貼齊欄位右緣，讓同一欄內每列的 $ 對齊在同一直排；
- *  負值（超沖／折讓）依會計慣例改用括號包住 $ 與數字，不出現負號 */
-function AmountCell({ amount }: { amount: number }) {
+ *  負值（超沖／折讓）依會計慣例改用括號包住 $ 與數字，不出現負號。width 預設 w-28，
+ *  showAllocationColumns 欄位較多時改窄一點的 w-24（見 CLAUDE 需求） */
+function AmountCell({ amount, width = 'w-28' }: { amount: number; width?: string }) {
   const negative = amount < 0;
   return (
-    <span className="flex w-28 shrink-0 items-baseline justify-end gap-0.5 font-mono tabular-nums text-neutral-dark">
+    <span className={cn('flex shrink-0 items-baseline justify-end gap-0.5 font-mono tabular-nums text-neutral-dark', width)}>
       {negative && <span className="text-neutral-mid">(</span>}
       <span className="text-neutral-mid">$</span>
       <span>{Math.abs(amount).toLocaleString('en-US')}</span>
@@ -148,6 +152,7 @@ function TxnRow({
   channelNameByUuid,
   expanded,
   onToggleExpand,
+  showAllocationColumns,
 }: {
   row: ReconTxnRef;
   side: ReconSide;
@@ -159,6 +164,7 @@ function TxnRow({
   channelNameByUuid: Map<string, string>;
   expanded: boolean;
   onToggleExpand: () => void;
+  showAllocationColumns: boolean;
 }) {
   // 已有預覽結果、該筆尚未結清（少沖／超沖仍有殘餘）時，於金額旁標示狀態徽章，讓使用者一眼看出差異落在哪一筆
   const statusBadge = allocation && !allocation.closed ? (SETTLEMENT_STATUS_BADGE[allocation.settlementStatus] ?? null) : null;
@@ -207,8 +213,15 @@ function TxnRow({
               {row.counterparty || '—'}
             </span>
             <span className="block truncate text-xs text-neutral-mid">
-              {row.date || '—'} · {channelLabel(row, channelNameByUuid)}
+              {/* 匯總沖帳確認階段不顯示銷售管道／廠商：該階段已鎖定單一管道／廠商，資訊重複 */}
+              {showAllocationColumns ? row.date || '—' : `${row.date || '—'} · ${channelLabel(row, channelNameByUuid)}`}
             </span>
+            {showAllocationColumns && (
+              <span className="block truncate text-xs text-neutral-mid">
+                {side === 'payable' ? '本次付款' : '本次收款'} {allocation ? fmtCurrency(allocation.settleAmount) : '—'} · 沖後{' '}
+                {allocation ? fmtCurrency(allocation.afterRemaining) : '—'}
+              </span>
+            )}
           </span>
           <span className="flex shrink-0 items-center gap-2">
             {badge && (
@@ -249,9 +262,11 @@ function TxnRow({
           <span className="w-10 shrink-0" />
         )}
         <button type="button" onClick={onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="w-28 shrink-0 font-mono text-neutral-mid">{row.date || '—'}</span>
-          <div className="flex w-48 min-w-0 shrink-0 flex-col">
-            <span className="flex min-w-0 items-center gap-1.5">
+          <span className={cn('shrink-0 font-mono text-neutral-mid', showAllocationColumns ? 'w-20' : 'w-28')}>{row.date || '—'}</span>
+          <div className={cn('flex min-w-0 shrink-0 flex-col', showAllocationColumns ? 'w-36' : 'w-48')}>
+            {/* showAllocationColumns 欄位縮窄後空間有限，折讓徽章改用 flex-wrap 換到下一行，
+                避免跟憑證號碼搶寬度被截斷（見 CLAUDE 需求：欄位再窄一點） */}
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
               <span className="truncate font-mono font-semibold text-neutral-dark" title={row.voucherNumber}>
                 {row.voucherNumber || '—'}
               </span>
@@ -265,14 +280,44 @@ function TxnRow({
               {row.counterparty || '—'}
             </span>
           </div>
-          <AmountCell amount={remainingAmount} />
-          <span className="ml-3 min-w-0 flex-1 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
-            {channelLabel(row, channelNameByUuid)}
-          </span>
-          {badge && (
-            <Badge tone={badge.tone} variant="muted">
-              {badge.label}
-            </Badge>
+          <AmountCell amount={remainingAmount} width={showAllocationColumns ? 'w-24' : 'w-28'} />
+          {/* 匯總沖帳確認階段（showAllocationColumns）不顯示銷售管道／廠商：該階段已鎖定單一管道／廠商，欄位資訊重複；
+              保留同寬度的空白 spacer 撐開版面，讓後面的本次收款／沖後餘額／狀態欄位維持靠右對齊 */}
+          {showAllocationColumns ? (
+            <span className="ml-3 min-w-0 flex-1" />
+          ) : (
+            <span className="ml-3 min-w-0 flex-1 truncate text-neutral-mid" title={channelLabel(row, channelNameByUuid)}>
+              {channelLabel(row, channelNameByUuid)}
+            </span>
+          )}
+          {showAllocationColumns ? (
+            <>
+              {allocation ? (
+                <AmountCell amount={allocation.settleAmount} width="w-24" />
+              ) : (
+                <span className="w-24 shrink-0 text-right font-mono tabular-nums text-neutral-mid">—</span>
+              )}
+              {allocation ? (
+                <AmountCell amount={allocation.afterRemaining} width="w-24" />
+              ) : (
+                <span className="w-24 shrink-0 text-right font-mono tabular-nums text-neutral-mid">—</span>
+              )}
+              <span className="w-16 shrink-0">
+                {badge ? (
+                  <Badge tone={badge.tone} variant="muted">
+                    {badge.label}
+                  </Badge>
+                ) : (
+                  <span className="text-neutral-mid">—</span>
+                )}
+              </span>
+            </>
+          ) : (
+            badge && (
+              <Badge tone={badge.tone} variant="muted">
+                {badge.label}
+              </Badge>
+            )
           )}
           <ChevronDown size={16} className={chevronClass} />
         </button>
@@ -356,6 +401,7 @@ export default function ReconTxnList({
   allocationByUuid,
   selectedUuids,
   onToggleSelect,
+  showAllocationColumns = false,
 }: ReconTxnListProps) {
   const totalRows = sections.reduce((sum, s) => sum + s.rows.length, 0);
 
@@ -367,10 +413,24 @@ export default function ReconTxnList({
     <div className="flex flex-col gap-2 min-[1300px]:gap-1">
       <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 min-[1300px]:flex">
         <span className={cn(HEADER_CLASS, 'w-10 shrink-0 text-center')}>{showStatusColumn && mode === 'perTxn' ? '選取' : ''}</span>
-        <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>開立日期</span>
-        <span className={cn(HEADER_CLASS, 'w-48 shrink-0')}>{side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}</span>
-        <span className={cn(HEADER_CLASS, 'w-28 shrink-0 text-right')}>{side === 'payable' ? '待付金額' : '待收金額'}</span>
-        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
+        <span className={cn(HEADER_CLASS, showAllocationColumns ? 'w-20 shrink-0' : 'w-28 shrink-0')}>開立日期</span>
+        <span className={cn(HEADER_CLASS, showAllocationColumns ? 'w-36 shrink-0' : 'w-48 shrink-0')}>
+          {side === 'payable' ? '憑證號碼／賣方' : '憑證號碼／買受人'}
+        </span>
+        <span className={cn(HEADER_CLASS, showAllocationColumns ? 'w-24 shrink-0 text-right' : 'w-28 shrink-0 text-right')}>
+          {side === 'payable' ? '待付金額' : '待收金額'}
+        </span>
+        {/* 匯總沖帳確認階段（showAllocationColumns）不顯示銷售管道／廠商欄：該階段已鎖定單一管道／廠商，資訊重複 */}
+        {showAllocationColumns ? (
+          <>
+            <span className="ml-3 min-w-0 flex-1" />
+            <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>{side === 'payable' ? '本次付款' : '本次收款'}</span>
+            <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>沖後餘額</span>
+            <span className={cn(HEADER_CLASS, 'w-16 shrink-0')}>狀態</span>
+          </>
+        ) : (
+          <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{side === 'payable' ? '廠商' : '銷售管道'}</span>
+        )}
         <span className="w-4 shrink-0" />
       </div>
 
@@ -391,6 +451,7 @@ export default function ReconTxnList({
               allocation={allocationByUuid.get(row.uuid)}
               selected={selectedUuids.has(row.uuid)}
               onToggleSelect={() => onToggleSelect(row.uuid)}
+              showAllocationColumns={showAllocationColumns}
               channelNameByUuid={channelNameByUuid}
               expanded={expandedUuid === row.uuid}
               onToggleExpand={() => onToggleExpand(row.uuid)}
