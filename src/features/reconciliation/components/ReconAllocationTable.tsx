@@ -11,7 +11,7 @@ interface ReconAllocationTableProps {
   side: ReconSide;
   /** ledgerUuid → 買受人／賣方與憑證號碼（見 ReconAllocationInfo 說明），沖帳 API 回應本身不含這兩個欄位 */
   allocationInfoByUuid: Map<string, ReconAllocationInfo>;
-  /** 反向沖帳（見 settle.ts 的 isReversedSettleResult）：true 時「本次付款」取絕對值顯示，
+  /** 反向沖帳（見 settle.ts 的 isReversedSettleResult）：true 時「本次付款／收款」取絕對值顯示，
    * 「應收金額」「付款餘額」屬餘額性質維持會計括號表示法不變 */
   reversed?: boolean;
 }
@@ -20,12 +20,13 @@ const thClass = 'whitespace-nowrap px-4 py-3 text-left text-xs font-semibold tex
 const tdClass = 'whitespace-nowrap px-4 py-3.5 text-sm text-neutral-dark';
 
 /**
- * 各原單拆帳明細表：交易編號／憑證號碼／買受人(賣方)／交易日／應收金額／本次付款／付款餘額／狀態。
+ * 各原單拆帳明細表：交易編號／憑證號碼／買受人(賣方)／交易日／應收金額／本次付款(收款)／付款餘額／狀態。
  * 手機用卡片、桌機用表格，供確認沖帳彈窗（ReconConfirmSummaryModal）與結果彈窗（ReconSettleResultModal）共用。
  */
 export default function ReconAllocationTable({ allocations, side, allocationInfoByUuid, reversed = false }: ReconAllocationTableProps) {
   const counterpartyLabel = side === 'payable' ? '賣方' : '買受人';
-  // 反向沖帳時「本次付款」是本次實際移動的金額，方向已由外層彈窗翻面表達，不再帶負號
+  const settleAmountLabel = side === 'payable' ? '本次付款' : '本次收款';
+  // 反向沖帳時「本次付款／收款」是本次實際移動的金額，方向已由外層彈窗翻面表達，不再帶負號
   const fmtSettleAmount = (n: number) => fmtCurrency(reversed ? Math.abs(n) : n);
 
   return (
@@ -58,7 +59,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
                   <span className="font-mono tabular-nums text-neutral-dark">{fmtCurrency(a.beforeRemaining)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-neutral-mid">本次付款</span>
+                  <span className="text-neutral-mid">{settleAmountLabel}</span>
                   <span className="font-mono font-semibold tabular-nums text-neutral-dark">{fmtSettleAmount(a.settleAmount)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
@@ -81,7 +82,7 @@ export default function ReconAllocationTable({ allocations, side, allocationInfo
               <th className={thClass}>{counterpartyLabel}</th>
               <th className={thClass}>交易日</th>
               <th className={`${thClass} text-right`}>應收金額</th>
-              <th className={`${thClass} text-right`}>本次付款</th>
+              <th className={`${thClass} text-right`}>{settleAmountLabel}</th>
               <th className={`${thClass} text-right`}>付款餘額</th>
               <th className={thClass}>狀態</th>
             </tr>
