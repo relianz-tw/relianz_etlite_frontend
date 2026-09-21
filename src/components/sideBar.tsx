@@ -9,6 +9,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  FlaskConical,
   Plus,
   SquarePlus,
   X,
@@ -244,6 +245,17 @@ const Sidebar = ({
             );
           })}
         </ul>
+
+        {/* 臨時入口：開帳精靈流程開發驗收用，正式串接完成、可從既有流程（如付款完成頁）進入後移除 */}
+        <div className="shrink-0 border-t border-dashed border-brand-tan/40 p-3">
+          <Link
+            href="/initialization"
+            className="flex items-center gap-1.5 rounded-md border border-dashed border-brand-tan/50 px-3 py-2 text-sm text-brand-tan-dark transition-colors hover:bg-brand-tan/10"
+          >
+            <FlaskConical size={16} />
+            導入
+          </Link>
+        </div>
 
         {/* 頁尾：目前公司名稱（有 demo uuid 時可切換）+ 登出 */}
         <div className="shrink-0 border-t border-surface-cream p-3">
