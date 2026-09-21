@@ -4,6 +4,7 @@
  * 慣例（見 src/api/onboarding/*.ts）寫好函式簽名與型別，待後端開通後直接可用，元件端無需改動。
  */
 import { apiFetch } from './client';
+import type { SettlementReportId } from '@/features/initialization/state/initializationReducer';
 
 export interface InitializationCompanyRequest {
   userUuid: string;
@@ -32,94 +33,121 @@ export function saveInitializationCompany(data: InitializationCompanyRequest): P
   });
 }
 
-export type DocumentRecognitionCategory =
-  | 'incomeTaxReport'
-  | 'businessTax401'
-  | 'invoiceExcel'
-  | 'bankStatement'
-  | 'companyRegistration';
-
-export interface DocumentRecognitionRequest {
+export interface SettlementRecognitionRequest {
   userUuid: string;
-  category: DocumentRecognitionCategory;
-  file: File;
+  files: File[];
 }
 
-/** 文件辨識出的公司基本資料文字欄位；僅 category='companyRegistration'（公司登記資料）會回傳 */
+/** 文件辨識出的公司基本資料文字欄位，用於回填步驟 3 封面頁的核心欄位（其餘補充欄位見 reports.cover） */
 export interface RecognizedCompanyInfo {
+  taxId?: string;
   companyName?: string;
   representative?: string;
   address?: string;
-  /** 設立登記日期 YYYY-MM-DD，用於回填步驟 2 的開業日期 */
+  /** 設立登記日期 YYYY-MM-DD */
   openDate?: string;
 }
 
-/** 單一分類欄位辨識結果：key 為期初表欄位名稱（如 cash、bankDeposits），value 為辨識出的金額 */
-export interface DocumentRecognitionResult {
-  fields: Record<string, number>;
-  /** 僅公司登記資料會回傳，用於回填步驟 2 的公司基本資料表單 */
+export interface RecognizedReportData {
+  /** 一般報表欄位（雙欄型報表），key 對應 reports/*.ts 各 ReportFieldDef.key */
+  fields?: Record<string, string | number>;
+  /** 表格型報表（投資人明細、財產目錄）新增的列，key 對應該報表 ReportTableDef.columns 的 key */
+  rows?: Record<string, string | number>[];
+}
+
+export interface SettlementRecognitionResult {
   company?: RecognizedCompanyInfo;
-  /** 辨識信心度 0-1，供 UI 提示使用者仍需人工核對 */
-  confidence: number;
+  /** 6 份報表（含封面）辨識結果，未辨識到的報表可不回傳，畫面上維持留空 */
+  reports: Partial<Record<SettlementReportId, RecognizedReportData>>;
+  /** 每個上傳檔案對應到哪份報表，供畫面標示辨識結果來源 */
+  files: { fileName: string; matchedReport: SettlementReportId | null }[];
 }
 
 // ==================== 暫時性本地假辨識（TEMP MOCK） ====================
-// TODO(mock): /ael/initialization/document/recognize 後端上線後整段移除，
-// 僅供後端就緒前在瀏覽器展示「上傳文件 → 自動帶入期初/公司資料」的流程效果，非真實辨識結果
-const MOCK_RECOGNITION: Record<DocumentRecognitionCategory, DocumentRecognitionResult> = {
-  incomeTaxReport: {
-    confidence: 0.92,
-    fields: {
-      cash: 85000,
-      bankDeposits: 620000,
-      accountsReceivable: 150000,
-      inventory: 210000,
-      fixedAssets: 480000,
-      businessTaxCredit: 12000,
-      accountsPayable: 95000,
-      shortTermLoans: 300000,
-      registeredCapital: 1000000,
-      retainedEarnings: -42000,
-    },
-  },
-  businessTax401: {
-    confidence: 0.88,
-    fields: { businessTaxCredit: 15600 },
-  },
-  invoiceExcel: {
-    // 進銷項明細本身不含資產負債餘額，故不帶回任何期初欄位
-    confidence: 0.8,
-    fields: {},
-  },
-  bankStatement: {
-    confidence: 0.95,
-    fields: { bankDeposits: 634200 },
-  },
-  companyRegistration: {
-    confidence: 0.9,
-    fields: { registeredCapital: 1000000 },
+// TODO(mock): /ael/initialization/settlement/recognize 後端上線後整段移除，
+// 僅供後端就緒前在瀏覽器展示「上傳結算申報書 → 自動帶入封面與各份報表」的流程效果，非真實辨識結果。
+// 以下數字經過設計使資產負債表左右欄合計相等，方便展示借貸平衡檢查列的效果；
+// 扣繳調節表與財產目錄未提供資料，示範「文件未涵蓋的報表維持留空」情境。
+function mockRecognizeSettlement(files: File[]): Promise<SettlementRecognitionResult> {
+  const result: SettlementRecognitionResult = {
     company: {
-      companyName: '友信創新股份有限公司',
+      companyName: '盤古投資有限公司',
       representative: '王小明',
-      address: '台北市大安區敦化南路二段100號8樓',
-      openDate: '2021-03-15',
+      address: '台北市內湖區我的道路1段88號',
+      openDate: '2023-01-31',
+      taxId: '82999614',
     },
-  },
-};
-
-function mockRecognize(category: DocumentRecognitionCategory): Promise<DocumentRecognitionResult> {
+    reports: {
+      cover: {
+        fields: {
+          taxRegistrationNo: '123456789',
+          industryStandardCode: '7020-99',
+          filingDate: '2023-01-31',
+          repIdNumber: 'A123456789',
+          repEmail: 'happygolucky168@gmail.com',
+          repPhone: '02-2356-1788',
+          declaredRevenueTotal: 741794,
+          businessTaxSalesTotal: 711000,
+          revenueDiff: 30794,
+          addOthers: 30794,
+        },
+      },
+      incomeStatement: {
+        fields: {
+          netRevenue: 741794,
+          costOfGoodsSold: 420000,
+          grossProfit: 321794,
+          operatingExpenses: 180000,
+          operatingIncome: 141794,
+          nonOperatingIncome: 5000,
+          nonOperatingLoss: 2000,
+          totalIncome: 144794,
+          taxableIncome: 144794,
+          taxPayable: 14479,
+          withholdingTaxCredit: 3000,
+          provisionalTaxPaid: 5000,
+          taxDueOrRefund: 6479,
+        },
+      },
+      balanceSheet: {
+        fields: {
+          currentAssetsSubtotal: 741794,
+          cash: 46623,
+          bankDeposits: 489942,
+          accountsReceivable: 150000,
+          businessTaxCredit: 12000,
+          fixedAssetsSubtotal: 480000,
+          fixedAssetsCost: 600000,
+          accumulatedDepreciation: -120000,
+          otherAssets: 0,
+          totalAssets: 1221794,
+          currentLiabilitiesSubtotal: 395000,
+          accountsPayable: 95000,
+          shortTermLoans: 300000,
+          longTermLiabilities: 0,
+          ownerEquitySubtotal: 826794,
+          registeredCapital: 1000000,
+          retainedEarnings: -173206,
+          totalLiabilitiesAndEquity: 1221794,
+        },
+      },
+      shareholders: {
+        rows: [{ investorName: '王小明', idOrTaxId: 'A123456789', investmentAmount: 1000000, sharePercentage: '100%', dividendAmount: 0, withholdingTax: 0 }],
+      },
+    },
+    files: files.map(file => ({ fileName: file.name, matchedReport: null })),
+  };
   // 模擬辨識耗時，讓「辨識中」狀態在畫面上可被觀察到
-  return new Promise(resolve => setTimeout(() => resolve(MOCK_RECOGNITION[category]), 1200));
+  return new Promise(resolve => setTimeout(() => resolve(result), 1500));
 }
 
-/** 上傳單份文件並辨識期初欄位（申報書/報表/對帳單/登記資料，依 category 走不同辨識邏輯） */
-export async function recognizeInitializationDocument(data: DocumentRecognitionRequest): Promise<DocumentRecognitionResult> {
+/** 上傳結算申報書（可多份）並辨識封面與各份報表欄位 */
+export async function recognizeSettlementReports(data: SettlementRecognitionRequest): Promise<SettlementRecognitionResult> {
   const formData = new FormData();
   formData.append('userUuid', data.userUuid);
-  formData.append('category', data.category);
-  formData.append('file', data.file);
+  data.files.forEach(file => formData.append('files', file));
   try {
-    return await apiFetch<DocumentRecognitionResult>('/ael/initialization/document/recognize', {
+    return await apiFetch<SettlementRecognitionResult>('/ael/initialization/settlement/recognize', {
       method: 'POST',
       body: formData,
       // AI 辨識耗時可能較長，逾時放寬到 120 秒（比照 onboarding invoiceRecognition）
@@ -127,8 +155,8 @@ export async function recognizeInitializationDocument(data: DocumentRecognitionR
     });
   } catch (err) {
     // TODO(mock): 後端端點上線後移除這段 fallback，直接讓錯誤往上拋
-    console.warn(`[initialization] /document/recognize 尚未就緒，改用本地假辨識資料（category=${data.category}）`, err);
-    return mockRecognize(data.category);
+    console.warn('[initialization] /settlement/recognize 尚未就緒，改用本地假辨識資料', err);
+    return mockRecognizeSettlement(data.files);
   }
 }
 
@@ -140,7 +168,7 @@ export interface OpeningBalanceRequest {
   equity: Record<string, number>;
 }
 
-/** 儲存期初餘額 */
+/** 儲存期初餘額（由步驟 4 資產負債表欄位轉出，見 reports/balanceSheetMapping.ts） */
 export function saveOpeningBalance(data: OpeningBalanceRequest): Promise<unknown> {
   return apiFetch('/ael/initialization/openbook', {
     method: 'POST',

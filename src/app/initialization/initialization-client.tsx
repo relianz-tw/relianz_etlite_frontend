@@ -15,30 +15,30 @@ function StepLoading() {
   );
 }
 
-const Step2Company = dynamic(
-  () => import('@/features/initialization/components/steps/Step2Company').then(m => ({ default: m.Step2Company })),
+const Step2Operating = dynamic(
+  () => import('@/features/initialization/components/steps/Step2Operating').then(m => ({ default: m.Step2Operating })),
   { loading: StepLoading }
 );
-const Step3AUpload = dynamic(
-  () => import('@/features/initialization/components/steps/Step3AUpload').then(m => ({ default: m.Step3AUpload })),
+const Step3Cover = dynamic(
+  () => import('@/features/initialization/components/steps/Step3Cover').then(m => ({ default: m.Step3Cover })),
   { loading: StepLoading }
 );
-const Step3BBalance = dynamic(
-  () => import('@/features/initialization/components/steps/Step3BBalance').then(m => ({ default: m.Step3BBalance })),
+const Step4Reports = dynamic(
+  () => import('@/features/initialization/components/steps/Step4Reports').then(m => ({ default: m.Step4Reports })),
   { loading: StepLoading }
 );
-const Step4Confirm = dynamic(
-  () => import('@/features/initialization/components/steps/Step4Confirm').then(m => ({ default: m.Step4Confirm })),
+const Step5Confirm = dynamic(
+  () => import('@/features/initialization/components/steps/Step5Confirm').then(m => ({ default: m.Step5Confirm })),
   { loading: StepLoading }
 );
-const Step5Done = dynamic(
-  () => import('@/features/initialization/components/steps/Step5Done').then(m => ({ default: m.Step5Done })),
+const Step6Done = dynamic(
+  () => import('@/features/initialization/components/steps/Step6Done').then(m => ({ default: m.Step6Done })),
   { loading: StepLoading }
 );
 
 export function InitializationClient() {
   const { state, dispatch } = useInitialization();
-  const { currentStep, currentSubStep } = state;
+  const { currentStep, currentReportIndex } = state;
   const searchParams = useSearchParams();
   const uuid = searchParams.get('uuid');
 
@@ -53,14 +53,14 @@ export function InitializationClient() {
   useEffect(() => {
     const card = document.querySelector('main > div');
     if (card) card.scrollTop = 0;
-  }, [currentStep, currentSubStep]);
+  }, [currentStep, currentReportIndex]);
 
   if (currentStep === 1) return <Step1Terms />;
-  if (currentStep === 2) return <Step2Company />;
-  if (currentStep === 3 && currentSubStep === 'A') return <Step3AUpload />;
-  if (currentStep === 3 && currentSubStep === 'B') return <Step3BBalance />;
-  if (currentStep === 4) return <Step4Confirm />;
-  if (currentStep === 5) return <Step5Done />;
+  if (currentStep === 2) return <Step2Operating />;
+  if (currentStep === 3) return <Step3Cover />;
+  if (currentStep === 4) return <Step4Reports />;
+  if (currentStep === 5) return <Step5Confirm />;
+  if (currentStep === 6) return <Step6Done />;
 
   return <Step1Terms />;
 }

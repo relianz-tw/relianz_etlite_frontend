@@ -10,7 +10,7 @@ import { ChevronLeft } from 'lucide-react';
 export function MobileBackBar() {
   const { state, dispatch } = useInitialization();
 
-  if (state.currentStep <= 1 || state.currentStep >= 5) return null;
+  if (state.currentStep <= 1 || state.currentStep >= 6) return null;
 
   return (
     <div className='md:hidden bg-white px-4 pt-[15px] pb-2'>

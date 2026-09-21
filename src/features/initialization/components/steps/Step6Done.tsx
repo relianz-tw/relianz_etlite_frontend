@@ -8,9 +8,10 @@ import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-export function Step5Done() {
+export function Step6Done() {
   const { state, dispatch, clearSession } = useInitialization();
   const router = useRouter();
+  const isUnderOneYear = state.operatingStatus === 'under_one_year';
 
   useEffect(() => {
     if (state.completed) return;
@@ -30,19 +31,15 @@ export function Step5Done() {
   return (
     <div className='flex flex-col items-center flex-1 min-h-0 p-5 md:p-12 md:overflow-y-auto text-center'>
       <div className='flex flex-1 flex-col items-center justify-center gap-4 max-w-md'>
-        {state.openingBalanceSkipped ? (
+        {isUnderOneYear ? (
           <>
             <TriangleAlert size={40} className='text-brand-tan' />
             <h1 className='text-xl md:text-2xl font-bold text-neutral-dark font-notoSerif'>已可開始使用</h1>
             <p className='text-sm text-neutral-mid'>
-              您尚未設定期初資料，帳務起點暫以 0 計算。建議儘快補上申報書或報表，讓報表數字更準確。
+              您尚未有結算申報書可供核對，帳務起點暫以 0 計算。日後結算申報完成，建議儘快補上申報書讓報表數字更準確。
             </p>
-            <Button
-              variant='outline'
-              onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 3, subStep: 'A' } })}
-              className='w-full'
-            >
-              前往設定期初資料
+            <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })} className='w-full'>
+              前往上傳結算申報書
             </Button>
           </>
         ) : (

@@ -1,17 +1,20 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { calcBalanceTotals, flattenBalanceGroup } from '../../utils/openingBalance';
+import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
-import type { BalanceField } from '../../state/initializationReducer';
 import { MobileFixedBottom } from '@/components/onboarding/MobileFixedBottom';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
 import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
 
-export function Step4Confirm() {
+export function Step5Confirm() {
   const { state, dispatch } = useInitialization();
-  const totals = calcBalanceTotals(state.openingBalance);
+  const balanceSheetFields = state.reports.balanceSheet.fields;
+  const totalAssets = Number(balanceSheetFields.totalAssets?.value) || 0;
+  const totalLiabilitiesAndEquity = Number(balanceSheetFields.totalLiabilitiesAndEquity?.value) || 0;
+  const isBalanced = totalAssets === totalLiabilitiesAndEquity;
+  const hasReports = state.operatingStatus === 'over_one_year';
 
   const handleConfirm = () => {
     // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
@@ -26,13 +29,13 @@ export function Step4Confirm() {
       isOperating: state.company.isOperating,
       openDate: state.company.openDate,
     }).catch(() => {});
-    saveOpeningBalance({
-      userUuid: state.userUuid,
-      baseDate: state.openingBalance.baseDate,
-      assets: flattenBalanceGroup(state.openingBalance.assets as unknown as Record<string, BalanceField>),
-      liabilities: flattenBalanceGroup(state.openingBalance.liabilities as unknown as Record<string, BalanceField>),
-      equity: flattenBalanceGroup(state.openingBalance.equity as unknown as Record<string, BalanceField>),
-    }).catch(() => {});
+    if (hasReports) {
+      saveOpeningBalance({
+        userUuid: state.userUuid,
+        baseDate: state.openingBalance.baseDate,
+        ...toOpeningBalancePayload(balanceSheetFields),
+      }).catch(() => {});
+    }
     dispatch({ type: 'NEXT_STEP' });
   };
 
@@ -61,19 +64,21 @@ export function Step4Confirm() {
           </dl>
         </SectionCard>
 
-        <SectionCard title='期初試算表摘要'>
-          <dl className='grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm'>
-            <dt className='text-neutral-mid'>資產合計</dt>
-            <dd className='text-neutral-dark'>{fmtCurrency(totals.assetsTotal)}</dd>
-            <dt className='text-neutral-mid'>負債合計</dt>
-            <dd className='text-neutral-dark'>{fmtCurrency(totals.liabilitiesTotal)}</dd>
-            <dt className='text-neutral-mid'>權益合計</dt>
-            <dd className='text-neutral-dark'>{fmtCurrency(totals.equityTotal)}</dd>
-          </dl>
-          {!totals.isBalanced && (
-            <p className='mt-2 text-xs text-semantic-error'>借貸尚未平衡（差額 {fmtCurrency(totals.diff)}），建議返回上一步調整。</p>
-          )}
-        </SectionCard>
+        {hasReports && (
+          <SectionCard title='期初試算表摘要'>
+            <dl className='grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm'>
+              <dt className='text-neutral-mid'>資產總計</dt>
+              <dd className='text-neutral-dark'>{fmtCurrency(totalAssets)}</dd>
+              <dt className='text-neutral-mid'>負債及業主權益總計</dt>
+              <dd className='text-neutral-dark'>{fmtCurrency(totalLiabilitiesAndEquity)}</dd>
+            </dl>
+            {!isBalanced && (
+              <p className='mt-2 text-xs text-semantic-error'>
+                借貸尚未平衡（差額 {fmtCurrency(totalAssets - totalLiabilitiesAndEquity)}），建議返回上一步調整。
+              </p>
+            )}
+          </SectionCard>
+        )}
       </div>
 
       <MobileFixedBottom>

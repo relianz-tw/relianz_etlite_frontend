@@ -6,7 +6,6 @@ import {
   initializationReducer,
   type InitializationAction,
   type InitializationState,
-  type SubStepType,
 } from './initializationReducer';
 import React, {
   createContext,
@@ -24,7 +23,7 @@ const SESSION_KEY = 'etlite_initialization_state';
 
 interface HistoryStepState {
   step: number;
-  subStep: SubStepType;
+  reportIndex: number;
 }
 
 interface InitializationContextValue {
@@ -69,15 +68,15 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!mounted || historyInitialized.current) return;
     historyInitialized.current = true;
-    history.replaceState({ step: state.currentStep, subStep: state.currentSubStep } satisfies HistoryStepState, '');
-  }, [mounted, state.currentStep, state.currentSubStep]);
+    history.replaceState({ step: state.currentStep, reportIndex: state.currentReportIndex } satisfies HistoryStepState, '');
+  }, [mounted, state.currentStep, state.currentReportIndex]);
 
   // 監聽瀏覽器上一頁：用 GO_TO_STEP 跳回 history 記錄的步驟
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       const s = event.state as HistoryStepState | null;
       if (s && typeof s.step === 'number') {
-        rawDispatch({ type: 'GO_TO_STEP', payload: { step: s.step, subStep: s.subStep ?? null } });
+        rawDispatch({ type: 'GO_TO_STEP', payload: { step: s.step, reportIndex: s.reportIndex ?? 0 } });
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -92,12 +91,8 @@ export function InitializationProvider({ children }: { children: React.ReactNode
 
     if (action.type === 'NEXT_STEP') {
       nextStep = getNextStep(stateRef.current);
-    } else if (action.type === 'SKIP_OPENING_BALANCE') {
-      nextStep = { step: 5, subStep: null };
-    } else if (action.type === 'START_MANUAL_BALANCE') {
-      nextStep = { step: 3, subStep: 'B' };
     } else if (action.type === 'GO_TO_STEP') {
-      nextStep = { step: action.payload.step, subStep: action.payload.subStep ?? null };
+      nextStep = { step: action.payload.step, reportIndex: action.payload.reportIndex ?? 0 };
     }
 
     if (nextStep) {
