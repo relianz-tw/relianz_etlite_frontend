@@ -21,12 +21,16 @@ import type {
   UpdateRentalBody,
   WithholdingCategoryCode,
   WithholdingCodeDto,
+  WithholdingGroupFilterBody,
+  WithholdingGroupFilterResult,
   WithholdingOtherCreateResult,
   WithholdingOtherFilterBody,
   WithholdingOtherFilterResult,
   WithholdingOtherRecordDto,
   WithholdingOtherSaveBody,
   WithholdingOtherUpdateBody,
+  WithholdingSummaryFilterBody,
+  WithholdingSummaryFilterResult,
 } from './types';
 
 const toRocYear = (year: number) => year - 1911;
@@ -157,4 +161,29 @@ export function getWithholdingDetail(
 /** 查詢各類扣繳碼表（GET /ael/withholding/code），type=1 執行業務業別／2 稿費必要費用別／3 其他所得給付項目 */
 export function listWithholdingCodes(type: 1 | 2 | 3): Promise<WithholdingCodeDto[]> {
   return apiFetch<WithholdingCodeDto[]>(`/ael/withholding/code${buildQuery({ type })}`);
+}
+
+/**
+ * ⚠️ 待後端提供：彙總「同一所得人同一類別」列表（POST /ael/withholding/summary/filter，對外收西元年）。
+ * 分群規則見 api/types.ts WithholdingSummaryFilterBody 註解。
+ */
+export function filterWithholdingSummary(body: Omit<WithholdingSummaryFilterBody, 'companyUuid' | 'paymentYear'> & { paymentYear: number }): Promise<WithholdingSummaryFilterResult> {
+  return apiFetch<WithholdingSummaryFilterResult>('/ael/withholding/summary/filter', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, companyUuid: COMPANY_UUID, paymentYear: toRocYear(body.paymentYear) }),
+  });
+}
+
+/** ⚠️ 待後端提供：查詢單一群組內的明細列表（POST /ael/withholding/summary/group/filter，對外收西元年） */
+export function filterWithholdingGroup(
+  body: Omit<WithholdingGroupFilterBody, 'companyUuid' | 'paymentYear'> & { paymentYear?: number },
+): Promise<WithholdingGroupFilterResult> {
+  return apiFetch<WithholdingGroupFilterResult>('/ael/withholding/summary/group/filter', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...body,
+      companyUuid: COMPANY_UUID,
+      paymentYear: body.paymentYear !== undefined ? toRocYear(body.paymentYear) : undefined,
+    }),
+  });
 }

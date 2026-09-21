@@ -2849,6 +2849,107 @@ export interface RentalFilterResult {
   yearlyTotalCount: number;
 }
 
+/**
+ * ⚠️ 以下彙總層（summary）端點為前端待後端開發規格，尚未串接，目前僅供 UI 開發參照；
+ * 上線前請與後端核對欄位名稱與分群規則是否一致。
+ *
+ * 各類扣繳列表「同一所得人同一類別」彙總（POST /ael/withholding/summary/filter）：
+ * incomeType≠51 依 identityNo（空則退回 taxIdNo，皆空則退回 recipientName）分群；
+ * incomeType=51（租金）依 rentalAddress 分群，recipientName 為該群組房東姓名以「、」串接。
+ */
+export interface WithholdingSummaryFilterBody {
+  companyUuid: string;
+  /** 民國年 */
+  paymentYear: number;
+  paymentMonth?: number;
+  /** 省略＝全部類別 */
+  incomeType?: WithholdingCategoryCode;
+  /** 所得人姓名模糊比對；租金比對房東姓名 */
+  name?: string;
+  /** 比對群組加總後的所得金額 */
+  amountMin?: number;
+  amountMax?: number;
+  /** false＝群組內存在未繳納的扣繳稅額 */
+  isRemitWithholding?: boolean;
+  /** false＝群組內存在未繳納的二代健保 */
+  isRemitNhi?: boolean;
+  /** 彙總層排序鍵，1 所得人姓名／2 所得金額／3 扣繳稅額／4 支付金額／5 筆數；非法或未傳視為 1 */
+  sortType?: number;
+  isDesc?: boolean;
+  /** 分頁單位是群組，不是明細筆數 */
+  page?: number;
+  limitCount?: number;
+}
+
+/** 彙總層單一群組；groupKey 為不透明字串，原樣傳給 summary/group/filter，前端不解析其內容 */
+export interface WithholdingSummaryGroupDto {
+  groupKey: string;
+  incomeType: WithholdingCategoryCode;
+  recipientName: string;
+  /** 租金多房東時可為空字串 */
+  recipientIdNo: string;
+  /** 僅 incomeType=51 回傳 */
+  rentalAddress?: string;
+  recordCount: number;
+  totalGrossIncome: number;
+  totalWithholdingAmount: number;
+  totalNhiAmount: number;
+  totalPaymentAmount: number;
+  unremitWithholdingCount: number;
+  unremitNhiCount: number;
+  firstPaymentMonth: number;
+  lastPaymentMonth: number;
+}
+
+/** POST /ael/withholding/summary/filter 回應 data */
+export interface WithholdingSummaryFilterResult {
+  list: WithholdingSummaryGroupDto[];
+  /** 篩選後的群組總數，用於算總頁數 */
+  searchTotalGroupCount: number;
+  searchTotalRecordCount: number;
+  searchTotalGrossIncome: number;
+  searchTotalWithholdingAmount: number;
+  searchTotalNhiAmount: number;
+  searchTotalPaymentAmount: number;
+  /** 僅受 paymentYear／paymentMonth 篩選影響 */
+  yearlyTotalGrossIncome: number;
+  yearlyTotalWithholdingAmount: number;
+  yearlyTotalNhiAmount: number;
+  yearlyTotalPaymentAmount: number;
+  yearlyTotalCount: number;
+}
+
+/** POST /ael/withholding/summary/group/filter 請求體：查詢單一群組內的明細列表 */
+export interface WithholdingGroupFilterBody {
+  companyUuid: string;
+  incomeType: WithholdingCategoryCode;
+  /** 原樣取自 WithholdingSummaryGroupDto.groupKey */
+  groupKey: string;
+  /** 民國年 */
+  paymentYear?: number;
+  paymentMonth?: number;
+  /** 沿用明細層既有 sortType 1–6（見 WithholdingOtherFilterBody） */
+  sortType?: number;
+  isDesc?: boolean;
+  page?: number;
+  limitCount?: number;
+  amountMin?: number;
+  amountMax?: number;
+  isRemitWithholding?: boolean;
+  isRemitNhi?: boolean;
+}
+
+/** POST /ael/withholding/summary/group/filter 回應 data；list 沿用既有明細 DTO 形狀 */
+export interface WithholdingGroupFilterResult {
+  group: WithholdingSummaryGroupDto;
+  list: (WithholdingOtherRecordDto | RentalRecordDto)[];
+  searchTotalCount: number;
+  searchTotalGrossIncome: number;
+  searchTotalWithholdingAmount: number;
+  searchTotalNhiAmount: number;
+  searchTotalPaymentAmount: number;
+}
+
 /** POST／PATCH /ael/withholding/rental 請求體；PATCH 另需 withholdingSummaryUuid（見 UpdateRentalBody） */
 export interface CreateRentalBody {
   companyUuid: string;

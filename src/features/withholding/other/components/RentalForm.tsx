@@ -414,9 +414,11 @@ interface RentalFormProps {
   recordId?: string;
   record?: WithholdingRecord;
   onReload: () => void;
+  /** 返回鍵目的地；來源可能是彙總列表（L1）或群組明細（L2），由 WithholdingFormView 依 ?from= 算出 */
+  backHref: string;
 }
 
-export default function RentalForm({ recordId, record, onReload }: RentalFormProps) {
+export default function RentalForm({ recordId, record, onReload, backHref }: RentalFormProps) {
   const router = useRouter();
   const { isLocked } = useLock();
   const isEdit = Boolean(recordId);
@@ -452,7 +454,7 @@ export default function RentalForm({ recordId, record, onReload }: RentalFormPro
     if (!record) return;
     try {
       await deleteRental(record.uuid);
-      router.push('/withholding/other');
+      router.push(backHref);
     } catch (err) {
       setDeleteOpen(false);
       setSubmitError(getFriendlyErrorMessage(err, '刪除失敗'));
@@ -465,7 +467,7 @@ export default function RentalForm({ recordId, record, onReload }: RentalFormPro
     <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[760px] px-4 pt-4 pb-10 nav:px-7 nav:pt-7">
         <div className="mb-6 flex items-center gap-3">
-          <Link href="/withholding/other" className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark">
+          <Link href={backHref} className="flex h-9 w-9 items-center justify-center rounded-md text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark">
             <ChevronLeft size={20} />
           </Link>
           <h1 className="flex-1 font-notoSerif text-[22px] font-semibold tracking-tight text-neutral-dark">{title}</h1>

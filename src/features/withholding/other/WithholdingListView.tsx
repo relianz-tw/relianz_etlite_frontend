@@ -10,16 +10,16 @@ import LockedBanner from '../components/LockedBanner';
 import { useLock } from '../components/LockContext';
 import WithholdingTabs from '../components/WithholdingTabs';
 import AddCategoryDialog from './components/AddCategoryDialog';
-import WithholdingCards from './components/WithholdingCards';
 import WithholdingFilterBar from './components/WithholdingFilterBar';
-import WithholdingTable from './components/WithholdingTable';
+import WithholdingSummaryCards from './components/WithholdingSummaryCards';
+import WithholdingSummaryTable from './components/WithholdingSummaryTable';
 import { availableYears, CATEGORY_OPTIONS } from './data';
-import { useWithholdingList } from './useWithholdingList';
+import { useWithholdingSummary } from './useWithholdingSummary';
 import type { CategoryCode } from './types';
-import { buildWithholdingQueryString, parseWithholdingFilters, SORT_KEY_LABELS } from './urlState';
-import type { WithholdingAdvancedFilter, WithholdingFilterState, WithholdingSortKey } from './urlState';
+import { buildWithholdingQueryString, parseWithholdingFilters, SUMMARY_SORT_KEY_LABELS } from './urlState';
+import type { WithholdingAdvancedFilter, WithholdingFilterState, WithholdingSummarySortKey } from './urlState';
 
-const SORT_KEYS = Object.keys(SORT_KEY_LABELS) as WithholdingSortKey[];
+const SORT_KEYS = Object.keys(SUMMARY_SORT_KEY_LABELS) as WithholdingSummarySortKey[];
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -37,7 +37,7 @@ export default function WithholdingListView() {
   const [advanced, setAdvanced] = useState<WithholdingAdvancedFilter>(() => filters.advanced);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
 
-  const { records, loading, error, hasNextPage, searchTotals, yearlyTotals, yearlyTotalCount, reload } = useWithholdingList({
+  const { groups, loading, error, totalGroupCount, searchTotals, yearlyTotals, yearlyTotalCount, reload } = useWithholdingSummary({
     category: filters.category,
     year: filters.year,
     month: filters.month,
@@ -57,7 +57,7 @@ export default function WithholdingListView() {
 
   const handleSearch = () => updateFilters({ query, page: 1 });
   const handleAdvancedApply = (next?: WithholdingAdvancedFilter) => updateFilters({ advanced: next ?? advanced, page: 1 });
-  const handleSortFieldChange = (key: WithholdingSortKey) => updateFilters({ sort: { key, dir: filters.sort.dir }, page: 1 });
+  const handleSortFieldChange = (key: WithholdingSummarySortKey) => updateFilters({ sort: { key, dir: filters.sort.dir }, page: 1 });
   const handleSortDirToggle = () => updateFilters({ sort: { key: filters.sort.key, dir: filters.sort.dir === 'asc' ? 'desc' : 'asc' } });
   const handleYearChange = (v: string) => updateFilters({ year: Number(v), page: 1 });
   const handleMonthChange = (v: string) => updateFilters({ month: Number(v), page: 1 });
@@ -65,9 +65,7 @@ export default function WithholdingListView() {
   const handleLimitChange = (v: number) => updateFilters({ limit: v, page: 1 });
   const handlePageChange = (v: number) => updateFilters({ page: v });
 
-  // 後端 filter 未回傳篩選後總筆數，無法算出精確總頁數；totalPages 只在確定「還有下一頁」時多顯示一頁，
-  // 從不宣稱一個查無依據的最終頁數（見 useWithholdingList 的 hasNextPage 說明）
-  const totalPages = Math.max(1, hasNextPage ? filters.page + 1 : filters.page);
+  const totalPages = Math.max(1, Math.ceil(totalGroupCount / filters.limit));
 
   return (
     <div className="min-h-screen bg-surface-off-white">
@@ -118,60 +116,52 @@ export default function WithholdingListView() {
           </Button>
         </div>
 
-        {filters.category === 'all' ? (
-          <div className="rounded-md border border-neutral-blue-gray/30 bg-white py-16 text-center text-sm text-neutral-mid">
-            「全部類別」合併查詢待後端提供對應 API，請先於上方選擇單一類別查看列表。
+        <div className="mb-5">
+          <WithholdingFilterBar
+            query={query}
+            onQueryChange={setQuery}
+            onSearch={handleSearch}
+            advanced={advanced}
+            onAdvancedChange={setAdvanced}
+            onAdvancedApply={handleAdvancedApply}
+          />
+        </div>
+
+        {error && <p className="mb-3 text-sm text-semantic-error">{error}</p>}
+
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-mid">
+          <div className="flex items-center gap-1.5">
+            排序：
+            <Select widthClassName="w-32" value={filters.sort.key} onValueChange={v => handleSortFieldChange(v as WithholdingSummarySortKey)}>
+              {SORT_KEYS.map(key => (
+                <option key={key} value={key}>
+                  {SUMMARY_SORT_KEY_LABELS[key]}
+                </option>
+              ))}
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={filters.sort.dir === 'asc' ? ArrowUp : ArrowDown}
+              onClick={handleSortDirToggle}
+              aria-label="切換排序方向"
+            />
           </div>
-        ) : (
-          <>
-            <div className="mb-5">
-              <WithholdingFilterBar
-                query={query}
-                onQueryChange={setQuery}
-                onSearch={handleSearch}
-                advanced={advanced}
-                onAdvancedChange={setAdvanced}
-                onAdvancedApply={handleAdvancedApply}
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            每頁顯示：
+            <Select widthClassName="w-20" value={String(filters.limit)} onValueChange={v => handleLimitChange(Number(v))}>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </Select>
+            筆
+          </div>
+        </div>
 
-            {error && <p className="mb-3 text-sm text-semantic-error">{error}</p>}
+        <WithholdingSummaryTable rows={groups} loading={loading} yearlyTotalCount={yearlyTotalCount} searchTotals={searchTotals} yearlyTotals={yearlyTotals} />
+        <WithholdingSummaryCards rows={groups} loading={loading} yearlyTotalCount={yearlyTotalCount} searchTotals={searchTotals} yearlyTotals={yearlyTotals} />
 
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-mid">
-              <div className="flex items-center gap-1.5">
-                排序：
-                <Select widthClassName="w-40" value={filters.sort.key} onValueChange={v => handleSortFieldChange(v as WithholdingSortKey)}>
-                  {SORT_KEYS.map(key => (
-                    <option key={key} value={key}>
-                      {SORT_KEY_LABELS[key]}
-                    </option>
-                  ))}
-                </Select>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={filters.sort.dir === 'asc' ? ArrowUp : ArrowDown}
-                  onClick={handleSortDirToggle}
-                  aria-label="切換排序方向"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                每頁顯示：
-                <Select widthClassName="w-20" value={String(filters.limit)} onValueChange={v => handleLimitChange(Number(v))}>
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </Select>
-                筆
-              </div>
-            </div>
-
-            <WithholdingTable rows={records} loading={loading} yearlyTotalCount={yearlyTotalCount} searchTotals={searchTotals} yearlyTotals={yearlyTotals} />
-            <WithholdingCards rows={records} loading={loading} yearlyTotalCount={yearlyTotalCount} searchTotals={searchTotals} yearlyTotals={yearlyTotals} />
-
-            <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
-          </>
-        )}
+        <Pagination page={filters.page} totalPages={totalPages} onPageChange={handlePageChange} />
       </div>
 
       <AddCategoryDialog open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} />

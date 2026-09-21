@@ -79,3 +79,28 @@ export interface WithholdingRecord {
    */
   nhiDeclareCode?: string;
 }
+
+/**
+ * 彙總列表（L1）單列，「同一所得人同一類別」加總；由 mapper.ts 的 mapSummaryGroupDtoToRow
+ * 從後端 WithholdingSummaryGroupDto 轉換而來。groupKey 為不透明字串，點擊列時原樣帶入
+ * L2 網址（/withholding/other/group/{groupKey}?ic=<類別代碼>）。
+ */
+export interface WithholdingGroupRow {
+  groupKey: string;
+  categoryCode: CategoryCode;
+  /** 租金多房東以「、」串接 */
+  recipientName: string;
+  /** 租金多房東時可能為空字串 */
+  recipientIdNumber: string;
+  /** 僅租金（51）使用 */
+  rentalAddress: string;
+  recordCount: number;
+  grossIncome: number;
+  withholdingAmount: number;
+  nhiAmount: number;
+  netPayment: number;
+  unremitWithholdingCount: number;
+  unremitNhiCount: number;
+  firstPaymentMonth: number;
+  lastPaymentMonth: number;
+}

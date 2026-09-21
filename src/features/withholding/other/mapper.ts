@@ -5,8 +5,9 @@ import type {
   WithholdingEarnerTypeCode,
   WithholdingOtherRecordDto,
   WithholdingOtherSaveBody,
+  WithholdingSummaryGroupDto,
 } from '@/api/types';
-import type { Burden, CategoryCode, EarnerType, Landlord, NhiDeclareStatus, VoucherType, WithholdingRecord } from './types';
+import type { Burden, CategoryCode, EarnerType, Landlord, NhiDeclareStatus, VoucherType, WithholdingGroupRow, WithholdingRecord } from './types';
 
 /**
  * 各類扣繳 DTO ↔ 畫面 WithholdingRecord 轉換。
@@ -125,6 +126,26 @@ export function mapRentalDtoToRecord(dto: RentalRecordDto): WithholdingRecord {
     isNhiDeclared: dto.isNhiDeclare,
     nhiDeclareStatus: (dto.status ?? 0) as NhiDeclareStatus,
     nhiDeclareCode: dto.code,
+  };
+}
+
+/** 彙總層 DTO → 畫面列（見 types.ts WithholdingGroupRow 註解） */
+export function mapSummaryGroupDtoToRow(dto: WithholdingSummaryGroupDto): WithholdingGroupRow {
+  return {
+    groupKey: dto.groupKey,
+    categoryCode: dto.incomeType,
+    recipientName: dto.recipientName,
+    recipientIdNumber: dto.recipientIdNo,
+    rentalAddress: dto.rentalAddress ?? '',
+    recordCount: dto.recordCount,
+    grossIncome: dto.totalGrossIncome,
+    withholdingAmount: dto.totalWithholdingAmount,
+    nhiAmount: dto.totalNhiAmount,
+    netPayment: dto.totalPaymentAmount,
+    unremitWithholdingCount: dto.unremitWithholdingCount,
+    unremitNhiCount: dto.unremitNhiCount,
+    firstPaymentMonth: dto.firstPaymentMonth,
+    lastPaymentMonth: dto.lastPaymentMonth,
   };
 }
 

@@ -19,8 +19,7 @@ export interface WithholdingAmountTotals {
 const EMPTY_TOTALS: WithholdingAmountTotals = { incomeAmount: 0, withholdingAmount: 0, nhiAmount: 0, netPayment: 0 };
 
 export interface UseWithholdingListParams {
-  /** 'all'（尚無合併查詢端點）時直接跳過查詢，回傳空清單，由呼叫端渲染「待後端提供」空狀態 */
-  category: CategoryCode | 'all';
+  category: CategoryCode;
   year: number;
   /** 0 = 全部月份 */
   month: number;
@@ -71,16 +70,6 @@ export function useWithholdingList(params: UseWithholdingListParams): UseWithhol
   const trimmedQuery = query.trim();
 
   useEffect(() => {
-    if (category === 'all') {
-      setRecords([]);
-      setHasNextPage(false);
-      setSearchTotals(EMPTY_TOTALS);
-      setYearlyTotals(EMPTY_TOTALS);
-      setYearlyTotalCount(0);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     setError('');
