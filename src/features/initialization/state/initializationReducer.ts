@@ -33,6 +33,8 @@ export type ReportRow = Record<string, ReportField>;
 
 export interface ReportData {
   fields: Record<string, ReportField>;
+  /** 僅 mirrorRight 報表（如資產負債表）使用：右欄獨立輸入值，供與 fields（左欄）交叉核對 */
+  fieldsRight: Record<string, ReportField>;
   rows: ReportRow[];
 }
 
@@ -133,8 +135,8 @@ export type InitializationAction =
   | { type: 'SET_BALANCE_BASE_DATE'; payload: string }
 
   // 步驟 3／4 共用：報表欄位與表格列
-  | { type: 'SET_REPORT_FIELD'; payload: { reportId: SettlementReportId; key: string; value: string | number } }
-  | { type: 'APPLY_RECOGNIZED_REPORT_FIELDS'; payload: { reportId: SettlementReportId; fields: Record<string, string | number> } }
+  | { type: 'SET_REPORT_FIELD'; payload: { reportId: SettlementReportId; key: string; value: string | number; side?: 'left' | 'right' } }
+  | { type: 'APPLY_RECOGNIZED_REPORT_FIELDS'; payload: { reportId: SettlementReportId; fields: Record<string, string | number>; side?: 'left' | 'right' } }
   | { type: 'ADD_REPORT_ROW'; payload: { reportId: SettlementReportId; columns: ReportFieldDef[] } }
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: SettlementReportId; index: number } }
   | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: SettlementReportId; index: number; key: string; value: string | number } }
@@ -190,12 +192,20 @@ export function getNextStep(state: InitializationState): StepTarget {
 
 // ==================== Reducer ====================
 
-function setReportField(reports: InitializationState['reports'], reportId: SettlementReportId, key: string, value: string | number, aiFilled: boolean): InitializationState['reports'] {
+function setReportField(
+  reports: InitializationState['reports'],
+  reportId: SettlementReportId,
+  key: string,
+  value: string | number,
+  aiFilled: boolean,
+  side: 'left' | 'right' = 'left'
+): InitializationState['reports'] {
+  const targetKey = side === 'right' ? 'fieldsRight' : 'fields';
   return {
     ...reports,
     [reportId]: {
       ...reports[reportId],
-      fields: { ...reports[reportId].fields, [key]: { value, aiFilled } },
+      [targetKey]: { ...reports[reportId][targetKey], [key]: { value, aiFilled } },
     },
   };
 }
@@ -252,12 +262,15 @@ export function initializationReducer(state: InitializationState, action: Initia
       return { ...state, openingBalance: { ...state.openingBalance, baseDate: action.payload } };
 
     case 'SET_REPORT_FIELD':
-      return { ...state, reports: setReportField(state.reports, action.payload.reportId, action.payload.key, action.payload.value, false) };
+      return {
+        ...state,
+        reports: setReportField(state.reports, action.payload.reportId, action.payload.key, action.payload.value, false, action.payload.side),
+      };
 
     case 'APPLY_RECOGNIZED_REPORT_FIELDS': {
       let reports = state.reports;
       for (const [key, value] of Object.entries(action.payload.fields)) {
-        reports = setReportField(reports, action.payload.reportId, key, value, true);
+        reports = setReportField(reports, action.payload.reportId, key, value, true, action.payload.side);
       }
       return { ...state, reports };
     }

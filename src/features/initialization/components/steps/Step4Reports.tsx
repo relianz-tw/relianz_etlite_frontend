@@ -50,13 +50,18 @@ export function Step4Reports() {
 
   const left = (
     <div className='flex flex-col gap-5'>
-      {header}
       {page.left && <ReportColumn reportId={page.id} column={page.left} />}
       {page.balanceCheck && <ReportBalanceBar reportId={page.id} page={page} />}
       {nextButton}
     </div>
   );
-  const right = page.right ? <ReportColumn reportId={page.id} column={page.right} /> : undefined;
+  const right = page.right ? <ReportColumn reportId={page.id} column={page.right} side={page.mirrorRight ? 'right' : 'left'} /> : undefined;
 
-  return <SplitPanel left={left} right={right} />;
+  return (
+    <div className='flex flex-col flex-1 min-h-0'>
+      {/* 標題橫跨左右兩欄、置於欄位捲動區之外，讓左右第一列資料切齊，捲動同步時對得上 */}
+      <div className='shrink-0 p-5 pb-0 md:p-12 md:pb-0'>{header}</div>
+      <SplitPanel left={left} right={right} syncScroll={page.syncScroll} />
+    </div>
+  );
 }

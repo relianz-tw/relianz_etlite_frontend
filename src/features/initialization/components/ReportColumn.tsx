@@ -7,6 +7,8 @@ import { Fragment } from 'react';
 interface ReportColumnProps {
   reportId: SettlementReportId;
   column: ReportColumnDef;
+  /** 'right' 時讀寫 state.reports[reportId].fieldsRight（見 mirrorRight 報表，如資產負債表右欄） */
+  side?: 'left' | 'right';
 }
 
 /**
@@ -14,9 +16,9 @@ interface ReportColumnProps {
  * 整欄用同一個 grid-cols-[auto,1fr] 容器（label 欄寬度取全欄最長標籤），
  * 讓每一列輸入框左側對齊，不因標籤長短不一而參差；section 標題橫跨兩欄。
  */
-export function ReportColumn({ reportId, column }: ReportColumnProps) {
+export function ReportColumn({ reportId, column, side = 'left' }: ReportColumnProps) {
   const { state, dispatch } = useInitialization();
-  const fields = state.reports[reportId].fields;
+  const fields = side === 'right' ? state.reports[reportId].fieldsRight : state.reports[reportId].fields;
 
   return (
     <div className='grid grid-cols-[auto,1fr] items-center gap-x-4 gap-y-3'>
@@ -28,7 +30,7 @@ export function ReportColumn({ reportId, column }: ReportColumnProps) {
               key={field.key}
               field={field}
               data={fields[field.key] ?? { value: '', aiFilled: false }}
-              onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId, key: field.key, value } })}
+              onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId, key: field.key, value, side } })}
             />
           ))}
         </Fragment>

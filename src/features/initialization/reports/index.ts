@@ -5,7 +5,7 @@ import { SHAREHOLDERS_PAGE } from './shareholders';
 import { WITHHOLDING_RECONCILIATION_PAGE } from './withholdingReconciliation';
 import { PROPERTY_LIST_PAGE } from './propertyList';
 import type { ReportColumnDef, ReportFieldDef, ReportPageDef } from './types';
-import type { ReportField, SettlementReportId } from '../state/initializationReducer';
+import type { ReportData, ReportField, SettlementReportId } from '../state/initializationReducer';
 
 export type { ReportColumnDef, ReportFieldDef, ReportPageDef, ReportSectionDef, ReportTableDef, ReportFieldType } from './types';
 export { COVER_LEFT, COVER_RIGHT };
@@ -35,15 +35,16 @@ function buildInitialFields(page: ReportPageDef): Record<string, ReportField> {
 }
 
 /** InitializationState.reports 初始值，供 reducer 的 initialState 與 RESTORE_STATE 合併使用 */
-export function buildInitialReportsState(): Record<SettlementReportId, { fields: Record<string, ReportField>; rows: Record<string, ReportField>[] }> {
+export function buildInitialReportsState(): Record<SettlementReportId, ReportData> {
   const coverKeys = [...collectFieldKeys(COVER_LEFT), ...collectFieldKeys(COVER_RIGHT)];
   return {
-    cover: { fields: Object.fromEntries(coverKeys.map(key => [key, emptyField()])), rows: [] },
-    incomeStatement: { fields: buildInitialFields(INCOME_STATEMENT_PAGE), rows: [] },
-    balanceSheet: { fields: buildInitialFields(BALANCE_SHEET_PAGE), rows: [] },
-    shareholders: { fields: {}, rows: [] },
-    withholdingReconciliation: { fields: buildInitialFields(WITHHOLDING_RECONCILIATION_PAGE), rows: [] },
-    propertyList: { fields: {}, rows: [] },
+    cover: { fields: Object.fromEntries(coverKeys.map(key => [key, emptyField()])), fieldsRight: {}, rows: [] },
+    incomeStatement: { fields: buildInitialFields(INCOME_STATEMENT_PAGE), fieldsRight: {}, rows: [] },
+    // mirrorRight：右欄與左欄科目相同，各自獨立一份初始值，供交叉核對輸入
+    balanceSheet: { fields: buildInitialFields(BALANCE_SHEET_PAGE), fieldsRight: buildInitialFields(BALANCE_SHEET_PAGE), rows: [] },
+    shareholders: { fields: {}, fieldsRight: {}, rows: [] },
+    withholdingReconciliation: { fields: buildInitialFields(WITHHOLDING_RECONCILIATION_PAGE), fieldsRight: {}, rows: [] },
+    propertyList: { fields: {}, fieldsRight: {}, rows: [] },
   };
 }
 

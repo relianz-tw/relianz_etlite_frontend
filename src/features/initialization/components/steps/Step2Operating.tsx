@@ -53,6 +53,9 @@ export function Step2Operating() {
         if (data.fields && Object.keys(data.fields).length > 0) {
           dispatch({ type: 'APPLY_RECOGNIZED_REPORT_FIELDS', payload: { reportId, fields: data.fields } });
         }
+        if (data.fieldsRight && Object.keys(data.fieldsRight).length > 0) {
+          dispatch({ type: 'APPLY_RECOGNIZED_REPORT_FIELDS', payload: { reportId, fields: data.fieldsRight, side: 'right' } });
+        }
         if (TABLE_REPORT_IDS.includes(reportId) && data.rows && data.rows.length > 0) {
           dispatch({ type: 'APPLY_RECOGNIZED_REPORT_ROWS', payload: { reportId, rows: data.rows } });
         }

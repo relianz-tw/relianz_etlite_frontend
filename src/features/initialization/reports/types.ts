@@ -44,4 +44,11 @@ export interface ReportPageDef {
   table?: ReportTableDef;
   /** 有值時於頁面底部顯示左右欄合計是否平衡（僅 twoColumn 適用） */
   balanceCheck?: { leftLabel: string; rightLabel: string };
+  /**
+   * true 時右欄與左欄顯示完全相同的科目（逐行對應），但各自獨立輸入，供交叉核對兩個來源的數字
+   * （如資產負債表）；右欄的值存於 state.reports[id].fieldsRight，不與左欄 fields 共用。
+   */
+  mirrorRight?: boolean;
+  /** true 時桌機左右欄捲動同步，方便逐行對照（搭配 mirrorRight 使用） */
+  syncScroll?: boolean;
 }

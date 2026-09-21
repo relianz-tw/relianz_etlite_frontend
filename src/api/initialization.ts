@@ -51,6 +51,8 @@ export interface RecognizedCompanyInfo {
 export interface RecognizedReportData {
   /** 一般報表欄位（雙欄型報表），key 對應 reports/*.ts 各 ReportFieldDef.key */
   fields?: Record<string, string | number>;
+  /** 僅 mirrorRight 報表（如資產負債表）使用：右欄獨立辨識值，供與 fields（左欄）交叉核對 */
+  fieldsRight?: Record<string, string | number>;
   /** 表格型報表（投資人明細、財產目錄）新增的列，key 對應該報表 ReportTableDef.columns 的 key */
   rows?: Record<string, string | number>[];
 }
@@ -110,7 +112,29 @@ function mockRecognizeSettlement(files: File[]): Promise<SettlementRecognitionRe
         },
       },
       balanceSheet: {
+        // 左右兩欄科目相同、各自獨立輸入供交叉核對（見 reports/balanceSheet.ts mirrorRight），
+        // mock 資料示範兩份來源數字一致的情境，故 fieldsRight 與 fields 相同
         fields: {
+          currentAssetsSubtotal: 741794,
+          cash: 46623,
+          bankDeposits: 489942,
+          accountsReceivable: 150000,
+          businessTaxCredit: 12000,
+          fixedAssetsSubtotal: 480000,
+          fixedAssetsCost: 600000,
+          accumulatedDepreciation: -120000,
+          otherAssets: 0,
+          totalAssets: 1221794,
+          currentLiabilitiesSubtotal: 395000,
+          accountsPayable: 95000,
+          shortTermLoans: 300000,
+          longTermLiabilities: 0,
+          ownerEquitySubtotal: 826794,
+          registeredCapital: 1000000,
+          retainedEarnings: -173206,
+          totalLiabilitiesAndEquity: 1221794,
+        },
+        fieldsRight: {
           currentAssetsSubtotal: 741794,
           cash: 46623,
           bankDeposits: 489942,
