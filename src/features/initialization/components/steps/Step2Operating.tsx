@@ -82,7 +82,7 @@ export function Step2Operating() {
         {/* 左欄：營運狀況選擇＋上傳 */}
         <div className='flex flex-1 flex-col min-h-0 md:w-1/2 p-5 md:p-12 md:overflow-y-auto'>
           <div className='flex flex-col gap-5'>
-            <h1 className='text-xl font-bold text-neutral-dark font-notoSerif'>開帳設定</h1>
+            <h1 className='text-xl font-bold text-neutral-dark'>開帳設定</h1>
             <p className='text-sm font-semibold text-neutral-dark'>請選擇您的營運狀況</p>
 
             <div className='flex flex-col gap-3'>

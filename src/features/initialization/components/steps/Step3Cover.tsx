@@ -137,7 +137,7 @@ export function Step3Cover() {
 
   const left = (
     <div className='flex flex-col gap-5'>
-      <h1 className='text-xl font-bold text-neutral-dark font-notoSerif'>公司基本資料</h1>
+      <h1 className='text-xl font-bold text-neutral-dark'>公司基本資料</h1>
 
       <div className='grid grid-cols-[auto,1fr] items-center gap-x-4 gap-y-4'>
         <RowLabel>統一編號</RowLabel>

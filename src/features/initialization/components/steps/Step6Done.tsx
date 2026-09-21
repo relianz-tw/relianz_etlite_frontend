@@ -34,7 +34,7 @@ export function Step6Done() {
         {isUnderOneYear ? (
           <>
             <TriangleAlert size={40} className='text-brand-tan' />
-            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark font-notoSerif'>已可開始使用</h1>
+            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark'>已可開始使用</h1>
             <p className='text-sm text-neutral-mid'>
               您尚未有結算申報書可供核對，帳務起點暫以 0 計算。日後結算申報完成，建議儘快補上申報書讓報表數字更準確。
             </p>
@@ -45,7 +45,7 @@ export function Step6Done() {
         ) : (
           <>
             <CircleCheck size={40} className='text-semantic-success' />
-            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark font-notoSerif'>開帳設定完成</h1>
+            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark'>開帳設定完成</h1>
             <p className='text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，即可開始使用 Easytax Lite 記帳。</p>
           </>
         )}

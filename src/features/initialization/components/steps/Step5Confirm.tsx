@@ -43,7 +43,7 @@ export function Step5Confirm() {
     <div className='flex flex-col flex-1 min-h-0 p-5 md:p-12 md:overflow-y-auto'>
       <div className='flex flex-col gap-5'>
         <div>
-          <h1 className='text-xl md:text-2xl font-bold text-neutral-dark mb-2 font-notoSerif'>確認開帳</h1>
+          <h1 className='text-xl md:text-2xl font-bold text-neutral-dark mb-2'>確認開帳</h1>
           <p className='text-sm text-neutral-mid'>確認以下資料無誤後即完成開帳設定，開帳基準日設定後將作為日後記帳的起點。</p>
         </div>
 

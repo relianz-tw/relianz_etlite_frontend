@@ -22,7 +22,7 @@ export function Step1Terms() {
 
   return (
     <div className='flex flex-col flex-1 min-h-0 p-5 md:p-12'>
-      <h1 className='text-xl md:text-2xl font-bold text-neutral-dark mb-4 font-notoSerif'>Easytax Lite 服務合約</h1>
+      <h1 className='text-xl md:text-2xl font-bold text-neutral-dark mb-4'>Easytax Lite 服務合約</h1>
 
       <div className='flex-1 min-h-0 overflow-y-auto rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white p-4 text-sm leading-relaxed text-neutral-mid'>
         {/* 條款全文比照姊妹專案 relianz_cashflow_frontend 的 src/app/startUp/terms/page.tsx（同一經營主體：友信創新股份有限公司），

@@ -20,7 +20,8 @@ export function Step4Reports() {
       <p className='text-xs font-semibold text-brand-blue'>
         第 {state.currentReportIndex + 1} / {total} 份
       </p>
-      <h1 className='text-xl md:text-2xl font-bold text-neutral-dark font-notoSerif'>{page.title}</h1>
+      {/* 報表名稱含頓號等標點，用序體排版可能出現字重/標點對不齊的問題，改用正文黑體 */}
+      <h1 className='text-xl md:text-2xl font-bold text-neutral-dark'>{page.title}</h1>
       {page.hint && <p className='mt-1 text-sm text-neutral-mid'>{page.hint}</p>}
     </div>
   );
