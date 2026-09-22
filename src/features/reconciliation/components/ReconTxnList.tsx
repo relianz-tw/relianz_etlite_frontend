@@ -409,6 +409,10 @@ export default function ReconTxnList({
     return <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">{emptyMessage}</div>;
   }
 
+  // 「其他」群組僅細分出單一子群組時，該標題會與上方「選擇交易‧其他‧N 筆」重複，故只有 2 個以上
+  // 子群組時才顯示各自標題，讓使用者看出這些交易分別來自哪些原始管道／廠商
+  const nonEmptySectionCount = sections.filter(s => s.rows.length > 0).length;
+
   return (
     <div className="flex flex-col gap-2 min-[1300px]:gap-1">
       <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 min-[1300px]:flex">
@@ -436,7 +440,7 @@ export default function ReconTxnList({
 
       {sections.map(section => (
         <div key={section.key} className="flex flex-col gap-2 min-[1300px]:gap-1">
-          {showSectionHeaders && section.rows.length > 0 && (
+          {showSectionHeaders && nonEmptySectionCount > 1 && section.rows.length > 0 && (
             <p className="mb-1 mt-3 px-1 text-xs font-semibold text-neutral-mid first:mt-2 min-[1300px]:px-3">
               {section.label}（{section.rows.length}）
             </p>
