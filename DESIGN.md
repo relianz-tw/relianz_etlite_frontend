@@ -186,14 +186,18 @@ Border-radius: 16px
   背景：#FFFFFF
   圓角：rounded-t-lg（僅上緣兩角，10px）
   陰影：shadow-level1（浮動面板，符合陰影例外規則）
-  內容區：max-h-[80vh]、overflow-y-auto、overscroll-contain
+  內容區：max-h-[80vh]（size="tall" 時 max-h-[92vh]，內容較多如完整明細表時使用）、
+    overflow-y-auto、overscroll-contain——內容區本身即捲動容器，若面板內含底部固定的動作列
+    （如「返回修改／確認送出」），該動作列改用 sticky bottom-0 bg-white border-t 釘在捲動容器底部，
+    不隨內容捲動（作法同 ReconSettleResultModal.tsx 的底部按鈕列）
   內距：px-4 pb-4（另加 pb 隨安全區域 env(safe-area-inset-bottom)）
 拖曳握把：頂部置中、40×4px、bg #9AA7B9（neutral-blue-gray/40）、整條握把區為 min-h-11 的按鈕
   （符合 44px 熱區），點擊或下拉（位移 > 80px）即關閉
 過渡：面板 translate-y transition-transform（--transition-base 200ms）；遮罩 opacity 同步淡入淡出
-nav:hidden（≥ nav 1000px 不掛載）
+斷點：breakpoint="nav"（預設）→ nav:hidden（≥ nav 1000px 不掛載）；breakpoint="wide" →
+  min-[1300px]:hidden，供沖帳中心等使用專屬 1300px 斷點的頁面（見 §8 Responsive Breakpoints 例外）
 ```
-對應元件：`src/components/ui/BottomSheet.tsx`。
+對應元件：`src/components/ui/BottomSheet.tsx`（`breakpoint?: 'nav' | 'wide'`、`size?: 'auto' | 'tall'`）。
 
 ### Sticky Action Bar（行動版底部固定操作條）
 
@@ -571,6 +575,27 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 ```
 對應元件：`src/components/ui/StepNumber.tsx`。
 
+### Step Page Switch（同頁步驟換頁切換）
+
+用途：同一頁面內的多個步驟都需要用到整頁寬度呈現（欄位多、或下一步是完整明細表），並排會互相擠壓
+版面時，改為「換頁」——同一時間只顯示一個步驟，切到下一步時上一步整個被取代，而非並排縮窄
+（如沖帳中心匯總沖帳：步驟 2 輸入金額 → 步驟 3 檢視明細並送出）。與 `Flow Stepper`（跨頁面精靈式流程）、
+`Step Number Badge`（同頁「並排」區塊標順序，不互相取代）用途不同，三者不可互相取代：本樣式僅用於
+同頁內、但個別步驟需要換頁呈現的情境。
+
+```
+容器：rounded-lg border border-neutral-blue-gray/30 bg-white p-4（沿用既有卡片樣式，見 Cards & Containers）
+標題列：flex items-center justify-between gap-2
+  左側：非第一步時最前面加返回鈕（lucide ChevronLeft，size 16，色 #005FA2 brand-blue，
+    點擊回到上一步，不用文字，保留最小 44px 熱區）+ StepNumber 徽章 + 標題
+    （text-sm font-semibold #3A3830 neutral-dark）+ 灰字副標（font-normal #797C80 neutral-mid）
+  右側：該步驟專屬的次要動作（如「返回修改」文字鈕），可選
+進場過渡：transition-[opacity,transform] duration-200，由 opacity-0 translate-y-1 過渡至
+  opacity-100 translate-y-0（步驟掛載時觸發，比照 Modal 進場手法）
+離場：不做動畫，直接卸載（與現有 Modal／Bottom Sheet 一致）
+```
+對應元件：`src/features/reconciliation/ReconciliationView.tsx`（匯總沖帳步驟 2／3 切換，目前僅此頁使用）。
+
 ### Flow Stepper（流程步驟指示器）
 
 用途：跨頁面精靈式流程的整體進度提示（如開帳精靈 `/initialization`）。
@@ -658,6 +683,25 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
 ```
 對應元件：`src/features/reconciliation/components/ReconTargetAllocation.tsx`、
 `src/features/reconciliation/components/ReconTargetSelect.tsx`。
+
+### Recon Pool Panel — Wide Layout（沖帳金額面板寬版排列）
+
+用途：沖帳金額面板（`ReconPoolPanel`）預設為窄欄（約 340px，逐筆沖帳右欄／行動版 Bottom Sheet），
+欄位一律上下堆疊。當面板改置於 Step Page Switch 的全寬步驟卡內（如匯總沖帳步驟 2）時，改用
+`layout="wide"` 切成多欄網格，避免單一欄位橫向拉成整排、留白過多。窄欄排版不受影響。
+
+```
+列 1（min-[1300px]:grid-cols-3、gap-4；< 1300px 仍單欄堆疊）：
+  此對帳單是否含折讓、退貨 ｜ 對帳單金額 ｜ 收款日／付款日
+列 2（應收 min-[1300px]:grid-cols-2；應付僅銀行手續費一欄，不留空白格）：
+  銀行手續費 ｜ 電商平台扣款（含已選憑證提示）
+列 3（整排，不進網格）：額外金額（OtherDeductionsEditor）
+列 4（整排，不進網格）：沖帳對象分配（ReconTargetAllocation）
+底部列：flex items-center justify-between，左側「實際存入/付出金額」（沿用原樣式），
+  右側主要動作按鈕改 w-auto（不再 w-full），actionHint／actionError 置於按鈕下方靠右
+```
+對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`（`layout?: 'narrow' | 'wide'`，
+預設 `'narrow'`）。
 
 ### Reversed Settlement Panel（負值／反向沖帳面板）
 

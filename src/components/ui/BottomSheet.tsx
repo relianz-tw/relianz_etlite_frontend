@@ -9,10 +9,25 @@ interface BottomSheetProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  /** 桌機不掛載的斷點：'nav'（預設，全站唯一斷點 1000px）／'wide'（沖帳中心專用 1300px，
+   *  見 DESIGN.md §8 響應式斷點例外） */
+  breakpoint?: 'nav' | 'wide';
+  /** 面板內容區高度上限：'auto'（預設 80vh）／'tall'（92vh，內容較多如完整明細表時使用） */
+  size?: 'auto' | 'tall';
 }
 
 // 下拉關閉判定：握把區向下拖曳超過此位移（px）即視為使用者要關閉面板
 const DRAG_CLOSE_THRESHOLD = 80;
+
+// 斷點／高度上限一律查表取完整靜態 class 字串，避免字串拼接讓 Tailwind JIT 掃不到
+const BREAKPOINT_CLASS: Record<NonNullable<BottomSheetProps['breakpoint']>, string> = {
+  nav: 'nav:hidden',
+  wide: 'min-[1300px]:hidden',
+};
+const SIZE_CLASS: Record<NonNullable<BottomSheetProps['size']>, string> = {
+  auto: 'max-h-[80vh]',
+  tall: 'max-h-[92vh]',
+};
 
 /**
  * 行動版底部面板（Bottom Sheet）：手機（< nav 1000px）下把表單疊在當前畫面下方，可下拉／點遮罩／
@@ -21,7 +36,7 @@ const DRAG_CLOSE_THRESHOLD = 80;
  * Portal／Escape 監聽／鎖背景捲動邏輯比照 Modal.tsx，僅版面（貼底、可下拉關閉）不同，不共用同一元件
  * 是因為兩者的定位與關閉手勢差異夠大，硬共用反而讓 Modal.tsx 條件分支變多。
  */
-export default function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
+export default function BottomSheet({ open, onClose, title, children, breakpoint = 'nav', size = 'auto' }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const dragStartY = useRef<number | null>(null);
 
@@ -61,7 +76,7 @@ export default function BottomSheet({ open, onClose, title, children }: BottomSh
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[55] nav:hidden">
+    <div className={`fixed inset-0 z-[55] ${BREAKPOINT_CLASS[breakpoint]}`}>
       <div
         className="absolute inset-0 bg-neutral-dark/40"
         onMouseDown={e => {
@@ -72,7 +87,7 @@ export default function BottomSheet({ open, onClose, title, children }: BottomSh
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'bottom-sheet-title' : undefined}
-        className="fixed inset-x-0 bottom-0 z-[60] flex max-h-[80vh] flex-col rounded-t-lg bg-white shadow-level1"
+        className={`fixed inset-x-0 bottom-0 z-[60] flex ${SIZE_CLASS[size]} flex-col rounded-t-lg bg-white shadow-level1`}
         style={{ transform: `translateY(${dragY}px)`, transition: dragStartY.current === null ? 'transform 200ms ease' : 'none' }}
       >
         <button

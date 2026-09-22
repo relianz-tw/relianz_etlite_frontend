@@ -4,6 +4,7 @@ import { listChannelRules } from '@/api/channelRules';
 import { fetchReconciliationPayables, fetchReconciliationReceivables } from '@/api/ledger';
 import type { SettleLedgerAllocation } from '@/api/types';
 import { listVendors } from '@/api/vendors';
+import LedgerTabs from '@/features/ledger/components/LedgerTabs';
 import BottomSheet from '@/components/ui/BottomSheet';
 import Button from '@/components/ui/Button';
 import ResizableSplitPane from '@/components/ui/ResizableSplitPane';
@@ -11,8 +12,9 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
 import TabBar from '@/components/ui/TabBar';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { fmtCurrency } from '@/lib/utils';
+import { cn, fmtCurrency } from '@/lib/utils';
 import { subMonths } from 'date-fns';
+import { ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
@@ -26,6 +28,7 @@ import ReconPlatformFeeVoucherList from './components/ReconPlatformFeeVoucherLis
 import ReconPoolPanel, { type ReconOtherDeductionRow } from './components/ReconPoolPanel';
 import ReconPoolSummary from './components/ReconPoolSummary';
 import ReconSettleResultModal from './components/ReconSettleResultModal';
+import ReconSettleTermsSummary from './components/ReconSettleTermsSummary';
 import ReconTxnList, { getSelectableUuids } from './components/ReconTxnList';
 import ReconVoucherPickerDialog from './components/ReconVoucherPickerDialog';
 import {
@@ -81,11 +84,13 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
 
 /**
  * 沖帳中心：同一頁承載逐筆／匯總兩種沖帳操作（見頁首 TabBar），選擇銷售管道／廠商後輸入金額完成沖帳。
- * 版面由上而下、由左而右對齊操作順序：頂部為橫向管道／廠商 chips（見 ReconGroupSidebar），下方左欄為交易
- * 清單、右欄為固定寬度（340px）的金額面板（見 ReconPoolPanel），三者同時在首屏出現，操作動線是
- * 「先在上方選管道 → 到左欄填金額 → 到左欄檢視完整明細並送出」，與閱讀方向一致；兩種模式步驟數不同
- * （逐筆 3 步／匯總 3 步：1 選管道 → 2 輸入對帳單金額 → 3 檢視完整明細並確認送出），故各區塊標題另加
- * StepNumber 徽章明示順序（見 @/components/ui/StepNumber、DESIGN.md「Step Number Badge」）。
+ * 兩種模式版面不同：逐筆沖帳（perTxn）維持左欄交易清單＋右欄固定寬度（340px）金額面板並排
+ * （見 ReconPoolPanel layout="narrow"）；匯總沖帳（summary）欄位較多且步驟 3 需要完整明細表空間，
+ * 改為全寬「換頁」呈現——同一時間只顯示一個步驟，桌機由 previewResult 是否已算出決定顯示步驟 2
+ * （輸入金額）或步驟 3（檢視明細並確認送出），兩者互相取代而非並排（見 DESIGN.md「Step Page Switch」）；
+ * 兩種模式步驟數皆為 3（逐筆：1 選管道 → 2 選交易 → 3 輸入金額；匯總：1 選管道 → 2 輸入對帳單金額 →
+ * 3 檢視完整明細並確認送出），各區塊標題加 StepNumber 徽章明示順序
+ * （見 @/components/ui/StepNumber、DESIGN.md「Step Number Badge」）。
  * 銷售管道與廠商清單取自真實 API（/ael/payment/channelRules、
  * /ael/vendors，含當前餘額 balance），候選交易取自對帳中心專屬 API（/ael/ledger/reconciliation/receivables、
  * /ael/ledger/reconciliation/payables，依 dateRange 篩選、settled 固定帶 false 僅顯示未結清，
@@ -99,20 +104,22 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
  *   流程，差別僅在於預覽時明確帶入使用者勾選的 ledgerUuids 與 isDefault=false，需先於左側選擇明確銷售
  *   管道／廠商。
  * - summary（匯總沖帳）：沖帳對象與拆帳結果一律由後端 settle/preview API 決定（依 transaction_date 由舊到新
- *   分配），前端不由使用者手動勾選調整。分兩階段呈現，以 previewResult 是否已算出為旗標（見
- *   summaryReviewing）：輸入階段僅顯示引導卡＋金額面板，不出現交易清單，避免使用者在填金額前先被一整頁
- *   唯讀清單擋住；按下「確認沖帳」打完 preview 後就地展開「本次沖帳明細」卡（非彈窗），沿用與逐筆沖帳
- *   相同的 ReconTxnList 版型列出該管道／廠商全部交易，右側疊加本次收款/付款、沖後餘額與狀態
- *   （showAllocationColumns，見 ReconTxnList），此時金額面板鎖為唯讀（見 ReconPoolPanel 的 readOnly），
- *   需按「返回修改」清空 previewResult 才能改金額重新試算。僅有明確 uuid 的真實管道／廠商可使用。
+ *   分配），前端不由使用者手動勾選調整。分兩步呈現，以 previewResult 是否已算出為旗標（見
+ *   summaryReviewing）：步驟 2（輸入）為全寬卡，欄位改多欄網格排列（ReconPoolPanel layout="wide"），
+ *   不出現交易清單，避免使用者在填金額前先被一整頁唯讀清單擋住；按下「確認沖帳」打完 preview 後，
+ *   桌機整張卡換成步驟 3「本次沖帳明細」（沿用與逐筆沖帳相同的 ReconTxnList 版型列出該管道／廠商全部交易，
+ *   疊加本次收款/付款、沖後餘額與狀態，見 showAllocationColumns），並以 ReconSettleTermsSummary
+ *   把留在步驟 2 輸入的收款日／沖帳對象以唯讀小字摘要帶出；行動版步驟 3 改走底部 BottomSheet 疊加
+ *   （breakpoint="wide" size="tall"），步驟 2 表單仍常駐於清單上方。需按「返回修改」（或行動版下拉／
+ *   點遮罩／Esc 關閉 BottomSheet）清空 previewResult 才能改金額重新試算。僅有明確 uuid 的真實管道／廠商可使用。
  *
- * 響應式斷點例外：沖帳中心版面資訊密度高（管道 chips＋交易清單＋金額面板三欄需同時可視），全站唯一斷點
+ * 響應式斷點例外：沖帳中心版面資訊密度高（管道 chips＋交易清單＋金額面板需同時可視），全站唯一斷點
  * `nav`（1000px）在此頁會太早切成桌機橫排導致擠壓，故本頁與其子元件改用 Tailwind arbitrary variant
  * `min-[1300px]:` 取代 `nav:`，僅此頁面／元件適用，不影響其餘頁面的 `nav` 斷點（見 DESIGN.md 響應式斷點章節）。
  *
  * 按下主要按鈕「確認沖帳」（見 handleOpenConfirm）：逐筆勾 1 筆改為本地試算（拆帳結果本來就是確定的），
  * 其餘打 settle/preview 取得逐筆拆帳明細。逐筆沖帳（含勾多筆）沿用彈窗流程——隨即顯示於
- * ReconConfirmSummaryModal，使用者僅能取消或直接確認送出，沒有中途選項；匯總沖帳改為就地展開明細卡
+ * ReconConfirmSummaryModal，使用者僅能取消或直接確認送出，沒有中途選項；匯總沖帳改為步驟 3 整頁卡
  * （見上方 summary 說明），同樣沒有中途選項，僅能「返回修改」或「確認送出沖帳」。
  * 超沖／少沖差額一律直接留在該筆原單（逐筆勾 1 筆）或沖入最後一筆交易（其餘情況）。
  * 執行成功後，清空已快取的候選清單並重新向後端拉取（含最新餘額），讓已沖帳交易與餘額變動自然反映。
@@ -355,6 +362,15 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   useEffect(() => {
     if (summaryReviewing) summaryDetailRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [summaryReviewing]);
+  // 桌機步驟 2／3 換頁進場過渡（見 DESIGN.md「Step Page Switch」）：每次 summaryReviewing 變動先重置為
+  // 未進場，下一輪 rAF 才切為已進場觸發 transition，確保新步驟卡片真的 play 一次淡入位移動畫
+  const [stepEntered, setStepEntered] = useState(false);
+  useEffect(() => {
+    setStepEntered(false);
+    const id = requestAnimationFrame(() => setStepEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, [summaryReviewing]);
+  const stepTransitionClass = cn('transition-[opacity,transform] duration-200', stepEntered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1');
 
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
@@ -704,13 +720,14 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
       : undefined;
   // 逐筆沖帳一律以「已勾選至少 1 筆」決定是否顯示動作區，不隨管道是否明確增減掛載／卸載——
   // 否則勾選第一筆交易時這塊區域才出現，會把下方交易清單往下推，使接續快速勾選的第二、三筆點擊座標對不準（實測會漏勾）
-  // 匯總沖帳進入檢視確認階段（summaryReviewing）後金額面板整個鎖為唯讀，動作區（收付款日／沖帳對象／確認鈕）
-  // 改由明細卡下方的「確認送出沖帳」取代，不重複出現
+  // 匯總沖帳進入檢視確認階段（summaryReviewing）後步驟 2 整張卡（含金額面板）直接換成步驟 3 明細卡，
+  // 動作區改由明細卡下方的「確認送出沖帳」取代，故此時 showActionArea 恆為 false 不會重複出現
   const showActionArea = summaryReviewing ? false : mode === 'perTxn' ? selectedUuids.size > 0 : canSettle;
 
   // 金額面板 props 單一來源：逐筆沖帳桌機（固定於右欄）與行動版（BottomSheet 內）共用同一份表單，
   // 僅顯示位置不同，避免同一套欄位／驗證邏輯在兩處各維護一份（見 DESIGN.md「Bottom Sheet」與 ReconPoolPanel 的 hideHeader）。
-  // 匯總沖帳桌機固定於右欄、行動版改在清單上方常駐顯示完整表單（見下方 min-[1300px]:hidden 區塊，不使用 BottomSheet），
+  // 匯總沖帳桌機步驟 2 全寬卡（layout="wide"）、行動版步驟 2 於清單上方常駐顯示（layout="narrow"，見下方
+  // min-[1300px]:hidden 區塊），步驟 3 桌機／行動版皆換頁或改走 BottomSheet 檢視唯讀明細，
   // 兩處同樣共用這份 props，改任一邊都會同步
   const poolPanelBaseProps: Omit<ComponentProps<typeof ReconPoolPanel>, 'hideHeader'> = {
     mode,
@@ -731,10 +748,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     feeAmount,
     onStatementChange: handleStatementChange,
     onFeeChange: handleFeeChange,
-    // 逐筆沖帳尚未勾選任何交易時停用金額欄位，避免送出跟勾選狀態不一致的金額；
-    // 匯總沖帳進入檢視確認階段後一併鎖定（見下方 readOnly）
-    amountDisabled: (mode === 'perTxn' && selectedUuids.size === 0) || summaryReviewing,
-    readOnly: summaryReviewing,
+    // 逐筆沖帳尚未勾選任何交易時停用金額欄位，避免送出跟勾選狀態不一致的金額
+    amountDisabled: mode === 'perTxn' && selectedUuids.size === 0,
     otherDeductions,
     onAddOtherDeduction: handleAddOtherDeduction,
     onRemoveOtherDeduction: handleRemoveOtherDeduction,
@@ -775,14 +790,16 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   return (
     <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1440px] px-4 pt-4 pb-28 min-[1300px]:px-7 min-[1300px]:pt-7 min-[1300px]:pb-7">
-        <div className="mb-5 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:items-end min-[1300px]:justify-between">
+        <div className="mb-4 flex flex-col gap-3 min-[1300px]:flex-row min-[1300px]:items-start min-[1300px]:justify-between">
           <div>
             <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark min-[1300px]:text-[28px]">沖帳中心</h1>
             <p className="mt-1 text-sm text-neutral-mid">選擇交易後確認金額，完成應收應付沖帳</p>
           </div>
-          <div className="w-full min-[1300px]:w-56">
-            <SegmentedControl options={SIDE_OPTIONS} value={side} onChange={handleSideChange} size="md" />
-          </div>
+          <LedgerTabs active="reconciliation" className="w-full min-[1300px]:w-64" />
+        </div>
+
+        <div className="mb-5 w-full min-[1300px]:w-56">
+          <SegmentedControl options={SIDE_OPTIONS} value={side} onChange={handleSideChange} size="md" />
         </div>
 
         {/* 日期篩選常駐置於逐筆／匯總沖帳分頁列右側（手機／桌機皆同一列），故容器一律 flex-row；
@@ -827,138 +844,191 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
           <div className="flex flex-col gap-4">
             <ReconGroupSidebar side={side} groups={groups} selectedKey={selectedGroupKey} onSelect={handleSelectGroup} showAllGroup={mode !== 'summary'} />
 
-            <ResizableSplitPane
-              // 匯總沖帳金額面板改在左欄：階段 2 檢視確認時使用者需要對照右側完整明細，金額面板在左較符合
-              // 由左到右的操作動線（先在左欄看/改金額，再到右欄看結果）；逐筆沖帳維持原本面板在右
-              panelSide={mode === 'summary' ? 'left' : 'right'}
-              breakpoint="wide"
-              // 匯總沖帳金額面板較窄：欄位少於逐筆沖帳（無需顯示已選交易清單），且階段 2 要讓出空間給右側完整明細表
-              defaultPanelWidth={mode === 'summary' ? 240 : 340}
-              minPanelWidth={mode === 'summary' ? 220 : 300}
-              maxPanelWidth={mode === 'summary' ? 300 : 420}
-              panel={
-                selectedGroupKey && (
-                  <div className="hidden min-[1300px]:sticky min-[1300px]:top-7 min-[1300px]:block">
-                    <ReconPoolPanel {...poolPanelBaseProps} />
-                  </div>
-                )
-              }
-            >
-              {!selectedGroupKey ? (
+            {mode === 'summary' ? (
+              !selectedGroupKey ? (
                 <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
                   請從上方選擇{side === 'receivable' ? '銷售管道' : '廠商'}
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 pb-4">
-                  {mode === 'perTxn' && isAllGroup && (
-                    <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
-                      一次只能沖銷一筆；要一次沖銷多筆，請先於上方選擇單一{side === 'receivable' ? '銷售管道' : '廠商'}
-                    </div>
-                  )}
-                  {mode === 'summary' && isAllGroup && (
+                  {isAllGroup && (
                     <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
                       請先於上方選擇單一{side === 'receivable' ? '銷售管道' : '廠商'}
                     </div>
                   )}
-                  {mode === 'perTxn' && !isAllGroup && selectedUuids.size > 1 && !canSettle && (
-                    <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
-                      此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援一次沖銷多筆，可改為只勾選一筆，或於上方切換至實際{side === 'receivable' ? '管道' : '廠商'}
-                    </div>
-                  )}
-                  {mode === 'summary' && !isAllGroup && !canSettle && (
+                  {!isAllGroup && !canSettle && (
                     <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
                       此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援匯總沖帳，可改用逐筆沖帳，或於上方切換至實際{side === 'receivable' ? '管道' : '廠商'}
                     </div>
                   )}
 
-                  {/* 行動版：匯總沖帳把完整金額表單（含使用餘額／手續費／額外金額／收款日／銀行帳戶／確認沖帳）
-                      移到清單上方常駐顯示，不再切成僅一顆入帳金額欄位＋另開 BottomSheet 兩處——兩處分別維護
-                      同一份表單容易讓使用者以為只有一欄可填。與桌機右欄共用同一份 poolPanelBaseProps，
-                      改任一邊都會同步；桌機僅顯示於右欄，此區塊 min-[1300px]:hidden */}
-                  {mode === 'summary' && (
-                    <div className="min-[1300px]:hidden">
-                      <ReconPoolPanel {...poolPanelBaseProps} />
-                    </div>
-                  )}
+                  {!isAllGroup && canSettle ? (
+                    <>
+                      {/* 行動版：步驟 2 全寬常駐顯示完整金額表單（與桌機共用同一份 poolPanelBaseProps，改任一邊都會
+                          同步），步驟 3 改走底部 BottomSheet 疊加（見下方掛載處），故此處僅在尚未試算 preview 結果
+                          （!previewResult）時顯示，避免與 BottomSheet 內的唯讀明細同時出現造成混淆 */}
+                      {!previewResult && (
+                        <div className="min-[1300px]:hidden">
+                          <ReconPoolPanel {...poolPanelBaseProps} layout="narrow" />
+                        </div>
+                      )}
 
-                  {mode === 'summary' && !isAllGroup ? (
-                    previewResult ? (
-                      // 階段 2（檢視確認）：就地展開完整明細卡，沿用與逐筆沖帳相同的 ReconTxnList 版型
-                      // （showAllocationColumns 補上本次收款/付款、沖後餘額、狀態欄），取代原本另開彈窗的做法
-                      <div ref={summaryDetailRef} className="scroll-mt-7 rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-                        <div className="mb-3 flex items-center justify-between gap-2">
-                          <p className="flex items-center gap-2 text-sm font-semibold text-neutral-dark">
-                            <StepNumber value={3} />
-                            本次沖帳明細
-                            <span className="font-normal text-neutral-mid">
-                              {side === 'payable' ? '待付' : '待收'}帳款 · {selectedGroupLabel} · {previewResult.allocations.length} 筆
-                            </span>
-                          </p>
-                          <button
-                            type="button"
-                            onClick={clearComputedState}
-                            disabled={submitLoading}
-                            className="shrink-0 text-xs font-semibold text-brand-blue hover:underline disabled:cursor-not-allowed disabled:text-neutral-blue-gray disabled:no-underline"
-                          >
-                            返回修改
-                          </button>
-                        </div>
-                        <ReconPoolSummary side={side} previewResult={previewResult} />
-                        {hasDiff && <p className="mb-3 text-xs text-neutral-mid">本次沖帳有差額，差額將沖入最後一筆交易</p>}
-                        <ReconTxnList
-                          side={side}
-                          sections={sections}
-                          showSectionHeaders={isOtherGroup}
-                          showStatusColumn={showStatusColumn}
-                          mode={mode}
-                          emptyMessage={`此群組沒有${side === 'payable' ? '待付' : '待收'}的交易`}
-                          channelNameByUuid={sideData?.nameByUuid ?? new Map()}
-                          expandedUuid={expandedUuid}
-                          onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
-                          allocationByUuid={allocationByUuid}
-                          selectedUuids={selectedUuids}
-                          onToggleSelect={handleToggleSelect}
-                          showAllocationColumns
-                        />
-                        <div className="mt-4">
-                          <ReconPlatformFeeVoucherList vouchers={platformFeeVouchers} />
-                        </div>
-                        {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
-                        <div className="mt-6 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-4 min-[1300px]:flex-row min-[1300px]:justify-end">
-                          <Button variant="outline" onClick={clearComputedState} disabled={submitLoading}>
-                            返回修改
-                          </Button>
-                          <Button variant="primary" onClick={handleConfirmSettle} disabled={submitLoading}>
-                            {submitLoading ? '送出中…' : '確認送出沖帳'}
-                          </Button>
-                        </div>
+                      {/* 桌機：步驟 2／3 整頁互相取代（見 DESIGN.md「Step Page Switch」），不再並排呈現 */}
+                      <div className="hidden min-[1300px]:block">
+                        {previewResult ? (
+                          // 步驟 3（檢視確認）：沿用與逐筆沖帳相同的 ReconTxnList 版型（showAllocationColumns
+                          // 補上本次收款/付款、沖後餘額、狀態欄），取代原本另開彈窗的做法
+                          <div ref={summaryDetailRef} className={cn('scroll-mt-7 rounded-lg border border-neutral-blue-gray/30 bg-white p-4', stepTransitionClass)}>
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                              <p className="flex items-center gap-2 text-sm font-semibold text-neutral-dark">
+                                <button
+                                  type="button"
+                                  onClick={clearComputedState}
+                                  disabled={submitLoading}
+                                  aria-label="返回修改"
+                                  className="flex min-h-11 min-w-11 shrink-0 items-center justify-center text-brand-blue disabled:cursor-not-allowed disabled:text-neutral-blue-gray min-[1300px]:min-h-0 min-[1300px]:min-w-0"
+                                >
+                                  <ChevronLeft size={16} />
+                                </button>
+                                <StepNumber value={3} />
+                                本次沖帳明細
+                                <span className="font-normal text-neutral-mid">
+                                  {side === 'payable' ? '待付' : '待收'}帳款 · {selectedGroupLabel} · {previewResult.allocations.length} 筆
+                                </span>
+                              </p>
+                              <button
+                                type="button"
+                                onClick={clearComputedState}
+                                disabled={submitLoading}
+                                className="shrink-0 text-xs font-semibold text-brand-blue hover:underline disabled:cursor-not-allowed disabled:text-neutral-blue-gray disabled:no-underline"
+                              >
+                                返回修改
+                              </button>
+                            </div>
+                            <ReconPoolSummary side={side} previewResult={previewResult} layout="wide" />
+                            <ReconSettleTermsSummary
+                              side={effectiveSide}
+                              paymentDate={paymentDate}
+                              options={reconTargets.options}
+                              primaryTargetKey={reconTargets.primaryTargetKey}
+                              allocationRows={reconTargets.allocationRows}
+                              depositAmount={Math.abs(depositAmount)}
+                            />
+                            {hasDiff && <p className="mb-3 text-xs text-neutral-mid">本次沖帳有差額，差額將沖入最後一筆交易</p>}
+                            <ReconTxnList
+                              side={side}
+                              sections={sections}
+                              showSectionHeaders={isOtherGroup}
+                              showStatusColumn={showStatusColumn}
+                              mode={mode}
+                              emptyMessage={`此群組沒有${side === 'payable' ? '待付' : '待收'}的交易`}
+                              channelNameByUuid={sideData?.nameByUuid ?? new Map()}
+                              expandedUuid={expandedUuid}
+                              onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
+                              allocationByUuid={allocationByUuid}
+                              selectedUuids={selectedUuids}
+                              onToggleSelect={handleToggleSelect}
+                              showAllocationColumns
+                            />
+                            <div className="mt-4">
+                              <ReconPlatformFeeVoucherList vouchers={platformFeeVouchers} />
+                            </div>
+                            {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
+                            <div className="mt-6 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-4 min-[1300px]:flex-row min-[1300px]:justify-end">
+                              <Button variant="outline" onClick={clearComputedState} disabled={submitLoading}>
+                                返回修改
+                              </Button>
+                              <Button variant="primary" onClick={handleConfirmSettle} disabled={submitLoading}>
+                                {submitLoading ? '送出中…' : '確認送出沖帳'}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          // 步驟 2（輸入）：全寬卡，欄位改多欄網格排列（layout="wide"），取代原本並排的窄欄金額面板
+                          <div className={cn('rounded-lg border border-neutral-blue-gray/30 bg-white p-4', stepTransitionClass)}>
+                            <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-neutral-dark">
+                              <StepNumber value={2} />
+                              輸入入帳金額
+                              <span className="font-normal text-neutral-mid">
+                                {selectedGroupLabel} · {side === 'payable' ? '待付' : '待收'}帳款 · {selectableUuids.length} 筆 · 合計 {fmtCurrency(groupTotalAmount)}
+                              </span>
+                            </p>
+                            <p className="mb-3 text-sm text-neutral-mid">
+                              請輸入對帳單金額，系統會依交易日由舊到新自動分配，確認沖帳後即可檢視完整明細
+                            </p>
+                            <ReconPoolPanel {...poolPanelBaseProps} layout="wide" hideHeader />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      // 階段 1（輸入）：未算出 preview 結果前不出現交易清單，避免使用者被一整頁唯讀清單擋住
-                      <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-neutral-dark">
-                          {selectedGroupLabel}
-                          <span className="font-normal text-neutral-mid">
-                            {side === 'payable' ? '待付' : '待收'}帳款 · {selectableUuids.length} 筆 · 合計 {fmtCurrency(groupTotalAmount)}
-                          </span>
-                        </p>
-                        <p className="mt-2 text-sm text-neutral-mid">
-                          請輸入對帳單金額，系統會依交易日由舊到新自動分配，確認沖帳後即可檢視完整明細
-                        </p>
-                      </div>
-                    )
+                    </>
                   ) : (
+                    // 尚未選定明確管道／廠商（isAllGroup）或該分類無對應管道／廠商（!canSettle）：
+                    // 改回唯讀瀏覽用的一般交易清單，與上方提示文字並存，不進兩步流程
                     <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <p className="flex items-center gap-2 text-sm font-semibold text-neutral-dark">
-                          {/* 選擇交易為逐筆沖帳操作順序第 2 步（1 選管道 → 2 選交易 → 3 輸入金額） */}
-                          {mode === 'perTxn' && <StepNumber value={2} />}
                           {isAllGroup ? '全部交易' : '選擇交易'}
                           <span className="font-normal text-neutral-mid">
                             {side === 'payable' ? '待付' : '待收'}帳款 · {selectedGroupLabel} · {selectableUuids.length} 筆
                           </span>
                         </p>
-                        {mode === 'perTxn' && showStatusColumn && !forceSingleSelect && (
+                      </div>
+                      <ReconTxnList
+                        side={side}
+                        sections={sections}
+                        showSectionHeaders={isOtherGroup}
+                        showStatusColumn={showStatusColumn}
+                        mode={mode}
+                        emptyMessage={isAllGroup ? '目前沒有交易' : `此群組沒有${side === 'payable' ? '待付' : '待收'}的交易`}
+                        channelNameByUuid={sideData?.nameByUuid ?? new Map()}
+                        expandedUuid={expandedUuid}
+                        onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
+                        allocationByUuid={allocationByUuid}
+                        selectedUuids={selectedUuids}
+                        onToggleSelect={handleToggleSelect}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              <ResizableSplitPane panelSide="right" breakpoint="wide" defaultPanelWidth={340} minPanelWidth={300} maxPanelWidth={420}
+                panel={
+                  selectedGroupKey && (
+                    <div className="hidden min-[1300px]:sticky min-[1300px]:top-7 min-[1300px]:block">
+                      <ReconPoolPanel {...poolPanelBaseProps} />
+                    </div>
+                  )
+                }
+              >
+                {!selectedGroupKey ? (
+                  <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">
+                    請從上方選擇{side === 'receivable' ? '銷售管道' : '廠商'}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 pb-4">
+                    {mode === 'perTxn' && isAllGroup && (
+                      <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
+                        一次只能沖銷一筆；要一次沖銷多筆，請先於上方選擇單一{side === 'receivable' ? '銷售管道' : '廠商'}
+                      </div>
+                    )}
+                    {mode === 'perTxn' && !isAllGroup && selectedUuids.size > 1 && !canSettle && (
+                      <div className="rounded-md border border-neutral-blue-gray/30 bg-surface-cream p-3 text-sm text-neutral-mid">
+                        此分類無對應{side === 'receivable' ? '銷售管道' : '廠商'}，暫不支援一次沖銷多筆，可改為只勾選一筆，或於上方切換至實際{side === 'receivable' ? '管道' : '廠商'}
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border border-neutral-blue-gray/30 bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-neutral-dark">
+                          {/* 選擇交易為逐筆沖帳操作順序第 2 步（1 選管道 → 2 選交易 → 3 輸入金額） */}
+                          <StepNumber value={2} />
+                          {isAllGroup ? '全部交易' : '選擇交易'}
+                          <span className="font-normal text-neutral-mid">
+                            {side === 'payable' ? '待付' : '待收'}帳款 · {selectedGroupLabel} · {selectableUuids.length} 筆
+                          </span>
+                        </p>
+                        {showStatusColumn && !forceSingleSelect && (
                           <button
                             type="button"
                             onClick={() => handleSelectAllToggle(selectableUuids)}
@@ -984,17 +1054,17 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
                         onToggleSelect={handleToggleSelect}
                       />
                     </div>
-                  )}
-                </div>
-              )}
-            </ResizableSplitPane>
+                  </div>
+                )}
+              </ResizableSplitPane>
+            )}
           </div>
         )}
       </div>
 
       {/* 行動版：底部固定操作條常駐顯示摘要，點擊開啟 BottomSheet 內的金額表單（見上方 poolPanelBaseProps）；
-          僅逐筆沖帳使用——匯總沖帳的完整表單已常駐於清單上方（見上方 min-[1300px]:hidden 區塊），不需要底部操作條
-          與 BottomSheet 這組雙層入口。桌機不出現，金額面板已固定於右欄（min-[1300px]:sticky） */}
+          僅逐筆沖帳使用——匯總沖帳步驟 2 的完整表單已常駐於清單上方（見上方 min-[1300px]:hidden 區塊），
+          不需要底部操作條這層摘要／開關入口。桌機不出現，金額面板已固定於右欄（min-[1300px]:sticky） */}
       {mode === 'perTxn' && selectedGroupKey && showActionArea && (
         <ReconMobileActionBar
           summaryLabel={mobileSummaryLabel}
@@ -1010,7 +1080,56 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         </BottomSheet>
       )}
 
-      {/* 匯總沖帳改為就地展開明細卡（見左欄 summaryReviewing 區塊），不再使用此彈窗 */}
+      {/* 行動版：匯總沖帳步驟 3（本次沖帳明細）改由底部拉高的 BottomSheet 疊加呈現（breakpoint="wide" 比照
+          本頁 1300px 專屬斷點、size="tall" 讓出更多高度容納完整明細表），取代桌機步驟 2/3 換頁的呈現方式；
+          下拉／點遮罩／Esc 關閉等同「返回修改」，回到步驟 2 表單且金額不清空（見 clearComputedState） */}
+      {mode === 'summary' && (
+        <BottomSheet open={previewResult !== null} onClose={clearComputedState} title="本次沖帳明細" breakpoint="wide" size="tall">
+          {previewResult && (
+            <div className="flex flex-col pb-[calc(12px+env(safe-area-inset-bottom))]">
+              <ReconPoolSummary side={side} previewResult={previewResult} />
+              <ReconSettleTermsSummary
+                side={effectiveSide}
+                paymentDate={paymentDate}
+                options={reconTargets.options}
+                primaryTargetKey={reconTargets.primaryTargetKey}
+                allocationRows={reconTargets.allocationRows}
+                depositAmount={Math.abs(depositAmount)}
+              />
+              {hasDiff && <p className="mb-3 text-xs text-neutral-mid">本次沖帳有差額，差額將沖入最後一筆交易</p>}
+              <ReconTxnList
+                side={side}
+                sections={sections}
+                showSectionHeaders={isOtherGroup}
+                showStatusColumn={showStatusColumn}
+                mode={mode}
+                emptyMessage={`此群組沒有${side === 'payable' ? '待付' : '待收'}的交易`}
+                channelNameByUuid={sideData?.nameByUuid ?? new Map()}
+                expandedUuid={expandedUuid}
+                onToggleExpand={uuid => setExpandedUuid(prev => (prev === uuid ? null : uuid))}
+                allocationByUuid={allocationByUuid}
+                selectedUuids={selectedUuids}
+                onToggleSelect={handleToggleSelect}
+                showAllocationColumns
+              />
+              <div className="mt-4">
+                <ReconPlatformFeeVoucherList vouchers={platformFeeVouchers} />
+              </div>
+              {submitError && <p className="mt-3 text-sm text-semantic-error">{submitError}</p>}
+              <div className="sticky bottom-0 -mx-4 mt-4 flex flex-col gap-2 border-t border-neutral-blue-gray/20 bg-white px-4 pt-3">
+                <Button variant="primary" onClick={handleConfirmSettle} disabled={submitLoading} className="w-full justify-center">
+                  {submitLoading ? '送出中…' : '確認送出沖帳'}
+                </Button>
+                <Button variant="outline" onClick={clearComputedState} disabled={submitLoading} className="w-full justify-center">
+                  返回修改
+                </Button>
+              </div>
+            </div>
+          )}
+        </BottomSheet>
+      )}
+
+      {/* 匯總沖帳改為步驟 3 整頁卡（桌機）／BottomSheet（行動版），不再使用此彈窗 */}
       {previewResult && mode !== 'summary' && (
         <ReconConfirmSummaryModal
           open={confirmSummaryOpen}
