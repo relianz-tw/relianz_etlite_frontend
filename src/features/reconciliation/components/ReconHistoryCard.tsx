@@ -15,6 +15,19 @@ interface ReconHistoryCardProps {
   onReverse: (item: SettleEventListItemDto) => void;
 }
 
+/** 桌機列欄寬＋群組外距共用定義，與 ReconHistoryList 表頭逐欄對應，改欄寬時兩處不會走鐘。
+ *  依語意分三群（識別／金額／帳戶），群間用 marginLeft 拉開，群內維持容器 gap-3（見 DESIGN.md Record Row 分組間距）。 */
+export const HISTORY_COL = {
+  time: 'w-14 shrink-0',
+  status: 'w-16 shrink-0',
+  counterparty: 'w-32 shrink-0',
+  count: 'w-14 shrink-0 text-right',
+  balanceBefore: 'w-28 shrink-0 text-right ml-4',
+  balanceAfter: 'w-28 shrink-0 text-right',
+  cashAmount: 'w-32 shrink-0 text-right',
+  target: 'ml-6 min-w-0 flex-1',
+} as const;
+
 /** 交易狀態標示（見 DESIGN.md Status Badge「應收／應付狀態標示」），比照 ReconTxnList 的 SETTLEMENT_STATUS_BADGE 寫法 */
 const SIDE_BADGE: Record<ReconSide, { label: string; tone: 'info' | 'neutral' }> = {
   receivable: { label: '應收', tone: 'info' },
@@ -34,15 +47,17 @@ function targetSummary(targetNames: string[]): string {
 /** 桌機列金額欄：$ 與數字貼在一起靠欄位右緣顯示（同一欄每列右緣仍對齊成直排），
  *  不把 $ 單獨貼在欄位左緣——一列有多個金額欄並排時，$ 離數字太遠會讓版面看起來斷開、不像同一組金額；
  *  負值（超沖／折讓）依會計慣例改用括號包住 $ 與數字，不出現負號，無金額時顯示 0（比照其他金額欄格式，不特別弱化）。
- *  emphasis 用於本列唯一的主要數值欄（實際存入／付款金額），僅以深淺色區分主次，字級與字重三欄一致 */
-function DeskAmountCell({ amount, emphasis }: { amount: number; emphasis?: boolean }) {
+ *  emphasis 用於本列唯一的主要數值欄（實際存入／付款金額），僅以深淺色區分主次，字級與字重三欄一致。
+ *  widthClassName 來自 HISTORY_COL，與表頭逐欄同寬，欄寬本身不含 gap（群組外距靠呼叫端的 ml-* 疊加）。 */
+function DeskAmountCell({ amount, emphasis, widthClassName }: { amount: number; emphasis?: boolean; widthClassName: string }) {
   const negative = amount < 0;
   const signClass = emphasis ? 'text-neutral-mid' : 'text-neutral-blue-gray';
   return (
     <span
       className={cn(
-        'flex shrink-0 items-baseline justify-end gap-0.5 font-mono text-sm tabular-nums',
-        emphasis ? 'w-24 text-neutral-dark' : 'w-20 text-neutral-mid',
+        'flex items-baseline justify-end gap-0.5 font-mono text-sm tabular-nums',
+        emphasis ? 'text-neutral-dark' : 'text-neutral-mid',
+        widthClassName,
       )}
     >
       {negative && <span className={signClass}>(</span>}
@@ -159,21 +174,21 @@ export default function ReconHistoryCard({ side, item, onReverse }: ReconHistory
       <div className="hidden min-[1300px]:block">
         <div className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm hover:bg-surface-cream">
           <button type="button" onClick={() => setExpanded(e => !e)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-            <span className="w-14 shrink-0 font-mono text-xs text-neutral-mid">{formatTimeHHmm(item.createdAt)}</span>
-            <span className="w-16 shrink-0">
+            <span className={cn(HISTORY_COL.time, 'font-mono text-sm text-neutral-mid')}>{formatTimeHHmm(item.createdAt)}</span>
+            <span className={HISTORY_COL.status}>
               <Badge tone={SIDE_BADGE[side].tone} variant="muted">
                 {SIDE_BADGE[side].label}
               </Badge>
             </span>
-            <span className="w-32 min-w-0 shrink-0 truncate text-sm text-neutral-dark" title={item.counterpartyName}>
+            <span className={cn(HISTORY_COL.counterparty, 'min-w-0 truncate text-sm text-neutral-dark')} title={item.counterpartyName}>
               {item.counterpartyName}
             </span>
-            {/* 時間欄（上方 w-14 font-mono text-xs）與此欄字級同步，僅資訊角色不同 */}
-            <span className="w-14 shrink-0 text-right text-xs text-neutral-mid">{item.itemCount} 筆</span>
-            <DeskAmountCell amount={item.balanceBefore} />
-            <DeskAmountCell amount={item.balanceAfter} />
-            <DeskAmountCell amount={item.cashAmount} emphasis />
-            <span className="ml-3 min-w-0 flex-1 truncate text-sm text-neutral-mid" title={item.targetNames.join('、')}>
+            {/* 時間欄（上方同為 text-sm font-mono）與此欄字級同步，主次改由顏色（text-neutral-mid）承擔 */}
+            <span className={cn(HISTORY_COL.count, 'text-sm text-neutral-mid')}>{item.itemCount} 筆</span>
+            <DeskAmountCell amount={item.balanceBefore} widthClassName={HISTORY_COL.balanceBefore} />
+            <DeskAmountCell amount={item.balanceAfter} widthClassName={HISTORY_COL.balanceAfter} />
+            <DeskAmountCell amount={item.cashAmount} emphasis widthClassName={HISTORY_COL.cashAmount} />
+            <span className={cn(HISTORY_COL.target, 'truncate text-sm text-neutral-mid')} title={item.targetNames.join('、')}>
               {targetText}
             </span>
             <ChevronDown size={16} className={chevronClass} />

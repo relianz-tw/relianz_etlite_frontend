@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { groupSettleEventsByDate } from '../historyGrouping';
 import type { ReconSide } from '../types';
 import { useSettleEventHistory } from '../useSettleEventHistory';
-import ReconHistoryCard from './ReconHistoryCard';
+import ReconHistoryCard, { HISTORY_COL } from './ReconHistoryCard';
 import ReconHistoryReverseModal from './ReconHistoryReverseModal';
 
 // 欄位精簡至 8 欄後改用 13px（比系統預設的 Record Row 表頭 text-xs 大一階），
@@ -79,24 +79,29 @@ export default function ReconHistoryList({ side, dateFrom, dateTo, unlimitedDate
 
   return (
     <div className="flex flex-col gap-4 min-[1300px]:gap-2 pb-4">
-      {/* 桌機表頭：與 ReconHistoryCard 桌機列欄寬一一對應 */}
-      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2.5 min-[1300px]:flex">
-        <span className={cn(HEADER_CLASS, 'w-14 shrink-0')}>時間</span>
-        <span className={cn(HEADER_CLASS, 'w-16 shrink-0')}>交易狀態</span>
-        <span className={cn(HEADER_CLASS, 'w-32 shrink-0')}>對象</span>
-        <span className={cn(HEADER_CLASS, 'w-14 shrink-0 text-right')}>筆數</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>沖前餘額</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>沖後餘額</span>
-        <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>{isPayable ? '實際付款金額' : '實際存入金額'}</span>
-        <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{isPayable ? '付款帳戶' : '存入帳戶'}</span>
+      {/* 桌機表頭：與 ReconHistoryCard 桌機列欄寬一一對應（共用 HISTORY_COL）。
+          吸頂於視窗頂端：本頁（≥1300px）版面無固定頂部列（AppShell 的 h-14 header 僅手機出現），
+          故 top-0 起算，不可比照其他頁面沿用 top-16；固定 h-9 高度供下方日期分組標頭的 top-9 對齊計算，
+          需帶不透明背景，資料列（bg-white）才會乾淨地捲到表頭底下而非透出 */}
+      <div className="hidden h-9 items-center gap-3 border-b border-neutral-blue-gray/20 bg-surface-off-white px-3 min-[1300px]:z-30 min-[1300px]:flex min-[1300px]:sticky min-[1300px]:top-0">
+        <span className={cn(HEADER_CLASS, HISTORY_COL.time)}>時間</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.status)}>交易狀態</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.counterparty)}>對象</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.count)}>筆數</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.balanceBefore)}>沖前餘額</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.balanceAfter)}>沖後餘額</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.cashAmount)}>{isPayable ? '實際付款金額' : '實際存入金額'}</span>
+        <span className={cn(HEADER_CLASS, HISTORY_COL.target)}>{isPayable ? '付款帳戶' : '存入帳戶'}</span>
         <span className="w-[68px] shrink-0" />
       </div>
 
       {groups.map((group, index) => (
         <div key={group.dateKey} className={cn(index > 0 && 'border-t border-neutral-blue-gray/20 pt-4')}>
           {/* 日期為此清單的主軸，標頭需比列內容更重：加粗放大＋左側城信藍短豎線；
-              分隔線放在日期上方，標示與上一組的分界，而非切在標頭與列表之間 */}
-          <div className="mb-2 flex items-center gap-2">
+              分隔線放在日期上方，標示與上一組的分界，而非切在標頭與列表之間。
+              桌機吸頂於表頭正下方（top-9 = 表頭固定高度 h-9），外距併入 pb-2（吸頂時不可留 mb-*，
+              否則透明縫隙會讓資料列從標頭與表頭之間露出來） */}
+          <div className="flex items-center gap-2 bg-surface-off-white pb-2 min-[1300px]:z-20 min-[1300px]:sticky min-[1300px]:top-9">
             <span className="h-4 w-[3px] shrink-0 rounded-full bg-brand-blue" />
             <span className="text-[15px] font-semibold text-neutral-dark">{group.label}</span>
           </div>
