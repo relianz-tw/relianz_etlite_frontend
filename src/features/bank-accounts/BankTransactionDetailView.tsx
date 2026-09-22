@@ -83,7 +83,7 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
             <ChevronLeft size={16} />
             返回銀行帳戶總覽
           </Link>
-          <h1 className="mx-auto max-w-[760px] font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">
+          <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">
             交易明細
           </h1>
         </div>
@@ -105,8 +105,8 @@ export default function BankTransactionDetailView({ transactionId, accountUuid, 
               </div>
             </div>
           ) : (
-            // 無憑證圖（多為匯總沖帳，無單一憑證可顯示）時不保留空的憑證欄位，改單欄呈現
-            <div className="mx-auto flex max-w-[760px] flex-col gap-5">
+            // 無憑證圖（多為匯總沖帳，無單一憑證可顯示）時不保留空的憑證欄位，改單欄呈現，並填滿頁面版寬
+            <div className="flex flex-col gap-5">
               <BankTransactionSummaryCard row={row} />
               <LinkedTransactionList items={row.details} />
               <JournalCard lines={dailyLines} defaultOpen />

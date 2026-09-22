@@ -5,9 +5,8 @@ import Button from '@/components/ui/Button';
 import Textarea from '@/components/ui/Textarea';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency } from '@/lib/utils';
-import { ExternalLink } from 'lucide-react';
-import Link from 'next/link';
 import { Fragment, useState } from 'react';
+import VoucherDetailLink from './VoucherDetailLink';
 
 const thClass = 'px-3 py-2.5 text-left text-xs font-semibold text-neutral-mid whitespace-nowrap';
 const tdClass = 'px-3 py-2 text-sm text-neutral-dark whitespace-nowrap overflow-hidden truncate';
@@ -147,15 +146,7 @@ export default function JournalOverviewList({ vouchers, onSaveSummary }: Journal
                         {line.debitCredit === '2' ? fmtCurrency(line.amount) : ''}
                       </td>
                       <td className="px-2 py-2 text-right">
-                        {isFirst && (
-                          <Link
-                            href={`/ledger/${voucher.ledgerUuid}`}
-                            title="查看原交易"
-                            className="inline-flex items-center rounded p-1 text-neutral-mid hover:text-brand-blue"
-                          >
-                            <ExternalLink size={14} />
-                          </Link>
-                        )}
+                        {isFirst && <VoucherDetailLink ledgerUuid={voucher.ledgerUuid} />}
                       </td>
                     </tr>
                   );
@@ -190,13 +181,10 @@ export default function JournalOverviewList({ vouchers, onSaveSummary }: Journal
                 <span className="font-semibold text-neutral-dark">{fmtRocDate(voucher.rocDate)}</span>
                 <span className="font-mono">{voucher.voucherNo}</span>
               </div>
-              <Link
-                href={`/ledger/${voucher.ledgerUuid}`}
-                title="查看原交易"
+              <VoucherDetailLink
+                ledgerUuid={voucher.ledgerUuid}
                 className="shrink-0 rounded p-1 text-neutral-mid hover:text-brand-blue"
-              >
-                <ExternalLink size={14} />
-              </Link>
+              />
             </div>
 
             {/* 分錄列表 */}

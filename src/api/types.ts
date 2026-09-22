@@ -1425,7 +1425,9 @@ export interface SettleEventListResult {
 }
 
 /** GET /ael/ledger/settle/event 回應；依沖帳事件反查關聯交易 uuid，只回 uuid 陣列，
- *  不含憑證欄位——顯示憑證明細需再逐筆打 fetchEntryDetail（見 settleEventOrigins.ts） */
+ *  不含憑證欄位——顯示憑證明細需再逐筆打 fetchEntryDetail（見 settleEventOrigins.ts）。
+ *  實測回應無 api.md 文件所示的扁平 bankAccountUuid 欄位，銀行帳戶資訊實際藏在
+ *  depositChannels（side=0 銷項）或 paymentChannels（side=1 進項）各管道內，需自行找 isBankAccount 那筆。 */
 export interface SettleEventRelationsResult {
   settleEventUuid: string;
   /** 0 手動／1 即沖／2 匯總／4 銀行提匯等 */
@@ -1437,7 +1439,10 @@ export interface SettleEventRelationsResult {
   settleAmount: number;
   cashAmount: number;
   isReverse: boolean;
-  bankAccountUuid: string | null;
+  /** 收款管道；僅 side=0（銷項）回傳 */
+  depositChannels?: SettleChannel[];
+  /** 付款管道；僅 side=1（進項）回傳 */
+  paymentChannels?: SettleChannel[];
   /** 主結算交易 uuid */
   mainSettlementLedgerUuid: string;
   /** 業務原單交易 uuid */
