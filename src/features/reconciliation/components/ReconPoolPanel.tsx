@@ -7,7 +7,8 @@ import DatePicker from '@/components/ui/DatePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import StepNumber from '@/components/ui/StepNumber';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { Lock } from 'lucide-react';
+import { ArrowLeftRight, Lock } from 'lucide-react';
+import { computeActualAmount } from '../settle';
 import type { ReconAllocationRow, ReconTarget } from '../targets';
 import type { ReconMode, ReconSide, ReconTxnRef } from '../types';
 import ReconTargetAllocation from './ReconTargetAllocation';
@@ -96,8 +97,9 @@ interface ReconPoolPanelProps {
  * 沖帳金額面板：置於右欄（約 340px 寬），與左側交易清單同時在首屏出現，操作順序由左至右——
  * 先在清單勾選交易，再到本面板確認/輸入金額，不需上下捲動切換（見 ReconciliationView 版面說明）。
  * 逐筆沖帳／匯總沖帳共用同一份 UI，差異僅在標頭是否顯示已選筆數與已選交易區塊（逐筆沖帳才顯示）。
- * 金額欄位一律為「總金額」；銀行手續費、電商平台扣款（僅應收）與每筆額外金額皆為固定減項（輸入值恆為負），
- * 三者與沖帳金額加總即為實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
+ * 金額欄位一律為「總金額」；銀行手續費與每筆額外金額預設為減項但可用 MoneyInput 的正負切換鈕改列為加項，
+ * 電商平台扣款（僅應收）則固定鎖在負值（lockedSign，切換鈕整組淡化不可點）。三者與沖帳金額加總即為
+ * 實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
  * 欄位固定上下堆疊（label 在上、輸入框在下 w-full）：本卡片寬度固定在 340px 左右的窄欄，不隨桌機斷點跟著
  * 加寬，若沿用左右並排寫法會被擠壓變形。
  */
@@ -149,7 +151,7 @@ export default function ReconPoolPanel({
   readOnly = false,
 }: ReconPoolPanelProps) {
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
+  const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
   // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值），見 DESIGN.md「Reversed Settlement Panel」
   const isReversed = depositAmount < 0;
@@ -209,6 +211,25 @@ export default function ReconPoolPanel({
             <SegmentedControl options={[...ALLOWANCE_OPTIONS]} value={includeAllowance ? 'yes' : 'no'} onChange={v => onIncludeAllowanceChange(v === 'yes')} />
           </div>
         )}
+        {/* 勾選加總本身為負：在沖帳金額欄位「之前」先說明方向判斷，避免使用者先看到一個負數自動帶入的
+            沖帳金額卻不明所以，見 DESIGN.md「逐筆勾選加總本身為負」 */}
+        {showNegativeSelectionHint && (
+          <div className="flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3">
+            <ArrowLeftRight size={16} className="mt-0.5 shrink-0 text-semantic-warm-dark" />
+            <div className="text-xs leading-relaxed text-semantic-warm-dark">
+              <p className="text-sm font-semibold">
+                本次沖帳已轉為「{effectiveSide === 'payable' ? '應付' : '應收'}」
+              </p>
+              <p className="mt-0.5">
+                因勾選的項目均屬退款／折讓性質，加總金額為負，代表此筆本次並非
+                {effectiveSide === 'payable' ? '收款' : '付款'}，而是需
+                {effectiveSide === 'payable' ? '支付' : '向對方收取'} {fmtCurrency(displayAmount)}。
+                下方{dateLabel}與{effectiveSide === 'payable' ? '付款' : '收款'}方式已依「
+                {effectiveSide === 'payable' ? '應付' : '應收'}」切換，請確認後再送出。
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-neutral-dark">{amountLabel}</label>
           <MoneyInput
@@ -229,19 +250,13 @@ export default function ReconPoolPanel({
       <div className="mt-3 flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <span className="text-sm text-neutral-dark">銀行手續費</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-lg text-neutral-mid">−</span>
-            <MoneyInput value={feeAmount} onChange={onFeeChange} negativeByDefault disabled={amountDisabled} />
-          </div>
+          <MoneyInput value={feeAmount} onChange={onFeeChange} allowSign negativeByDefault disabled={amountDisabled} />
         </div>
 
         {side === 'receivable' && (
           <div className="flex flex-col gap-1.5">
             <span className="text-sm text-neutral-dark">電商平台扣款</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-lg text-neutral-mid">−</span>
-              <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} negativeByDefault disabled={amountDisabled} />
-            </div>
+            <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} allowSign lockedSign={-1} disabled={amountDisabled} />
             {platformFeeAmount !== 0 &&
               (platformFeeVoucherTotal === Math.abs(platformFeeAmount) ? (
                 <p className="flex items-center justify-between text-xs text-semantic-success">
@@ -272,28 +287,19 @@ export default function ReconPoolPanel({
           onRemove={onRemoveOtherDeduction}
           onChange={onChangeOtherDeduction}
           disabled={amountDisabled}
+          allowSign
         />
       </div>
 
       <div className="mt-4 border-t border-neutral-blue-gray/20 pt-3 text-sm">
         <div className="flex items-center justify-between">
-          <span className={cn('font-semibold', isSelectedAmountNegative ? 'text-semantic-error' : 'text-neutral-dark')}>
+          <span className="font-semibold text-neutral-dark">
             {effectiveSide === 'payable' ? '實際付出金額' : '實際存入金額'}
           </span>
-          <span
-            className={cn(
-              'font-mono text-base font-semibold tabular-nums',
-              isSelectedAmountNegative ? 'text-semantic-error' : 'text-neutral-dark',
-            )}
-          >
+          <span className="font-mono text-base font-semibold tabular-nums text-neutral-dark">
             {fmtCurrency(displayAmount)}
           </span>
         </div>
-        {showNegativeSelectionHint && (
-          <p className="mt-1 text-xs text-semantic-error">
-            目前勾選沖帳的項目加總為負數，因此系統判斷為{effectiveSide === 'payable' ? '付出' : '收入'}
-          </p>
-        )}
       </div>
 
       {showActionArea && (

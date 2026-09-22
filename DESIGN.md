@@ -280,10 +280,13 @@ Disabled: 背景 #EAE5E3，文字 專業灰 #797C80
   未選取：圖示 #797C80（neutral-mid），Hover 背景 #F0EBE5（surface-warm）、圖示轉 #3A3830
   圖示: lucide Plus（正，左）/ Minus（負，右），14px
   Disabled：整個容器 opacity 50%、cursor-not-allowed，兩顆選項皆不 hover
+  Sign locked：切換鈕固定在指定方向且不可點，視覺同 Disabled（整組 opacity 50%、cursor-not-allowed），
+    但右側金額輸入框仍為正常可編輯狀態；用於業務上方向固定的扣款欄位（如電商平台扣款恆為負）
 排列：toggle 容器 + 金額輸入框，中間 gap 6px（gap-1.5），toggle 在左
 輸入框本身沿用上方 Form Inputs 規格，顯示絕對值（不顯示負號字元），正負完全由 toggle 選取狀態表達
 ```
-對應元件：`src/components/ui/MoneyInput.tsx` 的 `allowSign` prop（選用，預設關閉時為一般金額輸入，行為不變）。
+對應元件：`src/components/ui/MoneyInput.tsx` 的 `allowSign` prop（選用，預設關閉時為一般金額輸入，行為不變）；
+`lockedSign` prop 對應上述 Sign locked 狀態。
 
 **檔案上傳區塊（Dashed Upload Drop Zone）**（點擊或拖放上傳單一檔案，如匯入表單、憑證/照片上傳）
 ```
@@ -489,6 +492,10 @@ Amount Cell：
 表頭：hidden min-[1300px]:flex，欄名／欄寬與資料列一一對應，套用既有 HEADER_CLASS
   （text-xs font-semibold text-neutral-mid）
 
+  字級例外（欄位精簡、需要更明顯存在感時，如沖帳紀錄）：改用 text-[13px]（維持 font-semibold
+  text-neutral-mid），僅比系統預設大一階，避免與上方 Tab Bar（text-sm）、下方分組標頭（15px）
+  字級混淆看不出層次；欄位數多（>8 欄）的表頭仍維持系統預設 text-xs，避免加大後更擁擠
+
 分組標頭（依日期／類別分組的清單適用，如沖帳紀錄依收付款日分組）：
   當分組依據（如日期）本身就是這份清單的主軸時，標頭需比列內容更重，不能只是小灰字：
   text-[15px] font-semibold text-neutral-dark，左側加 h-4 w-[3px] rounded-full bg-brand-blue
@@ -642,6 +649,24 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
 方向翻轉：所有方向性文字改用「實際 side」而非原始 side——
   實際存入金額 ↔ 實際付出金額、收款日 ↔ 付款日、收款方式 ↔ 付款方式
 金額顯示：一律取絕對值（正值），不出現負號；分出對象分配（Allocation Row）同樣收正值＋翻轉後的方向
+```
+對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`。
+
+#### 逐筆勾選加總本身為負（如全選退款／折讓交易）
+
+與上方「整面翻面」情境不同：這裡是使用者勾選的交易本身加總就是負數，屬預期中的正常狀態，
+**不**套用整塊 `bg-brand-tan/5` tint（外框維持平常的 `border-brand-blue` ＋ `bg-white`），
+避免過度警示；插在「沖帳金額／對帳單金額」欄位「之前」，先說明方向判斷再讓使用者看到
+自動帶入的負數金額，避免不明所以：
+
+```
+提示框：border border-brand-tan/40、bg-brand-tan/10、rounded-md、p-3，
+  左側 icon 用 lucide ArrowLeftRight（size 16），文字色 #84724D（semantic-warm-dark）
+  內容：粗體一行「本次沖帳已轉為『應付／應收』」＋ 說明段落（判斷依據、
+  下方付款日/收款日與付款/收款方式已依此方向切換）
+
+金額列標題與數字：維持一般 #3A3830（neutral-dark），不得使用 semantic-error 紅字
+——紅色保留給真正的錯誤（如憑證金額不等值、分配超額）
 ```
 對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`。
 

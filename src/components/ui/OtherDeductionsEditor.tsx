@@ -25,6 +25,8 @@ interface OtherDeductionsEditorProps {
   onChange: (id: string, patch: Partial<Omit<OtherDeductionRow, 'id'>>) => void;
   /** 停用整個編輯器（新增按鈕與既有列的科目／名稱／金額／編輯／刪除皆不可操作），用於呼叫端尚未滿足前置條件時 */
   disabled?: boolean;
+  /** 開啟後金額欄改用 MoneyInput 的 allowSign 正負切換鈕，取代固定的「−」字元；預設 false 維持原本恆為負的行為 */
+  allowSign?: boolean;
 }
 
 /**
@@ -35,9 +37,10 @@ interface OtherDeductionsEditorProps {
  * 新增的列預設展開為編輯卡片；科目／項目名稱／金額都填妥後按「確認」收合為單行顯示（label 在上、金額輸入框在下，
  * 與同容器內的「手續費」欄位同一種格式），收合後金額仍可直接編輯，另提供編輯（展開回卡片改科目／名稱）與刪除操作；
  * 編輯卡片底部另有「取消」直接移除該筆未確認的項目，不需要額外的刪除圖示。
- * 所有項目在業務上一律是減項，金額輸入固定只能為負（純文字「−」字元 + MoneyInput negativeByDefault），不提供正負切換。
+ * 金額預設固定為負（純文字「−」字元 + MoneyInput negativeByDefault），不提供正負切換；
+ * 呼叫端傳入 allowSign 時改用 MoneyInput 的正負切換鈕，讓該項目可視需要改列為加項（見 allowSign prop）。
  */
-export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, disabled = false }: OtherDeductionsEditorProps) {
+export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange, disabled = false, allowSign = false }: OtherDeductionsEditorProps) {
   return (
     <div className="flex flex-col gap-2">
       {rows.map(row => {
@@ -70,10 +73,20 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
                   </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg text-neutral-mid">−</span>
-                <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} negativeByDefault disabled={disabled} />
-              </div>
+              {allowSign ? (
+                <MoneyInput
+                  value={row.amount}
+                  onChange={value => onChange(row.id, { amount: value })}
+                  allowSign
+                  negativeByDefault
+                  disabled={disabled}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg text-neutral-mid">−</span>
+                  <MoneyInput value={row.amount} onChange={value => onChange(row.id, { amount: value })} negativeByDefault disabled={disabled} />
+                </div>
+              )}
             </div>
           );
         }
@@ -96,10 +109,27 @@ export default function OtherDeductionsEditor({ rows, onAdd, onRemove, onChange,
             </div>
             <div>
               <Label required>金額</Label>
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg text-neutral-mid">−</span>
-                <MoneyInput widthClassName="w-full" value={row.amount} onChange={value => onChange(row.id, { amount: value })} negativeByDefault disabled={disabled} />
-              </div>
+              {allowSign ? (
+                <MoneyInput
+                  widthClassName="w-full"
+                  value={row.amount}
+                  onChange={value => onChange(row.id, { amount: value })}
+                  allowSign
+                  negativeByDefault
+                  disabled={disabled}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg text-neutral-mid">−</span>
+                  <MoneyInput
+                    widthClassName="w-full"
+                    value={row.amount}
+                    onChange={value => onChange(row.id, { amount: value })}
+                    negativeByDefault
+                    disabled={disabled}
+                  />
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => onRemove(row.id)} disabled={disabled}>

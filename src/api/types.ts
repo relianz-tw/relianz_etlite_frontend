@@ -1377,8 +1377,8 @@ export interface SettleEventListDetailDto {
   balanceBefore: number;
   /** 沖後餘額 */
   balanceAfter: number;
-  /** 該原單已核銷的折讓／退貨合計金額（負值代表折讓）；不為 0 時取絕對值取代 originAmount 顯示 */
-  allowanceTotalAmount: number;
+  /** 憑證摘要 */
+  summary: string;
 }
 
 /** GET /ael/ledger/settle/event/list 回應單筆沖帳事件；供「沖帳紀錄」清單顯示與就地復原使用 */

@@ -16,6 +16,17 @@ import type { ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 const PLATFORM_FEE_SUBJECT_VALUE = '電商平台費';
 
 /**
+ * 計算實際存入／付出金額：手續費、電商平台扣款、額外金額的加減效果以「沖帳金額本身的方向」為準，
+ * 而非直接相加——沖帳金額為負時（如逐筆沖帳全選退款／折讓交易，淨額為負），「+」調整項代表加重
+ * 負擔（讓金額往負的方向增加），「−」代表減輕負擔，維持「+ 增加、− 減少」的直覺，不因沖帳金額
+ * 恰好帶負號就讓調整項的正負看起來反過來。沖帳金額為正（一般情況）時等同直接相加，行為不變。
+ */
+export function computeActualAmount(statementAmount: number, adjustmentsTotal: number): number {
+  const direction = statementAmount < 0 ? -1 : 1;
+  return statementAmount + direction * adjustmentsTotal;
+}
+
+/**
  * 反向沖帳判定（顯示用）：對帳單金額或實際存入／付出金額為負，代表本次金流方向與
  * 目前 side 相反（見 ReconciliationView 的 isReversed、DESIGN.md「Reversed Settlement Panel」）。
  * 供確認／結果彈窗判斷金額要不要翻面顯示；不能改用 ReconciliationView 的 isReversed ——

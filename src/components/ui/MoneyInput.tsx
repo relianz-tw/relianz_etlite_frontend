@@ -15,6 +15,9 @@ interface MoneyInputProps {
   allowSign?: boolean;
   /** allowSign 開啟時，value 為 0（尚未輸入）時切換鈕的預設方向；僅影響尚未輸入前的視覺與後續輸入的正負號 */
   negativeByDefault?: boolean;
+  /** 設定後，allowSign 切換鈕固定顯示此方向且不可點（整組淡化），輸入的數字一律套用此正負號；
+   *  用於業務上恆為扣款／恆為加項的欄位（如沖帳中心的電商平台扣款）。輸入框本身仍可編輯。 */
+  lockedSign?: 1 | -1;
   /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
   aiFilled?: boolean;
 }
@@ -28,12 +31,13 @@ export default function MoneyInput({
   readOnly,
   allowSign,
   negativeByDefault,
+  lockedSign,
   aiFilled,
 }: MoneyInputProps) {
   // value 為 0 時正負號無法從數值本身判斷（0 與 -0 顯示相同），故另外保留一份「目前選定的正負號」，
   // 供使用者尚未輸入數字前先切換方向，之後輸入的數字即套用此方向
   const [zeroSign, setZeroSign] = useState<1 | -1>(negativeByDefault ? -1 : 1);
-  const sign: 1 | -1 = value !== 0 ? (value < 0 ? -1 : 1) : zeroSign;
+  const sign: 1 | -1 = lockedSign ?? (value !== 0 ? (value < 0 ? -1 : 1) : zeroSign);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, '');
@@ -42,6 +46,7 @@ export default function MoneyInput({
   };
 
   const handleSetSign = (nextSign: 1 | -1) => {
+    if (lockedSign) return;
     if (nextSign === sign) return;
     if (value !== 0) onChange?.(-value);
     else setZeroSign(nextSign);
@@ -64,13 +69,13 @@ export default function MoneyInput({
         <div
           className={cn(
             'flex h-7 shrink-0 items-center gap-0.5 rounded-md bg-surface-cream p-0.5',
-            (disabled || readOnly) && 'cursor-not-allowed opacity-50',
+            (disabled || readOnly || lockedSign) && 'cursor-not-allowed opacity-50',
           )}
         >
           <button
             type="button"
             onClick={() => handleSetSign(1)}
-            disabled={disabled || readOnly}
+            disabled={disabled || readOnly || !!lockedSign}
             aria-label="設為正值"
             aria-pressed={sign === 1}
             className={cn(
@@ -83,7 +88,7 @@ export default function MoneyInput({
           <button
             type="button"
             onClick={() => handleSetSign(-1)}
-            disabled={disabled || readOnly}
+            disabled={disabled || readOnly || !!lockedSign}
             aria-label="設為負值"
             aria-pressed={sign === -1}
             className={cn(

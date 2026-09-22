@@ -41,7 +41,7 @@ import {
   resolveCatchAllKey,
 } from './data';
 import type { ReconGroup, ReconGroupOption } from './data';
-import { previewSettle, submitPlatformFeeVoucherSettles, submitSettle, submitSingleSettle } from './settle';
+import { computeActualAmount, previewSettle, submitPlatformFeeVoucherSettles, submitSettle, submitSingleSettle } from './settle';
 import { buildSettleChannels, validateAllocationRows } from './targets';
 import type { ReconAllocationInfo, ReconMode, ReconSettleResult, ReconSide, ReconTxnRef } from './types';
 import { useReconTargets } from './useReconTargets';
@@ -357,7 +357,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   }, [summaryReviewing]);
 
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
-  const depositAmount = statementAmount + feeAmount + platformFeeAmount + otherDeductionsTotal;
+  const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
   const settleAmount = statementAmount;
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
   // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用

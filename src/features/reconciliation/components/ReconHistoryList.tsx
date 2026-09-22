@@ -12,7 +12,10 @@ import { useSettleEventHistory } from '../useSettleEventHistory';
 import ReconHistoryCard from './ReconHistoryCard';
 import ReconHistoryReverseModal from './ReconHistoryReverseModal';
 
-const HEADER_CLASS = 'text-xs font-semibold text-neutral-mid';
+// 欄位精簡至 8 欄後改用 13px（比系統預設的 Record Row 表頭 text-xs 大一階），
+// 讓表頭在版面中更有存在感；仍小於上方 TabBar（text-sm）與下方分組日期標頭（15px），避免三者字級混在一起看不出主次
+// （見 DESIGN.md「Record Row」章節之沖帳紀錄表頭字級例外說明）
+const HEADER_CLASS = 'text-[13px] font-semibold text-neutral-mid';
 
 interface ReconHistoryListProps {
   side: ReconSide;
@@ -77,16 +80,14 @@ export default function ReconHistoryList({ side, dateFrom, dateTo, unlimitedDate
   return (
     <div className="flex flex-col gap-4 min-[1300px]:gap-2 pb-4">
       {/* 桌機表頭：與 ReconHistoryCard 桌機列欄寬一一對應 */}
-      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2 min-[1300px]:flex">
+      <div className="hidden items-center gap-3 border-b border-neutral-blue-gray/20 px-3 pb-2.5 min-[1300px]:flex">
         <span className={cn(HEADER_CLASS, 'w-14 shrink-0')}>時間</span>
         <span className={cn(HEADER_CLASS, 'w-16 shrink-0')}>交易狀態</span>
-        <span className={cn(HEADER_CLASS, 'w-28 shrink-0')}>對象</span>
+        <span className={cn(HEADER_CLASS, 'w-32 shrink-0')}>對象</span>
         <span className={cn(HEADER_CLASS, 'w-14 shrink-0 text-right')}>筆數</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>{isPayable ? '應付金額' : '應收金額'}</span>
-        <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>沖帳金額</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>手續費及額外</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>{isPayable ? '實際付款金額' : '實際存入金額'}</span>
-        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>{isPayable ? '應付餘額' : '應收餘額'}</span>
+        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>沖前餘額</span>
+        <span className={cn(HEADER_CLASS, 'w-20 shrink-0 text-right')}>沖後餘額</span>
+        <span className={cn(HEADER_CLASS, 'w-24 shrink-0 text-right')}>{isPayable ? '實際付款金額' : '實際存入金額'}</span>
         <span className={cn(HEADER_CLASS, 'ml-3 min-w-0 flex-1')}>{isPayable ? '付款帳戶' : '存入帳戶'}</span>
         <span className="w-[68px] shrink-0" />
       </div>
