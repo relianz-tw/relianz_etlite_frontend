@@ -18,6 +18,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import FilterBar from './components/FilterBar';
 import LedgerCards from './components/LedgerCards';
 import LedgerTable from './components/LedgerTable';
+import LedgerTabs from './components/LedgerTabs';
 import SummaryCards from './components/SummaryCards';
 import { mapPayableItemsToRows, mapReceivableItemsToRows } from './data';
 import { defaultChartRange } from './summary';
@@ -263,9 +264,12 @@ export default function LedgerView() {
   return (
     <div className="min-h-screen bg-surface-off-white">
       <div className="mx-auto max-w-[1200px] px-4 pt-4 pb-7 nav:px-7 nav:pt-7">
-        <div className="mb-6">
-          <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">帳簿</h1>
-          <p className="mt-1 text-sm text-neutral-mid">有開立發票或收據的交易</p>
+        <div className="mb-6 flex flex-col gap-4 nav:flex-row nav:items-start nav:justify-between">
+          <div>
+            <h1 className="font-notoSerif text-[26px] font-semibold tracking-tight text-neutral-dark nav:text-[28px]">帳簿</h1>
+            <p className="mt-1 text-sm text-neutral-mid">有開立發票或收據的交易</p>
+          </div>
+          <LedgerTabs active="overview" />
         </div>
 
         <div className="mb-5">
