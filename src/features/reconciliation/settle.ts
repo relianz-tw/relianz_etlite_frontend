@@ -3,8 +3,11 @@
  * 進項（counterpartyUuid／paymentAmount）欄位不同，這裡統一轉換為共用的 ReconSettleResult 形狀，
  * 讓 ReconciliationView 與下游元件不需要再依 side 分別處理型別（見 ./types.ts 的 ReconSettleResult）。
  *
- * 符號約定：UI 側手續費與額外金額以「帶號」輸入（扣減項預設為負），API 欄位語意為「正的扣減金額」，
- * 因此本模組於送出 API 前統一對 feeAmount 與 otherDeductions[].amount 做反號。UI 狀態不動。
+ * 符號約定：UI 側手續費、電商平台扣款、額外金額以「帶號」輸入，送出 API 前一律經 toApiAdjustment
+ * 依沖帳金額（settleAmount）本身的方向反轉——沖帳金額為正的一般情況等同直接反號（UI 負的扣減項
+ * → API 正值）；沖帳金額為負（反向沖帳，見 computeActualAmount）時，UI「+」代表加重應付負擔，
+ * 此時改為原值送出（不反號），確保 API 收到的 settleAmount－各調整項＝depositAmount 這個關係式
+ * 在兩種情境下都成立（見 toApiAdjustment 說明）。UI 狀態本身不受影響。
  */
 import { previewSettlePayable, previewSettleReceivable, settlePayable, settlePayableSummary, settleReceivable, settleReceivableSummary } from '@/api/ledger';
 import { filterOfficialSubjects } from '@/api/subjects';
@@ -34,17 +37,27 @@ export function computeActualAmount(statementAmount: number, adjustmentsTotal: n
  */
 export const isReversedSettleResult = (r: ReconSettleResult) => r.settleAmount < 0 || r.actualAmount < 0;
 
-/** 應收側 ecommercePlatformFee 物件：UI 帶號（負）輸入，API 欄位語意為正的金額，故反號；僅應收 API 支援此欄位 */
-function toEcommercePlatformFee(platformFeeAmount: number): SettleEcommercePlatformFee {
-  return { feeAmount: -platformFeeAmount };
+/**
+ * 調整項（手續費／電商平台扣款／額外金額）送往 API 前的正負轉換：沖帳金額（settleAmount）為正的
+ * 一般情況，直接反號（UI 負的扣減項 → API 正值，符合「API 欄位語意為正的扣減金額」）；沖帳金額為負
+ * （反向沖帳）時改為原值送出，讓 API 端「settleAmount－調整項＝depositAmount」這個關係式在兩種情境
+ * 下都成立——與 computeActualAmount 的 direction 邏輯互為反運算，兩者須同步修改。
+ */
+function toApiAdjustment(settleAmount: number, uiValue: number): number {
+  const direction = settleAmount < 0 ? -1 : 1;
+  return -direction * uiValue;
 }
 
-function toOtherDeductions(rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
+/** 應收側 ecommercePlatformFee 物件：僅應收 API 支援此欄位（正負轉換見 toApiAdjustment） */
+function toEcommercePlatformFee(settleAmount: number, platformFeeAmount: number): SettleEcommercePlatformFee {
+  return { feeAmount: toApiAdjustment(settleAmount, platformFeeAmount) };
+}
+
+function toOtherDeductions(settleAmount: number, rows: ReconOtherDeductionRow[]): SettleSummaryOtherDeduction[] | undefined {
   if (rows.length === 0) return undefined;
-  // UI 帶號（負）→ API 正值（扣減金額語意），此處反號
   return rows.map(r => ({
     name: r.name,
-    amount: -r.amount,
+    amount: toApiAdjustment(settleAmount, r.amount),
     officialAccountingSubjectId: r.subject!.id!,
     companyAccountingSubjectUuid: r.subject!.companyAccountingSubjectUuid,
   }));
@@ -76,8 +89,8 @@ interface PreviewParams {
  * ledgerUuids 與 isDefault=false，僅針對勾選的原單試算（見 api.md settle/preview）。
  */
 export async function previewSettle(params: PreviewParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { feeAmount: -params.feeAmount };
-  const otherDeductions = toOtherDeductions(params.otherDeductions);
+  const allocations: SettleSummaryFee = { feeAmount: toApiAdjustment(params.settleAmount, params.feeAmount) };
+  const otherDeductions = toOtherDeductions(params.settleAmount, params.otherDeductions);
   const isDefault = params.isDefault ?? true;
   const ledgerUuids = params.ledgerUuids ?? [];
 
@@ -92,7 +105,7 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       balanceUsed: 0,
       allocations,
       otherDeductions,
-      ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
+      ecommercePlatformFee: toEcommercePlatformFee(params.settleAmount, params.platformFeeAmount),
     });
     return {
       settleAmount: res.settleAmount,
@@ -150,8 +163,8 @@ interface SummaryParams {
  * （見 ReconciliationView 的 depositAmount 計算）。
  */
 export async function submitSettle(params: SummaryParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee = { feeAmount: -params.feeAmount };
-  const otherDeductions = toOtherDeductions(params.otherDeductions);
+  const allocations: SettleSummaryFee = { feeAmount: toApiAdjustment(params.settleAmount, params.feeAmount) };
+  const otherDeductions = toOtherDeductions(params.settleAmount, params.otherDeductions);
 
   if (params.side === 'receivable') {
     const res = await settleReceivableSummary({
@@ -163,7 +176,7 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       balanceUsed: 0,
       allocations,
       otherDeductions,
-      ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
+      ecommercePlatformFee: toEcommercePlatformFee(params.settleAmount, params.platformFeeAmount),
     });
     return {
       settleAmount: res.settleAmount,
@@ -227,8 +240,8 @@ interface SingleSettleParams {
  * 手動沖帳 API 沒有 balanceBefore／balanceAfter 的概念（不影響管道／廠商餘額），對應欄位留空。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
-  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ feeAmount: -params.feeAmount }] : [];
-  const otherDeductions = toOtherDeductions(params.otherDeductions);
+  const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ feeAmount: toApiAdjustment(params.settleAmount, params.feeAmount) }] : [];
+  const otherDeductions = toOtherDeductions(params.settleAmount, params.otherDeductions);
 
   const res =
     params.side === 'receivable'
@@ -242,7 +255,7 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
           memo: '',
           allocations,
           otherDeductions,
-          ecommercePlatformFee: toEcommercePlatformFee(params.platformFeeAmount),
+          ecommercePlatformFee: toEcommercePlatformFee(params.settleAmount, params.platformFeeAmount),
         })
       : await settlePayable({
           ledgerUuid: params.ledgerUuid,

@@ -99,7 +99,7 @@ interface ReconPoolPanelProps {
  * 逐筆沖帳／匯總沖帳共用同一份 UI，差異僅在標頭是否顯示已選筆數與已選交易區塊（逐筆沖帳才顯示）。
  * 金額欄位一律為「總金額」；銀行手續費與每筆額外金額預設為減項但可用 MoneyInput 的正負切換鈕改列為加項，
  * 電商平台扣款（僅應收）則固定鎖在負值（lockedSign，切換鈕整組淡化不可點）。三者與沖帳金額加總即為
- * 實際存入/付出金額（對應 API 的 depositAmount／paymentAmount）。
+ * 實際存入/付出金額（對應 API 的 depositAmount／paymentAmount，見 settle.ts computeActualAmount）。
  * 欄位固定上下堆疊（label 在上、輸入框在下 w-full）：本卡片寬度固定在 340px 左右的窄欄，不隨桌機斷點跟著
  * 加寬，若沿用左右並排寫法會被擠壓變形。
  */
@@ -256,7 +256,16 @@ export default function ReconPoolPanel({
         {side === 'receivable' && (
           <div className="flex flex-col gap-1.5">
             <span className="text-sm text-neutral-dark">電商平台扣款</span>
-            <MoneyInput value={platformFeeAmount} onChange={onPlatformFeeAmountChange} allowSign lockedSign={-1} disabled={amountDisabled} />
+            {/* 切換鈕仍鎖死不可點，僅顯示方向：平常鎖負（扣款）；「本次沖帳已轉為應付」時鎖正——
+                此時金額本身仍是加重應付負擔的效果，交由 computeActualAmount 依沖帳金額方向計算，
+                鎖正後輸入的數字改存正值，送出 API 前依原本慣例統一反號（見 settle.ts toEcommercePlatformFee） */}
+            <MoneyInput
+              value={platformFeeAmount}
+              onChange={onPlatformFeeAmountChange}
+              allowSign
+              lockedSign={showNegativeSelectionHint ? 1 : -1}
+              disabled={amountDisabled}
+            />
             {platformFeeAmount !== 0 &&
               (platformFeeVoucherTotal === Math.abs(platformFeeAmount) ? (
                 <p className="flex items-center justify-between text-xs text-semantic-success">
