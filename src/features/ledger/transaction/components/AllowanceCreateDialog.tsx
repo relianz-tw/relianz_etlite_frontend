@@ -140,7 +140,15 @@ function AllowanceCreateDialogContent({
               *
             </span>
           </span>
-          <MoneyInput widthClassName="w-36" value={netAmount} onChange={setNetAmount} disabled={submitting} />
+          <MoneyInput
+            widthClassName="w-36"
+            value={netAmount}
+            onChange={v => {
+              setNetAmount(v);
+              setTaxAmount(Math.round(v * 0.05));
+            }}
+            disabled={submitting}
+          />
         </div>
 
         <div className="flex items-center justify-between gap-4">
