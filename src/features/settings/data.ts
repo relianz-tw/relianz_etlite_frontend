@@ -159,8 +159,6 @@ export interface VendorRecord {
   bankAccountNumber: string;
   remark: string;
   isActive: boolean;
-  /** 當前餘額（進項匯總沖帳超沖/少沖記餘額時異動） */
-  balance: number;
 }
 
 export const SETTINGS_VENDORS: VendorRecord[] = [
@@ -176,7 +174,6 @@ export const SETTINGS_VENDORS: VendorRecord[] = [
     bankAccountNumber: '822-01256789012',
     remark: '',
     isActive: true,
-    balance: 0,
   },
   {
     id: 'V002',
@@ -190,6 +187,5 @@ export const SETTINGS_VENDORS: VendorRecord[] = [
     bankAccountNumber: '',
     remark: '',
     isActive: true,
-    balance: 0,
   },
 ];

@@ -18,14 +18,10 @@ export interface LinkedLedgerTxn {
   amount: number;
   /** 發票字軌＋號碼；無票為空字串 */
   voucherNumber: string;
-  /** 該原單沖銷前剩餘金額 */
-  balanceBefore: number;
-  /** 該原單沖銷後剩餘金額 */
-  balanceAfter: number;
 }
 
 /** 銀行帳戶總覽的單筆沖帳事件（由 POST /ael/bankAccounts/transactions 回應的 BankSettleEventDto 對映，
- *  見 data.ts 的 mapSettleEventToRow）；沖帳事件本身無逐筆累計餘額，餘額僅存在於各筆 details 原單明細。 */
+ *  見 data.ts 的 mapSettleEventToRow）。 */
 export interface BankTxnRow {
   /** 沖帳事件 uuid，列表 key 與交易明細頁路由參數 */
   settleEventUuid: string;

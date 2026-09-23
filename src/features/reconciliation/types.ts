@@ -28,10 +28,6 @@ export interface ReconSettleResult {
   appliedSettleAmount: number;
   /** 實際異動銀行金額 */
   actualAmount: number;
-  /** 沖前餘額（廠商／銷售管道）；逐筆沖帳勾 1 筆走手動沖帳 API 無此欄位 */
-  balanceBefore?: number;
-  /** 沖後餘額（廠商／銷售管道）；逐筆沖帳勾 1 筆走手動沖帳 API 無此欄位 */
-  balanceAfter?: number;
   /** 實際有分配金額的原單筆數 */
   affectedCount: number;
   /** 拆帳前各原單 remaining 合計 */

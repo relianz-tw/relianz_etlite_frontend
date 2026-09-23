@@ -180,8 +180,6 @@ function SettlementEditDialogContent({
           depositChannels: [{ isBankAccount: true, bankAccountUuid, amount: depositAmount }],
           settleAmount: amount,
           depositAmount,
-          // 本對話框僅供編輯既有單筆沖帳金額，無「使用餘額」欄位，固定不使用餘額
-          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions: otherDeductionsBody,
@@ -193,7 +191,6 @@ function SettlementEditDialogContent({
           paymentChannels: [{ isBankAccount: true, bankAccountUuid, amount: depositAmount }],
           settleAmount: amount,
           paymentAmount: depositAmount,
-          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions: otherDeductionsBody,

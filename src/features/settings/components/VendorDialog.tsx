@@ -2,7 +2,6 @@
 
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import MoneyInput from '@/components/ui/MoneyInput';
 import Textarea from '@/components/ui/Textarea';
 import TextInput from '@/components/ui/TextInput';
 import { vendorExists } from '@/api/vendors';
@@ -30,7 +29,6 @@ const EMPTY_FORM: Omit<VendorRecord, 'id'> = {
   bankAccountNumber: '',
   remark: '',
   isActive: true,
-  balance: 0,
 };
 
 export default function VendorDialog({ open, onClose, onSubmit, initial }: VendorDialogProps) {
@@ -105,14 +103,6 @@ export default function VendorDialog({ open, onClose, onSubmit, initial }: Vendo
           </div>
         </div>
         {error && <p className="-mt-2 text-xs text-semantic-error">{error}</p>}
-
-        {/* 新增廠商時後端無法指定期初餘額（僅結算時自動異動），故僅編輯既有廠商時開放調整 */}
-        {initial && (
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-sm font-semibold text-neutral-dark">當前餘額</label>
-            <MoneyInput widthClassName="w-40" value={form.balance} onChange={value => setForm(f => ({ ...f, balance: value }))} />
-          </div>
-        )}
 
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">地址</label>

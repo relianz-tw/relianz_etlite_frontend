@@ -27,8 +27,6 @@ function mapDetailToLinked(detail: BankSettleEventDetailDto): LinkedLedgerTxn {
     subjectName: detail.subjectName,
     amount: detail.amount,
     voucherNumber: detail.voucherNumber,
-    balanceBefore: detail.balanceBefore,
-    balanceAfter: detail.balanceAfter,
   };
 }
 

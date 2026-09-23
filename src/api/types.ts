@@ -18,8 +18,6 @@ export interface VendorDto {
   remark: string;
   createdAt: string;
   updatedAt: string;
-  /** 廠商當前餘額（進項匯總沖帳超沖/少沖記餘額時異動）；後端 GET 回應偶見字串格式，讀取時一律 Number() 正規化 */
-  balance: number;
 }
 
 export type CreateVendorBody = Pick<
@@ -41,7 +39,6 @@ export type UpdateVendorBody = Pick<
   | 'accountNo'
   | 'remark'
   | 'isActive'
-  | 'balance'
 >;
 
 export interface VendorExistsResult {
@@ -334,8 +331,6 @@ export interface ChannelRuleDto {
   remark: string;
   createdAt: string;
   updatedAt: string;
-  /** 銷售管道當前餘額（銷項匯總沖帳超沖/少沖記餘額時異動）；後端回應偶見字串格式，讀取時一律 Number() 正規化 */
-  balance: number;
 }
 
 export type CreateChannelRuleBody = Pick<
@@ -347,7 +342,7 @@ export type CreateChannelRuleBody = Pick<
 };
 
 /** PATCH /ael/payment/channelRules body 的 uuid 為渠道 uuid，與回應 DTO 的 channelUuid 為同一值但欄位名不同（api.md 第 10224、10237 行） */
-export type UpdateChannelRuleBody = CreateChannelRuleBody & Pick<ChannelRuleDto, 'balance'> & { uuid: string };
+export type UpdateChannelRuleBody = CreateChannelRuleBody & { uuid: string };
 
 /**
  * 建立進項應付交易紀錄（POST /ael/ledger/payables）body。
@@ -928,8 +923,6 @@ export interface SettleReceivableBody {
   settleAmount: number;
   /** 實際存入 */
   depositAmount: number;
-  /** 使用餘額 */
-  balanceUsed: number;
   /** 備註 */
   memo: string;
   /** 沖帳手續費物件 */
@@ -953,8 +946,6 @@ export interface SettlePayableBody {
   settleAmount: number;
   /** 實際付款 */
   paymentAmount: number;
-  /** 使用餘額 */
-  balanceUsed: number;
   /** 備註 */
   memo: string;
   /** 沖帳手續費物件 */
@@ -1003,7 +994,6 @@ export interface SettleSummaryOtherDeduction {
 /**
  * 手動沖帳（POST /ael/ledger/receivables/settle、/ael/ledger/payables/settle）回應 data 區塊，
  * 銷項／進項共用同一形狀（見 api.md「手動沖帳銷項應收帳款／進項應付帳款」）。
- * 沒有 balanceBefore／balanceAfter（手動沖帳不影響管道／廠商餘額），也沒有 isBalance（不支援自動記入餘額）。
  */
 export interface ManualSettleResult {
   orderCode: string;
@@ -1074,8 +1064,6 @@ export interface SettleReceivablePreviewBody {
   settleAmount: number;
   /** 銷項實際存入 */
   depositAmount: number;
-  /** 使用餘額 */
-  balanceUsed: number;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   /** 電商平台扣款物件；非應收沖帳中心情境（如手動沖帳編輯）可不傳 */
@@ -1099,8 +1087,6 @@ export interface SettlePayablePreviewBody {
   settleAmount: number;
   /** 進項實際付出 */
   paymentAmount: number;
-  /** 使用餘額 */
-  balanceUsed: number;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   /** 使用者未新增任何額外金額時不傳此參數 */
@@ -1123,10 +1109,6 @@ interface SettlePreviewResultBase {
   settleAmount: number;
   /** 實際沖到原單合計金額 */
   appliedSettleAmount: number;
-  /** 沖前餘額（廠商／銷售管道） */
-  balanceBefore: number;
-  /** 沖後餘額（廠商／銷售管道） */
-  balanceAfter: number;
   /** 拆帳前各原單 remaining 合計 */
   totalBeforeRemaining: number;
   /** 此單是否含折讓／退貨：請求欄位回填 */
@@ -1169,8 +1151,6 @@ export interface SettleReceivableSummaryBody {
   depositChannels: SettleChannel[];
   /** 備註（選填） */
   memo?: string;
-  /** 使用餘額 */
-  balanceUsed: number;
   /** 沖帳手續費物件 */
   allocations: SettleSummaryFee;
   /** 電商平台扣款物件；非應收沖帳中心情境（如手動沖帳編輯）可不傳 */
@@ -1190,8 +1170,6 @@ export interface SettlePayableSummaryBody {
   /** 付款管道 */
   paymentChannels: SettleChannel[];
   memo?: string;
-  /** 使用餘額 */
-  balanceUsed: number;
   allocations: SettleSummaryFee;
   otherDeductions?: SettleSummaryOtherDeduction[];
 }
@@ -1208,10 +1186,6 @@ interface SettleSummaryResultBase {
   settleAmount: number;
   /** 實際沖到原單的合計 */
   appliedSettleAmount: number;
-  /** 沖前餘額（廠商／銷售管道） */
-  balanceBefore: number;
-  /** 沖後餘額（廠商／銷售管道） */
-  balanceAfter: number;
   /** 沖前剩餘合計 */
   totalBeforeRemaining: number;
   /** 唯一匯總結算帳 uuid */
@@ -1346,10 +1320,6 @@ export interface EntryDetailSettleEventDto {
   settleAmount: number;
   /** 實際收付（銷項為存入、進項為付款） */
   cashAmount: number;
-  /** 沖前廠商／銷售管道餘額 */
-  balanceBefore: number;
-  /** 沖後廠商／銷售管道餘額 */
-  balanceAfter: number;
   /** 是否已撤銷 */
   isReverse: boolean;
   /** 目前是否可撤銷（未撤銷且無更新的未撤銷事件） */
@@ -1638,10 +1608,6 @@ export interface BankSettleEventDetailDto {
   originAmount: number;
   /** 本事件對該原單的沖帳金額（非原單累計已沖金額） */
   amount: number;
-  /** 該原單沖銷前剩餘金額 */
-  balanceBefore: number;
-  /** 該原單沖銷後剩餘金額 */
-  balanceAfter: number;
 }
 
 /** POST /ael/bankAccounts/transactions 回應 data */

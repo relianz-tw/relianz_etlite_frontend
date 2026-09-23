@@ -42,8 +42,6 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
   const [actionError, setActionError] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [pendingDeactivate, setPendingDeactivate] = useState<ChannelRuleRecord | null>(null);
-  // balance 不對外開放編輯，但 PATCH 仍需帶回目前值，故獨立於 ChannelRuleRecord 之外保存
-  const [balanceByUuid, setBalanceByUuid] = useState<Record<string, number>>({});
 
   // 各公司「其他」管道的 uuid 不同，但名稱固定為「其他」；已開通過就不再顯示開通按鈕
   const hasOtherChannel = rules.some(rule => rule.channelName === '其他');
@@ -52,10 +50,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     setLoading(true);
     setLoadError('');
     listChannelRules()
-      .then(list => {
-        setRules(list.map(toChannelRuleRecord));
-        setBalanceByUuid(Object.fromEntries(list.map(dto => [dto.channelUuid, dto.balance ?? 0])));
-      })
+      .then(list => setRules(list.map(toChannelRuleRecord)))
       .catch(err => setLoadError(getFriendlyErrorMessage(err)))
       .finally(() => setLoading(false));
   };
@@ -76,7 +71,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
   };
   const handleSubmit = async (data: Omit<ChannelRuleRecord, 'id'>) => {
     if (editing) {
-      await updateChannelRule({ uuid: editing.id, ...data, balance: balanceByUuid[editing.id] ?? 0 });
+      await updateChannelRule({ uuid: editing.id, ...data });
     } else {
       await createChannelRule(data);
     }
@@ -101,7 +96,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     setActionError('');
     try {
       const { id, ...body } = rule;
-      await updateChannelRule({ ...body, uuid: id, isActive: false, balance: balanceByUuid[id] ?? 0 });
+      await updateChannelRule({ ...body, uuid: id, isActive: false });
       loadRules();
     } catch (err) {
       setActionError(getFriendlyErrorMessage(err));
@@ -115,7 +110,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
     setActionError('');
     try {
       const { id, ...body } = rule;
-      await updateChannelRule({ ...body, uuid: id, isActive: true, balance: balanceByUuid[id] ?? 0 });
+      await updateChannelRule({ ...body, uuid: id, isActive: true });
       loadRules();
     } catch (err) {
       setActionError(getFriendlyErrorMessage(err));

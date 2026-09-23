@@ -92,7 +92,7 @@ function defaultDateRange(): { dateFrom: string; dateTo: string } {
  * 3 檢視完整明細並確認送出），各區塊標題加 StepNumber 徽章明示順序
  * （見 @/components/ui/StepNumber、DESIGN.md「Step Number Badge」）。
  * 銷售管道與廠商清單取自真實 API（/ael/payment/channelRules、
- * /ael/vendors，含當前餘額 balance），候選交易取自對帳中心專屬 API（/ael/ledger/reconciliation/receivables、
+ * /ael/vendors），候選交易取自對帳中心專屬 API（/ael/ledger/reconciliation/receivables、
  * /ael/ledger/reconciliation/payables，依 dateRange 篩選、settled 固定帶 false 僅顯示未結清，
  * 一律不帶 paymentChannelUuid／counterpartyUuid 一次抓全部分組），分組比對一律依 uuid 而非名稱字串，
  * 避免同名不同管道/廠商誤判。
@@ -379,9 +379,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用
   const isReversed = depositAmount < 0;
   const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
-  // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining——
-  // 該管道／廠商若已有非零的既有餘額（balanceBefore），後端會自動將其併入本次結算，
-  // 即使 settleAmount 剛好等於 totalBeforeRemaining 仍可能造成超沖/少沖（實測驗證過）；僅用於確認彈窗內提示，不影響是否可送出
+  // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining
+  // （實測驗證過）；僅用於確認彈窗內提示，不影響是否可送出
   const hasDiff = !!previewResult && previewResult.allocations.some(a => a.settlementStatus !== 0);
   // 差額顯示須以「本次實際分配到的原單」沖前剩餘加總為準，不能用 previewResult.totalBeforeRemaining（該管道／廠商
   // 全部未沖交易的合計，含本次完全沒被觸及的其他原單）——否則差額會混入不相干的交易金額，讓使用者誤解沖帳結果

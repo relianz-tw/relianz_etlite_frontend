@@ -102,7 +102,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       ledgerUuids,
       settleAmount: params.settleAmount,
       depositAmount: params.actualAmount,
-      balanceUsed: 0,
       allocations,
       otherDeductions,
       ecommercePlatformFee: toEcommercePlatformFee(params.settleAmount, params.platformFeeAmount),
@@ -111,8 +110,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
       settleAmount: res.settleAmount,
       appliedSettleAmount: res.appliedSettleAmount,
       actualAmount: res.actualDepositAmount,
-      balanceBefore: res.balanceBefore,
-      balanceAfter: res.balanceAfter,
       affectedCount: res.affectedCount,
       totalBeforeRemaining: res.totalBeforeRemaining,
       allocations: res.ledgerAllocations,
@@ -126,7 +123,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     ledgerUuids,
     settleAmount: params.settleAmount,
     paymentAmount: params.actualAmount,
-    balanceUsed: 0,
     allocations,
     otherDeductions,
   });
@@ -134,8 +130,6 @@ export async function previewSettle(params: PreviewParams): Promise<ReconSettleR
     settleAmount: res.settleAmount,
     appliedSettleAmount: res.appliedSettleAmount,
     actualAmount: res.actualPaymentAmount,
-    balanceBefore: res.balanceBefore,
-    balanceAfter: res.balanceAfter,
     affectedCount: res.affectedCount,
     totalBeforeRemaining: res.totalBeforeRemaining,
     allocations: res.ledgerAllocations,
@@ -173,7 +167,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       depositAmount: params.actualAmount,
       paymentDate: params.paymentDate,
       depositChannels: params.channels,
-      balanceUsed: 0,
       allocations,
       otherDeductions,
       ecommercePlatformFee: toEcommercePlatformFee(params.settleAmount, params.platformFeeAmount),
@@ -182,8 +175,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
       settleAmount: res.settleAmount,
       appliedSettleAmount: res.appliedSettleAmount,
       actualAmount: res.actualDepositAmount,
-      balanceBefore: res.balanceBefore,
-      balanceAfter: res.balanceAfter,
       affectedCount: res.affectedCount,
       totalBeforeRemaining: res.totalBeforeRemaining,
       allocations: res.ledgerAllocations,
@@ -198,7 +189,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     paymentAmount: params.actualAmount,
     paymentDate: params.paymentDate,
     paymentChannels: params.channels,
-    balanceUsed: 0,
     allocations,
     otherDeductions,
   });
@@ -206,8 +196,6 @@ export async function submitSettle(params: SummaryParams): Promise<ReconSettleRe
     settleAmount: res.settleAmount,
     appliedSettleAmount: res.appliedSettleAmount,
     actualAmount: res.actualPaymentAmount,
-    balanceBefore: res.balanceBefore,
-    balanceAfter: res.balanceAfter,
     affectedCount: res.affectedCount,
     totalBeforeRemaining: res.totalBeforeRemaining,
     allocations: res.ledgerAllocations,
@@ -236,8 +224,7 @@ interface SingleSettleParams {
  * 逐筆沖帳勾 1 筆：走手動沖帳 API（settleReceivable／settlePayable，reconMethod=0），
  * 允許超沖少沖，事後可在交易明細頁編輯金額（見 SettlementEditDialog）。
  * payload 組法比照該對話框：allocations 為陣列，手續費為 0 時不放此項；otherDeductions 空陣列時送 undefined。
- * 回應正規化為 ReconSettleResult（單一 allocation），讓確認彈窗／結果彈窗能與多筆／匯總沖帳共用同一套元件——
- * 手動沖帳 API 沒有 balanceBefore／balanceAfter 的概念（不影響管道／廠商餘額），對應欄位留空。
+ * 回應正規化為 ReconSettleResult（單一 allocation），讓確認彈窗／結果彈窗能與多筆／匯總沖帳共用同一套元件。
  */
 export async function submitSingleSettle(params: SingleSettleParams): Promise<ReconSettleResult> {
   const allocations: SettleSummaryFee[] = params.feeAmount !== 0 ? [{ feeAmount: toApiAdjustment(params.settleAmount, params.feeAmount) }] : [];
@@ -251,7 +238,6 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
           depositChannels: params.channels,
           settleAmount: params.settleAmount,
           depositAmount: params.actualAmount,
-          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions,
@@ -263,7 +249,6 @@ export async function submitSingleSettle(params: SingleSettleParams): Promise<Re
           paymentChannels: params.channels,
           settleAmount: params.settleAmount,
           paymentAmount: params.actualAmount,
-          balanceUsed: 0,
           memo: '',
           allocations,
           otherDeductions,
@@ -312,7 +297,6 @@ export async function submitPlatformFeeVoucherSettles(vouchers: ReconTxnRef[], p
       paymentChannels: [{ isBankAccount: false, officialAccountingSubjectId: feeSubjectId, amount: voucher.amount }],
       settleAmount: voucher.amount,
       paymentAmount: voucher.amount,
-      balanceUsed: 0,
       memo: '',
       allocations: [],
       otherDeductions: undefined,
