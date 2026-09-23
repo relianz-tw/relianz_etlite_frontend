@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 
@@ -28,20 +28,50 @@ const SIZE_CLASS: Record<NonNullable<BottomSheetProps['size']>, string> = {
   auto: 'max-h-[80vh]',
   tall: 'max-h-[92vh]',
 };
+// 對應 BREAKPOINT_CLASS 的 CSS 斷點寬度（px），供下方 JS 端判斷「桌機是否已把面板 CSS 隱藏掉」使用，
+// 兩邊斷點值須同步：nav 比照 tailwind.config.js 的 theme.screens.nav；wide 比照沖帳中心專用斷點
+const BREAKPOINT_PX: Record<NonNullable<BottomSheetProps['breakpoint']>, number> = {
+  nav: 1000,
+  wide: 1300,
+};
+
+/** 目前視窗寬度是否已達到指定斷點（桌機版），用 useSyncExternalStore 而非 useEffect + useState，
+ *  避免多一次 render 造成的閃爍；SSR 快照固定回傳桌機，真正的值在 hydration 後由 matchMedia 重新計算。 */
+function useIsAboveBreakpoint(px: number): boolean {
+  const query = `(min-width: ${px}px)`;
+  return useSyncExternalStore(
+    callback => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', callback);
+      return () => mql.removeEventListener('change', callback);
+    },
+    () => window.matchMedia(query).matches,
+    () => true,
+  );
+}
 
 /**
- * 行動版底部面板（Bottom Sheet）：手機（< nav 1000px）下把表單疊在當前畫面下方，可下拉／點遮罩／
- * Esc 關閉回到原畫面且狀態不流失（見 DESIGN.md「Bottom Sheet（行動版底部面板）」）。桌機（nav:hidden）
- * 不掛載，呼叫端在桌機改用原本的並排／sticky 面板呈現（見 ReconciliationView 的雙掛載用法）。
+ * 行動版底部面板（Bottom Sheet）：手機（< nav 1000px，或 breakpoint="wide" 時 < 1300px）下把表單疊在
+ * 當前畫面下方，可下拉／點遮罩／Esc 關閉回到原畫面且狀態不流失（見 DESIGN.md「Bottom Sheet（行動版底部
+ * 面板）」）。桌機不掛載，呼叫端在桌機改用原本的並排／sticky 面板呈現（見 ReconciliationView 的雙掛載
+ * 用法）；桌機是否掛載一律以本元件內部的 useIsAboveBreakpoint 為準，不能只靠呼叫端的 `open` 值——
+ * 呼叫端可能在任何寬度都讓 `open` 維持 true（如同一個 previewResult 旗標桌機／行動版共用），
+ * 面板必須自己判斷寬度是否已經到達桌機斷點，避免桌機版背景捲動被行動版的鎖定邏輯誤鎖住。
  * Portal／Escape 監聽／鎖背景捲動邏輯比照 Modal.tsx，僅版面（貼底、可下拉關閉）不同，不共用同一元件
  * 是因為兩者的定位與關閉手勢差異夠大，硬共用反而讓 Modal.tsx 條件分支變多。
  */
 export default function BottomSheet({ open, onClose, title, children, breakpoint = 'nav', size = 'auto' }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const dragStartY = useRef<number | null>(null);
+  // 呼叫端可能在桌機寬度也讓 open 維持 true（如 ReconciliationView 匯總沖帳步驟 3 桌機／行動版共用同一個
+  // previewResult 旗標），此時面板本身只靠 CSS 斷點（BREAKPOINT_CLASS）視覺隱藏、DOM 仍掛著——若照樣鎖背景
+  // 捲動／監聽 Escape，會讓桌機版頁面整個卡死無法捲動。故以 visible 取代 open 作為實際「有沒有顯示」的判斷，
+  // 寬度不到斷點才真正視為開啟；跨過斷點時 useEffect 的 cleanup 會自動解除已鎖的 overflow。
+  const isAboveBreakpoint = useIsAboveBreakpoint(BREAKPOINT_PX[breakpoint]);
+  const visible = open && !isAboveBreakpoint;
 
   useEffect(() => {
-    if (!open) return;
+    if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -52,14 +82,14 @@ export default function BottomSheet({ open, onClose, title, children, breakpoint
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onClose]);
+  }, [visible, onClose]);
 
   // 每次開啟重置拖曳位移，避免上次關閉時的殘留位移影響下次開啟的初始位置
   useEffect(() => {
-    if (open) setDragY(0);
-  }, [open]);
+    if (visible) setDragY(0);
+  }, [visible]);
 
-  if (!open) return null;
+  if (!visible) return null;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     dragStartY.current = e.clientY;
