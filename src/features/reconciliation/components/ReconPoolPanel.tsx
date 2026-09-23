@@ -284,11 +284,6 @@ export default function ReconPoolPanel({
     />
   );
 
-  const depositAmountLabel = (
-    <span className="font-semibold text-neutral-dark">{effectiveSide === 'payable' ? '實際付出金額' : '實際存入金額'}</span>
-  );
-  const depositAmountValue = <span className="font-mono text-base font-semibold tabular-nums text-neutral-dark">{fmtCurrency(displayAmount)}</span>;
-
   const actionButtonBlock = (
     <div className={cn('flex flex-col', wide ? 'items-end' : 'items-stretch')}>
       <Button variant="primary" onClick={onAction} disabled={actionDisabled} className={wide ? 'w-auto' : 'w-full justify-center'}>
@@ -299,10 +294,19 @@ export default function ReconPoolPanel({
     </div>
   );
 
-  // 寬版欄位網格：列 1 三欄（含折讓／對帳單金額／收款日），showActionArea 為 false（尚未選定明確管道／廠商）
-  // 時列 1 自然縮成兩欄（見 DESIGN.md「Recon Pool Panel — Wide Layout」）；列 2 應收兩欄、應付僅一欄
-  const row1ColsClass = showActionArea ? 'min-[1300px]:grid-cols-3' : 'min-[1300px]:grid-cols-2';
+  // 寬版欄位網格：列 1 兩欄（含折讓／對帳單金額），列 2 應收兩欄、應付僅一欄（見 DESIGN.md
+  // 「Recon Pool Panel — Wide Layout」）；收款日改與收款方式同一區塊呈現（見下方 dateAndTargetBlock）
   const row2ColsClass = side === 'receivable' ? 'min-[1300px]:grid-cols-2' : '';
+
+  // 收款日／付款日與沖帳對象（收款方式）合併同一區塊呈現：ReconTargetAllocation 標頭本身已顯示
+  // 「收款方式 · 實際收款金額 $X」，故不再另外重複一份「實際存入金額」摘要列，避免同一數字出現兩次、
+  // 日期又與付款方式分開顯示造成介面凌亂（narrow／wide 排列相同，僅外層容器 mt/border 依上下文微調）
+  const dateAndTargetBlock = (
+    <>
+      {dateBlock}
+      {targetAllocationBlock}
+    </>
+  );
 
   return (
     <div className={cn('rounded-lg border-[1.5px] p-4', showReversedTint ? 'border-brand-tan bg-brand-tan/5' : 'border-brand-blue bg-white')}>
@@ -332,10 +336,9 @@ export default function ReconPoolPanel({
         <>
           <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
             {negativeSelectionHintBlock}
-            <div className={cn('grid gap-4', row1ColsClass)}>
+            <div className="grid gap-4 min-[1300px]:grid-cols-2">
               {includeAllowanceBlock}
               {amountBlock}
-              {showActionArea && dateBlock}
             </div>
           </div>
 
@@ -346,15 +349,12 @@ export default function ReconPoolPanel({
 
           <div className="mt-3">{otherDeductionsBlock}</div>
 
-          {showActionArea && <div className="mt-3">{targetAllocationBlock}</div>}
-
-          <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3 min-[1300px]:flex-row min-[1300px]:items-end min-[1300px]:justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              {depositAmountLabel}
-              {depositAmountValue}
+          {showActionArea && (
+            <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
+              {dateAndTargetBlock}
+              <div className="flex justify-end">{actionButtonBlock}</div>
             </div>
-            {showActionArea && actionButtonBlock}
-          </div>
+          )}
         </>
       ) : (
         <>
@@ -370,17 +370,9 @@ export default function ReconPoolPanel({
             {otherDeductionsBlock}
           </div>
 
-          <div className="mt-4 border-t border-neutral-blue-gray/20 pt-3 text-sm">
-            <div className="flex items-center justify-between">
-              {depositAmountLabel}
-              {depositAmountValue}
-            </div>
-          </div>
-
           {showActionArea && (
             <div className="mt-4 flex flex-col gap-3 border-t border-neutral-blue-gray/20 pt-3">
-              {dateBlock}
-              {targetAllocationBlock}
+              {dateAndTargetBlock}
               {actionButtonBlock}
             </div>
           )}

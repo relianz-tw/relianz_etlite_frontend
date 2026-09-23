@@ -691,14 +691,15 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
 `layout="wide"` 切成多欄網格，避免單一欄位橫向拉成整排、留白過多。窄欄排版不受影響。
 
 ```
-列 1（min-[1300px]:grid-cols-3、gap-4；< 1300px 仍單欄堆疊）：
-  此對帳單是否含折讓、退貨 ｜ 對帳單金額 ｜ 收款日／付款日
+列 1（min-[1300px]:grid-cols-2、gap-4；< 1300px 仍單欄堆疊）：
+  此對帳單是否含折讓、退貨 ｜ 對帳單金額
 列 2（應收 min-[1300px]:grid-cols-2；應付僅銀行手續費一欄，不留空白格）：
   銀行手續費 ｜ 電商平台扣款（含已選憑證提示）
 列 3（整排，不進網格）：額外金額（OtherDeductionsEditor）
-列 4（整排，不進網格）：沖帳對象分配（ReconTargetAllocation）
-底部列：flex items-center justify-between，左側「實際存入/付出金額」（沿用原樣式），
-  右側主要動作按鈕改 w-auto（不再 w-full），actionHint／actionError 置於按鈕下方靠右
+列 4（整排，不進網格，narrow／wide 排列相同）：收款日／付款日 + 沖帳對象分配
+  （ReconTargetAllocation）合併同一區塊——後者標頭本身已顯示「收款方式 · 實際收款金額 $X」，
+  不另外重複一份金額摘要，避免同一數字出現兩次、日期又與收款方式分開顯示造成介面凌亂
+底部列：flex justify-end，主要動作按鈕改 w-auto（不再 w-full），actionHint／actionError 置於按鈕下方靠右
 ```
 對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`（`layout?: 'narrow' | 'wide'`，
 預設 `'narrow'`）。
