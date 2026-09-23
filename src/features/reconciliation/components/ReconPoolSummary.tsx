@@ -2,6 +2,7 @@
 
 import { cn, fmtCurrency } from '@/lib/utils';
 import { CheckCircle2 } from 'lucide-react';
+import type { ReconOtherDeductionRow } from './ReconPoolPanel';
 import type { ReconSettleResult, ReconSide } from '../types';
 
 interface ReconPoolSummaryProps {
@@ -11,6 +12,11 @@ interface ReconPoolSummaryProps {
   /** 排列方式：'narrow'（預設，手機 Bottom Sheet 內沿用原上下堆疊）／'wide'（桌機步驟 3 全寬卡，
    *  上方三列改橫排，見 DESIGN.md「Recon Pool Panel — Wide Layout」） */
   layout?: 'narrow' | 'wide';
+  /** 銀行手續費／電商平台扣款／額外金額：留在步驟 2 輸入，步驟 3 以小字帶出方便核對「對帳單金額」
+   *  為何與「實際存入/付出金額」不同，三者皆為 0／空陣列時不顯示這行 */
+  feeAmount?: number;
+  platformFeeAmount?: number;
+  otherDeductions?: ReconOtherDeductionRow[];
 }
 
 /**
@@ -19,11 +25,25 @@ interface ReconPoolSummaryProps {
  * 實際存入(付出)金額取自 previewResult.actualAmount：換頁後金額面板不再與本卡同框（見
  * ReconciliationView 步驟 2／3 換頁說明），這是送出前使用者最需要核對的數字，故補在此卡呈現。
  */
-export default function ReconPoolSummary({ side, previewResult, layout = 'narrow' }: ReconPoolSummaryProps) {
+export default function ReconPoolSummary({
+  side,
+  previewResult,
+  layout = 'narrow',
+  feeAmount = 0,
+  platformFeeAmount = 0,
+  otherDeductions = [],
+}: ReconPoolSummaryProps) {
   // 差額須以後端試算的 appliedSettleAmount（已併入使用餘額）為準，不可直接用 settleAmount 相減，
   // 否則使用者一旦動用餘額，這裡算出的差額會跟下方沖帳列的差額（見 ReconciliationView 的 diffAmount）對不上
   const diff = previewResult.appliedSettleAmount - previewResult.totalBeforeRemaining;
   const isBalanced = diff === 0;
+
+  // 小字帶出對帳單金額如何變成實際存入/付出金額：三項皆為 0/空陣列時整行不顯示
+  const feeSummaryParts = [
+    feeAmount !== 0 ? `銀行手續費 ${fmtCurrency(feeAmount)}` : null,
+    platformFeeAmount !== 0 ? `電商平台扣款 ${fmtCurrency(platformFeeAmount)}` : null,
+    ...otherDeductions.filter(r => r.amount !== 0).map(r => `${r.name || '額外金額'} ${fmtCurrency(r.amount)}`),
+  ].filter((part): part is string => part !== null);
 
   return (
     <div className="mb-4 flex flex-col gap-1.5 border-b border-neutral-blue-gray/20 pb-4 text-sm">
@@ -41,6 +61,7 @@ export default function ReconPoolSummary({ side, previewResult, layout = 'narrow
           <span className="font-mono tabular-nums">{fmtCurrency(Math.abs(previewResult.actualAmount))}</span>
         </div>
       </div>
+      {feeSummaryParts.length > 0 && <p className="text-xs text-neutral-mid">{feeSummaryParts.join(' · ')}</p>}
       <div
         className={cn('mt-1 flex items-center justify-between border-t pt-2', isBalanced ? 'border-semantic-success/30' : 'border-neutral-blue-gray/30')}
       >

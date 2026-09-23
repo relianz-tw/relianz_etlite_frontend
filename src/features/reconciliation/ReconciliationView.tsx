@@ -905,7 +905,14 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
                                 返回修改
                               </button>
                             </div>
-                            <ReconPoolSummary side={side} previewResult={previewResult} layout="wide" />
+                            <ReconPoolSummary
+                              side={side}
+                              previewResult={previewResult}
+                              layout="wide"
+                              feeAmount={feeAmount}
+                              platformFeeAmount={platformFeeAmount}
+                              otherDeductions={otherDeductions}
+                            />
                             <ReconSettleTermsSummary
                               side={effectiveSide}
                               paymentDate={paymentDate}
@@ -1087,7 +1094,13 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
         <BottomSheet open={previewResult !== null} onClose={clearComputedState} title="本次沖帳明細" breakpoint="wide" size="tall">
           {previewResult && (
             <div className="flex flex-col pb-[calc(12px+env(safe-area-inset-bottom))]">
-              <ReconPoolSummary side={side} previewResult={previewResult} />
+              <ReconPoolSummary
+                side={side}
+                previewResult={previewResult}
+                feeAmount={feeAmount}
+                platformFeeAmount={platformFeeAmount}
+                otherDeductions={otherDeductions}
+              />
               <ReconSettleTermsSummary
                 side={effectiveSide}
                 paymentDate={paymentDate}
