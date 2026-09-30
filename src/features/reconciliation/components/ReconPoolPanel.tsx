@@ -156,8 +156,10 @@ export default function ReconPoolPanel({
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
-  // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值），見 DESIGN.md「Reversed Settlement Panel」
-  const isReversed = depositAmount < 0;
+  // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值），見 DESIGN.md「Reversed Settlement Panel」。
+  // 匯總沖帳排除在外：對帳單金額不可輸入負值，加總為負一律是輸入錯誤，交由 ReconciliationView 的
+  // summaryNegativeTotal 即時擋下，不翻面、不變色（見 DESIGN.md 同章節適用範圍說明）
+  const isReversed = mode !== 'summary' && depositAmount < 0;
   const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
   const displayAmount = Math.abs(depositAmount);
   const dateLabel = effectiveSide === 'payable' ? '付款日' : '收款日';

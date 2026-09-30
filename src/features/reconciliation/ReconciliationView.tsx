@@ -376,8 +376,11 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
   const settleAmount = statementAmount;
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
-  // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用
-  const isReversed = depositAmount < 0;
+  // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用。
+  // 匯總沖帳的對帳單金額欄位不允許輸入負值，加總為負一定是減項（銀行手續費／電商平台扣款／額外金額）
+  // 吃掉本金的輸入錯誤，不套用反向沖帳翻面（見 DESIGN.md「Reversed Settlement Panel」），直接擋下送出
+  const summaryNegativeTotal = mode === 'summary' && depositAmount < 0;
+  const isReversed = mode !== 'summary' && depositAmount < 0;
   const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;
   // 差額判斷須以逐筆拆帳狀態（settlementStatus）為準，不能只比較 settleAmount 與 totalBeforeRemaining
   // （實測驗證過）；僅用於確認彈窗內提示，不影響是否可送出
@@ -504,6 +507,8 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 需選收/付款日、分出對象需填完整且加總不可超過實際存入/付出金額
   const validateAmountInputs = (): string => {
     if (statementAmount === 0) return `請先輸入${mode === 'perTxn' ? '沖帳' : '對帳單'}金額`;
+    // 匯總沖帳加總為負視為輸入錯誤（見上方 summaryNegativeTotal 說明），不比照逐筆沖帳的反向沖帳合法放行
+    if (summaryNegativeTotal) return '加總金額不可為負，請確認銀行手續費、電商平台扣款與額外金額';
     // 反向沖帳（見上方 isReversed 說明）合法，僅擋下「減項把金額吃到跟輸入方向相反」這種真正的輸入錯誤
     if (statementAmount > 0 && depositAmount < 0) return '實際存入金額不可為負，請確認銀行手續費與額外金額';
     if (statementAmount < 0 && depositAmount > 0) return '實際付出金額不可為正，請確認銀行手續費與額外金額';
@@ -711,12 +716,14 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   const actionDisabled =
     mode === 'perTxn'
       ? previewLoading || statementAmount === 0 || selectedUuids.size === 0 || (selectedUuids.size > 1 && !canSettle)
-      : previewLoading || statementAmount === 0;
+      : previewLoading || statementAmount === 0 || summaryNegativeTotal;
   // 逐筆沖帳勾多筆但尚未選定明確管道／廠商時，提示原因而非讓使用者按下去才失敗
   const actionHint =
     mode === 'perTxn' && selectedUuids.size > 1 && !canSettle
       ? `多筆沖帳需先於上方選擇單一${side === 'receivable' ? '銷售管道' : '廠商'}才能送出`
       : undefined;
+  // 匯總沖帳加總為負：不等使用者按下「確認沖帳」才報錯，直接即時顯示於金額面板（見 poolPanelBaseProps.actionError）
+  const summaryNegativeTotalError = summaryNegativeTotal ? '加總金額不可為負，請確認銀行手續費、電商平台扣款與額外金額' : '';
   // 逐筆沖帳一律以「已勾選至少 1 筆」決定是否顯示動作區，不隨管道是否明確增減掛載／卸載——
   // 否則勾選第一筆交易時這塊區域才出現，會把下方交易清單往下推，使接續快速勾選的第二、三筆點擊座標對不準（實測會漏勾）
   // 匯總沖帳進入檢視確認階段（summaryReviewing）後步驟 2 整張卡（含金額面板）直接換成步驟 3 明細卡，
@@ -766,7 +773,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
     showActionArea,
     actionLabel,
     actionDisabled,
-    actionError: previewError,
+    actionError: summaryNegativeTotalError || previewError,
     actionHint,
     onAction: handleOpenConfirm,
     targetOptions: reconTargets.options,
