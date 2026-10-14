@@ -53,6 +53,19 @@ export function ReportTable({ reportId, table }: ReportTableProps) {
                       onChange={e => dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: e.target.value } })}
                     />
                   )}
+                  {col.type === 'decimal' && (
+                    <TextInput
+                      inputMode='decimal'
+                      value={typeof data.value === 'string' ? data.value : String(data.value)}
+                      aiFilled={data.aiFilled}
+                      onChange={e =>
+                        dispatch({
+                          type: 'SET_REPORT_ROW_FIELD',
+                          payload: { reportId, index, key: col.key, value: e.target.value.replace(/[^\d.]/g, '') },
+                        })
+                      }
+                    />
+                  )}
                   {col.type === 'date' && (
                     <DatePicker
                       value={data.value ? new Date(data.value) : undefined}

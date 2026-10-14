@@ -2,8 +2,9 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { completeInitialization } from '@/api/initialization';
-import { MobileFixedBottom } from '@/components/onboarding/MobileFixedBottom';
+import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
+import SectionCard from '@/components/ui/SectionCard';
 import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -29,33 +30,27 @@ export function Step6Done() {
   };
 
   return (
-    <div className='flex flex-col items-center flex-1 min-h-0 p-5 md:p-12 md:overflow-y-auto text-center'>
-      <div className='flex flex-1 flex-col items-center justify-center gap-4 max-w-md'>
+    <>
+      <StepPageHeader kicker='完成' title={isUnderOneYear ? '已可開始使用' : '開帳設定完成'} nav={{ onNext: handleStart, nextLabel: '開始使用' }} />
+
+      <SectionCard className='items-center gap-4 py-10 text-center'>
         {isUnderOneYear ? (
           <>
             <TriangleAlert size={40} className='text-brand-tan' />
-            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark'>已可開始使用</h1>
-            <p className='text-sm text-neutral-mid'>
+            <p className='max-w-md text-sm text-neutral-mid'>
               您尚未有結算申報書可供核對，帳務起點暫以 0 計算。日後結算申報完成，建議儘快補上申報書讓報表數字更準確。
             </p>
-            <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })} className='w-full'>
+            <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })}>
               前往上傳結算申報書
             </Button>
           </>
         ) : (
           <>
             <CircleCheck size={40} className='text-semantic-success' />
-            <h1 className='text-xl md:text-2xl font-bold text-neutral-dark'>開帳設定完成</h1>
-            <p className='text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，即可開始使用 Easytax Lite 記帳。</p>
+            <p className='max-w-md text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，即可開始使用 Easytax Lite 記帳。</p>
           </>
         )}
-      </div>
-
-      <MobileFixedBottom>
-        <Button onClick={handleStart} className='w-full'>
-          開始使用
-        </Button>
-      </MobileFixedBottom>
-    </div>
+      </SectionCard>
+    </>
   );
 }

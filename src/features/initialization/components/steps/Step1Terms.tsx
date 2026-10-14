@@ -1,10 +1,11 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { btnPrimaryDisableable } from '../../styles';
 import { agreeInitializationTerms } from '@/api/initialization';
-import { MobileFixedBottom } from '@/components/onboarding/MobileFixedBottom';
+import { StepPageHeader } from '@/components/initialization/StepPageHeader';
+import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 export function Step1Terms() {
@@ -21,10 +22,10 @@ export function Step1Terms() {
   };
 
   return (
-    <div className='flex flex-col flex-1 min-h-0 p-5 md:p-12'>
-      <h1 className='text-xl md:text-2xl font-bold text-neutral-dark mb-4'>Easytax Lite 服務合約</h1>
-
-      <div className='flex-1 min-h-0 overflow-y-auto rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white p-4 text-sm leading-relaxed text-neutral-mid'>
+    <>
+      {/* 標題與合約內文同在一張卡片內，不另分背景區塊 */}
+      <StepPageHeader kicker='合約' title='Easytax Lite 服務合約'>
+      <div className='max-h-[60vh] overflow-y-auto rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white p-4 text-sm leading-relaxed text-neutral-mid'>
         {/* 條款全文比照姊妹專案 relianz_cashflow_frontend 的 src/app/startUp/terms/page.tsx（同一經營主體：友信創新股份有限公司），
             僅將版面改為本頁滾動區樣式，文字內容未刪改；標題沿用來源文件原文「EASYTAX」用語 */}
         <p className='mb-3'>
@@ -127,16 +128,17 @@ export function Step1Terms() {
         </ul>
       </div>
 
-      <label className='mt-4 flex items-center gap-2 cursor-pointer'>
-        <Checkbox checked={checked} onChange={() => setChecked(v => !v)} aria-label='我已閱讀並同意服務合約' />
-        <span className='text-sm text-neutral-dark'>我已閱讀並同意上述服務合約</span>
-      </label>
-
-      <MobileFixedBottom>
-        <button onClick={handleAgree} disabled={!checked} className={btnPrimaryDisableable}>
+      {/* 同意按鈕放在合約內文下方，需先勾選才能繼續 */}
+      <div className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between'>
+        <label className='flex items-center gap-2 cursor-pointer'>
+          <Checkbox checked={checked} onChange={() => setChecked(v => !v)} aria-label='我已閱讀並同意服務合約' />
+          <span className='text-sm text-neutral-dark'>我已閱讀並同意上述服務合約</span>
+        </label>
+        <Button icon={ChevronRight} iconPosition='right' onClick={handleAgree} disabled={!checked}>
           同意並繼續
-        </button>
-      </MobileFixedBottom>
-    </div>
+        </Button>
+      </div>
+      </StepPageHeader>
+    </>
   );
 }

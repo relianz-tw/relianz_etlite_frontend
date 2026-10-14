@@ -6,17 +6,17 @@ import { CircleCheck, TriangleAlert } from 'lucide-react';
 
 interface ReportBalanceBarProps {
   reportId: SettlementReportId;
-  page: Pick<ReportPageDef, 'left' | 'right' | 'balanceCheck'>;
+  page: Pick<ReportPageDef, 'balanceCheck'>;
 }
 
 /** 報表頁左右欄合計比對列（如資產負債表：資產總計 vs 負債及業主權益總計），取代 3B 舊版 BalanceCheckBar */
 export function ReportBalanceBar({ reportId, page }: ReportBalanceBarProps) {
   const { state } = useInitialization();
-  if (!page.balanceCheck || !page.left?.totalFieldKey || !page.right?.totalFieldKey) return null;
+  if (!page.balanceCheck) return null;
 
   const fields = state.reports[reportId].fields;
-  const leftValue = Number(fields[page.left.totalFieldKey]?.value) || 0;
-  const rightValue = Number(fields[page.right.totalFieldKey]?.value) || 0;
+  const leftValue = Number(fields[page.balanceCheck.leftKey]?.value) || 0;
+  const rightValue = Number(fields[page.balanceCheck.rightKey]?.value) || 0;
   const diff = leftValue - rightValue;
   const isBalanced = diff === 0;
 

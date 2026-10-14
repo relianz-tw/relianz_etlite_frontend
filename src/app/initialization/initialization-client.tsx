@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 
 function StepLoading() {
   return (
-    <div className='flex-1 flex items-center justify-center bg-white'>
+    <div className='flex justify-center py-16'>
       <Loader2 size={24} className='animate-spin text-brand-blue' />
     </div>
   );
@@ -49,10 +49,10 @@ export function InitializationClient() {
     }
   }, [uuid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 步驟切換時手機版回滾至頂部（卡片容器為實際捲動層）
+  // 步驟切換時捲回頂部（InitializationLayout 的捲動層）
   useEffect(() => {
-    const card = document.querySelector('main > div');
-    if (card) card.scrollTop = 0;
+    const scroller = document.getElementById('initialization-scroll');
+    if (scroller) scroller.scrollTop = 0;
   }, [currentStep, currentReportIndex]);
 
   if (currentStep === 1) return <Step1Terms />;
