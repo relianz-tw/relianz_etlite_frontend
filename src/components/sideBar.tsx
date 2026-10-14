@@ -5,7 +5,6 @@ import { isDemoMode, isDemoModeAvailable, setDemoMode } from "@/api/config";
 import { buttonClassName } from "@/components/ui/Button";
 import { navLinks, navShortcut } from "@/data/navLinks";
 import {
-  ArrowRight,
   Building2,
   Check,
   ChevronDown,
@@ -257,10 +256,10 @@ const Sidebar = ({
           </Link>
         </div>
 
-        {/* 頁尾：目前公司名稱（有 demo uuid 時可切換）+ 登出 */}
+        {/* 頁尾：目前公司名稱（有 demo uuid 時可切換）+ 登出，分兩排 */}
         <div className="shrink-0 border-t border-surface-cream p-3">
           {isDemoModeAvailable ? (
-            <div className="relative mb-2">
+            <div className="relative mb-1">
               <button
                 type="button"
                 onClick={() => setCompanyMenuOpen((o) => !o)}
@@ -324,7 +323,7 @@ const Sidebar = ({
             </div>
           ) : (
             companyName && (
-              <div className="mb-2 flex items-center gap-1.5 px-3 text-xs text-neutral-mid">
+              <div className="mb-1 flex items-center gap-1.5 px-3 text-xs text-neutral-mid">
                 <Building2 size={14} className="shrink-0" />
                 <span className="truncate">{companyName}</span>
               </div>
@@ -332,9 +331,8 @@ const Sidebar = ({
           )}
           <button
             type="button"
-            className="flex w-full items-center gap-1.5 rounded-md border border-surface-cream px-3 py-1.5 text-[13px] text-neutral-dark transition-colors hover:bg-surface-cream hover:text-brand-primary"
+            className="block w-full px-3 py-1 text-right text-[13px] text-neutral-dark transition-colors hover:text-brand-primary"
           >
-            <ArrowRight size={13} />
             登出
           </button>
         </div>
