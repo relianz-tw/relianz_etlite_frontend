@@ -1,6 +1,7 @@
 'use client';
 
-import { buildEmptyRow, buildInitialReportsState, REPORT_PAGE_ORDER } from '../reports';
+import { buildEmptyRow, buildInitialReportsState } from '../reports';
+import type { ReportPageSpec, VatFormCode } from '../reports/reportPages';
 import type { ReportFieldDef } from '../reports/types';
 
 // ==================== 類型定義 ====================
@@ -10,7 +11,7 @@ export type OperatingStatus = 'under_one_year' | 'over_one_year' | null;
 
 /**
  * 12 份申報文件的 formCode（見 reports/formList.ts FORM_LIST，欄位定義由 GET /ael/peit/form/metadata 動態取得）。
- * CIT_COVER 併入步驟 3 公司資料頁，其餘 11 份為步驟 4 逐頁核對（見 reports/formList.ts REPORT_PAGE_ORDER）。
+ * CIT_COVER 併入步驟 3 公司資料頁；營所稅其餘各表與依期別展開的 401／403 為步驟 4 逐頁核對（見 reports/reportPages.ts）。
  */
 export type SettlementReportId =
   | 'VAT_401'
@@ -25,6 +26,9 @@ export type SettlementReportId =
   | 'CIT_PROPERTY'
   | 'CIT_SHAREHOLDERS'
   | 'CIT_UNAMORTIZED';
+
+/** 步驟 4 一個頁面的 key：營所稅為 formCode，401／403 為 `VAT_401:115-3`（見 reports/reportPages.ts） */
+export type ReportKey = string;
 
 /** 報表單一欄位值；money/date 欄位以字串或數字存放，aiFilled 沿用既有「AI 填入欄位提示」語意 */
 export interface ReportField {
@@ -42,7 +46,7 @@ export interface ReportData {
 
 export interface InitializationState {
   currentStep: number;
-  /** 步驟 4（報表核對）目前顯示第幾份，對應 reports/formList.ts 的 REPORT_PAGE_ORDER 索引（0-10） */
+  /** 步驟 4（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
   currentReportIndex: number;
 
   /**
@@ -59,12 +63,19 @@ export interface InitializationState {
   /** 開帳年度（民國年），預設值見 reports/formList.ts getCurrentOpenYear；尚未進入步驟 2 前為 null */
   openYear: number | null;
   /** 辨識後各表自己的民國年；未辨識的表退回 getDefaultFormYear 的預設年度 */
-  reportYears: Partial<Record<SettlementReportId, number>>;
+  reportYears: Partial<Record<ReportKey, number>>;
+  /** 營業稅各期使用的申報書：key 為期別頁 key（`VAT:115-3`），值為 401 或 403（擇一）；沒選過視為 401 */
+  vatChoices: Record<string, VatFormCode>;
+  /** 步驟 4 要逐頁核對的頁面清單；在步驟 2 按「下一步」時依開帳年度與日期算出並凍結（見 APPLY_REPORT_PLAN） */
+  reportPages: ReportPageSpec[];
+  /** 測試用：模擬「今天」的日期（YYYY-MM-DD），null 表示用系統日期；只影響開帳年度選項與預設值 */
+  simulatedDate: string | null;
+  /** 使用者改了開帳年度且確認過提示後為 true；按下步驟 2「下一步」時才真的清掉 reportYears（見 APPLY_YEAR_RESET） */
+  yearResetPending: boolean;
 
   // 步驟 3：公司基本資料，供確認頁與送出 API 使用。封面欄位全部依 metadata 存於 reports.CIT_COVER，
   // 按「下一步」時由 Step3Cover 把對應欄位整理進來（見 COVER_TO_COMPANY）
   company: {
-    orgType: string;
     taxId: string;
     name: string;
     representative: string;
@@ -83,8 +94,8 @@ export interface InitializationState {
     baseDate: string;
   };
 
-  // 步驟 3 封面頁補充欄位 + 步驟 4 報表核對資料，key 為 SettlementReportId
-  reports: Record<SettlementReportId, ReportData>;
+  // 步驟 3 封面頁補充欄位 + 步驟 4 報表核對資料，key 為 ReportKey（營所稅各表預先建立，401／403 期別頁用到時才建立）
+  reports: Record<ReportKey, ReportData>;
 
   // 步驟 6
   completed: boolean;
@@ -103,9 +114,12 @@ export const initialState: InitializationState = {
   operatingStatus: null,
   openYear: null,
   reportYears: {},
+  vatChoices: {},
+  reportPages: [],
+  yearResetPending: false,
+  simulatedDate: null,
 
   company: {
-    orgType: '',
     taxId: '',
     name: '',
     representative: '',
@@ -140,27 +154,33 @@ export type InitializationAction =
 
   // 步驟 2
   | { type: 'SET_OPERATING_STATUS'; payload: OperatingStatus }
-  | { type: 'SET_OPEN_YEAR'; payload: number }
+  | { type: 'SET_OPEN_YEAR'; payload: number | null }
+  | { type: 'SET_SIMULATED_DATE'; payload: string | null }
+  | { type: 'SET_VAT_CHOICE'; payload: { pageKey: string; formCode: VatFormCode } }
+  | { type: 'APPLY_REPORT_PLAN'; payload: ReportPageSpec[] }
+  | { type: 'SCHEDULE_YEAR_RESET' }
+  | { type: 'APPLY_YEAR_RESET' }
 
   // 步驟 3
   | { type: 'SET_COMPANY'; payload: Partial<InitializationState['company']> }
   | { type: 'SET_BALANCE_BASE_DATE'; payload: string }
 
   // 步驟 3／4 共用：報表欄位與表格列
-  | { type: 'SET_REPORT_FIELD'; payload: { reportId: SettlementReportId; key: string; value: string | number } }
+  | { type: 'SET_REPORT_FIELD'; payload: { reportId: ReportKey; key: string; value: string | number } }
+  | { type: 'PULL_SHARED_FIELDS'; payload: { reportId: ReportKey } }
   | {
       type: 'APPLY_IDENTIFIED_FORM';
       payload: {
-        reportId: SettlementReportId;
-        /** 該表辨識回傳的民國年，之後依此年度撈 metadata */
-        taxYear: number;
+        reportId: ReportKey;
+        /** 營所稅各表辨識回傳的民國年，之後依此年度撈 metadata；401／403 年度由期別決定，不傳 */
+        taxYear?: number;
         fields: Record<string, string | number>;
         rows: Record<string, string | number>[];
       };
     }
-  | { type: 'ADD_REPORT_ROW'; payload: { reportId: SettlementReportId; columns: ReportFieldDef[] } }
-  | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: SettlementReportId; index: number } }
-  | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: SettlementReportId; index: number; key: string; value: string | number } }
+  | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[] } }
+  | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
+  | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: ReportKey; index: number; key: string; value: string | number } }
 
   // 步驟 6
   | { type: 'COMPLETE' };
@@ -168,8 +188,6 @@ export type InitializationAction =
 // ==================== 步驟導航邏輯 ====================
 // Stepper 分組（見 Stepper 元件呼叫端）：1=合約　2=營運狀況　3+4=開帳資料（公司資料＋報表核對）　5=確認　6=完成
 // 步驟 2 選「未滿一年」時無結算申報書可核對，3 之後直接跳到 5（確認），略過步驟 4 的報表頁
-
-const LAST_REPORT_INDEX = REPORT_PAGE_ORDER.length - 1;
 
 export interface StepTarget {
   step: number;
@@ -186,7 +204,7 @@ export function getPrevStep(state: InitializationState): StepTarget {
       if (state.currentReportIndex > 0) return { step: 4, reportIndex: state.currentReportIndex - 1 };
       return { step: 3, reportIndex: 0 };
     case 5:
-      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: LAST_REPORT_INDEX } : { step: 3, reportIndex: 0 };
+      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 3, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -201,7 +219,7 @@ export function getNextStep(state: InitializationState): StepTarget {
     case 3:
       return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
     case 4:
-      if (state.currentReportIndex < LAST_REPORT_INDEX) return { step: 4, reportIndex: state.currentReportIndex + 1 };
+      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 4, reportIndex: state.currentReportIndex + 1 };
       return { step: 5, reportIndex: 0 };
     case 5:
       return { step: 6, reportIndex: 0 };
@@ -212,18 +230,26 @@ export function getNextStep(state: InitializationState): StepTarget {
 
 // ==================== Reducer ====================
 
+const EMPTY_REPORT: ReportData = { fields: {}, rows: [] };
+
+/** 取某頁資料；401／403 期別頁第一次寫入前沒有對應 key，視為空白 */
+function getReport(reports: InitializationState['reports'], reportId: ReportKey): ReportData {
+  return reports[reportId] ?? EMPTY_REPORT;
+}
+
 function setReportField(
   reports: InitializationState['reports'],
-  reportId: SettlementReportId,
+  reportId: ReportKey,
   key: string,
   value: string | number,
   aiFilled: boolean
 ): InitializationState['reports'] {
+  const current = getReport(reports, reportId);
   return {
     ...reports,
     [reportId]: {
-      ...reports[reportId],
-      fields: { ...reports[reportId].fields, [key]: { value, aiFilled } },
+      ...current,
+      fields: { ...current.fields, [key]: { value, aiFilled } },
     },
   };
 }
@@ -240,16 +266,16 @@ const SHARED_FIELD_KEYS = new Set(['HDR_VAT_NO', 'HDR_COMPANY_NAME', 'HDR_OWNER_
  */
 function setReportFieldSynced(
   reports: InitializationState['reports'],
-  reportId: SettlementReportId,
+  reportId: ReportKey,
   key: string,
   value: string | number,
   aiFilled: boolean
 ): InitializationState['reports'] {
-  const previous = reports[reportId].fields[key]?.value ?? '';
+  const previous = getReport(reports, reportId).fields[key]?.value ?? '';
   let next = setReportField(reports, reportId, key, value, aiFilled);
   if (!SHARED_FIELD_KEYS.has(key)) return next;
 
-  for (const otherId of Object.keys(next) as SettlementReportId[]) {
+  for (const otherId of Object.keys(next)) {
     if (otherId === reportId) continue;
     const current = next[otherId].fields[key]?.value ?? '';
     if (current === '' || current === previous) next = setReportField(next, otherId, key, value, aiFilled);
@@ -257,8 +283,8 @@ function setReportFieldSynced(
   return next;
 }
 
-function setReportRows(reports: InitializationState['reports'], reportId: SettlementReportId, rows: ReportRow[]): InitializationState['reports'] {
-  return { ...reports, [reportId]: { ...reports[reportId], rows } };
+function setReportRows(reports: InitializationState['reports'], reportId: ReportKey, rows: ReportRow[]): InitializationState['reports'] {
+  return { ...reports, [reportId]: { ...getReport(reports, reportId), rows } };
 }
 
 export function initializationReducer(state: InitializationState, action: InitializationAction): InitializationState {
@@ -270,9 +296,10 @@ export function initializationReducer(state: InitializationState, action: Initia
         ...initialState,
         ...action.payload,
         reports: { ...initialState.reports, ...action.payload.reports },
-        // company 欄位也可能因改版增減（如新增 orgType／phone／taxRegNo），同樣用初始值補齊
+        // company 欄位也可能因改版增減（如新增 phone／taxRegNo），同樣用初始值補齊
         company: { ...initialState.company, ...action.payload.company },
         reportYears: { ...initialState.reportYears, ...action.payload.reportYears },
+        vatChoices: { ...initialState.vatChoices, ...action.payload.vatChoices },
       };
 
     case 'NEXT_STEP': {
@@ -300,6 +327,22 @@ export function initializationReducer(state: InitializationState, action: Initia
     case 'SET_OPEN_YEAR':
       return { ...state, openYear: action.payload };
 
+    case 'SET_SIMULATED_DATE':
+      return { ...state, simulatedDate: action.payload };
+
+    case 'SET_VAT_CHOICE':
+      return { ...state, vatChoices: { ...state.vatChoices, [action.payload.pageKey]: action.payload.formCode } };
+
+    case 'APPLY_REPORT_PLAN':
+      return { ...state, reportPages: action.payload };
+
+    case 'SCHEDULE_YEAR_RESET':
+      return { ...state, yearResetPending: true };
+
+    // 已辨識文件的年度回到預設（由開帳年度推算）；欄位內容不動
+    case 'APPLY_YEAR_RESET':
+      return { ...state, reportYears: {}, yearResetPending: false };
+
     case 'SET_COMPANY':
       return { ...state, company: { ...state.company, ...action.payload } };
 
@@ -312,6 +355,23 @@ export function initializationReducer(state: InitializationState, action: Initia
         reports: setReportFieldSynced(state.reports, action.payload.reportId, action.payload.key, action.payload.value, false),
       };
 
+    // 401／403 期別頁等「晚建立」的頁面沒有參與先前的同步，開啟時從其他文件把還空白的公司識別欄位帶進來
+    case 'PULL_SHARED_FIELDS': {
+      const { reportId } = action.payload;
+      let reports = state.reports;
+      let changed = false;
+      for (const key of SHARED_FIELD_KEYS) {
+        const own = getReport(reports, reportId).fields[key]?.value;
+        if (own !== undefined && own !== '') continue;
+        const source = Object.entries(reports).find(([id, report]) => id !== reportId && (report.fields[key]?.value ?? '') !== '');
+        const sourceField = source?.[1].fields[key];
+        if (!sourceField) continue;
+        reports = setReportField(reports, reportId, key, sourceField.value, sourceField.aiFilled);
+        changed = true;
+      }
+      return changed ? { ...state, reports } : state;
+    }
+
     case 'APPLY_IDENTIFIED_FORM': {
       const { reportId, taxYear, fields, rows } = action.payload;
       let reports = state.reports;
@@ -323,24 +383,24 @@ export function initializationReducer(state: InitializationState, action: Initia
         const newRows: ReportRow[] = rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, { value, aiFilled: true }])));
         reports = setReportRows(reports, reportId, newRows);
       }
-      return { ...state, reports, reportYears: { ...state.reportYears, [reportId]: taxYear } };
+      return { ...state, reports, reportYears: taxYear === undefined ? state.reportYears : { ...state.reportYears, [reportId]: taxYear } };
     }
 
     case 'ADD_REPORT_ROW': {
       const { reportId, columns } = action.payload;
-      const rows = [...state.reports[reportId].rows, buildEmptyRow(columns)];
+      const rows = [...getReport(state.reports, reportId).rows, buildEmptyRow(columns)];
       return { ...state, reports: setReportRows(state.reports, reportId, rows) };
     }
 
     case 'REMOVE_REPORT_ROW': {
       const { reportId, index } = action.payload;
-      const rows = state.reports[reportId].rows.filter((_, i) => i !== index);
+      const rows = getReport(state.reports, reportId).rows.filter((_, i) => i !== index);
       return { ...state, reports: setReportRows(state.reports, reportId, rows) };
     }
 
     case 'SET_REPORT_ROW_FIELD': {
       const { reportId, index, key, value } = action.payload;
-      const rows = state.reports[reportId].rows.map((row, i) => (i === index ? { ...row, [key]: { value, aiFilled: false } } : row));
+      const rows = getReport(state.reports, reportId).rows.map((row, i) => (i === index ? { ...row, [key]: { value, aiFilled: false } } : row));
       return { ...state, reports: setReportRows(state.reports, reportId, rows) };
     }
 

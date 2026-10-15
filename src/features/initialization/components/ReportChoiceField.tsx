@@ -1,10 +1,11 @@
 'use client';
 
 import { useInitialization } from '../state/InitializationContext';
-import type { SettlementReportId } from '../state/initializationReducer';
+import type { ReportKey } from '../state/initializationReducer';
 import type { ReportFieldDef } from '../reports/types';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
+import { FIELD_LABEL_BASE, fieldLabelClass } from './fieldLabel';
 import { cn } from '@/lib/utils';
 import { Zap } from 'lucide-react';
 
@@ -12,27 +13,21 @@ import { Zap } from 'lucide-react';
 const MAX_TAB_OPTIONS = 3;
 
 interface ReportChoiceFieldProps {
-  reportId: SettlementReportId;
+  reportId: ReportKey;
   /** 區塊標題，作為這一組單選的 label */
   title: string;
-  /** 同區塊的布林欄位，視為多選一 */
+  /** 同一組的布林欄位，視為多選一 */
   fields: ReportFieldDef[];
-}
-
-/** 選項文字常帶有區塊前綴（如「組織型態－公司」），與標題重複時去掉前綴，避免 tab 過長 */
-function getOptionLabel(title: string, label: string): string {
-  const prefix = `${title}－`;
-  return label.startsWith(prefix) ? label.slice(prefix.length) : label;
 }
 
 /**
  * 同一區塊內的布林欄位合併成「多選一」：選項 ≤3 用 tab、>3 用下拉。
  * 資料仍以各欄位 1／0 存放（與辨識結果、下游送出格式一致），選取某項時同組其他項自動歸 0。
- * 與一般欄位同為「標籤在上、控制項在下」的欄位格，由 ReportSections 的兩欄 grid 排列。
+ * 與一般欄位同為「標籤與控制項同一行」的欄位格，由 ReportSections 的兩欄 grid 排列。
  */
 export function ReportChoiceField({ reportId, title, fields }: ReportChoiceFieldProps) {
   const { state, dispatch } = useInitialization();
-  const data = state.reports[reportId].fields;
+  const data = state.reports[reportId]?.fields ?? {};
 
   const selected = fields.find(f => Number(data[f.key]?.value) === 1);
   const aiFilled = selected ? data[selected.key]?.aiFilled : false;
@@ -47,11 +42,18 @@ export function ReportChoiceField({ reportId, title, fields }: ReportChoiceField
     }
   };
 
-  const options = fields.map(f => ({ value: f.key, label: getOptionLabel(title, f.label) }));
+  const options = fields.map(f => ({ value: f.key, label: f.label }));
+
+  // 選項文字較長時，tab 內文字縮小並可換行
+  const hasLongOption = options.some(o => o.label.length > 10);
+
+  // tab 的選項文字很長時（如簽證別），改佔滿整列，標籤縮窄讓 tab 有足夠寬度
+  const isWide = fields.length <= MAX_TAB_OPTIONS && options.reduce((sum, o) => sum + o.label.length, 0) > 14;
 
   return (
-    <div className='flex min-w-0 flex-col gap-1.5'>
-      <span className='text-[13px] font-medium text-neutral-dark'>{title}</span>
+    <div className={cn('flex min-w-0 items-center gap-3', isWide && 'md:col-span-2')}>
+      <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(title), isWide && 'md:w-[19%]')}>{title}</span>
+      <div className='min-w-0 flex-1'>
       {fields.length > MAX_TAB_OPTIONS ? (
         <Select widthClassName='w-full' value={selected?.key ?? ''} aiFilled={aiFilled} onValueChange={v => (v ? v !== selected?.key && handleSelect(v) : selected && handleSelect(selected.key))}>
           {/* 選定後「請選擇」改為「（無）」，選它即清除選擇 */}
@@ -71,9 +73,10 @@ export function ReportChoiceField({ reportId, title, fields }: ReportChoiceField
           )}
         >
           {aiFilled && <Zap aria-hidden='true' size={14} className='shrink-0 fill-semantic-success text-semantic-success' />}
-          <SegmentedControl className='flex-1' fontWeightClassName='font-medium' options={options} value={selected?.key ?? ''} onChange={handleSelect} />
+          <SegmentedControl className='flex-1' fontWeightClassName='font-medium' wrapOptions={hasLongOption} options={options} value={selected?.key ?? ''} onChange={handleSelect} />
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,9 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { REPORT_PAGE_ORDER, getCurrentOpenYear, getDefaultFormYear, mergeSections } from '../../reports';
+import { getCurrentOpenYear, getDefaultFormYear, resolveToday, type ReportPageSpec } from '../../reports';
 import { ReportPageView } from '../ReportPageView';
 import { useEffect } from 'react';
-import type { ReportPageDef, ReportSectionDef } from '../../reports';
 import type { InitializationState } from '../../state/initializationReducer';
 
 /** 封面欄位 fieldCode → 步驟 5 確認頁與送出 API 使用的公司資料欄位 */
@@ -38,14 +37,12 @@ function readOnboardingCompany(): { taxId?: string; name?: string; representativ
   }
 }
 
-/** 封面頁把組織型態／申報種類／其他勾選合併成「申報類別」一張卡 */
-const mergeCoverSections = (sections: ReportSectionDef[]) => mergeSections(sections, ['ORG', 'FILING', 'FLAGS'], { key: 'CATEGORY', title: '申報類別' });
-
 /** 步驟 3：封面頁，所有欄位依 metadata API（formNo 1）動態呈現，下一步時再把封面值整理成公司資料供確認頁使用 */
 export function Step3Cover() {
   const { state, dispatch } = useInitialization();
   const isOverOneYear = state.operatingStatus === 'over_one_year';
-  const coverYear = state.reportYears.CIT_COVER ?? getDefaultFormYear('CIT_COVER', state.openYear ?? getCurrentOpenYear());
+  const coverYear = state.reportYears.CIT_COVER ?? getDefaultFormYear('CIT_COVER', state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate)));
+  const coverSpec: ReportPageSpec = { key: 'CIT_COVER', formCode: 'CIT_COVER', taxYear: coverYear, required: false };
 
   // 首次進入時帶入 onboarding 已填的公司資料（只補空白欄位，不覆蓋已輸入或辨識帶入的值）
   useEffect(() => {
@@ -60,31 +57,25 @@ export function Step3Cover() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleNext = (page: ReportPageDef | null) => {
+  const handleNext = () => {
     const fields = state.reports.CIT_COVER.fields;
     const company: Partial<InitializationState['company']> = {};
     for (const [fieldCode, companyKey] of Object.entries(COVER_TO_COMPANY)) {
       const value = fields[fieldCode]?.value;
       if (value !== undefined && value !== '') company[companyKey] = String(value);
     }
-    // 組織型態取「組織型態」多選一中被選取的選項名稱
-    const orgChoice = (page?.sections ?? []).flatMap(s => s.choices ?? []).find(c => c.groupCode === 'ORG_TYPE');
-    const orgSelected = orgChoice?.fields.find(f => Number(fields[f.key]?.value) === 1);
-    if (orgSelected) company.orgType = orgSelected.label;
-
     dispatch({ type: 'SET_COMPANY', payload: company });
     dispatch({ type: 'NEXT_STEP' });
   };
 
   return (
     <ReportPageView
-      formCode='CIT_COVER'
+      spec={coverSpec}
       taxYear={coverYear}
       kicker='封面'
       // 封面頁尚未開始逐頁核對，進度為 0；一年內新設立無需核對各表，不顯示進度與上傳區
-      progress={isOverOneYear ? { value: 0, max: REPORT_PAGE_ORDER.length } : undefined}
+      progress={isOverOneYear ? { value: 0, max: state.reportPages.length } : undefined}
       showIdentify={isOverOneYear}
-      transformSections={mergeCoverSections}
       nextLabel='下一步'
       onNext={handleNext}
     />

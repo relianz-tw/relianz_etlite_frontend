@@ -15,6 +15,8 @@ interface SegmentedControlProps<T extends string> {
   className?: string;
   /** 選項文字字重，預設 font-semibold */
   fontWeightClassName?: string;
+  /** true 時選項文字可換行並縮小字級，適合選項文字很長的場景 */
+  wrapOptions?: boolean;
   disabled?: boolean;
 }
 
@@ -32,6 +34,7 @@ export default function SegmentedControl<T extends string>({
   fit = false,
   className = '',
   fontWeightClassName = 'font-semibold',
+  wrapOptions = false,
   disabled = false,
 }: SegmentedControlProps<T>) {
   return (
@@ -47,7 +50,7 @@ export default function SegmentedControl<T extends string>({
             type="button"
             disabled={disabled}
             onClick={() => onChange(option.value)}
-            className={`whitespace-nowrap rounded-[4px] ${fontWeightClassName} transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${SIZE_CLASS[size]} ${fit ? 'px-4' : ''} ${
+            className={`${wrapOptions ? 'whitespace-normal break-words px-2 leading-snug !text-xs' : 'whitespace-nowrap'} rounded-[4px] ${fontWeightClassName} transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${SIZE_CLASS[size]} ${fit ? 'px-4' : ''} ${
               active ? 'bg-brand-blue text-white' : 'text-neutral-mid hover:text-neutral-dark'
             }`}
           >

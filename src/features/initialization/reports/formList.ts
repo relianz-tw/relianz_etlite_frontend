@@ -45,10 +45,19 @@ export function getCurrentOpenYear(now: Date = new Date()): number {
   return (isAfterJune ? now.getFullYear() : now.getFullYear() - 1) - ROC_YEAR_OFFSET;
 }
 
-/** 開帳年度可選項目：當期與下一年，皆為民國年 */
+/**
+ * 開帳年度可選項目（民國年）：
+ * 6/1–12/31 只能開今年；1/1–5/31 去年的申報期尚未結束，可選去年或今年。
+ */
 export function getOpenYearOptions(now: Date = new Date()): number[] {
   const current = getCurrentOpenYear(now);
-  return [current, current + 1];
+  const isAfterJune = now.getMonth() >= 5;
+  return isAfterJune ? [current] : [current, current + 1];
+}
+
+/** 測試用：有模擬日期（YYYY-MM-DD）時以它代替系統日期，否則用系統當下時間 */
+export function resolveToday(simulatedDate: string | null): Date {
+  return simulatedDate ? new Date(`${simulatedDate}T00:00:00`) : new Date();
 }
 
 /** 民國年轉西元年，供畫面顯示「2026 年（民國 115）」 */
@@ -61,5 +70,8 @@ export function getDefaultFormYear(formCode: SettlementReportId, openYear: numbe
   return getFormItem(formCode).taxType === 'vat' ? openYear : openYear - 1;
 }
 
-/** 步驟 4 逐頁核對順序（封面已併入步驟 3，故排除），對應 state.currentReportIndex */
-export const REPORT_PAGE_ORDER: SettlementReportId[] = FORM_LIST.filter(f => f.formCode !== 'CIT_COVER').map(f => f.formCode);
+/**
+ * 步驟 4 的營所稅各表順序（封面已併入步驟 3、401／403 依期別另外展開，故皆排除）。
+ * 完整的逐頁清單見 reports/reportPages.ts buildReportPages。
+ */
+export const CIT_PAGE_ORDER: SettlementReportId[] = FORM_LIST.filter(f => f.taxType === 'cit' && f.formCode !== 'CIT_COVER').map(f => f.formCode);

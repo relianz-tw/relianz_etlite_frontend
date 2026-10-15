@@ -2,24 +2,32 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
-import { getFormItem } from '../reports';
+import { formatPeriodLabel, getFormItem, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
+import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
-import { ReportBalanceBar } from './ReportBalanceBar';
+import { BalanceSheetView } from './BalanceSheetView';
 import { ReportSections } from './ReportSections';
 import { ReportTable } from './ReportTable';
 import { StepNavButtons, StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import ProgressBar from '@/components/ui/ProgressBar';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import SectionCard from '@/components/ui/SectionCard';
 import { useEffect, useMemo } from 'react';
-import type { ReportPageDef, ReportSectionDef } from '../reports/types';
 import type { SettlementReportId } from '../state/initializationReducer';
 
 /** 所屬年度欄位：值固定等於該頁標題的民國年，自動填入、不給使用者輸入 */
 const TAX_YEAR_FIELD_KEY = 'HDR_TAX_YEAR';
+/** 401／403 的所屬期別起訖月：由頁面的期別自動填入、不給使用者輸入 */
+const PERIOD_START_FIELD_KEY = 'HDR_PERIOD_START_MONTH';
+const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
+
+/** 資產負債表用 T 字帳版面（BalanceSheetView），其餘文件頁用一般欄位卡片 */
+const BALANCE_SHEET_CODE: SettlementReportId = 'CIT_BALANCE_SHEET';
 
 interface ReportPageViewProps {
-  formCode: SettlementReportId;
+  /** 這一頁（營所稅各表、封面或某一期別的 401／403） */
+  spec: ReportPageSpec;
   /** 該表要撈 metadata 的民國年 */
   taxYear: number;
   /** 標題上方的小字（如「第 1 / 11 份」） */
@@ -27,49 +35,79 @@ interface ReportPageViewProps {
   progress?: { value: number; max: number };
   /** 是否顯示上傳辨識區 */
   showIdentify: boolean;
-  /** 載入後對區塊做整理（如封面把組織型態／申報種類／其他勾選合併成一張卡） */
-  transformSections?: (sections: ReportSectionDef[]) => ReportSectionDef[];
   nextLabel: string;
-  /** 按下一步時呼叫，帶入已載入的頁面定義（尚未載入為 null） */
-  onNext: (page: ReportPageDef | null) => void;
+  onNext: () => void;
 }
 
 /**
  * 結算申報書單頁版面（步驟 3 封面、步驟 4 逐頁核對共用）：
  * 頁首卡片（標題、上一頁／下一頁、進度、上傳辨識）＋依 metadata API 動態產生的欄位卡片＋列明細表格＋頁底導覽。
  */
-export function ReportPageView({ formCode, taxYear, kicker, progress, showIdentify, transformSections, nextLabel, onNext }: ReportPageViewProps) {
+export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, nextLabel, onNext }: ReportPageViewProps) {
   const { state, dispatch } = useInitialization();
-  const { formNo, title } = getFormItem(formCode);
+  // 營業稅期別頁依使用者選的 401 或 403（預設 401）決定表單與資料 key，營所稅頁固定
+  const { formCode, reportKey } = resolveReportPage(spec, state.vatChoices);
+  const { formNo, title: fallbackTitle } = getFormItem(formCode);
   const { page: rawPage, loading, error, retry } = useFormMetadata(formNo, taxYear);
+  // 標題以 metadata 的文件名稱為準，載入前先用內建名稱
+  const title = rawPage?.title ?? fallbackTitle;
 
-  // 這份文件有所屬年度欄位時，自動填入標題的民國年（辨識帶入的值也以標題年度為準）
-  const hasTaxYearField = !!rawPage?.sections.some(s => s.fields.some(f => f.key === TAX_YEAR_FIELD_KEY));
-  const currentTaxYear = state.reports[formCode].fields[TAX_YEAR_FIELD_KEY]?.value;
+  // 這份文件有所屬年度（401／403 另有期別起訖月）欄位時，自動填入頁面標示的值（辨識帶入的值也以頁面為準）
+  // 資產負債表日取損益表的「所得期間迄」（沒填視為該年度 12 月 31 日）
+  const incomePeriodEnd = state.reports.CIT_INCOME_TAX?.fields.HDR_PERIOD_END?.value;
+  const autoValues: Record<string, string | number> = { [TAX_YEAR_FIELD_KEY]: taxYear };
+  if (spec.period) {
+    autoValues[PERIOD_START_FIELD_KEY] = spec.period.phase;
+    autoValues[PERIOD_END_FIELD_KEY] = spec.period.phase + 1;
+  }
+  if (formCode === BALANCE_SHEET_CODE) autoValues[BALANCE_SHEET_DATE_FIELD_KEY] = getBalanceSheetDateValue(taxYear, incomePeriodEnd);
+  const autoKeys = Object.keys(autoValues);
+  const reportFields = state.reports[reportKey]?.fields;
   useEffect(() => {
-    if (hasTaxYearField && Number(currentTaxYear) !== taxYear) {
-      dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: formCode, key: TAX_YEAR_FIELD_KEY, value: taxYear } });
+    if (!rawPage) return;
+    for (const [fieldKey, value] of Object.entries(autoValues)) {
+      const exists = rawPage.sections.some(s => s.fields.some(f => f.key === fieldKey));
+      if (exists && String(reportFields?.[fieldKey]?.value ?? '') !== String(value)) {
+        dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: reportKey, key: fieldKey, value } });
+      }
     }
-  }, [hasTaxYearField, currentTaxYear, taxYear, formCode, dispatch]);
+    // autoValues 由 taxYear、期別推得，依賴列出來源即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawPage, reportFields, taxYear, spec.period?.phase, incomePeriodEnd, reportKey, dispatch]);
 
+  // 這一頁的欄位載入後，把其他文件已填的公司識別欄位（統編、公司名稱等）帶進來
+  useEffect(() => {
+    if (rawPage) dispatch({ type: 'PULL_SHARED_FIELDS', payload: { reportId: reportKey } });
+  }, [rawPage, reportKey, dispatch]);
+
+  // 區塊、欄位、分組完全依 metadata，只把自動填入的欄位拿掉（不給使用者輸入）
+  const autoKeyList = autoKeys.join(',');
   const sections = useMemo(() => {
     if (!rawPage) return [];
-    // 所屬年度欄位不顯示給使用者
-    const visible = rawPage.sections.map(s => ({ ...s, fields: s.fields.filter(f => f.key !== TAX_YEAR_FIELD_KEY) }));
-    return transformSections ? transformSections(visible) : visible;
-    // transformSections 為呼叫端的模組層函式，不納入依賴
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawPage]);
+    const hidden = autoKeyList.split(',');
+    return rawPage.sections.map(s => ({ ...s, fields: s.fields.filter(f => !hidden.includes(f.key)) }));
+  }, [rawPage, autoKeyList]);
+
+  // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
+  // 401／403 顯示期別與必填／選填；其餘文件顯示年度
+  const badges = spec.period
+    ? [formatPeriodLabel(spec.period.rocYear, spec.period.phase), spec.required ? '必填' : '選填']
+    : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : `民國 ${taxYear} 年度`];
+
+  // 必填的期別需要有資料（上傳辨識成功或手填皆可）才能前進；
+  // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死
+  const blocked = spec.required && !error && !isPageFilled(state.reports, reportKey);
 
   const nav = {
     onPrev: () => dispatch({ type: 'PREV_STEP' }),
-    onNext: () => onNext(rawPage),
+    onNext,
     nextLabel,
+    nextDisabled: blocked,
   };
 
   return (
     <>
-      <StepPageHeader kicker={kicker} title={title} badges={[`民國 ${taxYear} 年度`]} nav={nav}>
+      <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav}>
         {progress && (
           <div className='flex flex-col gap-1.5'>
             <ProgressBar value={progress.value} max={progress.max} label='文件進度' />
@@ -78,7 +116,21 @@ export function ReportPageView({ formCode, taxYear, kicker, progress, showIdenti
             </span>
           </div>
         )}
-        {showIdentify && <FormIdentifyPanel formTitle={title} />}
+        {spec.period && (
+          <div className='flex flex-col gap-1.5'>
+            <span className='text-[13px] font-medium text-neutral-dark'>這一期使用哪一種申報書？（401 與 403 擇一）</span>
+            <SegmentedControl
+              options={[
+                { value: 'VAT_401', label: '營業人銷售額與稅額申報書(401)' },
+                { value: 'VAT_403', label: '營業人銷售額與稅額申報書(403)' },
+              ]}
+              value={state.vatChoices[spec.key] ?? 'VAT_401'}
+              onChange={value => dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: spec.key, formCode: value === 'VAT_403' ? 'VAT_403' : 'VAT_401' } })}
+            />
+          </div>
+        )}
+        {blocked && <p className='text-xs text-semantic-error'>此期別為必填，請上傳文件或手動輸入資料後再前往下一份。</p>}
+        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} />}
       </StepPageHeader>
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}
@@ -93,13 +145,18 @@ export function ReportPageView({ formCode, taxYear, kicker, progress, showIdenti
 
       {rawPage && (
         <>
-          <ReportSections reportId={rawPage.id} sections={sections} />
-          {rawPage.table && (
-            <SectionCard title='明細'>
-              <ReportTable reportId={rawPage.id} table={rawPage.table} />
-            </SectionCard>
+          {formCode === BALANCE_SHEET_CODE ? (
+            <BalanceSheetView sections={sections} />
+          ) : (
+            <>
+              <ReportSections reportId={reportKey} sections={sections} />
+              {rawPage.table && (
+                <SectionCard title='明細'>
+                  <ReportTable reportId={reportKey} table={rawPage.table} />
+                </SectionCard>
+              )}
+            </>
           )}
-          {rawPage.balanceCheck && <ReportBalanceBar reportId={rawPage.id} page={rawPage} />}
 
           {/* 長表單捲到底不用回頂端：桌機頁底再放一組上一頁／下一頁（手機已固定於畫面底部） */}
           <div className='hidden items-center justify-between md:flex'>

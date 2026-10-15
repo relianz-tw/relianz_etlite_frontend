@@ -1,6 +1,8 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
+import { useFormMetadata } from '../../hooks/useFormMetadata';
+import { getCurrentOpenYear, getDefaultFormYear, getFormItem, resolveToday } from '../../reports';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
@@ -15,12 +17,21 @@ export function Step5Confirm() {
   const isBalanced = totalAssets === totalLiabilitiesAndEquity;
   const hasReports = state.operatingStatus === 'over_one_year';
 
+  // 組織型態在損益及稅額計算表（`ORG_KIND` 組）選擇，名稱取 metadata 的選項名稱
+  const incomeYear = state.reportYears.CIT_INCOME_TAX ?? getDefaultFormYear('CIT_INCOME_TAX', state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate)));
+  const { page: incomePage } = useFormMetadata(getFormItem('CIT_INCOME_TAX').formNo, incomeYear);
+  const orgTypeLabel =
+    incomePage?.sections
+      .flatMap(section => section.choices ?? [])
+      .find(choice => choice.groupCode === 'ORG_KIND')
+      ?.fields.find(field => Number(state.reports.CIT_INCOME_TAX?.fields[field.key]?.value) === 1)?.label ?? '';
+
   const handleConfirm = () => {
     // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
     // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
     saveInitializationCompany({
       userUuid: state.userUuid,
-      orgType: state.company.orgType,
+      orgType: orgTypeLabel,
       taxId: state.company.taxId,
       companyName: state.company.name,
       representative: state.company.representative,
@@ -56,7 +67,7 @@ export function Step5Confirm() {
         <SectionCard title='公司資料'>
           <dl className='grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm'>
             <dt className='text-neutral-mid'>組織型態</dt>
-            <dd className='text-neutral-dark'>{state.company.orgType || '—'}</dd>
+            <dd className='text-neutral-dark'>{orgTypeLabel || '—'}</dd>
             <dt className='text-neutral-mid'>統一編號</dt>
             <dd className='text-neutral-dark'>{state.company.taxId || '—'}</dd>
             <dt className='text-neutral-mid'>公司名稱</dt>

@@ -1,22 +1,23 @@
 import { useInitialization } from '../state/InitializationContext';
-import type { SettlementReportId } from '../state/initializationReducer';
+import type { ReportKey } from '../state/initializationReducer';
 import type { ReportTableDef } from '../reports/types';
 import DatePicker from '@/components/ui/DatePicker';
 import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import TextInput from '@/components/ui/TextInput';
-import { formatLocalDate } from '@/lib/utils';
+import { FIELD_LABEL_BASE, fieldLabelClass } from './fieldLabel';
+import { cn, formatLocalDate } from '@/lib/utils';
 import { Plus, X } from 'lucide-react';
 
 interface ReportTableProps {
-  reportId: SettlementReportId;
+  reportId: ReportKey;
   table: ReportTableDef;
 }
 
 /** 表格型報表（投資人明細、財產目錄）：逐列卡片呈現，可新增／刪除列，沒有資料留空即可 */
 export function ReportTable({ reportId, table }: ReportTableProps) {
   const { state, dispatch } = useInitialization();
-  const rows = state.reports[reportId].rows;
+  const rows = state.reports[reportId]?.rows ?? [];
 
   return (
     <div className='flex flex-col gap-4'>
@@ -36,8 +37,9 @@ export function ReportTable({ reportId, table }: ReportTableProps) {
             {table.columns.map(col => {
               const data = row[col.key] ?? { value: '', aiFilled: false };
               return (
-                <div key={col.key} className='flex flex-col'>
-                  <Label className='mb-1.5'>{col.label}</Label>
+                <div key={col.key} className='flex min-w-0 items-center gap-3'>
+                  <Label className={cn(FIELD_LABEL_BASE, fieldLabelClass(col.label), '!mb-0 !font-medium')}>{col.label}</Label>
+                  <div className='min-w-0 flex-1'>
                   {col.type === 'money' && (
                     <MoneyInput
                       value={typeof data.value === 'number' ? data.value : Number(data.value) || 0}
@@ -75,6 +77,7 @@ export function ReportTable({ reportId, table }: ReportTableProps) {
                       }
                     />
                   )}
+                  </div>
                 </div>
               );
             })}

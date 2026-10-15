@@ -17,10 +17,8 @@ export interface ReportFieldDef {
 }
 
 export interface ReportSectionDef {
-  /** metadata 的區塊代碼（sectionCode），供封面頁依區塊挑選欄位 */
-  key?: string;
-  /** 區塊標題；空字串則不渲染標題列 */
-  title: string;
+  /** metadata 的區塊代碼（sectionCode） */
+  key: string;
   fields: ReportFieldDef[];
   /** 依 metadata choiceGroups 合併成的多選一，渲染於一般欄位之前（見 ReportChoiceField） */
   choices?: ReportChoiceDef[];
@@ -29,7 +27,7 @@ export interface ReportSectionDef {
 /** 一組多選一：成員為同一個 choiceGroup 的布林欄位 */
 export interface ReportChoiceDef {
   groupCode: string;
-  /** 組名稱（如「組織型態」），作為這組單選的 label */
+  /** 組名稱（如「組織型態」），作為這組選擇的 label */
   title: string;
   fields: ReportFieldDef[];
 }
@@ -46,6 +44,4 @@ export interface ReportPageDef {
   sections: ReportSectionDef[];
   /** 列欄位（表格型明細，如投資人明細、財產目錄），渲染於固定欄位下方；無則不顯示 */
   table?: ReportTableDef;
-  /** 有值時於頁面底部顯示兩個合計欄位是否平衡（如資產總計 vs 負債及權益總計） */
-  balanceCheck?: { leftKey: string; rightKey: string; leftLabel: string; rightLabel: string };
 }

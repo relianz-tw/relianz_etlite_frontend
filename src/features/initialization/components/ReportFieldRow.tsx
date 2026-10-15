@@ -4,6 +4,7 @@ import Checkbox from '@/components/ui/Checkbox';
 import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import TextInput from '@/components/ui/TextInput';
+import { FIELD_LABEL_BASE, fieldLabelClass } from './fieldLabel';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { Zap } from 'lucide-react';
 
@@ -38,8 +39,10 @@ export function ReportFieldRow({ field, data, onChange }: ReportFieldRowProps) {
   }
 
   return (
-    <div className='flex min-w-0 flex-col gap-1.5'>
-      <span className='text-[13px] font-medium text-neutral-dark'>{field.label}</span>
+    // 標籤與輸入框同一行；名稱太長時標籤換行、字級縮小一級
+    <div className='flex min-w-0 items-center gap-3'>
+      <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(field.label))}>{field.label}</span>
+      <div className='min-w-0 flex-1'>
       {field.type === 'money' && (
         <MoneyInput
           widthClassName='w-full'
@@ -70,6 +73,7 @@ export function ReportFieldRow({ field, data, onChange }: ReportFieldRowProps) {
       {field.type === 'date' && (
         <DatePicker value={data.value ? new Date(data.value) : undefined} aiFilled={data.aiFilled} onChange={date => onChange(date ? formatLocalDate(date) : '')} />
       )}
+      </div>
     </div>
   );
 }
