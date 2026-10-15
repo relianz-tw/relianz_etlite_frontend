@@ -50,9 +50,27 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
 
   const amount = (key: string) => Number(data[key]?.value) || 0;
 
+  // 依父科目（parentFieldCode）算縮排層級：區塊小計（BS_1100 等）以外，每往下一層縮 16px，最多三層
+  const depthOf = (field: ReportFieldDef): number => {
+    let depth = 0;
+    let parent = field.parentKey ? fieldMap.get(field.parentKey) : undefined;
+    while (parent && depth < 3) {
+      depth++;
+      parent = parent.parentKey ? fieldMap.get(parent.parentKey) : undefined;
+    }
+    return Math.max(0, depth - 1);
+  };
+
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
     <label key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
-      <span className={cn('break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized ? 'font-bold' : 'font-normal')}>{field.label}</span>
+      <span
+        style={{ paddingLeft: depthOf(field) * 16 }}
+        className={cn('break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}
+      >
+        {field.officialCode && !emphasized && <span className='mr-1.5 text-xs tabular-nums text-neutral-mid'>{field.officialCode}</span>}
+        {field.isDeduction && !field.label.startsWith('減') && '減：'}
+        {field.label}
+      </span>
       <MoneyInput
         widthClassName='w-full'
         value={amount(field.key)}
@@ -144,8 +162,14 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
         </div>
 
         {/* 總額列：左右各一個合計欄位，中間以等號圓章表示是否相等 */}
-        <div className='grid grid-cols-1 border-t-2 border-neutral-dark md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center'>
-          <div className='bg-semantic-success/5 p-5 md:px-6'>
+        {/* 底色放在整列（含中間的等號欄），平衡為綠色、不平衡為紅色、尚未填寫為灰色 */}
+        <div
+          className={cn(
+            'grid grid-cols-1 border-t-2 border-neutral-dark md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center',
+            isBalanced ? 'bg-semantic-success/5' : hasTotals ? 'bg-semantic-error/5' : 'bg-surface-off-white'
+          )}
+        >
+          <div className='p-5 md:px-6'>
             {assetTotalField && (
               <div className='flex flex-col gap-1.5'>
                 <span className='text-xs tabular-nums text-neutral-mid'>{getOfficialCode(ASSET_TOTAL_KEY)}</span>
@@ -163,7 +187,7 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
           >
             {hasTotals && !isBalanced ? '≠' : '='}
           </span>
-          <div className='border-t border-neutral-blue-gray/30 bg-semantic-success/5 p-5 md:border-t-0 md:px-6'>
+          <div className='border-t border-neutral-blue-gray/30 p-5 md:border-t-0 md:px-6'>
             {liabilityEquityTotalField && (
               <div className='flex flex-col gap-1.5'>
                 <span className='text-xs tabular-nums text-neutral-mid'>{getOfficialCode(LIABILITY_EQUITY_TOTAL_KEY)}</span>

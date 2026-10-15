@@ -1,5 +1,5 @@
-import { CIT_PAGE_ORDER, getDefaultFormYear } from './formList';
-import type { ReportData, SettlementReportId } from '../state/initializationReducer';
+import { CIT_PAGE_ORDER, getDefaultFormYear, isFormApplicable, isSoleOrPartnership } from './formList';
+import type { OrgType, ReportData, SettlementReportId } from '../state/initializationReducer';
 
 /** 西元年換算民國年的差值 */
 const ROC_YEAR_OFFSET = 1911;
@@ -22,6 +22,8 @@ export interface ReportPageSpec {
   /** 僅營業稅期別頁有 */
   period?: { rocYear: number; phase: number };
   required: boolean;
+  /** 非申報書的特殊頁：登記文件上傳、負責人／合夥人資料（formCode 僅為占位） */
+  kind?: 'registration' | 'partners';
 }
 
 export interface VatPeriod {
@@ -77,8 +79,8 @@ export function buildVatPeriods(openYear: number, today: Date): VatPeriod[] {
 /**
  * 步驟 4 要逐頁核對的所有頁面，順序：營所稅各表 → 營業稅各期（由舊到新，每期擇一填 401 或 403）。
  */
-export function buildReportPages({ openYear, today }: { openYear: number; today: Date }): ReportPageSpec[] {
-  const cit: ReportPageSpec[] = CIT_PAGE_ORDER.map(formCode => ({
+export function buildReportPages({ openYear, today, orgType = null }: { openYear: number; today: Date; orgType?: OrgType }): ReportPageSpec[] {
+  const cit: ReportPageSpec[] = CIT_PAGE_ORDER.filter(formCode => isFormApplicable(formCode, orgType)).map(formCode => ({
     key: formCode,
     formCode,
     taxYear: getDefaultFormYear(formCode, openYear),
@@ -93,7 +95,11 @@ export function buildReportPages({ openYear, today }: { openYear: number; today:
     required: p.required,
   }));
 
-  return [...cit, ...vat];
+  // 登記資料頁排在最後：所有組織型態都要上傳登記文件，獨資／合夥再填負責人及合夥人資料
+  const registration: ReportPageSpec[] = [{ key: 'REGISTRATION', formCode: 'CIT_COVER', taxYear: openYear, required: false, kind: 'registration' }];
+  if (isSoleOrPartnership(orgType)) registration.push({ key: 'PARTNERS', formCode: 'CIT_COVER', taxYear: openYear, required: false, kind: 'partners' });
+
+  return [...cit, ...vat, ...registration];
 }
 
 /** 依年度分組描述期別，如「民國 114 年 1–2、3–4 月；民國 115 年 1–2 月」 */

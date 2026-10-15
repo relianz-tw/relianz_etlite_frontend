@@ -6,6 +6,19 @@ import type { ReportFieldDef } from '../reports/types';
 
 // ==================== 類型定義 ====================
 
+/** 組織型態：決定要備哪些文件（公司有股東名簿與未分配盈餘申報書，獨資合夥改填負責人／合夥人資料） */
+export type OrgType = 'share' | 'limited' | 'sole' | 'partnership' | null;
+
+/** 負責人／合夥人資料（獨資只有負責人，合夥另有合夥人） */
+export interface Partner {
+  title: '負責人' | '合夥人';
+  name: string;
+  idNo: string;
+  address: string;
+  /** 出資額 */
+  capital: number;
+}
+
 /** 步驟二「請選擇您的營運狀況」，決定是否需要逐頁核對結算申報書各表 */
 export type OperatingStatus = 'under_one_year' | 'over_one_year' | null;
 
@@ -59,6 +72,8 @@ export interface InitializationState {
   termsAgreed: boolean;
 
   // 步驟 2
+  /** 組織型態，於開帳設定選擇，並同步寫入損益表 ORG_KIND */
+  orgType: OrgType;
   operatingStatus: OperatingStatus;
   /** 開帳年度（民國年），預設值見 reports/formList.ts getCurrentOpenYear；尚未進入步驟 2 前為 null */
   openYear: number | null;
@@ -97,6 +112,11 @@ export interface InitializationState {
   // 步驟 3 封面頁補充欄位 + 步驟 4 報表核對資料，key 為 ReportKey（營所稅各表預先建立，401／403 期別頁用到時才建立）
   reports: Record<ReportKey, ReportData>;
 
+  /** 登記文件上傳（key 為文件類型代碼，值為檔名）。TODO：後端上傳 API 上線後改存檔案識別碼 */
+  registrationFiles: Record<string, string>;
+  /** 負責人及合夥人資料（獨資／合夥才使用） */
+  partners: Partner[];
+
   // 步驟 6
   completed: boolean;
 }
@@ -111,6 +131,7 @@ export const initialState: InitializationState = {
 
   termsAgreed: false,
 
+  orgType: null,
   operatingStatus: null,
   openYear: null,
   reportYears: {},
@@ -137,6 +158,9 @@ export const initialState: InitializationState = {
 
   reports: buildInitialReportsState(),
 
+  registrationFiles: {},
+  partners: [],
+
   completed: false,
 };
 
@@ -153,6 +177,7 @@ export type InitializationAction =
   | { type: 'AGREE_TERMS' }
 
   // 步驟 2
+  | { type: 'SET_ORG_TYPE'; payload: OrgType }
   | { type: 'SET_OPERATING_STATUS'; payload: OperatingStatus }
   | { type: 'SET_OPEN_YEAR'; payload: number | null }
   | { type: 'SET_SIMULATED_DATE'; payload: string | null }
@@ -181,6 +206,10 @@ export type InitializationAction =
   | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[] } }
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
   | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: ReportKey; index: number; key: string; value: string | number } }
+
+  // 步驟 4 登記資料頁
+  | { type: 'SET_REGISTRATION_FILE'; payload: { docType: string; fileName: string | null } }
+  | { type: 'SET_PARTNERS'; payload: Partner[] }
 
   // 步驟 6
   | { type: 'COMPLETE' };
@@ -287,6 +316,14 @@ function setReportRows(reports: InitializationState['reports'], reportId: Report
   return { ...reports, [reportId]: { ...getReport(reports, reportId), rows } };
 }
 
+/** 組織型態 → 損益表 ORG_KIND 組的欄位代碼 */
+const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
+  share: 'ORG_1_SHARE',
+  limited: 'ORG_2_LIMITED',
+  sole: 'ORG_6_SOLE',
+  partnership: 'ORG_5_PARTNERSHIP',
+};
+
 export function initializationReducer(state: InitializationState, action: InitializationAction): InitializationState {
   switch (action.type) {
     case 'RESTORE_STATE':
@@ -320,6 +357,23 @@ export function initializationReducer(state: InitializationState, action: Initia
 
     case 'AGREE_TERMS':
       return { ...state, termsAgreed: true };
+
+    case 'SET_ORG_TYPE': {
+      // 同步損益表「組織種類」勾選（辨識帶入的值之後仍可被覆蓋）
+      let reports = state.reports;
+      for (const [type, fieldCode] of Object.entries(ORG_TYPE_FIELD)) {
+        reports = setReportField(reports, 'CIT_INCOME_TAX', fieldCode, type === action.payload ? 1 : 0, false);
+      }
+      return { ...state, orgType: action.payload, reports };
+    }
+
+    case 'SET_REGISTRATION_FILE': {
+      const { [action.payload.docType]: _removed, ...rest } = state.registrationFiles;
+      return { ...state, registrationFiles: action.payload.fileName ? { ...rest, [action.payload.docType]: action.payload.fileName } : rest };
+    }
+
+    case 'SET_PARTNERS':
+      return { ...state, partners: action.payload };
 
     case 'SET_OPERATING_STATUS':
       return { ...state, operatingStatus: action.payload };

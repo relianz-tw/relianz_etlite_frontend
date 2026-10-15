@@ -5,7 +5,9 @@ import { useFormMetadata } from '../hooks/useFormMetadata';
 import { formatPeriodLabel, getFormItem, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
+import { FormPaperPreview } from './FormPaperPreview';
 import { BalanceSheetView } from './BalanceSheetView';
+import { PaperFormView } from './PaperFormView';
 import { ReportSections } from './ReportSections';
 import { ReportTable } from './ReportTable';
 import { StepNavButtons, StepPageHeader } from '@/components/initialization/StepPageHeader';
@@ -24,6 +26,9 @@ const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
 
 /** 資產負債表用 T 字帳版面（BalanceSheetView），其餘文件頁用一般欄位卡片 */
 const BALANCE_SHEET_CODE: SettlementReportId = 'CIT_BALANCE_SHEET';
+
+/** 套用「紙本對照」逐列版型（代號 chip、小計、扣除項）的營所稅文件 */
+const PAPER_FORM_CODES: SettlementReportId[] = ['CIT_INCOME_TAX', 'CIT_AMT', 'CIT_INVESTORS', 'CIT_UE', 'CIT_WH_RECON'];
 
 interface ReportPageViewProps {
   /** 這一頁（營所稅各表、封面或某一期別的 401／403） */
@@ -108,6 +113,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   return (
     <>
       <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav}>
+        <FormPaperPreview formCode={formCode} />
         {progress && (
           <div className='flex flex-col gap-1.5'>
             <ProgressBar value={progress.value} max={progress.max} label='文件進度' />
@@ -149,7 +155,11 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
             <BalanceSheetView sections={sections} />
           ) : (
             <>
-              <ReportSections reportId={reportKey} sections={sections} />
+              {PAPER_FORM_CODES.includes(formCode) ? (
+                <PaperFormView reportId={reportKey} formCode={formCode} sections={sections} />
+              ) : (
+                <ReportSections reportId={reportKey} sections={sections} />
+              )}
               {rawPage.table && (
                 <SectionCard title='明細'>
                   <ReportTable reportId={reportKey} table={rawPage.table} />

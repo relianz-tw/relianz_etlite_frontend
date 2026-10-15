@@ -1,4 +1,4 @@
-import type { SettlementReportId } from '../state/initializationReducer';
+import type { OrgType, SettlementReportId } from '../state/initializationReducer';
 
 /** 西元年換算民國年的差值 */
 const ROC_YEAR_OFFSET = 1911;
@@ -75,3 +75,14 @@ export function getDefaultFormYear(formCode: SettlementReportId, openYear: numbe
  * 完整的逐頁清單見 reports/reportPages.ts buildReportPages。
  */
 export const CIT_PAGE_ORDER: SettlementReportId[] = FORM_LIST.filter(f => f.taxType === 'cit' && f.formCode !== 'CIT_COVER').map(f => f.formCode);
+
+/** 獨資或合夥（無股東名簿與未分配盈餘申報書，改填負責人／合夥人資料） */
+export function isSoleOrPartnership(orgType: OrgType): boolean {
+  return orgType === 'sole' || orgType === 'partnership';
+}
+
+/** 該文件對此組織型態是否需要（獨資／合夥沒有未分配盈餘申報書與股東名簿；尚未選擇時視為公司） */
+export function isFormApplicable(formCode: SettlementReportId, orgType: OrgType): boolean {
+  if (!isSoleOrPartnership(orgType)) return true;
+  return formCode !== 'CIT_UE' && formCode !== 'CIT_SHAREHOLDERS';
+}

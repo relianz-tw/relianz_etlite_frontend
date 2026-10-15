@@ -46,6 +46,8 @@ export interface IdentifiedForm {
 }
 
 export interface CitIdentifyResult {
+  /** 開帳民國年（回傳請求帶入的 openingYear） */
+  openingYear?: number;
   profile: Record<string, boolean | null>;
   /** 固定 10 筆，請用 formCode 對應，不要用陣列下標 */
   forms: IdentifiedForm[];
@@ -59,6 +61,12 @@ export interface MetadataField {
   sectionCode: string | null;
   /** true＝可重複列欄位（列模板） */
   isRow: boolean;
+  /** 父科目 fieldCode（目前僅資產負債表有），用於縮排呈現階層 */
+  parentFieldCode?: string | null;
+  /** 扣除項（紙本以括號或「減：」表示） */
+  isDeduction?: boolean;
+  /** 小計／合計列（非使用者直接輸入的明細） */
+  isSubtotal?: boolean;
 }
 
 /** 互斥勾選組；maxSelect=1 表示二選一／多選一 */
@@ -104,10 +112,11 @@ export function getFormMetadata(formNo: number, taxYear: number): Promise<FormMe
   return apiFetch<FormMetadata>(`/ael/peit/form/metadata${buildQuery({ formNo, taxYear })}`);
 }
 
-/** 辨識營所稅結算申報書（可含多頁）或 401／403 PDF，不寫庫，僅回辨識結果供前端回填欄位 */
-export function identifyCit(file: File): Promise<CitIdentifyResult> {
+/** 辨識營所稅結算申報書（可含多頁）或 401／403 PDF，不寫庫，僅回辨識結果供前端回填欄位；openingYear 為開帳民國年 */
+export function identifyCit(file: File, openingYear: number): Promise<CitIdentifyResult> {
   const formData = new FormData();
   formData.append('companyUuid', COMPANY_UUID);
+  formData.append('openingYear', String(openingYear));
   formData.append('file', file);
   return apiFetch<CitIdentifyResult>('/ael/peit/cit/identify', {
     method: 'POST',

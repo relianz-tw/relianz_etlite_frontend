@@ -1,7 +1,8 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { FORM_LIST, buildReportPages, describePeriods, getOpenYearOptions, resolveToday, toGregorianYear } from '../../reports';
+import { FORM_LIST, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
+import { getRegistrationDocs } from '../../reports/registrationDocs';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,7 +11,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { OperatingStatus } from '../../state/initializationReducer';
+import type { OperatingStatus, OrgType } from '../../state/initializationReducer';
 
 // 測試用「模擬今天日期」只在開發環境顯示；其他環境（如 staging）需設 NEXT_PUBLIC_ENABLE_DATE_SIMULATOR=true 才開
 const SHOW_DATE_SIMULATOR = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_ENABLE_DATE_SIMULATOR === 'true';
@@ -19,6 +20,14 @@ const STATUS_OPTIONS: { value: Exclude<OperatingStatus, null>; title: string; de
   { value: 'under_one_year', title: '尚未結算申報過', desc: '公司營運未滿一年' },
   { value: 'over_one_year', title: '穩定經營超過一年以上', desc: '已有前一年度的結算申報資料' },
 ];
+
+const ORG_OPTIONS: { value: Exclude<OrgType, null>; title: string; desc: string }[] = [
+  { value: 'share', title: '股份有限公司', desc: '需備股東名簿與未分配盈餘申報書' },
+  { value: 'limited', title: '有限公司', desc: '需備股東名簿與未分配盈餘申報書' },
+  { value: 'sole', title: '獨資行號', desc: '改填負責人資料，不需股東名簿' },
+  { value: 'partnership', title: '合夥行號', desc: '改填負責人及合夥人資料，不需股東名簿' },
+];
+
 
 /** 步驟編號圓章：已完成為實心藍，進行中為藍框 */
 function StepBadge({ n, done }: { n: number; done: boolean }) {
@@ -77,7 +86,7 @@ export function Step2Operating() {
   const hasYear = state.openYear !== null;
 
   // 步驟 4 要逐頁核對的頁面（營所稅各表＋營業稅各期）；未滿一年不逐頁核對，為空
-  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, today }) : [];
+  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, today, orgType: state.orgType }) : [];
   const vatPages = plan.filter(p => p.period);
   const requiredVat = describePeriods(vatPages.filter(p => p.required));
   const optionalVat = describePeriods(vatPages.filter(p => !p.required));
@@ -91,10 +100,14 @@ export function Step2Operating() {
   };
 
   // 穩定經營需再選年度才算完成；未滿一年選完營運狀況即可前進
-  const ready = state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear);
+  const hasOrgType = state.orgType !== null;
+  const ready = hasOrgType && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear));
+  const registrationDocs = getRegistrationDocs(state.orgType);
 
   const hint =
-    state.operatingStatus === null
+    !hasOrgType
+      ? '先選擇組織型態，會依型態列出需要準備的文件。'
+      : state.operatingStatus === null
       ? '選擇營運狀況後，會顯示接下來需要準備的文件。'
       : isOverOneYear && !hasYear
         ? '選擇開帳年度後，會顯示需要準備的文件。'
@@ -154,7 +167,40 @@ export function Step2Operating() {
       <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white px-5 md:px-6'>
         <div className='flex flex-col gap-4 py-6'>
           <div className='flex items-center gap-3'>
-            <StepBadge n={1} done={state.operatingStatus !== null} />
+            <StepBadge n={1} done={hasOrgType} />
+            <h2 className='text-lg font-bold text-neutral-dark'>請選擇組織型態</h2>
+          </div>
+          <div role='radiogroup' aria-label='組織型態' className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+            {ORG_OPTIONS.map(option => {
+              const selected = state.orgType === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-3 rounded-lg border-[1.5px] p-4 transition-colors',
+                    selected ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray/50 bg-white hover:border-brand-blue'
+                  )}
+                >
+                  <input
+                    type='radio'
+                    name='orgType'
+                    className='mt-1 h-[18px] w-[18px] shrink-0 accent-brand-blue'
+                    checked={selected}
+                    onChange={() => dispatch({ type: 'SET_ORG_TYPE', payload: option.value })}
+                  />
+                  <span className='flex flex-col gap-0.5'>
+                    <span className='text-[15px] font-bold text-neutral-dark'>{option.title}</span>
+                    <span className='text-[13px] text-neutral-mid'>{option.desc}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className='flex flex-col gap-4 py-6'>
+          <div className='flex items-center gap-3'>
+            <StepBadge n={2} done={state.operatingStatus !== null} />
             <h2 className='text-lg font-bold text-neutral-dark'>請選擇您的營運狀況</h2>
           </div>
           <div role='radiogroup' aria-label='營運狀況' className='grid grid-cols-1 gap-3 md:grid-cols-2'>
@@ -188,7 +234,7 @@ export function Step2Operating() {
         {isOverOneYear && (
           <div className='flex flex-col gap-4 py-6'>
             <div className='flex items-center gap-3'>
-              <StepBadge n={2} done={hasYear} />
+              <StepBadge n={3} done={hasYear} />
               <div className='flex flex-col'>
                 <h2 className='text-lg font-bold text-neutral-dark'>{onlyYear !== null ? '開帳年度' : '請選擇要開帳的年度'}</h2>
                 <span className='text-[13px] text-neutral-mid'>從這個年度的期初開始記帳，前一年度的結算申報資料會作為期初餘額</span>
@@ -225,14 +271,14 @@ export function Step2Operating() {
         {isOverOneYear && hasYear && state.openYear !== null && (
           <div className='flex flex-col gap-3.5 py-6'>
             <div className='flex items-center gap-3'>
-              <StepBadge n={3} done />
+              <StepBadge n={isOverOneYear ? 4 : 3} done />
               <h2 className='text-lg font-bold text-neutral-dark'>請先備齊以下文件</h2>
             </div>
             <p className='text-[15px] text-neutral-mid'>
               請準備民國 {state.openYear - 1} 年度的結算申報資料。接下來會一頁一頁呈現表單，每一頁都可以上傳文件快速帶入資料，也可以直接手動輸入。
             </p>
             <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark md:grid-cols-2'>
-              {FORM_LIST.filter(form => form.taxType === 'cit').map(form => (
+              {FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType)).map(form => (
                 <li key={form.formNo}>
                   {form.title}
                   {form.optional && '（如有）'}
@@ -247,6 +293,13 @@ export function Step2Operating() {
                   </ul>
                 </li>
               )}
+            </ul>
+            <p className='text-[15px] font-medium text-neutral-dark'>登記資料（逐頁核對的最後會請您上傳）</p>
+            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark md:grid-cols-2'>
+              {registrationDocs.map(doc => (
+                <li key={doc.code}>{doc.title}</li>
+              ))}
+              {isSoleOrPartnership(state.orgType) && <li>負責人{state.orgType === 'partnership' ? '及合夥人' : ''}基本資料（姓名、身分證字號、戶籍地址、出資額）</li>}
             </ul>
           </div>
         )}

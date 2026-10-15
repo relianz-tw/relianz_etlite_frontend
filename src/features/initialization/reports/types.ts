@@ -14,6 +14,14 @@ export interface ReportFieldDef {
   allowSign?: boolean;
   /** 合計／子合計列，字重加粗與一般明細列區隔 */
   emphasize?: boolean;
+  /** 紙本上的欄位代號（metadata officialFieldCode），顯示於代號 chip */
+  officialCode?: string;
+  /** 父科目 fieldCode，用於資產負債表縮排 */
+  parentKey?: string;
+  /** 扣除項，紙本以「減：」或括號表示 */
+  isDeduction?: boolean;
+  /** 小計／合計列 */
+  isSubtotal?: boolean;
 }
 
 export interface ReportSectionDef {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useInitialization } from '../state/InitializationContext';
-import { FORM_LIST, formatPeriodLabel, getVatReportKey } from '../reports';
+import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
 import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
@@ -80,7 +80,9 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
     setStatus('recognizing');
     setMessage('');
     try {
-      const result = await identifyCit(file);
+      // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
+      const openingYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
+      const result = await identifyCit(file, openingYear);
       const knownCodes = new Set<string>(FORM_LIST.map(f => f.formCode));
       const presentForms = result.forms.filter(f => f.present && !f.errorCode && knownCodes.has(f.formCode));
       const failedForms = result.forms.filter(f => f.errorCode && knownCodes.has(f.formCode));
