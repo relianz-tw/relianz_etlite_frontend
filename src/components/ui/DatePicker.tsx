@@ -17,6 +17,8 @@ interface DatePickerProps {
   aiFilled?: boolean;
   /** 驗證失敗時為 true，邊框改為錯誤色（優先權高於 aiFilled） */
   error?: boolean;
+  /** 為 true 時，打開月曆不搶走輸入框的焦點，可直接用鍵盤輸入民國日期（預設 false，維持焦點移入月曆） */
+  keepInputFocus?: boolean;
 }
 
 /** Date → 民國年 YYY/MM/DD */
@@ -48,7 +50,7 @@ export function parseRocDate(text: string): Date | undefined {
   return date;
 }
 
-export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false, aiFilled = false, error = false }: DatePickerProps) {
+export default function DatePicker({ value, onChange, placeholder = '選擇日期', className = '', disabled = false, aiFilled = false, error = false, keepInputFocus = false }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputText, setInputText] = useState(formatRocDate(value));
 
@@ -103,7 +105,7 @@ export default function DatePicker({ value, onChange, placeholder = '選擇日�
           <CalendarIcon size={16} className="shrink-0 cursor-pointer text-neutral-mid" />
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start">
+      <PopoverContent align="start" onOpenAutoFocus={keepInputFocus ? e => e.preventDefault() : undefined}>
         <Calendar
           mode="single"
           selected={value}

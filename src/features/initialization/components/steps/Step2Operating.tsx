@@ -152,6 +152,7 @@ export function Step2Operating() {
             <DatePicker
               value={state.simulatedDate ? today : undefined}
               placeholder='選擇模擬日期'
+              keepInputFocus
               onChange={date => date && handleSimulatedDateChange(formatLocalDate(date))}
             />
             {state.simulatedDate && (
@@ -275,6 +276,7 @@ export function Step2Operating() {
               <DatePicker
                 value={state.openingBalance.baseDate ? new Date(`${state.openingBalance.baseDate}T00:00:00`) : undefined}
                 placeholder='選擇開帳基準日'
+                keepInputFocus
                 onChange={date => dispatch({ type: 'SET_BALANCE_BASE_DATE', payload: date ? formatLocalDate(date) : '' })}
               />
             </div>

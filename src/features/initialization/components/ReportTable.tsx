@@ -72,6 +72,7 @@ export function ReportTable({ reportId, table }: ReportTableProps) {
                     <DatePicker
                       value={data.value ? new Date(data.value) : undefined}
                       aiFilled={data.aiFilled}
+                      keepInputFocus
                       onChange={date =>
                         dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: date ? formatLocalDate(date) : '' } })
                       }

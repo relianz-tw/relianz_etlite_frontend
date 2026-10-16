@@ -71,7 +71,7 @@ export function ReportFieldRow({ field, data, onChange }: ReportFieldRowProps) {
         />
       )}
       {field.type === 'date' && (
-        <DatePicker value={data.value ? new Date(data.value) : undefined} aiFilled={data.aiFilled} onChange={date => onChange(date ? formatLocalDate(date) : '')} />
+        <DatePicker value={data.value ? new Date(data.value) : undefined} aiFilled={data.aiFilled} keepInputFocus onChange={date => onChange(date ? formatLocalDate(date) : '')} />
       )}
       </div>
     </div>
