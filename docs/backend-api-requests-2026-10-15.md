@@ -44,6 +44,17 @@
 ### 3. 組織型態
 前端在開帳設定新增「組織型態」（股份有限／有限／獨資／合夥），並寫入損益表 `ORG_KIND`（`ORG_1_SHARE`、`ORG_2_LIMITED`、`ORG_6_SOLE`、`ORG_5_PARTNERSHIP`）。開帳送出（`saveInitializationCompany` 的 `orgType`）請確認接受這四種。
 
+### 4. 開帳資料儲存（目前完全沒有）
+前端各頁填的欄位只存在瀏覽器 sessionStorage，按「開始使用」後清除，後端沒有任何紀錄。`/ael/initialization/*` 實測仍為 404，前端暫時吞錯放行。
+
+| 項目 | 說明 |
+|---|---|
+| 各表欄位與明細列 | 營所稅 11 張表（含封面）＋營業稅 401／403 各期，整批儲存與讀取。key：`formCode` + `taxYear`，401／403 另加期別起始月。值以 `fieldCode` 對應 metadata |
+| 送出時機 | 步驟 5「確認開帳」一次送出；是否支援逐頁暫存請決定 |
+| 期初餘額 | `openbook` 的 `assets`／`liabilities`／`equity` 現由前端依 form 4 metadata 組出（排除小計與有子科目的父科目），請確認後端接受這個粒度 |
+| `orgType` | 現送代碼 `share`／`limited`／`sole`／`partnership` |
+| 待確認欄位 | `industryId`（目前送封面行業代碼）、`isOperating`、`openDate`、`baseDate` 前端沒有輸入入口，來源與定義請後端確認，前端不自行推算 |
+
 ## 二、建議調整
 
 ### 4. metadata 提供區塊名稱與順序

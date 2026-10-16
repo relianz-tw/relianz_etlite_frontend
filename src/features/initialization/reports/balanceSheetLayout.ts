@@ -27,11 +27,6 @@ export const LIABILITY_EQUITY_TOTAL_KEY = 'BS_9000';
 /** 資產負債表日欄位：由頁面依封面會計年度結束月自動填入、不給使用者輸入 */
 export const BALANCE_SHEET_DATE_FIELD_KEY = 'HDR_BS_DATE';
 
-/** 區塊標題旁的官方代號：metadata 的 officialFieldCode 即 fieldCode 去掉 BS_ 前綴 */
-export function getOfficialCode(fieldKey: string): string {
-  return fieldKey.replace(/^BS_/, '');
-}
-
 /**
  * 解析日期字串為西元年月日。接受 YYYY-MM-DD，以及辨識結果可能保留的民國年寫法（114-12-31、114/12/31、114年12月31日）；
  * 小於 1911 的年份視為民國年。無法解析回傳 null。

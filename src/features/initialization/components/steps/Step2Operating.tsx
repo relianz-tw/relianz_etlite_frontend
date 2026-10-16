@@ -1,7 +1,7 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { FORM_LIST, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
+import { FORM_LIST, ORG_TYPE_LABEL, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
 import { getRegistrationDocs } from '../../reports/registrationDocs';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
@@ -22,10 +22,10 @@ const STATUS_OPTIONS: { value: Exclude<OperatingStatus, null>; title: string; de
 ];
 
 const ORG_OPTIONS: { value: Exclude<OrgType, null>; title: string; desc: string }[] = [
-  { value: 'share', title: '股份有限公司', desc: '需備股東名簿與未分配盈餘申報書' },
-  { value: 'limited', title: '有限公司', desc: '需備股東名簿與未分配盈餘申報書' },
-  { value: 'sole', title: '獨資行號', desc: '改填負責人資料，不需股東名簿' },
-  { value: 'partnership', title: '合夥行號', desc: '改填負責人及合夥人資料，不需股東名簿' },
+  { value: 'share', title: ORG_TYPE_LABEL.share, desc: '需備股東名簿與未分配盈餘申報書' },
+  { value: 'limited', title: ORG_TYPE_LABEL.limited, desc: '需備股東名簿與未分配盈餘申報書' },
+  { value: 'sole', title: ORG_TYPE_LABEL.sole, desc: '改填負責人資料，不需股東名簿' },
+  { value: 'partnership', title: ORG_TYPE_LABEL.partnership, desc: '改填負責人及合夥人資料，不需股東名簿' },
 ];
 
 
@@ -262,6 +262,25 @@ export function Step2Operating() {
           </div>
         )}
 
+        {state.operatingStatus !== null && (
+          <div className='flex flex-col gap-4 py-6'>
+            <div className='flex items-center gap-3'>
+              <StepBadge n={isOverOneYear ? 4 : 3} done={state.openingBalance.baseDate !== ''} />
+              <div className='flex flex-col'>
+                <h2 className='text-lg font-bold text-neutral-dark'>開帳基準日</h2>
+                <span className='text-[13px] text-neutral-mid'>從這一天起開始記帳，作為日後帳務的起點</span>
+              </div>
+            </div>
+            <div className='md:w-60'>
+              <DatePicker
+                value={state.openingBalance.baseDate ? new Date(`${state.openingBalance.baseDate}T00:00:00`) : undefined}
+                placeholder='選擇開帳基準日'
+                onChange={date => dispatch({ type: 'SET_BALANCE_BASE_DATE', payload: date ? formatLocalDate(date) : '' })}
+              />
+            </div>
+          </div>
+        )}
+
         {hint && (
           <div className='py-6'>
             <p className='rounded-lg bg-surface-off-white px-4 py-3 text-sm text-neutral-mid'>{hint}</p>
@@ -271,7 +290,7 @@ export function Step2Operating() {
         {isOverOneYear && hasYear && state.openYear !== null && (
           <div className='flex flex-col gap-3.5 py-6'>
             <div className='flex items-center gap-3'>
-              <StepBadge n={isOverOneYear ? 4 : 3} done />
+              <StepBadge n={5} done />
               <h2 className='text-lg font-bold text-neutral-dark'>請先備齊以下文件</h2>
             </div>
             <p className='text-[15px] text-neutral-mid'>

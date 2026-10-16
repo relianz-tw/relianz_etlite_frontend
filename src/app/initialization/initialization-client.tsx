@@ -55,6 +55,19 @@ export function InitializationClient() {
     if (scroller) scroller.scrollTop = 0;
   }, [currentStep, currentReportIndex]);
 
+  // 步驟 2–5 正在填資料時，關閉分頁或重新整理前讓瀏覽器跳出「確定要離開」確認；
+  // 合約與完成頁沒有待保存的內容，不攔。瀏覽器只會顯示內建文字，無法自訂
+  const hasUnsavedProgress = currentStep >= 2 && currentStep <= 5;
+  useEffect(() => {
+    if (!hasUnsavedProgress) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedProgress]);
+
   if (currentStep === 1) return <Step1Terms />;
   if (currentStep === 2) return <Step2Operating />;
   if (currentStep === 3) return <Step3Cover />;

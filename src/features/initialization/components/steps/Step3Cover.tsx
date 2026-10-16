@@ -60,10 +60,12 @@ export function Step3Cover() {
   const handleNext = () => {
     const fields = state.reports.CIT_COVER.fields;
     const company: Partial<InitializationState['company']> = {};
+    // 空值也要寫回：使用者清空封面欄位時，確認頁與送出資料不能殘留舊值
     for (const [fieldCode, companyKey] of Object.entries(COVER_TO_COMPANY)) {
-      const value = fields[fieldCode]?.value;
-      if (value !== undefined && value !== '') company[companyKey] = String(value);
+      company[companyKey] = String(fields[fieldCode]?.value ?? '');
     }
+    // 行業代碼同時作為送出用的 industryId（封面 metadata 只有這一個行業欄位）
+    company.industryId = company.industryName;
     dispatch({ type: 'SET_COMPANY', payload: company });
     dispatch({ type: 'NEXT_STEP' });
   };

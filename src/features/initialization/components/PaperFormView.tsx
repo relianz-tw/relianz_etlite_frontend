@@ -25,18 +25,9 @@ interface PaperFormViewProps {
   sections: ReportSectionDef[];
 }
 
-/** 紙本代號 chip：官方代號（如 01、5-1）原樣顯示；數字或字母代號加括號對照紙本 */
-function CodeChip({ code }: { code?: string }) {
-  return (
-    <span className={cn('inline-flex h-6 min-w-12 items-center justify-center rounded bg-brand-blue/10 px-1.5 text-xs font-bold tabular-nums text-brand-blue', !code && 'invisible')}>
-      {code ? `(${code})` : '(00)'}
-    </span>
-  );
-}
-
 /**
  * 紙本對照版型（營所稅各表共用）：每個區塊一張卡片，金額欄位為「運算符號｜代號 chip｜標籤｜金額」逐列呈現，
- * 小計列淡藍底粗體、扣除項前加「−」，與紙本逐欄比對。版面完全依 metadata 欄位屬性（officialFieldCode、isSubtotal、isDeduction）。
+ * 小計列淡藍底粗體、扣除項前加「−」，與紙本逐欄比對。版面完全依 metadata 欄位屬性（isSubtotal、isDeduction）。
  * 小計與合計由辨識帶入或使用者輸入，前端不自行加總。
  */
 export function PaperFormView({ reportId, formCode, sections }: PaperFormViewProps) {
@@ -86,8 +77,7 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
         {rows.length > 0 && (
           <div className='flex flex-col'>
             {hasPairs && (
-              <div className='hidden grid-cols-[24px_56px_minmax(0,1fr)_170px_170px] gap-x-3 px-3 pb-1.5 text-xs font-bold text-neutral-mid md:grid'>
-                <span />
+              <div className='hidden grid-cols-[24px_minmax(0,1fr)_170px_170px] gap-x-3 px-3 pb-1.5 text-xs font-bold text-neutral-mid md:grid'>
                 <span />
                 <span>項目</span>
                 <span className='text-right'>帳載結算金額</span>
@@ -102,18 +92,17 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
                 <div
                   key={main.key}
                   className={cn(
-                    'grid grid-cols-[20px_52px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5',
-                    adj ? 'md:grid-cols-[24px_56px_minmax(0,1fr)_170px_170px]' : 'md:grid-cols-[24px_56px_minmax(0,1fr)_240px]',
+                    'grid grid-cols-[20px_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5',
+                    adj ? 'md:grid-cols-[24px_minmax(0,1fr)_170px_170px]' : 'md:grid-cols-[24px_minmax(0,1fr)_240px]',
                     main.isSubtotal && 'mt-1 bg-brand-blue/5'
                   )}
                 >
                   <span className='text-center text-lg text-neutral-mid'>{operator}</span>
-                  <CodeChip code={main.officialCode} />
                   <span className={cn('min-w-0 break-words text-sm leading-snug text-neutral-dark', main.isSubtotal ? 'font-bold' : 'font-medium')}>
                     {hasPairs ? main.label.replace(PAIR_LABEL_SUFFIX, '') : main.label}
                   </span>
                   {/* 成對區塊裡沒有另一半的欄位，輸入框放在「帳載」那一欄對齊 */}
-                  <div className={cn('col-start-2 col-end-4 md:col-end-auto', adj ? 'grid grid-cols-2 gap-2 md:contents md:col-start-auto' : hasPairs ? 'md:col-start-4' : 'md:col-start-auto')}>
+                  <div className={cn('col-start-2 md:col-end-auto', adj ? 'grid grid-cols-2 gap-2 md:contents md:col-start-auto' : hasPairs ? 'md:col-start-3' : 'md:col-start-auto')}>
                     {renderMoneyInput(main)}
                     {adj && renderMoneyInput(adj)}
                   </div>
@@ -143,20 +132,6 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
 
   return (
     <>
-      <div className='flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-neutral-blue-gray/30 bg-white px-5 py-3 text-[13px] text-neutral-mid'>
-        <span className='flex items-center gap-2'>
-          <span className='inline-flex h-5 min-w-9 items-center justify-center rounded bg-brand-blue/10 px-1 text-xs font-bold text-brand-blue'>(01)</span>
-          紙本上的欄位代號
-        </span>
-        <span className='flex items-center gap-2'>
-          <span className='h-4 w-6 rounded border-[1.5px] border-semantic-success bg-semantic-success/5' />
-          辨識帶入，請核對
-        </span>
-        <span className='flex items-center gap-2'>
-          <span className='h-4 w-6 rounded border border-neutral-blue-gray/50 bg-white' />
-          手動輸入
-        </span>
-      </div>
       <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white'>{visible.map(renderSection)}</div>
     </>
   );

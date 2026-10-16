@@ -8,6 +8,16 @@ import { useEffect, useMemo, useState } from 'react';
 // metadata 依 formNo + 民國年固定不變，模組層快取避免上一頁／下一頁來回切換時重複打 API
 const metadataCache = new Map<string, FormMetadata>();
 
+/** 非 hook 版本：送出前需要各表 dataType 時使用，與畫面共用同一份快取 */
+export async function loadFormMetadata(formNo: number, taxYear: number): Promise<FormMetadata> {
+  const key = `${formNo}-${taxYear}`;
+  const cached = metadataCache.get(key);
+  if (cached) return cached;
+  const data = await getFormMetadata(formNo, taxYear);
+  metadataCache.set(key, data);
+  return data;
+}
+
 /** 依文件編號與民國年取得該表欄位定義並組成畫面用的 ReportPageDef；切換年度（如辨識後）會自動重撈 */
 export function useFormMetadata(formNo: number, taxYear: number) {
   const key = `${formNo}-${taxYear}`;

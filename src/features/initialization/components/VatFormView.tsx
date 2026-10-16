@@ -74,12 +74,11 @@ interface VatFormViewProps {
   sections: ReportSectionDef[];
 }
 
-/** 欄位代號 chip：官方代號加圈號，如「21 ①」 */
-function CodeChip({ code, marker }: { code?: string; marker?: string }) {
+/** 圈號 chip：紙本公式用來指稱欄位的圈號（如 ①）；沒有圈號時留白佔位，讓金額框對齊 */
+function CodeChip({ marker }: { marker?: string }) {
   return (
-    <span className={cn('inline-flex h-6 w-11 shrink-0 items-center justify-center rounded bg-brand-blue/10 px-1.5 text-xs font-bold tabular-nums text-brand-blue', !code && 'invisible')}>
-      {code ?? '0'}
-      {marker && <span className='ml-0.5'>{marker}</span>}
+    <span className={cn('inline-flex h-6 w-11 shrink-0 items-center justify-center rounded bg-brand-blue/10 px-1.5 text-xs font-bold text-brand-blue', !marker && 'invisible')}>
+      {marker ?? '0'}
     </span>
   );
 }
@@ -105,7 +104,7 @@ export function VatFormView({ reportId, sections }: VatFormViewProps) {
     <div className='col-start-2 flex min-w-0 flex-col gap-1 md:col-start-auto'>
       {colLabel && <span className='text-xs text-neutral-mid md:hidden'>{colLabel}</span>}
       <div className='flex items-center gap-2'>
-        <CodeChip code={field.officialCode} marker={marker} />
+        <CodeChip marker={marker} />
         <div className='min-w-0 flex-1'>
           <ReportAmountInput field={field} data={fieldData(field.key)} onChange={value => setField(field.key, value)} />
         </div>

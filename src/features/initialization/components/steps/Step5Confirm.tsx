@@ -2,36 +2,52 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { useFormMetadata } from '../../hooks/useFormMetadata';
-import { getCurrentOpenYear, getDefaultFormYear, getFormItem, resolveToday } from '../../reports';
+import { ORG_TYPE_LABEL, getCurrentOpenYear, getDefaultFormYear, getFormItem, resolveToday } from '../../reports';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
+import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
+import { confirmCit } from '@/api/peit';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import SectionCard from '@/components/ui/SectionCard';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export function Step5Confirm() {
   const { state, dispatch } = useInitialization();
+  const [submitting, setSubmitting] = useState(false);
   const balanceSheetFields = state.reports.CIT_BALANCE_SHEET.fields;
   const totalAssets = Number(balanceSheetFields.BS_1000?.value) || 0; // 資產總計
   const totalLiabilitiesAndEquity = Number(balanceSheetFields.BS_9000?.value) || 0; // 負債及權益總計
   const isBalanced = totalAssets === totalLiabilitiesAndEquity;
   const hasReports = state.operatingStatus === 'over_one_year';
+  const openYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
 
-  // 組織型態在損益及稅額計算表（`ORG_KIND` 組）選擇，名稱取 metadata 的選項名稱
-  const incomeYear = state.reportYears.CIT_INCOME_TAX ?? getDefaultFormYear('CIT_INCOME_TAX', state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate)));
-  const { page: incomePage } = useFormMetadata(getFormItem('CIT_INCOME_TAX').formNo, incomeYear);
-  const orgTypeLabel =
-    incomePage?.sections
-      .flatMap(section => section.choices ?? [])
-      .find(choice => choice.groupCode === 'ORG_KIND')
-      ?.fields.find(field => Number(state.reports.CIT_INCOME_TAX?.fields[field.key]?.value) === 1)?.label ?? '';
+  // 期初餘額的科目清單取自資產負債表 metadata（與步驟 4 同年度，快取命中不會重打 API）
+  const balanceYear = state.reportYears.CIT_BALANCE_SHEET ?? getDefaultFormYear('CIT_BALANCE_SHEET', openYear);
+  const { page: balancePage } = useFormMetadata(getFormItem('CIT_BALANCE_SHEET').formNo, balanceYear);
 
-  const handleConfirm = () => {
+  // 組織型態由步驟 2 決定
+  const orgTypeLabel = state.orgType ? ORG_TYPE_LABEL[state.orgType] : '';
+
+  const handleConfirm = async () => {
+    // 逐頁核對的資料先寫入後端；失敗就擋在這一步，避免使用者以為已存但實際沒存
+    setSubmitting(true);
+    try {
+      const forms = await buildConfirmForms(state);
+      if (forms.length > 0) await confirmCit(forms);
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, '開帳資料儲存失敗，請稍後再試'));
+      setSubmitting(false);
+      return;
+    }
+
     // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
     // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
     saveInitializationCompany({
       userUuid: state.userUuid,
-      orgType: orgTypeLabel,
+      orgType: state.orgType ?? '',
       taxId: state.company.taxId,
       companyName: state.company.name,
       representative: state.company.representative,
@@ -46,9 +62,10 @@ export function Step5Confirm() {
       saveOpeningBalance({
         userUuid: state.userUuid,
         baseDate: state.openingBalance.baseDate,
-        ...toOpeningBalancePayload(balanceSheetFields),
+        ...toOpeningBalancePayload(balanceSheetFields, balancePage),
       }).catch(() => {});
     }
+    setSubmitting(false);
     dispatch({ type: 'NEXT_STEP' });
   };
 
@@ -57,7 +74,7 @@ export function Step5Confirm() {
       <StepPageHeader
         kicker='確認'
         title='確認開帳'
-        nav={{ onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: handleConfirm, nextLabel: '確認開帳' }}
+        nav={{ onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: handleConfirm, nextLabel: submitting ? '儲存中…' : '確認開帳', nextDisabled: submitting }}
       >
         <p className='text-sm text-neutral-mid'>確認以下資料無誤後即完成開帳設定，開帳基準日設定後將作為日後記帳的起點。</p>
       </StepPageHeader>
@@ -72,7 +89,7 @@ export function Step5Confirm() {
             <dd className='text-neutral-dark'>{state.company.taxId || '—'}</dd>
             <dt className='text-neutral-mid'>公司名稱</dt>
             <dd className='text-neutral-dark'>{state.company.name || '—'}</dd>
-            <dt className='text-neutral-mid'>代表人</dt>
+            <dt className='text-neutral-mid'>負責人</dt>
             <dd className='text-neutral-dark'>{state.company.representative || '—'}</dd>
             <dt className='text-neutral-mid'>地址</dt>
             <dd className='text-neutral-dark'>{state.company.address || '—'}</dd>

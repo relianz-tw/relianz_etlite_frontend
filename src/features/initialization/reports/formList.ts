@@ -76,6 +76,14 @@ export function getDefaultFormYear(formCode: SettlementReportId, openYear: numbe
  */
 export const CIT_PAGE_ORDER: SettlementReportId[] = FORM_LIST.filter(f => f.taxType === 'cit' && f.formCode !== 'CIT_COVER').map(f => f.formCode);
 
+/** 組織型態顯示名稱（步驟 2 選項、確認頁共用） */
+export const ORG_TYPE_LABEL: Record<Exclude<OrgType, null>, string> = {
+  share: '股份有限公司',
+  limited: '有限公司',
+  sole: '獨資行號',
+  partnership: '合夥行號',
+};
+
 /** 獨資或合夥（無股東名簿與未分配盈餘申報書，改填負責人／合夥人資料） */
 export function isSoleOrPartnership(orgType: OrgType): boolean {
   return orgType === 'sole' || orgType === 'partnership';

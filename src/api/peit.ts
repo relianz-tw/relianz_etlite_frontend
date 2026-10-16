@@ -125,3 +125,43 @@ export function identifyCit(file: File, openingYear: number): Promise<CitIdentif
     signal: AbortSignal.timeout(180_000),
   });
 }
+
+/** confirm 的單一欄位值：依 dataType 只填對應的 value*，其餘留 null */
+export interface ConfirmField {
+  fieldCode: string;
+  valueInt?: number | null;
+  valueDecimal?: number | null;
+  valueText?: string | null;
+  valueDate?: string | null;
+  valueBoolean?: boolean | null;
+}
+
+export interface ConfirmRow {
+  /** 列序，≥0；前端依畫面順序從 0 起 */
+  rowIndex: number;
+  fields: ConfirmField[];
+}
+
+export interface ConfirmForm {
+  formCode: string;
+  present: boolean;
+  taxYear: number;
+  /** 僅 401／403：所屬起月（1／3／5／7／9／11） */
+  periodStartMonth?: number;
+  fields: ConfirmField[];
+  rows: ConfirmRow[];
+}
+
+export interface CitConfirmResult {
+  companyUuid: string;
+  writtenFormCount: number;
+  forms: { formCode: string; written: boolean; writtenFieldCount: number; skipped: boolean; skipReason?: string }[];
+}
+
+/** 確認並寫入營所稅各表與營業稅 401／403 各期資料（使用者逐頁核對後的最終值） */
+export function confirmCit(forms: ConfirmForm[]): Promise<CitConfirmResult> {
+  return apiFetch<CitConfirmResult>('/ael/peit/cit/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ companyUuid: COMPANY_UUID, forms }),
+  });
+}

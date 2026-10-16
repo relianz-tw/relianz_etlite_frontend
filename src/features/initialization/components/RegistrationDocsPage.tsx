@@ -5,6 +5,7 @@ import { useInitialization } from '../state/InitializationContext';
 import { getRegistrationDocs } from '../reports/registrationDocs';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import type { StepNavProps } from '@/components/initialization/StepPageHeader';
+import { StepProgress, type StepProgressValue } from '@/components/initialization/StepProgress';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
 import { CircleCheck, FileText, Upload, X } from 'lucide-react';
@@ -12,7 +13,7 @@ import { CircleCheck, FileText, Upload, X } from 'lucide-react';
 const MAX_SIZE_MB = 10;
 
 /** 登記文件上傳頁：依組織型態列出文件，每項可上傳 PDF 或圖片。TODO：後端上傳 API 上線後改為實際上傳，目前只記錄檔名 */
-export function RegistrationDocsPage({ kicker, nav }: { kicker: string; nav: StepNavProps }) {
+export function RegistrationDocsPage({ kicker, nav, progress }: { kicker: string; nav: StepNavProps; progress: StepProgressValue }) {
   const { state, dispatch } = useInitialization();
   const docs = getRegistrationDocs(state.orgType);
 
@@ -20,6 +21,7 @@ export function RegistrationDocsPage({ kicker, nav }: { kicker: string; nav: Ste
     <>
       <StepPageHeader kicker={kicker} title='登記資料' badges={['給客戶上傳']} nav={nav}>
         <p className='text-sm text-neutral-mid'>請上傳最新的登記文件，供事務所核對公司（行號）資料。檔案格式 PDF 或圖片，{MAX_SIZE_MB}MB 以內。</p>
+        <StepProgress {...progress} />
       </StepPageHeader>
       <SectionCard>
         <div className='flex flex-col divide-y divide-neutral-blue-gray/30'>

@@ -1,43 +1,36 @@
+import { BALANCE_BLOCKS } from './balanceSheetLayout';
+import type { ReportPageDef } from './types';
 import type { ReportField } from '../state/initializationReducer';
 
+/** 資產負債表區塊（sectionCode）→ /ael/initialization/openbook 期初餘額 API 分組 */
+const SECTION_GROUP: Record<string, 'assets' | 'liabilities' | 'equity'> = {
+  [BALANCE_BLOCKS.currentAssets.sectionKey]: 'assets',
+  [BALANCE_BLOCKS.nonCurrentAssets.sectionKey]: 'assets',
+  [BALANCE_BLOCKS.currentLiabilities.sectionKey]: 'liabilities',
+  [BALANCE_BLOCKS.nonCurrentLiabilities.sectionKey]: 'liabilities',
+  [BALANCE_BLOCKS.equity.sectionKey]: 'equity',
+};
+
 /**
- * CIT_BALANCE_SHEET（資產負債表）欄位 key → /ael/initialization/openbook 期初餘額 API 分組。
- * 僅列出明細科目（不含各分組合計／總計欄位，避免與明細重複計入），供 Step5Confirm 送出用。
- * key 對應官方 field_code（由 GET /ael/peit/form/metadata 取得）。
- * 對應表待後端確認實際 API 欄位需求後可能調整，目前先依既有 openbook 慣例保留三分組結構。
+ * 由資產負債表 metadata（GET /ael/peit/form/metadata）產生期初餘額 payload，供 Step5Confirm 送出。
+ * 只送明細科目：排除小計／合計、區塊小計欄位，以及底下還有子科目的父科目，避免與明細重複計入。
+ * 科目清單全部來自 metadata，後端增減科目時不需改前端。
  */
-const ASSET_KEYS = [
-  'BS_1110', // 現金及約當現金
-  'BS_1131', // 應收票據
-  'BS_1141', // 應收帳款
-  'BS_1150', // 其他應收款
-  'BS_1160', // 存貨
-  'BS_1170', // 預付款項
-  'BS_1312', // 房屋及建築
-  'BS_1313', // 減：累計折舊－房屋及建築
-  'BS_1321', // 機具設備
-  'BS_1322', // 減：累計折舊－機具設備
-];
-const LIABILITY_KEYS = [
-  'BS_2110', // 短期借款
-  'BS_2140', // 應付帳款
-  'BS_2150', // 其他應付款
-  'BS_2210', // 長期借款
-];
-const EQUITY_KEYS = [
-  'BS_3100', // 資本／股本
-  'BS_3120', // 資本公積
-  'BS_3430', // 未分配盈餘（或累積虧損）
-];
+export function toOpeningBalancePayload(balanceSheetFields: Record<string, ReportField>, page: ReportPageDef | null) {
+  const payload = { assets: {} as Record<string, number>, liabilities: {} as Record<string, number>, equity: {} as Record<string, number> };
+  if (!page) return payload;
 
-function pickFields(fields: Record<string, ReportField>, keys: string[]): Record<string, number> {
-  return Object.fromEntries(keys.map(key => [key, Number(fields[key]?.value) || 0]));
-}
+  const subtotalKeys = new Set<string>(Object.values(BALANCE_BLOCKS).map(block => block.subtotalKey));
+  const allFields = page.sections.flatMap(section => section.fields);
+  const parentKeys = new Set(allFields.flatMap(field => (field.parentKey ? [field.parentKey] : [])));
 
-export function toOpeningBalancePayload(balanceSheetFields: Record<string, ReportField>) {
-  return {
-    assets: pickFields(balanceSheetFields, ASSET_KEYS),
-    liabilities: pickFields(balanceSheetFields, LIABILITY_KEYS),
-    equity: pickFields(balanceSheetFields, EQUITY_KEYS),
-  };
+  for (const section of page.sections) {
+    const group = SECTION_GROUP[section.key];
+    if (!group) continue;
+    for (const field of section.fields) {
+      if (field.type !== 'money' || field.isSubtotal || subtotalKeys.has(field.key) || parentKeys.has(field.key)) continue;
+      payload[group][field.key] = Number(balanceSheetFields[field.key]?.value) || 0;
+    }
+  }
+  return payload;
 }

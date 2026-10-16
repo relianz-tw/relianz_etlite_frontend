@@ -5,7 +5,7 @@ import type { ReportData, ReportField, SettlementReportId } from '../state/initi
 
 export type { ReportFieldDef, ReportPageDef, ReportSectionDef, ReportTableDef, ReportFieldType, ReportChoiceDef } from './types';
 export * from './reportPages';
-export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getOpenYearOptions, resolveToday, toGregorianYear, getFormItem, isFormApplicable, isSoleOrPartnership } from './formList';
+export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getOpenYearOptions, resolveToday, toGregorianYear, getFormItem, isFormApplicable, isSoleOrPartnership, ORG_TYPE_LABEL } from './formList';
 
 /** 沒有 sectionCode 的欄位歸入的預設區塊 */
 const DEFAULT_SECTION_CODE = 'OTHER';
@@ -32,7 +32,6 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
       key: f.fieldCode,
       label: f.fieldName,
       type: FIELD_TYPE_MAP[f.dataType] ?? 'text',
-      officialCode: f.officialFieldCode ?? undefined,
       parentKey: f.parentFieldCode ?? undefined,
       isDeduction: f.isDeduction || undefined,
       isSubtotal: f.isSubtotal || undefined,

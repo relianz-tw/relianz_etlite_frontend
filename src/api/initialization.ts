@@ -3,7 +3,7 @@
  * TODO: 後端尚未提供 /ael/initialization/* 端點（實測皆 404），此檔先依既有 onboarding API
  * 慣例（見 src/api/onboarding/*.ts）寫好函式簽名與型別，待後端開通後直接可用，元件端無需改動。
  *
- * 結算申報書文件辨識已改接 /ael/peit/401/identify（見 src/api/peit.ts），不在此檔。
+ * 結算申報書文件辨識已改接 /ael/peit/cit/identify（見 src/api/peit.ts），不在此檔。
  */
 import { apiFetch } from './client';
 

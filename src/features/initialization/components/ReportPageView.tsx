@@ -12,8 +12,8 @@ import { ReportSections } from './ReportSections';
 import { VatFormView } from './VatFormView';
 import { ReportTable } from './ReportTable';
 import { StepNavButtons, StepPageHeader } from '@/components/initialization/StepPageHeader';
+import { StepProgress, type StepProgressValue } from '@/components/initialization/StepProgress';
 import Button from '@/components/ui/Button';
-import ProgressBar from '@/components/ui/ProgressBar';
 import { ChevronRight, Info } from 'lucide-react';
 import SectionCard from '@/components/ui/SectionCard';
 import { useEffect, useMemo } from 'react';
@@ -38,7 +38,7 @@ interface ReportPageViewProps {
   taxYear: number;
   /** 標題上方的小字（如「第 1 / 11 份」） */
   kicker: string;
-  progress?: { value: number; max: number };
+  progress?: StepProgressValue;
   /** 是否顯示上傳辨識區 */
   showIdentify: boolean;
   nextLabel: string;
@@ -115,14 +115,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     <>
       <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav}>
         <FormPaperPreview formCode={formCode} />
-        {progress && (
-          <div className='flex flex-col gap-1.5'>
-            <ProgressBar value={progress.value} max={progress.max} label='文件進度' />
-            <span className='text-xs text-neutral-mid'>
-              {progress.value === 0 ? `封面填完後，接下來逐頁核對 ${progress.max} 份文件` : `共 ${progress.max} 份文件逐頁核對，已走到第 ${progress.value} 份`}
-            </span>
-          </div>
-        )}
+        {progress && <StepProgress {...progress} />}
         {spec.period && (
           // 申報書種類提示條：預設 401，使用者可在這一期改用 403（上傳辨識到另一種也會自動切換）
           <div className='flex flex-col gap-3 rounded-lg bg-brand-blue/10 px-4 py-3 md:flex-row md:items-center md:justify-between'>

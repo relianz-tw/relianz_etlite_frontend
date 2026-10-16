@@ -6,7 +6,6 @@ import {
   BALANCE_BLOCKS,
   LIABILITY_EQUITY_TOTAL_KEY,
   LIABILITY_TOTAL_KEY,
-  getOfficialCode,
   type BalanceBlockConfig,
 } from '../reports/balanceSheetLayout';
 import { ReportChoiceField } from './ReportChoiceField';
@@ -67,7 +66,6 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
         style={{ paddingLeft: depthOf(field) * 16 }}
         className={cn('break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}
       >
-        {field.officialCode && !emphasized && <span className='mr-1.5 text-xs tabular-nums text-neutral-mid'>{field.officialCode}</span>}
         {field.isDeduction && !field.label.startsWith('減') && '減：'}
         {field.label}
       </span>
@@ -88,7 +86,6 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
     return (
       <div className='flex h-full flex-col gap-2'>
         <div className='flex items-baseline gap-2'>
-          {subtotal && <span className='text-xs tabular-nums text-neutral-mid'>{getOfficialCode(subtotal.key)}</span>}
           <h3 className='text-[15px] font-bold text-neutral-dark'>{config.title}</h3>
         </div>
         {rows.map(f => renderRow(f))}
@@ -172,7 +169,6 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
           <div className='p-5 md:px-6'>
             {assetTotalField && (
               <div className='flex flex-col gap-1.5'>
-                <span className='text-xs tabular-nums text-neutral-mid'>{getOfficialCode(ASSET_TOTAL_KEY)}</span>
                 {renderRow(assetTotalField, true)}
               </div>
             )}
@@ -190,7 +186,6 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
           <div className='border-t border-neutral-blue-gray/30 p-5 md:border-t-0 md:px-6'>
             {liabilityEquityTotalField && (
               <div className='flex flex-col gap-1.5'>
-                <span className='text-xs tabular-nums text-neutral-mid'>{getOfficialCode(LIABILITY_EQUITY_TOTAL_KEY)}</span>
                 {renderRow(liabilityEquityTotalField, true)}
               </div>
             )}

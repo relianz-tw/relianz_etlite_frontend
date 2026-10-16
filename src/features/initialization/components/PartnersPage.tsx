@@ -3,22 +3,35 @@
 import { useInitialization } from '../state/InitializationContext';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import type { StepNavProps } from '@/components/initialization/StepPageHeader';
+import { StepProgress, type StepProgressValue } from '@/components/initialization/StepProgress';
 import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SectionCard from '@/components/ui/SectionCard';
 import TextInput from '@/components/ui/TextInput';
 import { fmtCurrency } from '@/lib/utils';
 import { Plus, TriangleAlert, X } from 'lucide-react';
+import { useEffect } from 'react';
 import type { Partner } from '../state/initializationReducer';
 
 const EMPTY_OWNER: Partner = { title: '負責人', name: '', idNo: '', address: '', capital: 0 };
 const EMPTY_PARTNER: Partner = { title: '合夥人', name: '', idNo: '', address: '', capital: 0 };
 
 /** 負責人（獨資）或負責人及合夥人（合夥）的基本資料與出資額 */
-export function PartnersPage({ kicker, nav }: { kicker: string; nav: Omit<StepNavProps, 'nextDisabled'> }) {
+export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: Omit<StepNavProps, 'nextDisabled'>; progress: StepProgressValue }) {
   const { state, dispatch } = useInitialization();
   const isPartnership = state.orgType === 'partnership';
   const partners = state.partners.length > 0 ? state.partners : [EMPTY_OWNER];
+
+  // 負責人姓名預設帶封面的負責人（只補空白，不覆蓋使用者已輸入的值）；寫進 state 才會被保存與送出
+  const coverOwnerName = String(state.reports.CIT_COVER?.fields.HDR_OWNER_NAME?.value ?? '');
+  useEffect(() => {
+    if (!coverOwnerName) return;
+    const owner = partners.find(p => p.title === '負責人');
+    if (owner?.name) return;
+    dispatch({ type: 'SET_PARTNERS', payload: partners.map(p => (p.title === '負責人' ? { ...p, name: coverOwnerName } : p)) });
+    // partners 變動不需重跑，只在封面負責人變動或首次進入時補值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverOwnerName]);
 
   // 出資額加總應等於資產負債表 3110 欄（資本額）；資產負債表尚未填（為 0）時無從比對，不擋
   const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
@@ -31,6 +44,12 @@ export function PartnersPage({ kicker, nav }: { kicker: string; nav: Omit<StepNa
     <>
       <StepPageHeader kicker={kicker} title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch }}>
         <p className='text-sm text-neutral-mid'>{isPartnership ? '合夥需填負責人及每位合夥人，出資額加總應等於資產負債表資本額 (3110)。' : '請填寫負責人資料與出資額。'}</p>
+        <StepProgress {...progress} />
+        {mismatch && (
+          <p className='text-xs text-semantic-error'>
+            出資額合計 {fmtCurrency(totalCapital)} 與資產負債表資本額 {fmtCurrency(balanceCapital)} 不符，請調整後再前往下一份。
+          </p>
+        )}
       </StepPageHeader>
 
       {partners.map((p, index) => (

@@ -359,7 +359,7 @@ export function initializationReducer(state: InitializationState, action: Initia
       return { ...state, termsAgreed: true };
 
     case 'SET_ORG_TYPE': {
-      // 同步損益表「組織種類」勾選（辨識帶入的值之後仍可被覆蓋）
+      // 同步損益表「組織種類」勾選；組織型態只由這裡（步驟 2）決定，損益表那邊不回寫，因為步驟 4 的頁面清單已依此凍結
       let reports = state.reports;
       for (const [type, fieldCode] of Object.entries(ORG_TYPE_FIELD)) {
         reports = setReportField(reports, 'CIT_INCOME_TAX', fieldCode, type === action.payload ? 1 : 0, false);
@@ -417,7 +417,10 @@ export function initializationReducer(state: InitializationState, action: Initia
       for (const key of SHARED_FIELD_KEYS) {
         const own = getReport(reports, reportId).fields[key]?.value;
         if (own !== undefined && own !== '') continue;
-        const source = Object.entries(reports).find(([id, report]) => id !== reportId && (report.fields[key]?.value ?? '') !== '');
+        // 封面是公司資料的主要入口，優先當來源；沒有再找其他有值的文件
+        const hasValue = (id: string) => id !== reportId && (reports[id]?.fields[key]?.value ?? '') !== '';
+        const sourceId = hasValue('CIT_COVER') ? 'CIT_COVER' : Object.keys(reports).find(hasValue);
+        const source = sourceId ? ([sourceId, reports[sourceId]] as const) : undefined;
         const sourceField = source?.[1].fields[key];
         if (!sourceField) continue;
         reports = setReportField(reports, reportId, key, sourceField.value, sourceField.aiFilled);
