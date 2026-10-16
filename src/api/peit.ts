@@ -6,8 +6,8 @@
 import { apiFetch, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
 
-/** dataType：0 文字、1 整數或金額元、2 小數、3 日期、4 布林 */
-export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4;
+/** dataType：0 文字、1 金額元、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額） */
+export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface IdentifiedField {
   fieldCode: string;
@@ -94,7 +94,8 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
   switch (field.dataType) {
     case 0: // 文字
       return field.valueText ?? undefined;
-    case 1: // 整數或金額元
+    case 1: // 金額元
+    case 5: // 純整數
       return field.valueInt ?? undefined;
     case 2: // 小數
       return field.valueDecimal ?? undefined;

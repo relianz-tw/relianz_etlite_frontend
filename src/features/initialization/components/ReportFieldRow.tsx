@@ -60,6 +60,19 @@ export function ReportFieldRow({ field, data, onChange }: ReportFieldRowProps) {
           onChange={e => onChange(e.target.value)}
         />
       )}
+      {/* 純整數欄位（如年數、份數，dataType 5）：不是金額，不顯示 $ 與千分位 */}
+      {field.type === 'integer' && (
+        <TextInput
+          widthClassName='w-full'
+          inputMode='numeric'
+          value={data.value === '' ? '' : String(data.value)}
+          aiFilled={data.aiFilled}
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '');
+            onChange(digits === '' ? '' : Number(digits));
+          }}
+        />
+      )}
       {/* 小數欄位（如稅率、持股比例），MoneyInput 僅支援整數，故沿用 TextInput 並限制輸入格式 */}
       {field.type === 'decimal' && (
         <TextInput

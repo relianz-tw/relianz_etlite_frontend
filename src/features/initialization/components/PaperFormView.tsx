@@ -44,7 +44,7 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
   const renderSection = (section: ReportSectionDef) => {
     const title = SECTION_TITLES[formCode]?.[section.key];
     // 金額與小數（稅率、毛利率等）欄位都以逐列呈現；文字、日期、勾選另外排
-    const isRowField = (f: ReportFieldDef) => f.type === 'money' || f.type === 'decimal';
+    const isRowField = (f: ReportFieldDef) => f.type === 'money' || f.type === 'integer' || f.type === 'decimal';
     const moneyFields = section.fields.filter(isRowField);
 
     // 帳載／調整後成對：用 _BOOK 欄位的基底代號找對應 _ADJ，兩者合併成一列

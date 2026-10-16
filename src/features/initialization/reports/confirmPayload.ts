@@ -15,7 +15,8 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
   switch (meta.dataType) {
     case 0:
       return { ...base, valueText: String(field.value) };
-    case 1: {
+    case 1: // 金額元
+    case 5: { // 純整數
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueInt: Math.round(n) } : null;
     }

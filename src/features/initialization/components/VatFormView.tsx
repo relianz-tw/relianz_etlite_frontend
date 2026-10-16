@@ -96,7 +96,7 @@ export function VatFormView({ reportId, sections }: VatFormViewProps) {
   const fieldData = (key: string) => data[key] ?? { value: '', aiFilled: false };
   const setField = (key: string, value: string | number) => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId, key, value } });
   const hasValue = (key: string) => Number(data[key]?.value) !== 0 && data[key]?.value !== undefined && data[key]?.value !== '';
-  const isRowField = (f: ReportFieldDef) => f.type === 'money' || f.type === 'decimal';
+  const isRowField = (f: ReportFieldDef) => f.type === 'money' || f.type === 'integer' || f.type === 'decimal';
 
   const sectionMap = new Map(sections.map(s => [s.key, s]));
 

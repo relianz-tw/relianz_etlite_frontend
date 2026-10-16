@@ -10,13 +10,14 @@ export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getO
 /** 沒有 sectionCode 的欄位歸入的預設區塊 */
 const DEFAULT_SECTION_CODE = 'OTHER';
 
-/** metadata dataType（0 文字、1 整數或金額、2 小數、3 日期、4 布林）→ 畫面欄位型別 */
+/** metadata dataType（0 文字、1 金額元、2 小數、3 日期、4 布林、5 純整數）→ 畫面欄位型別 */
 const FIELD_TYPE_MAP: Record<IdentifiedFieldDataType, ReportFieldType> = {
   0: 'text',
   1: 'money',
   2: 'decimal',
   3: 'date',
   4: 'boolean',
+  5: 'integer',
 };
 
 /** 依 metadata API 回傳組出畫面渲染用的 ReportPageDef（步驟 3 封面頁、步驟 4 報表核對頁共用） */

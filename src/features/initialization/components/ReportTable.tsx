@@ -55,6 +55,17 @@ export function ReportTable({ reportId, table }: ReportTableProps) {
                       onChange={e => dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: e.target.value } })}
                     />
                   )}
+                  {col.type === 'integer' && (
+                    <TextInput
+                      inputMode='numeric'
+                      value={data.value === '' ? '' : String(data.value)}
+                      aiFilled={data.aiFilled}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '');
+                        dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: digits === '' ? '' : Number(digits) } });
+                      }}
+                    />
+                  )}
                   {col.type === 'decimal' && (
                     <TextInput
                       inputMode='decimal'

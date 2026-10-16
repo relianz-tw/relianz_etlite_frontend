@@ -1,7 +1,7 @@
 import type { SettlementReportId } from '../state/initializationReducer';
 
-/** 報表欄位型別：money 用 MoneyInput、text/decimal 用 TextInput、date 用 DatePicker、boolean 用 Checkbox */
-export type ReportFieldType = 'money' | 'text' | 'date' | 'decimal' | 'boolean';
+/** 報表欄位型別：money 用 MoneyInput、integer（純整數，無 $ 與千分位）／text／decimal 用 TextInput、date 用 DatePicker、boolean 用 Checkbox */
+export type ReportFieldType = 'money' | 'integer' | 'text' | 'date' | 'decimal' | 'boolean';
 
 export interface ReportFieldDef {
   /** 對應 state.reports[reportId].fields 的 key（表格型報表則對應 row 內的 key） */
