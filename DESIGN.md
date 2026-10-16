@@ -330,6 +330,20 @@ Focus 樣式不變：仍套用一般 Focus border／shadow（#005FA2），聚焦
 首個使用情境：`src/features/ledger/transaction/TransactionFormView.tsx` 上傳憑證照片後呼叫
 POST /ael/invoice/identification/one 自動帶入的表單欄位。
 
+### 紙本對照欄位列（Paper-aligned Row）
+
+開帳精靈的申報書頁（損益表、基本稅額、未分配盈餘、扣繳調節表、營業稅 401／403）逐列對照紙本欄位，實作見 `PaperFormView`、`VatFormView`。
+
+- **區塊標題**：`text-lg font-bold`，下方 `border-b-2 border-neutral-dark`；區塊內小節標題 `text-base font-bold`，旁可接 `text-[13px] text-neutral-mid` 的說明。
+- **一列**：`運算符號 ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。運算符號欄 24px，用 `−`（扣除項）、`＝`（小計／合計），`text-lg text-neutral-mid`。
+- **代號 chip**：`h-6 rounded bg-brand-blue/10 text-xs font-bold text-brand-blue`，內容為紙本官方欄位代號；營業稅另加圈號（如 `21 ①`），固定寬 `w-11` 讓金額框對齊。損益表置於標籤與金額之間（`min-w-12`，加括號）；營業稅置於各欄金額框左側（每列有「銷售額｜稅額」兩個代號）。
+- **成對欄位**：「帳載／調整後」「銷售額（金額）／稅額」並排，桌機每欄 170–200px，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
+- **小計／合計列**：`bg-brand-blue/5`、標籤與數字粗體，`mt-1` 與明細分開。
+- **群組小標**（如「統一發票扣抵聯」）：`text-[13px] font-bold`，其下明細縮排 `pl-5`。
+- **收合**：沒有金額的列預設收合，連結 `text-[13px] font-medium text-brand-blue` 附 `ChevronDown`。
+- **本期結果卡**（營業稅）：應繳 `border-brand-blue/35 bg-brand-blue/10`，留抵 `border-semantic-success/40 bg-semantic-success/5`；金額 `text-2xl font-bold`。
+- 合計與稅額計算一律取欄位值（辨識帶入或使用者輸入），前端不自行加總。
+
 ### Navigation — Sidebar（側邊欄導覽）
 
 全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +

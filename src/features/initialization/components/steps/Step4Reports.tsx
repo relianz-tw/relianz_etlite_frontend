@@ -1,7 +1,7 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
-import { buildReportPages, getCurrentOpenYear, resolveToday } from '../../reports';
+import { buildReportPages, formatPeriodLabel, getCurrentOpenYear, resolveToday } from '../../reports';
 import { PartnersPage } from '../PartnersPage';
 import { RegistrationDocsPage } from '../RegistrationDocsPage';
 import { ReportPageView } from '../ReportPageView';
@@ -22,8 +22,9 @@ export function Step4Reports() {
 
   if (!spec) return null;
 
-  const kicker = `第 ${state.currentReportIndex + 1} / ${total} 份`;
-  const nextLabel = state.currentReportIndex < total - 1 ? '下一份' : '下一步：確認開帳';
+  // 營業稅期別頁不是 14 份結算申報書的一部分，標題上方只標期別、不顯示進度
+  const kicker = spec.period ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}` : `第 ${state.currentReportIndex + 1} / ${total} 份`;
+  const nextLabel = state.currentReportIndex >= total - 1 ? '下一步：確認開帳' : spec.period ? '下一步' : '下一份';
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel };
   if (spec.kind === 'registration') return <RegistrationDocsPage kicker={kicker} nav={nav} />;
   if (spec.kind === 'partners') return <PartnersPage kicker={kicker} nav={nav} />;
@@ -36,10 +37,10 @@ export function Step4Reports() {
       key={spec.key}
       spec={spec}
       taxYear={taxYear}
-      kicker={`第 ${state.currentReportIndex + 1} / ${total} 份`}
-      progress={{ value: state.currentReportIndex + 1, max: total }}
+      kicker={kicker}
+      progress={spec.period ? undefined : { value: state.currentReportIndex + 1, max: total }}
       showIdentify
-      nextLabel={state.currentReportIndex < total - 1 ? '下一份' : '下一步：確認開帳'}
+      nextLabel={nextLabel}
       onNext={() => dispatch({ type: 'NEXT_STEP' })}
     />
   );

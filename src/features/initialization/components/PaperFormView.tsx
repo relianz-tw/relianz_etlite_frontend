@@ -3,10 +3,8 @@
 import { useState } from 'react';
 import { useInitialization } from '../state/InitializationContext';
 import { SECTION_TITLES } from '../reports/sectionTitles';
-import { ReportChoiceField } from './ReportChoiceField';
-import { ReportFieldRow } from './ReportFieldRow';
-import MoneyInput from '@/components/ui/MoneyInput';
-import TextInput from '@/components/ui/TextInput';
+import { PaperSectionFields } from './PaperSectionFields';
+import { ReportAmountInput } from './ReportAmountInput';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 import type { ReportKey, SettlementReportId } from '../state/initializationReducer';
@@ -50,28 +48,13 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
   const fieldData = (key: string) => data[key] ?? { value: '', aiFilled: false };
   const hasValue = (key: string) => Number(data[key]?.value) !== 0 && data[key]?.value !== undefined && data[key]?.value !== '';
 
-  // 扣除項由左側「−」表示，數值一律填正數，不開正負切換
-  const renderMoneyInput = (field: ReportFieldDef) =>
-    field.type === 'decimal' ? (
-      <TextInput
-        widthClassName='w-full'
-        inputMode='decimal'
-        value={String(fieldData(field.key).value)}
-        aiFilled={fieldData(field.key).aiFilled}
-        onChange={e => setField(field.key, e.target.value.replace(/[^\d.]/g, ''))}
-      />
-    ) : (
-      <MoneyInput widthClassName='w-full' value={Number(fieldData(field.key).value) || 0} aiFilled={fieldData(field.key).aiFilled} onChange={value => setField(field.key, value)} />
-    );
+  const renderMoneyInput = (field: ReportFieldDef) => <ReportAmountInput field={field} data={fieldData(field.key)} onChange={value => setField(field.key, value)} />;
 
   const renderSection = (section: ReportSectionDef) => {
     const title = SECTION_TITLES[formCode]?.[section.key];
     // 金額與小數（稅率、毛利率等）欄位都以逐列呈現；文字、日期、勾選另外排
     const isRowField = (f: ReportFieldDef) => f.type === 'money' || f.type === 'decimal';
     const moneyFields = section.fields.filter(isRowField);
-    const otherFields = section.fields.filter(f => !isRowField(f));
-    const inputFields = otherFields.filter(f => f.type !== 'boolean');
-    const checkFields = otherFields.filter(f => f.type === 'boolean');
 
     // 帳載／調整後成對：用 _BOOK 欄位的基底代號找對應 _ADJ，兩者合併成一列
     const adjMap = new Map(moneyFields.filter(f => f.key.endsWith(ADJ_SUFFIX)).map(f => [f.key.slice(0, -ADJ_SUFFIX.length), f]));
@@ -99,17 +82,7 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{title}</h2>
         )}
 
-        {(section.choices?.length ?? 0) > 0 || inputFields.length > 0 ? (
-          <div className='grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6'>
-            {section.choices?.map(choice => (
-              <ReportChoiceField key={choice.groupCode} reportId={reportId} title={choice.title} fields={choice.fields} />
-            ))}
-            {inputFields.map(field => (
-              <ReportFieldRow key={field.key} field={field} data={fieldData(field.key)} onChange={value => setField(field.key, value)} />
-            ))}
-          </div>
-        ) : null}
-
+        <PaperSectionFields reportId={reportId} section={section} isRowField={isRowField}>
         {rows.length > 0 && (
           <div className='flex flex-col'>
             {hasPairs && (
@@ -160,13 +133,7 @@ export function PaperFormView({ reportId, formCode, sections }: PaperFormViewPro
           </div>
         )}
 
-        {checkFields.length > 0 && (
-          <div className='flex flex-wrap gap-x-8 gap-y-2'>
-            {checkFields.map(field => (
-              <ReportFieldRow key={field.key} field={field} data={fieldData(field.key)} onChange={value => setField(field.key, value)} />
-            ))}
-          </div>
-        )}
+        </PaperSectionFields>
       </div>
     );
   };
