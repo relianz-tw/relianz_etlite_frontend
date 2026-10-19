@@ -3,7 +3,7 @@
 import { useInitialization } from '../../state/InitializationContext';
 import { FORM_LIST, ORG_TYPE_LABEL, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
 import { getRegistrationDocs } from '../../reports/registrationDocs';
-import { StepPageHeader } from '@/components/initialization/StepPageHeader';
+import { StepNavButtons, StepPageHeader, type StepNavProps } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePicker from '@/components/ui/DatePicker';
@@ -113,6 +113,9 @@ export function Step2Operating() {
         ? '選擇開帳年度後，會顯示需要準備的文件。'
         : '';
 
+  // 此頁不提供「上一頁」；桌機的「下一步」放在卡片下方，手機沿用固定底部操作列
+  const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一步', nextDisabled: !ready };
+
   return (
     <>
       <ConfirmDialog
@@ -132,12 +135,8 @@ export function Step2Operating() {
       <StepPageHeader
         kicker='營運狀況'
         title='開帳設定'
-        nav={{
-          onPrev: () => dispatch({ type: 'PREV_STEP' }),
-          onNext: handleNext,
-          nextLabel: '下一步',
-          nextDisabled: !ready,
-        }}
+        nav={nav}
+        hideDesktopNav
       />
 
       {SHOW_DATE_SIMULATOR && (
@@ -328,6 +327,10 @@ export function Step2Operating() {
             </ul>
           </div>
         )}
+
+        <div className='hidden justify-end py-6 md:flex'>
+          <StepNavButtons nav={nav} />
+        </div>
       </div>
     </>
   );

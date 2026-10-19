@@ -36,6 +36,8 @@ interface StepPageHeaderProps {
   /** 標題下方的小標籤，如「民國 114 年度」 */
   badges?: string[];
   nav?: StepNavProps;
+  /** 桌機不在卡片右上顯示按鈕（改由頁面自行放在內容下方）；手機的固定底部操作列不受影響 */
+  hideDesktopNav?: boolean;
   /** 卡片下半部內容（進度條、上傳辨識區等），與標題、上一頁／下一頁同屬一塊 */
   children?: ReactNode;
 }
@@ -44,7 +46,7 @@ interface StepPageHeaderProps {
  * 開帳精靈每一頁共用的頁首卡片：標題資訊、上一頁／下一頁、進度與上傳區放在同一塊。
  * 桌機（md 以上）按鈕在卡片右上；手機改為固定於畫面底部的操作列，捲到哪都按得到。
  */
-export function StepPageHeader({ kicker, title, badges, nav, children }: StepPageHeaderProps) {
+export function StepPageHeader({ kicker, title, badges, nav, hideDesktopNav, children }: StepPageHeaderProps) {
   return (
     <>
       <SectionCard className='gap-5 md:p-6'>
@@ -63,7 +65,7 @@ export function StepPageHeader({ kicker, title, badges, nav, children }: StepPag
               </div>
             )}
           </div>
-          {nav && <StepNavButtons nav={nav} className='hidden shrink-0 md:flex' />}
+          {nav && !hideDesktopNav && <StepNavButtons nav={nav} className='hidden shrink-0 md:flex' />}
         </div>
         {children}
       </SectionCard>
