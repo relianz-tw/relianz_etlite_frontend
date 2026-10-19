@@ -232,8 +232,11 @@ export function Step2Operating() {
           </div>
         </div>
 
+        {/* 開帳年度與開帳基準日在桌面並排，手機直向堆疊 */}
+        {state.operatingStatus !== null && (
+        <div className='grid grid-cols-1 gap-x-8 gap-y-6 py-6 md:grid-cols-2'>
         {isOverOneYear && (
-          <div className='flex flex-col gap-4 py-6'>
+          <div className='flex flex-col gap-4'>
             <div className='flex items-center gap-3'>
               <StepBadge n={3} done={hasYear} />
               <div className='flex flex-col'>
@@ -243,7 +246,7 @@ export function Step2Operating() {
             </div>
             {onlyYear !== null ? (
               // 只有一個年度時不需要選擇，改為資訊列，避免看起來像可點的按鈕
-              <div className='flex items-center justify-between gap-3 rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white px-4 py-3.5'>
+              <div className='flex h-12 items-center justify-between gap-3 rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white px-4'>
                 <span className='text-base font-bold text-neutral-dark'>
                   {toGregorianYear(onlyYear)} 年（民國 {onlyYear} 年）
                 </span>
@@ -263,8 +266,7 @@ export function Step2Operating() {
           </div>
         )}
 
-        {state.operatingStatus !== null && (
-          <div className='flex flex-col gap-4 py-6'>
+          <div className='flex flex-col gap-4'>
             <div className='flex items-center gap-3'>
               <StepBadge n={isOverOneYear ? 4 : 3} done={state.openingBalance.baseDate !== ''} />
               <div className='flex flex-col'>
@@ -272,8 +274,9 @@ export function Step2Operating() {
                 <span className='text-[13px] text-neutral-mid'>從這一天起開始記帳，作為日後帳務的起點</span>
               </div>
             </div>
-            <div className='md:w-60'>
+            <div>
               <DatePicker
+                className='h-12'
                 value={state.openingBalance.baseDate ? new Date(`${state.openingBalance.baseDate}T00:00:00`) : undefined}
                 placeholder='選擇開帳基準日'
                 keepInputFocus
@@ -281,6 +284,7 @@ export function Step2Operating() {
               />
             </div>
           </div>
+        </div>
         )}
 
         {hint && (
