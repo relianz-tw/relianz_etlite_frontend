@@ -438,6 +438,41 @@ Font: Noto Sans TC 12px, font-weight 600
 應收／應付狀態標示：沿用 Badge 元件、`variant="muted"`——應收 `tone="info"`、應付 `tone="neutral"`。
 對應元件：`src/features/reconciliation/components/ReconHistoryCard.tsx`（沖帳紀錄列的交易狀態欄）。
 
+### 申報對帳任務（側邊欄任務卡 + 任務清單項目）
+
+用於 401／403 申報書與帳簿發票的對帳提示。對應元件：`src/features/vat-reconcile/`。
+
+```
+側邊欄任務卡（SidebarTaskCard）
+  位置：導覽清單下方、公司名稱上方，固定不隨選單捲動；外層 border-t border-surface-cream p-3
+  卡片：bg-surface-off-white, radius 10px, padding 12px, 無陰影；整張為 <Link>
+  標題列：lucide ListChecks 16px + 「申報對帳」(brand-primary, 14px, semibold)；
+          有待處理 → 右側 Badge solid neutral 顯示待處理期數；全部符合 → 右側 CircleCheck 16px (semantic-success)
+  六格色條（1/3/5/7/9/11 期）：高 6px、radius 3px、gap 4px
+          已符合 semantic-success、待處理 neutral-mid、未上傳申報 neutral-blue-gray
+  說明列：12px neutral-dark，如「115 年 · 2 期待處理」
+  載入中：色條與說明列改為 surface-cream 實色區塊（不用 spinner / skeleton）
+  失敗：說明列 12px semantic-error「無法取得對帳結果」，點擊進任務頁重試
+  手機：頂部列選單鈕右上角 8px neutral-dark 圓點（有待處理才顯示）
+
+任務清單項目（TaskItem）
+  容器：bg-surface-off-white, radius 10px, padding 16px 20px, 項目間 gap 12px
+  編號：28px 圓形 brand-primary 底、白字 13px semibold（沿用 Step Number Badge 語意）
+  標題 15px semibold；說明 13px neutral-mid；剩餘金額標籤 12px neutral-mid + 數值 18px semibold tabular-nums
+  動作按鈕：「一鍵新增發票簿」primary；「新增交易」outline；手機版按鈕撐滿寬度（min-h 44px）
+
+期別格（PeriodTile）
+  白底、radius 10px、border 2px；選取 brand-primary、未選 neutral-blue-gray/30
+  內容：表單類型（401/403，12px neutral-mid）、期別（Noto Serif TC 18px）、Badge
+  Badge：已符合 → muted success；待處理 N → solid neutral；未上傳申報 → muted neutral
+
+對帳明細（CompareFormView）
+  沿用開帳 401／403 紙本對照版面（VatFormView）：大區塊卡片、小節標題、群組小標、圈號 chip、
+  小計淡藍底與「＝」、扣除項「−」、金額｜稅額成對；每個欄位的輸入框改為唯讀三欄「帳簿試算｜已申報｜差額」
+  有差額的列：bg-brand-tan/10 底，差額數字 bold；沒有任何數字的列預設收合，小計列一律顯示
+  手機（< nav）：三個數字改為單行文字「帳簿／申報／差額」，不橫向捲動
+```
+
 ### Sortable Table Header
 
 用於可點擊排序的表格欄位標題（如帳簿、營業稅中心的列表表頭）。

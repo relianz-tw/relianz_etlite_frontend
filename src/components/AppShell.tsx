@@ -1,6 +1,8 @@
 "use client";
 
 import Sidebar from "@/components/sideBar";
+import { PendingDot } from "@/features/vat-reconcile/SidebarTaskCard";
+import { VatReconcileProvider } from "@/features/vat-reconcile/VatReconcileContext";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -33,6 +35,8 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
+    // 申報對帳資料全站共用（側欄任務卡、手機選單圓點、對帳頁），故 Provider 掛在殼層；免殼層頁面不會打對帳 API
+    <VatReconcileProvider>
     <div style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}>
       {/* 手機版固定頂部列：logo 與選單鈕同列呈現 */}
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-surface-cream bg-white px-4 nav:hidden print:hidden">
@@ -48,9 +52,10 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           type="button"
           aria-label="開啟選單"
           onClick={() => setOpen(true)}
-          className="text-neutral-dark hover:text-brand-primary"
+          className="relative text-neutral-dark hover:text-brand-primary"
         >
           <Menu size={22} />
+          <PendingDot />
         </button>
       </header>
 
@@ -66,6 +71,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           列印時（如勞務報酬單）側欄與淨空皆不需要，比照 print:hidden 一併還原 */}
       <div className="pt-14 nav:ml-[var(--sidebar-w)] nav:pt-0 print:ml-0 print:pt-0">{children}</div>
     </div>
+    </VatReconcileProvider>
   );
 };
 

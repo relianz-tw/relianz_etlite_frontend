@@ -2,6 +2,7 @@
  * 開帳精靈（/initialization）文件辨識與欄位 metadata API，對應後端「開帳流程／peit」。
  * - GET  /ael/peit/form/metadata：依文件編號與民國年回欄位 metadata（畫面表單由此動態產生）
  * - POST /ael/peit/cit/identify：上傳 PDF 辨識營所稅結算申報書各表與營業稅 401／403，回傳各表自己的 taxYear
+ * - POST /ael/peit/vat/compare：某期發票試算 401／403 並與已寫入申報值對帳
  */
 import { apiFetch, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
@@ -157,6 +158,36 @@ export interface CitConfirmResult {
   companyUuid: string;
   writtenFormCount: number;
   forms: { formCode: string; written: boolean; writtenFieldCount: number; skipped: boolean; skipReason?: string }[];
+}
+
+/** compare 的單一對帳欄位；filedValue／delta 為 null 代表該期尚未寫入申報書 */
+export interface VatCompareDiff {
+  fieldCode: string;
+  fieldName: string;
+  /** IN_NONDEDUCT_RATIO（dataType=2）為 0–1 小數，其餘為金額元 */
+  invoiceValue: number;
+  filedValue: number | null;
+  /** invoiceValue − filedValue */
+  delta: number | null;
+}
+
+/** compare 回傳中前端用到的部分；invoiceCalc 為發票試算明細，目前畫面不使用故不展開型別 */
+export interface VatCompareResult {
+  taxYear: number;
+  cmsPhase: number;
+  /** 依發票判定：401 或 403 */
+  formKind: string;
+  /** 已 confirm 寫入的申報書；該期尚未寫入為 null */
+  filed: { caseUuid: string; formCode: string; status: number } | null;
+  diffs: VatCompareDiff[];
+}
+
+/** 某期發票試算 401／403 並與已寫入申報值對帳（POST /ael/peit/vat/compare）；cmsPhase 僅 1／3／5／7／9／11 */
+export function compareVat(params: { taxYear: number; cmsPhase: number }): Promise<VatCompareResult> {
+  return apiFetch<VatCompareResult>('/ael/peit/vat/compare', {
+    method: 'POST',
+    body: JSON.stringify({ companyUuid: COMPANY_UUID, ...params }),
+  });
 }
 
 /** 確認並寫入營所稅各表與營業稅 401／403 各期資料（使用者逐頁核對後的最終值） */

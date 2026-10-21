@@ -4,6 +4,7 @@ import { getBasicSetting } from "@/api/basicSettings";
 import { isDemoMode, isDemoModeAvailable, setDemoMode } from "@/api/config";
 import { buttonClassName } from "@/components/ui/Button";
 import { navLinks, navShortcut } from "@/data/navLinks";
+import SidebarTaskCard from "@/features/vat-reconcile/SidebarTaskCard";
 import {
   Building2,
   Check,
@@ -244,6 +245,9 @@ const Sidebar = ({
             );
           })}
         </ul>
+
+        {/* 申報對帳任務卡：全站可見，提示 401／403 與帳簿發票是否一致 */}
+        <SidebarTaskCard />
 
         {/* 臨時入口：開帳精靈流程開發驗收用，正式串接完成、可從既有流程（如付款完成頁）進入後移除 */}
         <div className="shrink-0 border-t border-dashed border-brand-tan/40 p-3">
