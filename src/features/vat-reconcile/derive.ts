@@ -16,6 +16,8 @@ export interface ReconcileTask {
   description: string;
   /** 剩餘金額（元，正數），直接取後端 delta 的絕對值，不在前端加總 */
   amount?: number;
+  /** 不足時對應的稅金（元，正數），取後端稅額欄 delta 的絕對值；該欄無差額則不帶 */
+  tax?: number;
 }
 
 export interface PeriodReconcile {
@@ -30,9 +32,12 @@ export interface PeriodReconcile {
  * 一律取後端已算好的合計欄位，避免前端自行加總。
  */
 const OUT_AMOUNT_FIELD = 'OUT_SALES_GRAND_TOTAL';
-const IN_AMOUNT_FIELDS: { fieldCode: string; label: string }[] = [
-  { fieldCode: 'IN_PURCHASE_AMT_SUM', label: '進貨及費用' },
-  { fieldCode: 'IN_ASSET_AMT_SUM', label: '固定資產' },
+/** 銷項稅金：401／403 共用的「應稅合計稅額(2)」，金額欄的銷售額總計沒有對應稅額欄故另指定 */
+const OUT_TAX_FIELD = 'OUT_TAXABLE_TAX_SUM';
+/** 進項各金額欄與其稅額欄（得扣抵進項合計－進貨及費用／固定資產的稅額） */
+const IN_AMOUNT_FIELDS: { fieldCode: string; taxFieldCode: string; label: string }[] = [
+  { fieldCode: 'IN_PURCHASE_AMT_SUM', taxFieldCode: 'IN_PURCHASE_TAX_SUM', label: '進貨及費用' },
+  { fieldCode: 'IN_ASSET_AMT_SUM', taxFieldCode: 'IN_ASSET_TAX_SUM', label: '固定資產' },
 ];
 
 /** 差額容許誤差：IN_NONDEDUCT_RATIO 為小數，避免浮點雜訊被誤判成有差異 */
@@ -70,6 +75,7 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
           description: '補登本期銷項發票前，需要先建立本期發票簿（字軌）。',
         });
       }
+      const taxDiff = diffOf(OUT_TAX_FIELD);
       tasks.push({
         id: 'shortfall-out',
         kind: 'shortfall',
@@ -77,6 +83,7 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
         title: '銷項發票不足',
         description: '申報的銷售額比帳簿多，請補登本期銷項發票。',
         amount,
+        tax: taxDiff && hasDelta(taxDiff) ? Math.abs(taxDiff.delta as number) : undefined,
       });
     } else {
       tasks.push({
@@ -90,10 +97,11 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
     }
   }
 
-  IN_AMOUNT_FIELDS.forEach(({ fieldCode, label }) => {
+  IN_AMOUNT_FIELDS.forEach(({ fieldCode, taxFieldCode, label }) => {
     const d = diffOf(fieldCode);
     if (!d || !hasDelta(d)) return;
     const amount = Math.abs(d.delta as number);
+    const taxDiff = diffOf(taxFieldCode);
     if ((d.delta as number) < 0) {
       tasks.push({
         id: `shortfall-${fieldCode}`,
@@ -102,6 +110,7 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
         title: `進項憑證不足（${label}）`,
         description: `申報的${label}金額比帳簿多，請補登本期進項憑證。`,
         amount,
+        tax: taxDiff && hasDelta(taxDiff) ? Math.abs(taxDiff.delta as number) : undefined,
       });
     } else {
       tasks.push({

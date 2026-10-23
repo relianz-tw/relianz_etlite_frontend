@@ -8,14 +8,16 @@ import ImportDropSection from './ImportDropSection';
 interface ImportInvoiceDialogProps {
   open: boolean;
   onClose: () => void;
+  /** 匯入的期間顯示文字（如「115 年 07 月 - 08 月」）；未傳時退回佔位字串 */
+  periodLabel?: string;
 }
 
-// 目前為期間佔位字串，尚未串接當期營業稅申報期間資料
-const PERIOD = '115 年 5 - 6 月份';
+// 未指定期間時的佔位字串，尚未串接當期營業稅申報期間資料
+const DEFAULT_PERIOD = '115 年 5 - 6 月份';
 
 type Step = 'notice' | 'form';
 
-export default function ImportInvoiceDialog({ open, onClose }: ImportInvoiceDialogProps) {
+export default function ImportInvoiceDialog({ open, onClose, periodLabel = DEFAULT_PERIOD }: ImportInvoiceDialogProps) {
   const [step, setStep] = useState<Step>('notice');
 
   // 每次開啟 dialog 都從提醒步驟開始
@@ -65,7 +67,7 @@ export default function ImportInvoiceDialog({ open, onClose }: ImportInvoiceDial
     <Modal open={open} onClose={onClose} title="匯入電子發票" widthClassName="max-w-[560px]">
       <div className="flex flex-col gap-5">
         <ImportDropSection
-          title={`${PERIOD}電子發票匯入`}
+          title={`${periodLabel}電子發票匯入`}
           hint={
             <>
               匯入電子發票紀錄檔案格式必須是 Excel (.XLSX) 檔且符合【財政部電子發票整合服務平台】規範（
@@ -80,7 +82,7 @@ export default function ImportInvoiceDialog({ open, onClose }: ImportInvoiceDial
 
         <div className="border-t border-neutral-blue-gray/30" />
 
-        <ImportDropSection title={`${PERIOD}折讓單匯入`} onCancel={onClose} />
+        <ImportDropSection title={`${periodLabel}折讓單匯入`} onCancel={onClose} />
       </div>
     </Modal>
   );

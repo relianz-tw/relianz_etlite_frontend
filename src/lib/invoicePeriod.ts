@@ -47,6 +47,21 @@ export function sortInvoicePeriodOptions(options: InvoicePeriodOption[]): Invoic
   return [...options].sort((a, b) => b.rocYear - a.rocYear || b.phase - a.phase);
 }
 
+/** 期別 → 該期起訖日（含頭尾）：phase 為單數月，迄日取下一個月的最後一天 */
+export function phaseToDateRange(rocYear: number, phase: number): [Date, Date] {
+  const year = rocYear + 1911;
+  return [new Date(year, phase - 1, 1), new Date(year, phase + 1, 0)];
+}
+
+/** 起訖日剛好對應某一個雙月期別才回傳 rocYear／phase，其餘（自訂區間、跨期、單月）一律 null */
+export function dateRangeToPhase(from: Date, to: Date): { rocYear: number; phase: number } | null {
+  const phase = from.getMonth() + 1;
+  if (phase % 2 === 0) return null;
+  const [start, end] = phaseToDateRange(from.getFullYear() - 1911, phase);
+  const same = (a: Date, b: Date) => a.getTime() === b.getTime();
+  return same(from, start) && same(to, end) ? { rocYear: from.getFullYear() - 1911, phase } : null;
+}
+
 /** 下拉選單 value（`${民國年}-${期別}`）→ 查詢用的 rocYear／phase；格式不符時回傳 null */
 export function parseInvoicePeriodValue(value: string): { rocYear: number; phase: number } | null {
   const match = /^(\d+)-(\d+)$/.exec(value);

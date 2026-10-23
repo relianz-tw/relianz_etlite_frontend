@@ -10,6 +10,7 @@ import Pagination from '@/components/ui/Pagination';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import Select from '@/components/ui/Select';
 import TabBar from '@/components/ui/TabBar';
+import LedgerTaskPanel from '@/features/vat-reconcile/LedgerTaskPanel';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, sortRows } from '@/lib/utils';
 import { Download } from 'lucide-react';
@@ -297,6 +298,11 @@ export default function LedgerView() {
             onAdvancedChange={setAdvanced}
             onAdvancedApply={handleAdvancedApply}
           />
+        </div>
+
+        {/* 面板不符顯示條件時回傳 null，空容器以 empty:hidden 收起避免多出間距 */}
+        <div className="mb-5 empty:hidden">
+          <LedgerTaskPanel dateFrom={filters.advanced.dateFrom} dateTo={filters.advanced.dateTo} />
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">

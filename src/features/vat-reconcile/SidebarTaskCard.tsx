@@ -18,7 +18,7 @@ function barClass(p: PeriodState): string {
   }
 }
 
-/** 側邊欄「申報對帳」任務卡：六格色條對應 1／3／5／7／9／11 期，點擊進任務頁 */
+/** 側邊欄「任務中心」任務卡：六格色條對應 1／3／5／7／9／11 期，點擊進任務頁 */
 export default function SidebarTaskCard() {
   const { rocYear, periods, initialLoading, pendingCount } = useVatReconcile();
   const allFailed = !initialLoading && periods.every(p => p.error);
@@ -38,7 +38,7 @@ export default function SidebarTaskCard() {
       >
         <span className="flex items-center gap-1.5 text-sm font-semibold text-brand-primary">
           <ListChecks size={16} />
-          申報對帳
+          任務中心
           {!initialLoading && pendingCount > 0 && (
             <Badge tone="neutral" variant="solid" className="ml-auto">
               {pendingCount}

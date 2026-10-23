@@ -73,9 +73,19 @@ export default function FilterBar({
 
   // 交易期間：預設為「月」，切換月／年時自動對應到當下該月／該年的起訖日期，日期亦可再手動調整；
   // 三者的變更皆直接寫入 advanced.dateFrom/dateTo 並立即套用篩選（呼叫 filter API），銷項／進項共用同一組邏輯
-  const [periodType, setPeriodType] = useState<PeriodType>('month');
-  const [periodFrom, setPeriodFrom] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[0]);
-  const [periodTo, setPeriodTo] = useState<Date | undefined>(() => getPeriodRange('month', new Date())[1]);
+  // 網址已帶日期區間時（如從任務中心跳轉、帶入某雙月期別）以網址為準，否則預設本月
+  const [periodFrom, setPeriodFrom] = useState<Date | undefined>(
+    () => parseRocDate(advanced.dateFrom) ?? getPeriodRange('month', new Date())[0],
+  );
+  const [periodTo, setPeriodTo] = useState<Date | undefined>(
+    () => parseRocDate(advanced.dateTo) ?? getPeriodRange('month', new Date())[1],
+  );
+  // 區間剛好是整年才選「年」；其餘（含雙月期別、自訂區間）維持「月」，實際區間由日期欄位顯示
+  const [periodType, setPeriodType] = useState<PeriodType>(() => {
+    const [yearStart, yearEnd] = periodFrom ? getPeriodRange('year', periodFrom) : [];
+    const isFullYear = periodFrom?.getTime() === yearStart?.getTime() && periodTo?.getTime() === yearEnd?.getTime();
+    return isFullYear ? 'year' : 'month';
+  });
 
   // 掛載時若網址尚無日期篩選（如首次進入頁面），把畫面上顯示的「本月」預設區間實際套用到查詢；
   // 否則畫面顯示本月、但列表/圖表仍抓全部區間，彼此不同步（帳簿總覽圖表依 filters.advanced 同步區間）

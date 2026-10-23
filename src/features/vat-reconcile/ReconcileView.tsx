@@ -1,19 +1,22 @@
 'use client';
 
 import { saveInvoiceBook } from '@/api/invoiceBook';
+import ImportInvoiceDialog from '@/components/ImportInvoiceDialog';
 import NewTransactionDialog from '@/components/NewTransactionDialog';
 import Badge from '@/components/ui/Badge';
 import type { BadgeTone } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import { appendReturnQuery, buildLedgerPeriodQuery } from '@/features/ledger/urlState';
 import InvoiceBookDialog from '@/features/settings/components/InvoiceBookDialog';
-import { parseInvoicePeriodValue, toInvoicePeriodOption } from '@/lib/invoicePeriod';
-import { formatTWD } from '@/lib/utils';
-import { BookPlus, CircleCheck, FileUp, Info, Plus, RefreshCw } from 'lucide-react';
+import { formatInvoicePeriodLabel, parseInvoicePeriodValue, toInvoicePeriodOption } from '@/lib/invoicePeriod';
+import { BookPlus, CircleCheck, FileUp, Info, Plus, RefreshCw, Upload } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import CompareFormView from './CompareFormView';
+import CompletionNextStepDialog from './CompletionNextStepDialog';
 import { VAT_PHASES, phaseRangeLabel } from './derive';
 import type { PeriodStatus, ReconcileTask } from './derive';
+import TaskFigures from './TaskFigures';
 import { markReconcileStale, useVatReconcile } from './VatReconcileContext';
 import type { PeriodState } from './VatReconcileContext';
 
@@ -43,6 +46,9 @@ export default function ReconcileView() {
   const searchParams = useSearchParams();
 
   const [bookDialogOpen, setBookDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  // 發票簿建立完成後詢問下一步；記下剛建立的期別，避免 reload 後預設選中期別改變而帶錯區間
+  const [nextStepPeriod, setNextStepPeriod] = useState<{ rocYear: number; phase: number } | null>(null);
   // null＝未開啟；'sales'／'purchase' 對應 /ledger/new 的 side 參數
   const [txSide, setTxSide] = useState<'sales' | 'purchase' | null>(null);
 
@@ -74,6 +80,13 @@ export default function ReconcileView() {
       startNum: form.startNum,
     });
     reload();
+    setNextStepPeriod(parsed);
+  };
+
+  const handleImportClose = () => {
+    setImportDialogOpen(false);
+    // 匯入後留在本頁，立即重查
+    reload();
   };
 
   const handleTxClose = () => {
@@ -86,7 +99,7 @@ export default function ReconcileView() {
   return (
     <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 px-4 py-8 nav:px-8 nav:py-10">
       <header className="flex flex-col gap-1">
-        <h1 className="font-display-zh text-2xl font-semibold text-neutral-dark nav:text-[32px] nav:leading-tight">申報對帳</h1>
+        <h1 className="font-display-zh text-2xl font-semibold text-neutral-dark nav:text-[32px] nav:leading-tight">任務中心</h1>
         <p className="text-sm text-neutral-mid">
           比對 {rocYear} 年帳簿發票試算結果與已寫入的 401／403 申報值，找出缺少的項目並即時補齊。
         </p>
@@ -124,6 +137,7 @@ export default function ReconcileView() {
             period={selected}
             onReload={reload}
             onCreateBook={() => setBookDialogOpen(true)}
+            onImportInvoice={() => setImportDialogOpen(true)}
             onAddTransaction={side => setTxSide(side === 'in' ? 'purchase' : 'sales')}
           />
         )}
@@ -136,10 +150,27 @@ export default function ReconcileView() {
         periods={[periodOption]}
         defaultPeriod={periodOption.value}
       />
+      <ImportInvoiceDialog
+        open={importDialogOpen}
+        onClose={handleImportClose}
+        periodLabel={formatInvoicePeriodLabel(rocYear, selectedPhase)}
+      />
+      {nextStepPeriod && (
+        <CompletionNextStepDialog
+          open
+          onClose={() => setNextStepPeriod(null)}
+          rocYear={nextStepPeriod.rocYear}
+          phase={nextStepPeriod.phase}
+        />
+      )}
       <NewTransactionDialog
         open={txSide !== null}
         onClose={handleTxClose}
-        manualHref={`/ledger/new?side=${txSide ?? 'sales'}`}
+        // 帶 from 讓存檔或返回後回到帳簿時，日期區間自動設為目前選的這一期
+        manualHref={appendReturnQuery(
+          `/ledger/new?side=${txSide ?? 'sales'}`,
+          buildLedgerPeriodQuery(rocYear, selectedPhase, txSide ?? 'sales'),
+        )}
       />
     </div>
   );
@@ -150,10 +181,11 @@ interface PeriodDetailProps {
   period: PeriodState;
   onReload: () => void;
   onCreateBook: () => void;
+  onImportInvoice: () => void;
   onAddTransaction: (side: 'out' | 'in') => void;
 }
 
-function PeriodDetail({ rocYear, period, onReload, onCreateBook, onAddTransaction }: PeriodDetailProps) {
+function PeriodDetail({ rocYear, period, onReload, onCreateBook, onImportInvoice, onAddTransaction }: PeriodDetailProps) {
   const { data } = period;
 
   const heading = (
@@ -194,7 +226,14 @@ function PeriodDetail({ rocYear, period, onReload, onCreateBook, onAddTransactio
           <h3 className="text-base font-semibold text-neutral-dark">待完成項目</h3>
           <ol className="flex flex-col gap-3">
             {data.tasks.map((task, i) => (
-              <TaskItem key={task.id} index={i + 1} task={task} onCreateBook={onCreateBook} onAddTransaction={onAddTransaction} />
+              <TaskItem
+                key={task.id}
+                index={i + 1}
+                task={task}
+                onCreateBook={onCreateBook}
+                onImportInvoice={onImportInvoice}
+                onAddTransaction={onAddTransaction}
+              />
             ))}
           </ol>
           <p className="flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3 text-[13px] leading-relaxed text-semantic-warm-dark">
@@ -239,10 +278,11 @@ interface TaskItemProps {
   index: number;
   task: ReconcileTask;
   onCreateBook: () => void;
+  onImportInvoice: () => void;
   onAddTransaction: (side: 'out' | 'in') => void;
 }
 
-function TaskItem({ index, task, onCreateBook, onAddTransaction }: TaskItemProps) {
+function TaskItem({ index, task, onCreateBook, onImportInvoice, onAddTransaction }: TaskItemProps) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg bg-surface-off-white px-4 py-4 nav:px-5">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-primary text-[13px] font-semibold text-white">
@@ -252,16 +292,16 @@ function TaskItem({ index, task, onCreateBook, onAddTransaction }: TaskItemProps
         <span className="text-[15px] font-semibold text-neutral-dark">{task.title}</span>
         <span className="text-[13px] leading-relaxed text-neutral-mid">{task.description}</span>
       </div>
-      {task.amount !== undefined && (
-        <div className="flex min-w-[120px] flex-col nav:items-end">
-          <span className="text-xs text-neutral-mid">剩餘金額</span>
-          <span className="text-lg font-semibold tabular-nums text-neutral-dark">NT${formatTWD(task.amount)}</span>
-        </div>
-      )}
+      <TaskFigures amount={task.amount} tax={task.tax} />
       {task.kind === 'invoiceBook' && (
-        <Button icon={BookPlus} onClick={onCreateBook} className="w-full nav:w-auto">
-          一鍵新增發票簿
-        </Button>
+        <div className="flex w-full flex-col gap-2 nav:w-auto nav:flex-row">
+          <Button icon={BookPlus} onClick={onCreateBook} className="w-full nav:w-auto">
+            一鍵新增發票簿
+          </Button>
+          <Button variant="outline" icon={Upload} onClick={onImportInvoice} className="w-full nav:w-auto">
+            匯入電子發票
+          </Button>
+        </div>
       )}
       {task.kind === 'shortfall' && task.side && (
         <Button variant="outline" icon={Plus} onClick={() => onAddTransaction(task.side as 'out' | 'in')} className="w-full nav:w-auto">

@@ -1,3 +1,5 @@
+import { formatRocDate } from '@/components/ui/DatePicker';
+import { phaseToDateRange } from '@/lib/invoicePeriod';
 import type { ReadonlyURLSearchParams } from 'next/navigation';
 import type { AdvancedFilter, PurchaseSubTab, QuickSearchField, SalesSubTab, Side, SortKey, SortState } from './types';
 
@@ -96,6 +98,16 @@ export function buildLedgerQueryString(state: LedgerFilterState): string {
   if (state.channelUuid) params.set(SHARE_PARAM[state.side], state.channelUuid);
   if (state.limit !== DEFAULT_LIMIT) params.set('limit', String(state.limit));
   if (state.page !== DEFAULT_PAGE) params.set('page', String(state.page));
+  return params.toString();
+}
+
+/** 某一雙月期別的帳簿查詢字串（日期區間為該期起訖），供其他頁面跳轉帳簿或當作 from 返回參數 */
+export function buildLedgerPeriodQuery(rocYear: number, phase: number, side: Side = DEFAULT_SIDE): string {
+  const [from, to] = phaseToDateRange(rocYear, phase);
+  const params = new URLSearchParams();
+  if (side !== DEFAULT_SIDE) params.set('side', side);
+  params.set('dateFrom', formatRocDate(from));
+  params.set('dateTo', formatRocDate(to));
   return params.toString();
 }
 
