@@ -5,18 +5,29 @@ import { agreeInitializationTerms } from '@/api/initialization';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
+import { getFriendlyErrorMessage } from '@/lib/errors';
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export function Step1Terms() {
   const { state, dispatch } = useInitialization();
   const [checked, setChecked] = useState(state.termsAgreed);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAgree = () => {
-    if (!checked) return;
-    // TODO: /ael/initialization/* 後端上線後，改回 await agreeInitializationTerms 並在失敗時擋住不前進
-    // （避免重蹈 cashflow /startUp/terms 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
-    agreeInitializationTerms(state.userUuid).catch(() => {});
+  const handleAgree = async () => {
+    if (!checked || submitting) return;
+    // 同意紀錄寫入失敗就擋在這一步，避免使用者以為已同意但後端沒有紀錄
+    // （避免重蹈 cashflow /startUp/terms 失敗仍照樣前進的問題）
+    setSubmitting(true);
+    try {
+      await agreeInitializationTerms();
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, '合約同意紀錄失敗，請稍後再試'));
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
     dispatch({ type: 'AGREE_TERMS' });
     dispatch({ type: 'NEXT_STEP' });
   };
@@ -134,8 +145,8 @@ export function Step1Terms() {
           <Checkbox checked={checked} onChange={() => setChecked(v => !v)} aria-label='我已閱讀並同意服務合約' />
           <span className='text-sm text-neutral-dark'>我已閱讀並同意上述服務合約</span>
         </label>
-        <Button icon={ChevronRight} iconPosition='right' onClick={handleAgree} disabled={!checked}>
-          同意並繼續
+        <Button icon={ChevronRight} iconPosition='right' onClick={handleAgree} disabled={!checked || submitting}>
+          {submitting ? '處理中…' : '同意並繼續'}
         </Button>
       </div>
       </StepPageHeader>

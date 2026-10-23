@@ -43,14 +43,7 @@ export function Step5Confirm() {
       return;
     }
 
-    // TODO: /ael/peit/openingDate 後端上線後，改回 await 並在失敗時擋住不前進；上線前先吞掉錯誤以免卡住開帳流程
-    // 開帳日（步驟 2 的開帳基準日）重送會覆寫，故重試安全
-    saveOpeningDate(toRocYyyMmDd(state.openingBalance.baseDate)).catch(() => {});
-
-    // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
-    // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
-    saveInitializationCompany({
-      userUuid: state.userUuid,
+    const companyPayload = {
       orgType: state.orgType ?? '',
       taxId: state.company.taxId,
       companyName: state.company.name,
@@ -62,11 +55,26 @@ export function Step5Confirm() {
       contactName: state.company.contactName,
       contactPhone: state.company.contactPhone,
       contactEmail: state.company.contactEmail,
-      industryId: state.company.industryId,
-      isOperating: state.company.isOperating,
-      openDate: state.company.openDate,
-    }).catch(() => {});
-    if (hasReports) {
+    };
+    // 開帳日（步驟 2 的開帳基準日）重送會覆寫，故重試安全
+    const openingDate = toRocYyyMmDd(state.openingBalance.baseDate);
+
+    if (!hasReports) {
+      // 未滿一年：公司資料與開帳日是這條路線僅有的寫入，失敗就擋在這一步
+      // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）
+      try {
+        await saveInitializationCompany(companyPayload);
+        await saveOpeningDate(openingDate);
+      } catch (error) {
+        toast.error(getFriendlyErrorMessage(error, '公司資料儲存失敗，請稍後再試'));
+        setSubmitting(false);
+        return;
+      }
+    } else {
+      // TODO: 滿一年的公司資料來自封面辨識、常為空白，後端會因必填欄位缺漏拒絕，
+      // 先不擋流程；待封面補上必填驗證後，改成與未滿一年相同的 await + 擋住
+      saveOpeningDate(openingDate).catch(() => {});
+      saveInitializationCompany(companyPayload).catch(() => {});
       saveOpeningBalance({
         userUuid: state.userUuid,
         baseDate: state.openingBalance.baseDate,
