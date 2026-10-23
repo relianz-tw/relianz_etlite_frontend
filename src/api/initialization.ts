@@ -1,14 +1,15 @@
 /**
  * 開帳精靈（/initialization）API。
- * TODO: 後端尚未提供 /ael/initialization/* 端點（實測皆 404），此檔先依既有 onboarding API
- * 慣例（見 src/api/onboarding/*.ts）寫好函式簽名與型別，待後端開通後直接可用，元件端無需改動。
+ * terms/agree、company、complete 三支已上線，一律以 companyUuid 識別公司（= ac_uuid）；
+ * openbook 兩支後端尚未提供（實測 404），仍沿用 userUuid 的舊簽名，待後端開通後再對齊。
  *
  * 結算申報書文件辨識已改接 /ael/peit/cit/identify（見 src/api/peit.ts），不在此檔。
  */
 import { apiFetch } from './client';
+import { COMPANY_UUID } from './config';
 
+/** 公司基本資料與聯絡人；companyUuid 由函式內注入，開帳日不在此送（改打 /ael/peit/openingDate） */
 export interface InitializationCompanyRequest {
-  userUuid: string;
   orgType: string;
   taxId: string;
   companyName: string;
@@ -20,24 +21,21 @@ export interface InitializationCompanyRequest {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
-  industryId: string;
-  isOperating: boolean;
-  openDate: string;
 }
 
-/** 標記服務合約已同意 */
-export function agreeInitializationTerms(userUuid: string): Promise<unknown> {
+/** 標記服務合約已同意；termsAgreedAt 為 RFC3339 */
+export function agreeInitializationTerms(): Promise<{ companyUuid: string; termsAgreedAt: string }> {
   return apiFetch('/ael/initialization/terms/agree', {
     method: 'POST',
-    body: JSON.stringify({ userUuid }),
+    body: JSON.stringify({ companyUuid: COMPANY_UUID }),
   });
 }
 
-/** 儲存公司基本資料與開帳基準日設定 */
-export function saveInitializationCompany(data: InitializationCompanyRequest): Promise<unknown> {
+/** 儲存公司基本資料與聯絡人 */
+export function saveInitializationCompany(data: InitializationCompanyRequest): Promise<{ companyUuid: string }> {
   return apiFetch('/ael/initialization/company', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, companyUuid: COMPANY_UUID }),
   });
 }
 
@@ -62,10 +60,10 @@ export function getInitializationOpeningBalance(userUuid: string): Promise<Openi
   return apiFetch(`/ael/initialization/openbook?userUuid=${encodeURIComponent(userUuid)}`);
 }
 
-/** 標記開帳精靈完成 */
-export function completeInitialization(userUuid: string): Promise<unknown> {
+/** 標記開帳精靈完成；initCompletedAt 為 RFC3339 */
+export function completeInitialization(): Promise<{ companyUuid: string; initCompletedAt: string }> {
   return apiFetch('/ael/initialization/complete', {
     method: 'POST',
-    body: JSON.stringify({ userUuid }),
+    body: JSON.stringify({ companyUuid: COMPANY_UUID }),
   });
 }

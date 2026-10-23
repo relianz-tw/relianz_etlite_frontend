@@ -16,7 +16,7 @@ export function Step6Done() {
 
   useEffect(() => {
     if (state.completed) return;
-    completeInitialization(state.userUuid)
+    completeInitialization()
       .then(() => dispatch({ type: 'COMPLETE' }))
       .catch(() => {
         // 標記完成失敗不影響使用者體驗（已可進系統），僅後端統計會晚一點才更新
