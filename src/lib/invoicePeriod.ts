@@ -12,6 +12,8 @@ export interface InvoicePeriodOption {
   rocYear: number;
   /** 雙月期別代碼（1/3/5/7/9/11），對應 GET/POST /ael/invoiceBook 的 phase */
   phase: number;
+  /** 是否為當前期（僅來自 forSetting 清單），預設選取與「本期」標示用 */
+  isCurrent?: boolean;
 }
 
 /** 期別（1/3/5/7/9/11）雙月起訖 → 顯示字串，如「115 年 07 月 - 08 月」 */
@@ -22,13 +24,22 @@ export function formatInvoicePeriodLabel(rocYear: number, phase: number): string
 }
 
 /** GET /ael/invoiceBook/getDate/forSetting 回應項目 → 下拉選單選項 */
-export function toInvoicePeriodOption(period: { year: number; phase: number }): InvoicePeriodOption {
+export function toInvoicePeriodOption(period: { year: number; phase: number; count?: number; isCurrent?: boolean }): InvoicePeriodOption {
+  // 後綴：當前期標「本期」，有紙本發票本數時標「N 本」，如「115 年 07 月 - 08 月（本期、2 本）」
+  const notes = [period.isCurrent ? '本期' : '', period.count !== undefined ? `${period.count} 本` : ''].filter(Boolean);
+  const label = formatInvoicePeriodLabel(period.year, period.phase);
   return {
     value: `${period.year}-${period.phase}`,
-    label: formatInvoicePeriodLabel(period.year, period.phase),
+    label: notes.length > 0 ? `${label}（${notes.join('、')}）` : label,
     rocYear: period.year,
     phase: period.phase,
+    isCurrent: period.isCurrent,
   };
+}
+
+/** 下拉預設選項：優先當前期，沒有（或未提供 isCurrent）才取排序後的第一個 */
+export function pickDefaultInvoicePeriod(options: InvoicePeriodOption[]): InvoicePeriodOption | undefined {
+  return options.find(option => option.isCurrent) ?? options[0];
 }
 
 /** 期別選項依 rocYear、phase 由新到舊排序，供下拉選單「最新在最上方」使用 */

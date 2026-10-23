@@ -20,7 +20,7 @@ import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
 import { SETTLEMENT_STYLE } from '@/features/settings/data';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { parseInvoicePeriodValue, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
+import { parseInvoicePeriodValue, pickDefaultInvoicePeriod, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
 import type { InvoicePeriodOption } from '@/lib/invoicePeriod';
 import { ChevronsRight } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -181,7 +181,8 @@ export default function TransactionMetaCard({
       .then(list => {
         const options = sortInvoicePeriodOptions(list.map(toInvoicePeriodOption));
         setPeriods(options);
-        if (!form.invoicePeriod && options.length > 0) onChange({ invoicePeriod: options[0].value });
+        const defaultPeriod = pickDefaultInvoicePeriod(options);
+        if (!form.invoicePeriod && defaultPeriod) onChange({ invoicePeriod: defaultPeriod.value });
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
