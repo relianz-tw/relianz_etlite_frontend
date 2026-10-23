@@ -2821,9 +2821,6 @@ export interface RentalFilterResult {
 }
 
 /**
- * ⚠️ 以下彙總層（summary）端點為前端待後端開發規格，尚未串接，目前僅供 UI 開發參照；
- * 上線前請與後端核對欄位名稱與分群規則是否一致。
- *
  * 各類扣繳列表「同一所得人同一類別」彙總（POST /ael/withholding/summary/filter）：
  * incomeType≠51 依 identityNo（空則退回 taxIdNo，皆空則退回 recipientName）分群；
  * incomeType=51（租金）依 rentalAddress 分群，recipientName 為該群組房東姓名以「、」串接。

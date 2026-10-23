@@ -164,7 +164,7 @@ export function listWithholdingCodes(type: 1 | 2 | 3): Promise<WithholdingCodeDt
 }
 
 /**
- * ⚠️ 待後端提供：彙總「同一所得人同一類別」列表（POST /ael/withholding/summary/filter，對外收西元年）。
+ * 彙總「同一所得人同一類別」列表（POST /ael/withholding/summary/filter，對外收西元年）。
  * 分群規則見 api/types.ts WithholdingSummaryFilterBody 註解。
  */
 export function filterWithholdingSummary(body: Omit<WithholdingSummaryFilterBody, 'companyUuid' | 'paymentYear'> & { paymentYear: number }): Promise<WithholdingSummaryFilterResult> {
@@ -174,7 +174,7 @@ export function filterWithholdingSummary(body: Omit<WithholdingSummaryFilterBody
   });
 }
 
-/** ⚠️ 待後端提供：查詢單一群組內的明細列表（POST /ael/withholding/summary/group/filter，對外收西元年） */
+/** 查詢單一群組內的明細列表（POST /ael/withholding/summary/group/filter，對外收西元年） */
 export function filterWithholdingGroup(
   body: Omit<WithholdingGroupFilterBody, 'companyUuid' | 'paymentYear'> & { paymentYear?: number },
 ): Promise<WithholdingGroupFilterResult> {
