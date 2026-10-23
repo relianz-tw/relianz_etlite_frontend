@@ -55,10 +55,9 @@ interface FormSource {
 
 /** 列出需要送出的表：營所稅各表（依組織型態）＋營業稅各期實際使用的 401／403；登記文件與負責人頁不在此 API 範圍 */
 function listFormSources(state: InitializationState): FormSource[] {
-  // 營運未滿一年不逐頁核對各表，只有封面；使用者先填過各表再改選「未滿一年」時，殘留的資料不能送出
-  if (state.operatingStatus !== 'over_one_year') {
-    return [{ formCode: 'CIT_COVER', reportKey: 'CIT_COVER', taxYear: state.reportYears.CIT_COVER ?? getDefaultFormYear('CIT_COVER', state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate))) }];
-  }
+  // 營運未滿一年沒有申報書：公司資料走 saveInitializationCompany，不送 confirm；
+  // 使用者先填過各表再改選「未滿一年」時，殘留的資料也不能送出
+  if (state.operatingStatus !== 'over_one_year') return [];
 
   const openYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
 

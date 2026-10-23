@@ -99,6 +99,11 @@ export interface InitializationState {
     phone: string;
     /** 稅籍編號 */
     taxRegNo: string;
+    /** 郵寄區號、聯絡人資料：只有「尚未結算申報過」的公司資料表單會填（見 Step3CompanyInfo） */
+    zipCode: string;
+    contactName: string;
+    contactPhone: string;
+    contactEmail: string;
     industryId: string;
     industryName: string;
     isOperating: boolean;
@@ -147,6 +152,10 @@ export const initialState: InitializationState = {
     address: '',
     phone: '',
     taxRegNo: '',
+    zipCode: '',
+    contactName: '',
+    contactPhone: '',
+    contactEmail: '',
     industryId: '',
     industryName: '',
     isOperating: false,

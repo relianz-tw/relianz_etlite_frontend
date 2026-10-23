@@ -99,9 +99,10 @@ export function Step2Operating() {
     dispatch({ type: 'NEXT_STEP' });
   };
 
-  // 穩定經營需再選年度才算完成；未滿一年選完營運狀況即可前進
+  // 穩定經營需再選年度才算完成；開帳基準日兩種營運狀況都必填（確認開帳時會寫入後端開帳日）
   const hasOrgType = state.orgType !== null;
-  const ready = hasOrgType && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear));
+  const hasBaseDate = state.openingBalance.baseDate !== '';
+  const ready = hasOrgType && hasBaseDate && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear));
   const registrationDocs = getRegistrationDocs(state.orgType);
 
   const hint =
@@ -111,7 +112,9 @@ export function Step2Operating() {
       ? '選擇營運狀況後，會顯示接下來需要準備的文件。'
       : isOverOneYear && !hasYear
         ? '選擇開帳年度後，會顯示需要準備的文件。'
-        : '';
+        : !hasBaseDate
+          ? '請選擇開帳基準日。'
+          : '';
 
   // 此頁不提供「上一頁」；桌機的「下一步」放在卡片下方，手機沿用固定底部操作列
   const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一步', nextDisabled: !ready };

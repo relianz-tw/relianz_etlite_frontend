@@ -16,6 +16,10 @@ export interface InitializationCompanyRequest {
   address: string;
   phone: string;
   taxRegNo: string;
+  zipCode: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
   industryId: string;
   isOperating: boolean;
   openDate: string;

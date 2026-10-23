@@ -2,6 +2,7 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { getCurrentOpenYear, getDefaultFormYear, resolveToday, type ReportPageSpec } from '../../reports';
+import { readOnboardingCompany } from '../../utils/onboardingCompany';
 import { ReportPageView } from '../ReportPageView';
 import { useEffect } from 'react';
 import type { InitializationState } from '../../state/initializationReducer';
@@ -24,18 +25,6 @@ const ONBOARDING_TO_COVER = {
   representative: 'HDR_OWNER_NAME',
   address: 'HDR_ADDRESS',
 } as const;
-
-/** 從 onboarding sessionStorage 讀取已填過的公司資料 */
-function readOnboardingCompany(): { taxId?: string; name?: string; representative?: string; address?: string } | null {
-  try {
-    const raw = sessionStorage.getItem('etlite_onboarding_state');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { taxId?: string; company?: { name?: string; representative?: string; address?: string } };
-    return { taxId: parsed.taxId, ...parsed.company };
-  } catch {
-    return null;
-  }
-}
 
 /** 步驟 3：封面頁，所有欄位依 metadata API（formNo 1）動態呈現，下一步時再把封面值整理成公司資料供確認頁使用 */
 export function Step3Cover() {

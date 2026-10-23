@@ -29,6 +29,13 @@ export function formatYyyymmddRoc(value: string): string {
   return `${year - 1911}/${month}/${day}`;
 }
 
+/** ISO 日期（YYYY-MM-DD）→ 後端民國 YYYMMDD（如 2025-05-14 → 1140514）；格式不符回傳空字串 */
+export function toRocYyyMmDd(isoDate: string): string {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '';
+  return `${String(Number(match[1]) - 1911).padStart(3, '0')}${match[2]}${match[3]}`;
+}
+
 /**
  * 月份（1-12）→ 營業稅雙月期別代碼（1/3/5/7/9/11），如 1-2 月為 1、3-4 月為 3……。
  * 統一供所有需要帶入「期別」查詢參數的 API 使用（如 GET /ael/invoice/trackRule 的 phase）。

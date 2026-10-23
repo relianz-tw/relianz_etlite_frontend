@@ -6,11 +6,11 @@ import { ORG_TYPE_LABEL, getCurrentOpenYear, getDefaultFormYear, getFormItem, re
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
-import { confirmCit } from '@/api/peit';
+import { confirmCit, saveOpeningDate } from '@/api/peit';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import SectionCard from '@/components/ui/SectionCard';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc, toRocYyyMmDd } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,6 +43,10 @@ export function Step5Confirm() {
       return;
     }
 
+    // TODO: /ael/peit/openingDate 後端上線後，改回 await 並在失敗時擋住不前進；上線前先吞掉錯誤以免卡住開帳流程
+    // 開帳日（步驟 2 的開帳基準日）重送會覆寫，故重試安全
+    saveOpeningDate(toRocYyyMmDd(state.openingBalance.baseDate)).catch(() => {});
+
     // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
     // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
     saveInitializationCompany({
@@ -54,6 +58,10 @@ export function Step5Confirm() {
       address: state.company.address,
       phone: state.company.phone,
       taxRegNo: state.company.taxRegNo,
+      zipCode: state.company.zipCode,
+      contactName: state.company.contactName,
+      contactPhone: state.company.contactPhone,
+      contactEmail: state.company.contactEmail,
       industryId: state.company.industryId,
       isOperating: state.company.isOperating,
       openDate: state.company.openDate,
@@ -97,8 +105,24 @@ export function Step5Confirm() {
             <dd className='text-neutral-dark'>{state.company.phone || '—'}</dd>
             <dt className='text-neutral-mid'>稅籍編號</dt>
             <dd className='text-neutral-dark'>{state.company.taxRegNo || '—'}</dd>
-            <dt className='text-neutral-mid'>行業別</dt>
-            <dd className='text-neutral-dark'>{state.company.industryName || '—'}</dd>
+            {hasReports ? (
+              <>
+                <dt className='text-neutral-mid'>行業別</dt>
+                <dd className='text-neutral-dark'>{state.company.industryName || '—'}</dd>
+              </>
+            ) : (
+              <>
+                {/* 未滿一年的公司資料表單沒有行業別輸入，改顯示郵寄區號與聯絡人 */}
+                <dt className='text-neutral-mid'>郵寄區號</dt>
+                <dd className='text-neutral-dark'>{state.company.zipCode || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人姓名</dt>
+                <dd className='text-neutral-dark'>{state.company.contactName || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人電話</dt>
+                <dd className='text-neutral-dark'>{state.company.contactPhone || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人信箱</dt>
+                <dd className='text-neutral-dark'>{state.company.contactEmail || '—'}</dd>
+              </>
+            )}
             <dt className='text-neutral-mid'>開帳基準日</dt>
             <dd className='font-semibold text-brand-blue'>
               {state.openingBalance.baseDate ? formatYyyymmddRoc(state.openingBalance.baseDate) : '—'}
