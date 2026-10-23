@@ -23,6 +23,10 @@ const Step3Cover = dynamic(
   () => import('@/features/initialization/components/steps/Step3Cover').then(m => ({ default: m.Step3Cover })),
   { loading: StepLoading }
 );
+const Step3CompanyInfo = dynamic(
+  () => import('@/features/initialization/components/steps/Step3CompanyInfo').then(m => ({ default: m.Step3CompanyInfo })),
+  { loading: StepLoading }
+);
 const Step4Reports = dynamic(
   () => import('@/features/initialization/components/steps/Step4Reports').then(m => ({ default: m.Step4Reports })),
   { loading: StepLoading }
@@ -70,7 +74,8 @@ export function InitializationClient() {
 
   if (currentStep === 1) return <Step1Terms />;
   if (currentStep === 2) return <Step2Operating />;
-  if (currentStep === 3) return <Step3Cover />;
+  // 尚未結算申報過沒有申報書，改填固定的公司資料表單；穩定經營一年以上沿用封面頁
+  if (currentStep === 3) return state.operatingStatus === 'over_one_year' ? <Step3Cover /> : <Step3CompanyInfo />;
   if (currentStep === 4) return <Step4Reports />;
   if (currentStep === 5) return <Step5Confirm />;
   if (currentStep === 6) return <Step6Done />;

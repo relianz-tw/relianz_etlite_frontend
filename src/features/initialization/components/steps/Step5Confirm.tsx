@@ -54,6 +54,10 @@ export function Step5Confirm() {
       address: state.company.address,
       phone: state.company.phone,
       taxRegNo: state.company.taxRegNo,
+      zipCode: state.company.zipCode,
+      contactName: state.company.contactName,
+      contactPhone: state.company.contactPhone,
+      contactEmail: state.company.contactEmail,
       industryId: state.company.industryId,
       isOperating: state.company.isOperating,
       openDate: state.company.openDate,
@@ -97,8 +101,24 @@ export function Step5Confirm() {
             <dd className='text-neutral-dark'>{state.company.phone || '—'}</dd>
             <dt className='text-neutral-mid'>稅籍編號</dt>
             <dd className='text-neutral-dark'>{state.company.taxRegNo || '—'}</dd>
-            <dt className='text-neutral-mid'>行業別</dt>
-            <dd className='text-neutral-dark'>{state.company.industryName || '—'}</dd>
+            {hasReports ? (
+              <>
+                <dt className='text-neutral-mid'>行業別</dt>
+                <dd className='text-neutral-dark'>{state.company.industryName || '—'}</dd>
+              </>
+            ) : (
+              <>
+                {/* 未滿一年的公司資料表單沒有行業別輸入，改顯示郵寄區號與聯絡人 */}
+                <dt className='text-neutral-mid'>郵寄區號</dt>
+                <dd className='text-neutral-dark'>{state.company.zipCode || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人姓名</dt>
+                <dd className='text-neutral-dark'>{state.company.contactName || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人電話</dt>
+                <dd className='text-neutral-dark'>{state.company.contactPhone || '—'}</dd>
+                <dt className='text-neutral-mid'>聯絡人信箱</dt>
+                <dd className='text-neutral-dark'>{state.company.contactEmail || '—'}</dd>
+              </>
+            )}
             <dt className='text-neutral-mid'>開帳基準日</dt>
             <dd className='font-semibold text-brand-blue'>
               {state.openingBalance.baseDate ? formatYyyymmddRoc(state.openingBalance.baseDate) : '—'}
