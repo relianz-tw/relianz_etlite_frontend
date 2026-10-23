@@ -43,19 +43,6 @@ export function Step5Confirm() {
       return;
     }
 
-    const companyPayload = {
-      orgType: state.orgType ?? '',
-      taxId: state.company.taxId,
-      companyName: state.company.name,
-      representative: state.company.representative,
-      address: state.company.address,
-      phone: state.company.phone,
-      taxRegNo: state.company.taxRegNo,
-      zipCode: state.company.zipCode,
-      contactName: state.company.contactName,
-      contactPhone: state.company.contactPhone,
-      contactEmail: state.company.contactEmail,
-    };
     // 開帳日（步驟 2 的開帳基準日）重送會覆寫，故重試安全
     const openingDate = toRocYyyMmDd(state.openingBalance.baseDate);
 
@@ -63,7 +50,19 @@ export function Step5Confirm() {
       // 未滿一年：公司資料與開帳日是這條路線僅有的寫入，失敗就擋在這一步
       // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）
       try {
-        await saveInitializationCompany(companyPayload);
+        await saveInitializationCompany({
+          orgType: state.orgType ?? '',
+          taxId: state.company.taxId,
+          companyName: state.company.name,
+          representative: state.company.representative,
+          address: state.company.address,
+          phone: state.company.phone,
+          taxRegNo: state.company.taxRegNo,
+          zipCode: state.company.zipCode,
+          contactName: state.company.contactName,
+          contactPhone: state.company.contactPhone,
+          contactEmail: state.company.contactEmail,
+        });
         await saveOpeningDate(openingDate);
       } catch (error) {
         toast.error(getFriendlyErrorMessage(error, '公司資料儲存失敗，請稍後再試'));
@@ -71,10 +70,8 @@ export function Step5Confirm() {
         return;
       }
     } else {
-      // TODO: 滿一年的公司資料來自封面辨識、常為空白，後端會因必填欄位缺漏拒絕，
-      // 先不擋流程；待封面補上必填驗證後，改成與未滿一年相同的 await + 擋住
+      // 滿一年不送 company：這條路線沒有郵寄區號與聯絡人欄位，後端必填驗證必然回 400
       saveOpeningDate(openingDate).catch(() => {});
-      saveInitializationCompany(companyPayload).catch(() => {});
       saveOpeningBalance({
         userUuid: state.userUuid,
         baseDate: state.openingBalance.baseDate,
