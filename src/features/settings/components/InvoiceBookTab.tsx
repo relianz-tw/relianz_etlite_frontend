@@ -5,7 +5,7 @@ import type { InvoiceBookDto } from '@/api/types';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { parseInvoicePeriodValue, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
+import { parseInvoicePeriodValue, pickDefaultInvoicePeriod, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
 import type { InvoicePeriodOption } from '@/lib/invoicePeriod';
 import { CirclePlus, Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -39,7 +39,7 @@ export default function InvoiceBookTab() {
       .then(list => {
         const options = sortInvoicePeriodOptions(list.map(toInvoicePeriodOption));
         setPeriods(options);
-        setPeriod(prev => prev || options[0]?.value || '');
+        setPeriod(prev => prev || pickDefaultInvoicePeriod(options)?.value || '');
       })
       .catch(err => setPeriodsError(getFriendlyErrorMessage(err)))
       .finally(() => setPeriodsLoading(false));

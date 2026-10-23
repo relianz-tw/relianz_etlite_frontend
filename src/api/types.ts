@@ -96,8 +96,10 @@ export interface InvoiceBookPeriodDto {
   year: number;
   /** 期別（1/3/5/7/9/11） */
   phase: number;
-  /** 該期別下已建立的發票本數 */
+  /** 該期紙本發票本數；後端 Count 失敗時為 0 */
   count: number;
+  /** 是否為依今天算出的當前期；清單範圍為開帳日所屬期別起至今天當期 */
+  isCurrent: boolean;
 }
 
 /**
