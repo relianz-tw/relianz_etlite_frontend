@@ -6,11 +6,11 @@ import { ORG_TYPE_LABEL, getCurrentOpenYear, getDefaultFormYear, getFormItem, re
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
-import { confirmCit } from '@/api/peit';
+import { confirmCit, saveOpeningDate } from '@/api/peit';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import SectionCard from '@/components/ui/SectionCard';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { fmtCurrency, formatYyyymmddRoc } from '@/lib/utils';
+import { fmtCurrency, formatYyyymmddRoc, toRocYyyMmDd } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,9 @@ export function Step5Confirm() {
     // 逐頁核對的資料先寫入後端；失敗就擋在這一步，避免使用者以為已存但實際沒存
     setSubmitting(true);
     try {
+      // 開帳日（步驟 2 的開帳基準日）寫入後端；重送會覆寫，故重試安全
+      const openingDate = toRocYyyMmDd(state.openingBalance.baseDate);
+      if (openingDate) await saveOpeningDate(openingDate);
       const forms = await buildConfirmForms(state);
       if (forms.length > 0) await confirmCit(forms);
     } catch (error) {

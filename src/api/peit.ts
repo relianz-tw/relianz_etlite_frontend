@@ -190,6 +190,14 @@ export function compareVat(params: { taxYear: number; cmsPhase: number }): Promi
   });
 }
 
+/** 寫入／覆寫公司開帳日；openingDate 為民國 YYYMMDD（如 1140514），重送會覆寫 */
+export function saveOpeningDate(openingDate: string): Promise<{ companyUuid: string; openingDate: string }> {
+  return apiFetch('/ael/peit/openingDate', {
+    method: 'POST',
+    body: JSON.stringify({ companyUuid: COMPANY_UUID, openingDate }),
+  });
+}
+
 /** 確認並寫入營所稅各表與營業稅 401／403 各期資料（使用者逐頁核對後的最終值） */
 export function confirmCit(forms: ConfirmForm[]): Promise<CitConfirmResult> {
   return apiFetch<CitConfirmResult>('/ael/peit/cit/confirm', {
