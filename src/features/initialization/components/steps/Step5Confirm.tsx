@@ -35,9 +35,6 @@ export function Step5Confirm() {
     // 逐頁核對的資料先寫入後端；失敗就擋在這一步，避免使用者以為已存但實際沒存
     setSubmitting(true);
     try {
-      // 開帳日（步驟 2 的開帳基準日）寫入後端；重送會覆寫，故重試安全
-      const openingDate = toRocYyyMmDd(state.openingBalance.baseDate);
-      if (openingDate) await saveOpeningDate(openingDate);
       const forms = await buildConfirmForms(state);
       if (forms.length > 0) await confirmCit(forms);
     } catch (error) {
@@ -45,6 +42,10 @@ export function Step5Confirm() {
       setSubmitting(false);
       return;
     }
+
+    // TODO: /ael/peit/openingDate 後端上線後，改回 await 並在失敗時擋住不前進；上線前先吞掉錯誤以免卡住開帳流程
+    // 開帳日（步驟 2 的開帳基準日）重送會覆寫，故重試安全
+    saveOpeningDate(toRocYyyMmDd(state.openingBalance.baseDate)).catch(() => {});
 
     // TODO: /ael/initialization/* 後端上線後，改回 await + try/catch 並在失敗時擋住不前進
     // （避免重蹈 cashflow /startUp 失敗仍照樣前進的問題）；目前後端未提供，先不擋流程
