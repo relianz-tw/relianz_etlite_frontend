@@ -3,6 +3,7 @@
 import { listInvoiceBookPeriods, listInvoiceBooks, saveInvoiceBook, updateInvoiceBook } from '@/api/invoiceBook';
 import type { InvoiceBookDto } from '@/api/types';
 import Button from '@/components/ui/Button';
+import InvoicePeriodOptionLabel from '@/components/InvoicePeriodOptionLabel';
 import Select from '@/components/ui/Select';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { parseInvoicePeriodValue, pickDefaultInvoicePeriod, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
@@ -100,7 +101,7 @@ export default function InvoiceBookTab() {
           )}
           {periods.map(o => (
             <option key={o.value} value={o.value}>
-              {o.label}
+              <InvoicePeriodOptionLabel option={o} />
             </option>
           ))}
         </Select>

@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button';
 import DatePicker from '@/components/ui/DatePicker';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import InvoicePeriodOptionLabel from '@/components/InvoicePeriodOptionLabel';
 import Select from '@/components/ui/Select';
 import SubjectPicker from '@/components/ui/SubjectPicker';
 import TextInput from '@/components/ui/TextInput';
@@ -504,7 +505,7 @@ export default function TransactionMetaCard({
             )}
             {periods.map(o => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                <InvoicePeriodOptionLabel option={o} />
               </option>
             ))}
           </Select>

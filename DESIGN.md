@@ -435,6 +435,9 @@ Font: Noto Sans TC 12px, font-weight 600
 - 進行中狀態／復業／單據類型標示（如折讓） → info
 - 待處理／未完成／未申報 → neutral
 
+發票期間下拉選項：期間文字後接各自獨立的 Badge——「本期」`variant="solid" tone="info"`、「N 本」（已建發票本數，含 0 本）`variant="muted" tone="neutral"`。
+對應元件：`src/components/InvoicePeriodOptionLabel.tsx`。
+
 應收／應付狀態標示：沿用 Badge 元件、`variant="muted"`——應收 `tone="info"`、應付 `tone="neutral"`。
 對應元件：`src/features/reconciliation/components/ReconHistoryCard.tsx`（沖帳紀錄列的交易狀態欄）。
 

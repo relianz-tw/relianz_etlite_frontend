@@ -4,6 +4,7 @@ import { checkInvoiceTrackRule } from '@/api/invoice';
 import Button from '@/components/ui/Button';
 import Label from '@/components/ui/Label';
 import Modal from '@/components/ui/Modal';
+import InvoicePeriodOptionLabel from '@/components/InvoicePeriodOptionLabel';
 import Select from '@/components/ui/Select';
 import TextInput from '@/components/ui/TextInput';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
@@ -103,7 +104,7 @@ export default function InvoiceBookDialog({ open, onClose, onSubmit, periods, de
           <Select value={form.period} onValueChange={v => setForm(f => ({ ...f, period: v }))}>
             {periods.map(o => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                <InvoicePeriodOptionLabel option={o} />
               </option>
             ))}
           </Select>

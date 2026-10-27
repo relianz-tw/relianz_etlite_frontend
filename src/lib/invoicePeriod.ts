@@ -14,6 +14,8 @@ export interface InvoicePeriodOption {
   phase: number;
   /** 是否為當前期（僅來自 forSetting 清單），預設選取與「本期」標示用 */
   isCurrent?: boolean;
+  /** 該期已建立的紙本發票本數（僅來自 forSetting 清單），顯示為「N 本」標籤 */
+  count?: number;
 }
 
 /** 期別（1/3/5/7/9/11）雙月起訖 → 顯示字串，如「115 年 07 月 - 08 月」 */
@@ -25,15 +27,14 @@ export function formatInvoicePeriodLabel(rocYear: number, phase: number): string
 
 /** GET /ael/invoiceBook/getDate/forSetting 回應項目 → 下拉選單選項 */
 export function toInvoicePeriodOption(period: { year: number; phase: number; count?: number; isCurrent?: boolean }): InvoicePeriodOption {
-  // 後綴：當前期標「本期」，有紙本發票本數時標「N 本」，如「115 年 07 月 - 08 月（本期、2 本）」
-  const notes = [period.isCurrent ? '本期' : '', period.count !== undefined ? `${period.count} 本` : ''].filter(Boolean);
-  const label = formatInvoicePeriodLabel(period.year, period.phase);
+  // 「本期」「N 本」不再串進 label，改由 InvoicePeriodOptionLabel 以各自的 Badge 呈現
   return {
     value: `${period.year}-${period.phase}`,
-    label: notes.length > 0 ? `${label}（${notes.join('、')}）` : label,
+    label: formatInvoicePeriodLabel(period.year, period.phase),
     rocYear: period.year,
     phase: period.phase,
     isCurrent: period.isCurrent,
+    count: period.count,
   };
 }
 
