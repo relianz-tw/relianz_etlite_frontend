@@ -24,6 +24,9 @@ export default function SidebarTaskCard() {
   const allFailed = !initialLoading && periods.every(p => p.error);
   const anyMatched = periods.some(p => p.data?.status === 'matched');
 
+  // 沒有需要補齊的前期：任務中心沒有事可做，不佔側邊欄位置
+  if (!initialLoading && periods.length === 0) return null;
+
   let summary: string;
   if (allFailed) summary = '無法取得對帳結果';
   else if (pendingCount > 0) summary = `${rocYear} 年 · ${pendingCount} 期待處理`;

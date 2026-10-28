@@ -73,6 +73,31 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 /**
+ * 下載檔案端點（如 GET /ael/peit/vat/media）：成功時回檔案本體（非信封），失敗時才回 JSON 信封，
+ * 故以 Content-Type 判斷：JSON 視為錯誤並照信封規則 throw ApiError，其餘回傳 Blob。
+ */
+export async function apiFetchFile(path: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`);
+  } catch {
+    throw new ApiError('F0001', '網路連線失敗', 0);
+  }
+
+  if (res.headers.get('Content-Type')?.includes('application/json')) {
+    let body: ApiEnvelope<unknown>;
+    try {
+      body = await res.json();
+    } catch {
+      throw new ApiError('F0002', `HTTP ${res.status} 回應非 JSON`, res.status);
+    }
+    throw new ApiError(body.errorCode ?? body.errorcode ?? '', body.message ?? '', res.status);
+  }
+  if (!res.ok) throw new ApiError('F0002', `HTTP ${res.status}`, res.status);
+  return res.blob();
+}
+
+/**
  * 少數端點（如 GET /ael/employee）分頁資訊 pagination 與 data 同級、不在 data 內，
  * 無法用 apiFetch 直接拆封取得，改用此函式取得整個信封物件。
  */

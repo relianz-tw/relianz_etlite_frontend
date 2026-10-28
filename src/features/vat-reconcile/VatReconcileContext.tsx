@@ -5,7 +5,8 @@ import { listInvoiceBooks } from '@/api/invoiceBook';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { VAT_PHASES, deriveReconcile, needsBookCount } from './derive';
+import { monthToBimonthlyPhase } from '@/lib/utils';
+import { deriveReconcile, needsBookCount, phasesBefore } from './derive';
 import type { PeriodReconcile } from './derive';
 
 export const RECONCILE_PATH = '/business-tax/reconcile';
@@ -24,6 +25,10 @@ export interface PeriodState {
 interface VatReconcileValue {
   /** 民國年（目前固定為當年度） */
   rocYear: number;
+  /**
+   * 需要補齊的前期：今天所屬期別之前、且已寫入申報書的期別（載入中與讀取失敗的期別也保留）。
+   * 本期起由系統直接處理，未申報的前期沒有申報值可比對，都不在此列；可能為空
+   */
   periods: PeriodState[];
   /** 全部期別首次載入中 */
   initialLoading: boolean;
@@ -46,9 +51,6 @@ export function markReconcileStale() {
 /** 交易表單頁：還在填寫時不重查，等使用者離開才查 */
 const TRANSACTION_FORM_PREFIXES = ['/ledger/new', '/einvoice'];
 
-const emptyPeriods =(): PeriodState[] =>
-  VAT_PHASES.map(phase => ({ phase, loading: true, error: '', data: null }));
-
 /** 單一期別：先 compare，必要時再查發票本數；任一步驟失敗只影響該期 */
 async function loadPeriod(rocYear: number, phase: number): Promise<PeriodState> {
   try {
@@ -62,8 +64,14 @@ async function loadPeriod(rocYear: number, phase: number): Promise<PeriodState> 
 
 export function VatReconcileProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const rocYear = useMemo(() => new Date().getFullYear() - 1911, []);
-  const [periods, setPeriods] = useState<PeriodState[]>(emptyPeriods);
+  const { rocYear, phases } = useMemo(() => {
+    const now = new Date();
+    // 只查今天所屬期別之前的前期，本期起不需要補資料
+    return { rocYear: now.getFullYear() - 1911, phases: phasesBefore(monthToBimonthlyPhase(now.getMonth() + 1)) };
+  }, []);
+  const [allPeriods, setPeriods] = useState<PeriodState[]>(() =>
+    phases.map(phase => ({ phase, loading: true, error: '', data: null })),
+  );
   const [initialLoading, setInitialLoading] = useState(true);
   // 以遞增的請求序號丟棄過期回應（快速連續觸發重查時，只採用最後一次）
   const requestId = useRef(0);
@@ -74,17 +82,20 @@ export function VatReconcileProvider({ children }: { children: React.ReactNode }
     lastLoadedAt.current = Date.now();
     // 重查時保留舊資料避免畫面閃爍，只標記載入中
     setPeriods(prev => prev.map(p => ({ ...p, loading: true })));
-    VAT_PHASES.forEach(async phase => {
+    phases.forEach(async phase => {
       const next = await loadPeriod(rocYear, phase);
       if (id !== requestId.current) return;
       setPeriods(prev => prev.map(p => (p.phase === phase ? next : p)));
     });
-  }, [rocYear]);
+  }, [rocYear, phases]);
 
-  // 全部期別都回來後才算首次載入完成
+  // 全部期別都回來（或沒有前期可查）後才算首次載入完成
   useEffect(() => {
-    if (initialLoading && periods.every(p => !p.loading)) setInitialLoading(false);
-  }, [periods, initialLoading]);
+    if (initialLoading && allPeriods.every(p => !p.loading)) setInitialLoading(false);
+  }, [allPeriods, initialLoading]);
+
+  // 未申報的前期沒有申報值可比對，不列入任務中心
+  const periods = useMemo(() => allPeriods.filter(p => p.data?.status !== 'notFiled'), [allPeriods]);
 
   const reloadIfStale = useCallback(() => {
     if (Date.now() - lastLoadedAt.current >= STALE_MS) reload();

@@ -8,25 +8,27 @@ import type { BadgeTone } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { appendReturnQuery, buildLedgerPeriodQuery } from '@/features/ledger/urlState';
 import InvoiceBookDialog from '@/features/settings/components/InvoiceBookDialog';
+import { formatTWD } from '@/lib/utils';
 import { formatInvoicePeriodLabel, parseInvoicePeriodValue, toInvoicePeriodOption } from '@/lib/invoicePeriod';
 import { BookPlus, CircleCheck, FileUp, Info, Plus, RefreshCw, Upload } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import CompareFormView from './CompareFormView';
 import CompletionNextStepDialog from './CompletionNextStepDialog';
-import { VAT_PHASES, phaseRangeLabel } from './derive';
+import { phaseRangeLabel } from './derive';
 import type { PeriodStatus, ReconcileTask } from './derive';
+import MediaFilesPanel from './MediaFilesPanel';
 import TaskFigures from './TaskFigures';
 import { markReconcileStale, useVatReconcile } from './VatReconcileContext';
 import type { PeriodState } from './VatReconcileContext';
 
 const STATUS_BADGE: Record<PeriodStatus, { tone: BadgeTone; variant: 'solid' | 'muted'; text: string }> = {
-  matched: { tone: 'success', variant: 'muted', text: '已符合' },
-  pending: { tone: 'neutral', variant: 'solid', text: '待處理' },
-  notFiled: { tone: 'neutral', variant: 'muted', text: '未上傳申報' },
+  matched: { tone: 'success', variant: 'muted', text: '相符' },
+  pending: { tone: 'neutral', variant: 'solid', text: '不符' },
+  notFiled: { tone: 'neutral', variant: 'muted', text: '尚未有申報檔案' },
 };
 
-/** 期別格與詳情標題共用的狀態徽章；待處理另帶項目數 */
+/** 期別格與詳情標題共用的狀態徽章 */
 function PeriodBadge({ period }: { period: PeriodState }) {
   if (period.error) return <Badge tone="error">讀取失敗</Badge>;
   if (!period.data) return <Badge tone="neutral">載入中</Badge>;
@@ -34,13 +36,45 @@ function PeriodBadge({ period }: { period: PeriodState }) {
   return (
     <Badge tone={tone} variant={variant}>
       {text}
-      {period.data.status === 'pending' ? ` ${period.data.tasks.length}` : ''}
     </Badge>
   );
 }
 
+function ReconcileHeader() {
+  return (
+    <header className="flex flex-col gap-1">
+      <h1 className="font-display-zh text-2xl font-semibold text-neutral-dark nav:text-[32px] nav:leading-tight">任務中心</h1>
+      <p className="text-sm text-neutral-mid">
+        已申報的前期：比對帳簿發票試算結果與已寫入的 401／403 申報值，找出缺少的項目並即時補齊。
+      </p>
+    </header>
+  );
+}
+
 export default function ReconcileView() {
-  const { rocYear, periods, initialLoading, reload } = useVatReconcile();
+  const { rocYear, periods } = useVatReconcile();
+
+  // 沒有已申報的前期（例如年初才開始使用）：沒有需要補齊的資料
+  if (periods.length === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 px-4 py-8 nav:px-8 nav:py-10">
+        <ReconcileHeader />
+        <div className="flex items-center gap-4 rounded-lg bg-semantic-success-muted/35 p-5">
+          <CircleCheck size={32} className="shrink-0 text-semantic-success" />
+          <div className="flex flex-col">
+            <span className="font-semibold text-semantic-success">無需補齊</span>
+            <span className="text-[13px] text-neutral-dark">沒有需要補齊的前期申報書，本期之後由系統直接處理。</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <ReconcileContent rocYear={rocYear} />;
+}
+
+function ReconcileContent({ rocYear }: { rocYear: number }) {
+  const { periods, initialLoading, reload } = useVatReconcile();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -57,11 +91,12 @@ export default function ReconcileView() {
     const pending = periods.find(p => p.data?.status === 'pending');
     if (pending) return pending.phase;
     const filed = [...periods].reverse().find(p => p.data && p.data.status !== 'notFiled');
-    return filed?.phase ?? VAT_PHASES[0];
+    return filed?.phase ?? periods[0].phase;
   }, [periods]);
 
   const phaseParam = Number(searchParams.get('phase'));
-  const selectedPhase = (VAT_PHASES as readonly number[]).includes(phaseParam) ? phaseParam : defaultPhase;
+  // 網址帶的期別必須在清單內，否則退回預設期別
+  const selectedPhase = periods.some(p => p.phase === phaseParam) ? phaseParam : defaultPhase;
   const selected = periods.find(p => p.phase === selectedPhase) ?? periods[0];
 
   const selectPhase = (phase: number) => router.replace(`${pathname}?phase=${phase}`, { scroll: false });
@@ -98,12 +133,7 @@ export default function ReconcileView() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 px-4 py-8 nav:px-8 nav:py-10">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-display-zh text-2xl font-semibold text-neutral-dark nav:text-[32px] nav:leading-tight">任務中心</h1>
-        <p className="text-sm text-neutral-mid">
-          比對 {rocYear} 年帳簿發票試算結果與已寫入的 401／403 申報值，找出缺少的項目並即時補齊。
-        </p>
-      </header>
+      <ReconcileHeader />
 
       <section aria-label="各期對帳狀態" className="grid grid-cols-3 gap-2 nav:grid-cols-6 nav:gap-3">
         {periods.map(p => {
@@ -263,6 +293,7 @@ function PeriodDetail({ rocYear, period, onReload, onCreateBook, onImportInvoice
         </div>
       )}
 
+      <MediaFilesPanel key={period.phase} rocYear={rocYear} phase={period.phase} />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -291,6 +322,18 @@ function TaskItem({ index, task, onCreateBook, onImportInvoice, onAddTransaction
       <div className="flex min-w-0 flex-1 basis-60 flex-col">
         <span className="text-[15px] font-semibold text-neutral-dark">{task.title}</span>
         <span className="text-[13px] leading-relaxed text-neutral-mid">{task.description}</span>
+        {task.diffs && (
+          <ul className="mt-2 flex flex-col gap-1">
+            {task.diffs.map(d => (
+              <li key={d.fieldName} className="flex flex-wrap justify-between gap-x-4 text-[13px] text-neutral-dark">
+                <span>{d.fieldName}</span>
+                <span className="font-semibold tabular-nums">
+                  {d.delta > 0 ? '+' : '−'}NT${formatTWD(Math.abs(d.delta))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <TaskFigures amount={task.amount} tax={task.tax} />
       {task.kind === 'invoiceBook' && (

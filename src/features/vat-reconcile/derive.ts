@@ -3,6 +3,9 @@ import type { VatCompareDiff, VatCompareResult } from '@/api/peit';
 /** 營業稅雙月期別代碼（compare 的 cmsPhase 僅接受這六個） */
 export const VAT_PHASES = [1, 3, 5, 7, 9, 11] as const;
 
+/** 早於指定期別的期別：任務中心只處理「前期」，本期起由系統直接處理 */
+export const phasesBefore = (phase: number): number[] => VAT_PHASES.filter(p => p < phase);
+
 export type PeriodStatus = 'matched' | 'pending' | 'notFiled';
 
 export type TaskKind = 'invoiceBook' | 'shortfall' | 'surplus' | 'review';
@@ -18,6 +21,8 @@ export interface ReconcileTask {
   amount?: number;
   /** 不足時對應的稅金（元，正數），取後端稅額欄 delta 的絕對值；該欄無差額則不帶 */
   tax?: number;
+  /** review 任務用：有差額的欄位與後端 delta（帶正負號：負＝帳簿少於申報），逐欄列出不加總 */
+  diffs?: { fieldName: string; delta: number }[];
 }
 
 export interface PeriodReconcile {
@@ -44,6 +49,19 @@ const IN_AMOUNT_FIELDS: { fieldCode: string; taxFieldCode: string; label: string
 const DELTA_EPSILON = 1e-6;
 
 export const hasDelta = (d: VatCompareDiff) => d.delta !== null && Math.abs(d.delta) > DELTA_EPSILON;
+
+/** 比例欄位（0–1 小數）不是金額，不套用「申報書沒寫」的判斷，也不會以 NT$ 列在差額清單 */
+const RATIO_FIELD = 'IN_NONDEDUCT_RATIO';
+
+/**
+ * 帳簿有金額、申報書該欄沒寫（filedValue 為 null）也算不符：此時後端 delta 為 null，
+ * 以「申報書視為 0」得到差額＝帳簿金額，與 delta 的定義（invoiceValue − filedValue）一致。
+ */
+const isMissingInFiled = (d: VatCompareDiff) =>
+  d.fieldCode !== RATIO_FIELD && d.filedValue === null && Math.abs(d.invoiceValue) > DELTA_EPSILON;
+
+/** 該欄是否與申報書不符：有差額，或帳簿有金額但申報書沒寫 */
+const isMismatch = (d: VatCompareDiff) => hasDelta(d) || isMissingInFiled(d);
 
 /** 期別 → 「07–08 月」 */
 export function phaseRangeLabel(phase: number): string {
@@ -124,13 +142,14 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
     }
   });
 
-  // 有欄位不符、但金額合計欄都對得上（例如只有稅額欄差異）：交給使用者看明細，不硬湊補登任務
-  if (tasks.length === 0 && result.diffs.some(hasDelta)) {
+  // 有欄位不符、但沒有任何可對應到補登動作的合計欄差額：逐欄列出差額讓使用者確認，不硬湊補登任務
+  if (tasks.length === 0 && result.diffs.some(isMismatch)) {
     tasks.push({
       id: 'review',
       kind: 'review',
       title: '部分欄位與申報書不一致',
-      description: '金額合計欄位相符，但有其他欄位存在差額，請查看下方對帳明細。',
+      description: '以下欄位的帳簿金額與申報書不同，請確認並補齊，完整欄位見下方對帳明細。',
+      diffs: result.diffs.filter(isMismatch).map(d => ({ fieldName: d.fieldName, delta: hasDelta(d) ? (d.delta as number) : d.invoiceValue })),
     });
   }
 
