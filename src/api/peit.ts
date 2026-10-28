@@ -3,8 +3,10 @@
  * - GET  /ael/peit/form/metadata：依文件編號與民國年回欄位 metadata（畫面表單由此動態產生）
  * - POST /ael/peit/cit/identify：上傳 PDF 辨識營所稅結算申報書各表與營業稅 401／403，回傳各表自己的 taxYear
  * - POST /ael/peit/vat/compare：某期發票試算 401／403 並與已寫入申報值對帳
+ * - POST /ael/peit/vat/media/{txt,tetu,t07,t07/supplement}：產生申報媒體檔（重送覆蓋）
+ * - GET  /ael/peit/vat/media/status：查媒體檔產生狀態；GET /ael/peit/vat/media：下載
  */
-import { apiFetch, buildQuery } from './client';
+import { apiFetch, apiFetchFile, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
 
 /** dataType：0 文字、1 金額元、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額） */
@@ -188,6 +190,56 @@ export function compareVat(params: { taxYear: number; cmsPhase: number }): Promi
     method: 'POST',
     body: JSON.stringify({ companyUuid: COMPANY_UUID, ...params }),
   });
+}
+
+/** 申報媒體檔種類：TXT／TET_U／T07／T07 補申報 */
+export type VatMediaKind = 'txt' | 'tetu' | 't07' | 't07s';
+
+export interface VatMediaFile {
+  fileName: string;
+  /** ISO 8601 */
+  generatedAt: string;
+  /** 401／403；T07 類檔案為 null */
+  formKind: string | null;
+  kind: VatMediaKind;
+}
+
+interface VatMediaParams {
+  taxYear: number;
+  cmsPhase: number;
+}
+
+/** t07s 的路徑為 /media/t07/supplement，其餘與 kind 同名 */
+const VAT_MEDIA_PATH: Record<VatMediaKind, string> = {
+  txt: '/ael/peit/vat/media/txt',
+  tetu: '/ael/peit/vat/media/tetu',
+  t07: '/ael/peit/vat/media/t07',
+  t07s: '/ael/peit/vat/media/t07/supplement',
+};
+
+/** 產生某期申報媒體檔；重送視為重新產生（覆蓋） */
+export function generateVatMedia(kind: VatMediaKind, params: VatMediaParams): Promise<VatMediaFile> {
+  return apiFetch<VatMediaFile>(VAT_MEDIA_PATH[kind], {
+    method: 'POST',
+    body: JSON.stringify({ companyUuid: COMPANY_UUID, ...params }),
+  });
+}
+
+/**
+ * 查某期全部媒體檔的產生狀態（GET /ael/peit/vat/media/status，不帶 kind）。
+ * 規格寫「省略 kind＝回該期全部」但 schema 只標單一物件，故陣列／物件／null 都統一成陣列，待實測確認。
+ */
+export async function getVatMediaStatus(params: VatMediaParams): Promise<VatMediaFile[]> {
+  const data = await apiFetch<VatMediaFile | VatMediaFile[] | null>(
+    `/ael/peit/vat/media/status${buildQuery({ companyUuid: COMPANY_UUID, ...params })}`,
+  );
+  if (!data) return [];
+  return Array.isArray(data) ? data : [data];
+}
+
+/** 下載已產生的媒體檔（GET /ael/peit/vat/media，text/plain）；未產檔後端回 errorCode 0006 */
+export function downloadVatMedia(kind: VatMediaKind, params: VatMediaParams): Promise<Blob> {
+  return apiFetchFile(`/ael/peit/vat/media${buildQuery({ companyUuid: COMPANY_UUID, ...params, kind })}`);
 }
 
 /** 寫入／覆寫公司開帳日；openingDate 為民國 YYYMMDD（如 1140514），重送會覆寫 */
