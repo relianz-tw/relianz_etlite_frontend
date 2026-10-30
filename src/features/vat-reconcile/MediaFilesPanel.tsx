@@ -1,10 +1,11 @@
 'use client';
 
-import { downloadVatMedia, generateVatMedia, getVatMediaStatus } from '@/api/peit';
+import { downloadVatMedia, getVatMediaStatus } from '@/api/peit';
 import type { VatMediaFile, VatMediaKind } from '@/api/peit';
 import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { Download, FilePlus, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const MEDIA_KINDS: { kind: VatMediaKind; label: string; hint: string }[] = [
@@ -20,6 +21,19 @@ function formatGeneratedAt(iso: string): string {
   if (Number.isNaN(d.getTime())) return iso;
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * 將媒體檔 Blob 轉成可顯示的文字。
+ * 先以 UTF-8 嚴格解碼；若檔案是 Big5 編碼（財政部媒體檔常見）會解碼失敗，改以 Big5 重解，避免中文變亂碼。
+ */
+async function blobToText(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder('big5').decode(buf);
+  }
 }
 
 /** 以暫時的 <a download> 觸發瀏覽器下載 */
@@ -39,16 +53,34 @@ interface MediaFilesPanelProps {
   phase: number;
 }
 
-/** 某期申報媒體檔：四種檔各自「產生／重新產生」與「下載」；切換期別時由呼叫端以 key 重掛 */
+/** 申報檔入口：收納成一顆按鈕，點擊才開彈窗列出檔案；切換期別時由呼叫端以 key 重掛 */
 export default function MediaFilesPanel({ rocYear, phase }: MediaFilesPanelProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="ghost" size="sm" icon={FileText} onClick={() => setOpen(true)}>
+        查看申報檔
+      </Button>
+      {/* Modal 關閉時不掛載內容，所以狀態查詢會等到使用者開啟彈窗才送出 */}
+      <Modal open={open} onClose={() => setOpen(false)} title="申報檔" widthClassName="max-w-[560px]">
+        <MediaFilesList rocYear={rocYear} phase={phase} />
+      </Modal>
+    </>
+  );
+}
+
+/** 某期申報媒體檔：四種檔各自「查看」「下載」（檔案由後端產生，前端不提供產生） */
+function MediaFilesList({ rocYear, phase }: MediaFilesPanelProps) {
   const params = { taxYear: rocYear, cmsPhase: phase };
 
   const [files, setFiles] = useState<Partial<Record<VatMediaKind, VatMediaFile>>>({});
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState('');
   // 每列各自的進行中動作與錯誤，一列失敗不影響其他列
-  const [busy, setBusy] = useState<Partial<Record<VatMediaKind, 'generate' | 'download'>>>({});
+  const [busy, setBusy] = useState<Partial<Record<VatMediaKind, 'view' | 'download'>>>({});
   const [errors, setErrors] = useState<Partial<Record<VatMediaKind, string>>>({});
+  // 正在查看的檔案內容；有值時彈窗內以預覽取代清單
+  const [preview, setPreview] = useState<{ kind: VatMediaKind; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,27 +102,48 @@ export default function MediaFilesPanel({ rocYear, phase }: MediaFilesPanelProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const run = async (kind: VatMediaKind, action: 'generate' | 'download') => {
+  const run = async (kind: VatMediaKind, action: 'view' | 'download') => {
     setBusy(b => ({ ...b, [kind]: action }));
     setErrors(e => ({ ...e, [kind]: '' }));
     try {
-      if (action === 'generate') {
-        const file = await generateVatMedia(kind, params);
-        setFiles(f => ({ ...f, [kind]: file }));
-      } else {
-        const blob = await downloadVatMedia(kind, params);
-        saveBlob(blob, files[kind]?.fileName ?? `${kind}.txt`);
-      }
+      const blob = await downloadVatMedia(kind, params);
+      if (action === 'view') setPreview({ kind, text: await blobToText(blob) });
+      else saveBlob(blob, files[kind]?.fileName ?? `${kind}.txt`);
     } catch (err) {
-      setErrors(e => ({ ...e, [kind]: getFriendlyErrorMessage(err, action === 'generate' ? '產生失敗' : '下載失敗') }));
+      setErrors(e => ({ ...e, [kind]: getFriendlyErrorMessage(err, action === 'view' ? '查看失敗' : '下載失敗') }));
     } finally {
       setBusy(b => ({ ...b, [kind]: undefined }));
     }
   };
 
+  if (preview) {
+    const meta = MEDIA_KINDS.find(m => m.kind === preview.kind);
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[15px] font-semibold text-neutral-dark">{meta?.label}</span>
+            <span className="truncate text-[13px] text-neutral-mid">{files[preview.kind]?.fileName}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => setPreview(null)}>
+              返回
+            </Button>
+            <Button variant="outline" size="sm" icon={Download} onClick={() => run(preview.kind, 'download')}>
+              下載
+            </Button>
+          </div>
+        </div>
+        {errors[preview.kind] && <span className="text-[13px] text-semantic-error">{errors[preview.kind]}</span>}
+        <pre className="max-h-[60vh] overflow-auto whitespace-pre rounded-md bg-surface-off-white p-4 font-mono text-xs text-neutral-dark">
+          {preview.text}
+        </pre>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-base font-semibold text-neutral-dark">申報檔</h3>
       {statusError && <p className="text-[13px] text-semantic-error">{statusError}</p>}
       <ul className="flex flex-col gap-3">
         {MEDIA_KINDS.map(({ kind, label, hint }) => {
@@ -105,21 +158,21 @@ export default function MediaFilesPanel({ rocYear, phase }: MediaFilesPanelProps
                     ? '讀取中…'
                     : file
                       ? `${file.fileName}・產生於 ${formatGeneratedAt(file.generatedAt)}`
-                      : `尚未產生・${hint}`}
+                      : `尚無檔案・${hint}`}
                 </span>
                 {errors[kind] && <span className="text-[13px] text-semantic-error">{errors[kind]}</span>}
               </div>
               <div className="flex w-full flex-col gap-2 nav:w-auto nav:flex-row">
                 <Button
-                  variant="outline"
-                  icon={file ? RefreshCw : FilePlus}
-                  onClick={() => run(kind, 'generate')}
-                  disabled={statusLoading || !!action}
+                  icon={Eye}
+                  onClick={() => run(kind, 'view')}
+                  disabled={!file || !!action}
                   className="w-full nav:w-auto"
                 >
-                  {action === 'generate' ? '產生中…' : file ? '重新產生' : '產生'}
+                  {action === 'view' ? '讀取中…' : '查看'}
                 </Button>
                 <Button
+                  variant="outline"
                   icon={Download}
                   onClick={() => run(kind, 'download')}
                   disabled={!file || !!action}
