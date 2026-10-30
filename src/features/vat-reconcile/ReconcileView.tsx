@@ -227,9 +227,12 @@ function PeriodDetail({ rocYear, period, onReload, onCreateBook, onImportInvoice
         </h2>
         <PeriodBadge period={period} />
       </div>
-      <Button variant="ghost" size="sm" icon={RefreshCw} onClick={onReload} disabled={period.loading}>
-        重新比對
-      </Button>
+      <div className="flex items-center gap-1">
+        {data && <MediaFilesPanel key={period.phase} rocYear={rocYear} phase={period.phase} />}
+        <Button variant="ghost" size="sm" icon={RefreshCw} onClick={onReload} disabled={period.loading}>
+          重新比對
+        </Button>
+      </div>
     </div>
   );
 
@@ -293,7 +296,6 @@ function PeriodDetail({ rocYear, period, onReload, onCreateBook, onImportInvoice
         </div>
       )}
 
-      <MediaFilesPanel key={period.phase} rocYear={rocYear} phase={period.phase} />
       </div>
 
       <div className="flex flex-col gap-3">
