@@ -1,31 +1,17 @@
 'use client';
 
-import { createBankAccount, listBankAccounts, updateBankAccount } from '@/api/bankAccounts';
+import { listBankAccounts, updateBankAccount } from '@/api/bankAccounts';
 import type { BankAccountDto, UpdateBankAccountBody } from '@/api/types';
-import Button from '@/components/ui/Button';
-import Label from '@/components/ui/Label';
-import MoneyInput from '@/components/ui/MoneyInput';
-import Textarea from '@/components/ui/Textarea';
-import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { numberToChineseNumeral, todayYyyymmdd } from '@/lib/utils';
 import { CirclePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import BankAccountCard from './BankAccountCard';
+import BankAccountCreateForm from './BankAccountCreateForm';
 import ChannelRuleSection from './ChannelRuleSection';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 import VendorSection from './VendorSection';
 import type { BankAccountRecord } from '../data';
-
-const EMPTY_NEW_ACCOUNT: Omit<BankAccountRecord, 'id' | 'lastBalanceUpdateDate' | 'isActive' | 'isDefaultReceivingAccount' | 'isDefaultPaymentAccount'> = {
-  nickname: '',
-  bankCode: '',
-  bankName: '',
-  bankBranch: '',
-  accountNumber: '',
-  balance: 0,
-  remark: '',
-};
 
 /** BankAccountRecord 轉為 updateBankAccount() 所需的 PATCH body（不含 companyUuid，由 API 層補上） */
 function toUpdateBody(record: BankAccountRecord): Omit<UpdateBankAccountBody, 'companyUuid'> {
@@ -73,7 +59,6 @@ export default function PaymentSettingsTab() {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
   const [adding, setAdding] = useState(false);
-  const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT);
   const [pendingDeactivate, setPendingDeactivate] = useState<BankAccountRecord | null>(null);
 
   const loadAccounts = () => {
@@ -169,33 +154,6 @@ export default function PaymentSettingsTab() {
     }
   };
 
-  const saveNewAccount = async () => {
-    if (!newAccount.nickname.trim() || !newAccount.accountNumber.trim()) return;
-    setSaving(true);
-    setActionError('');
-    try {
-      await createBankAccount({
-        accountName: newAccount.nickname,
-        bankCode: newAccount.bankCode,
-        accountNo: newAccount.accountNumber,
-        bankName: newAccount.bankName,
-        branchName: newAccount.bankBranch,
-        currentBalance: newAccount.balance,
-        isDefaultReceivingAccount: false,
-        isDefaultPaymentAccount: false,
-        isActive: true,
-        remark: newAccount.remark,
-      });
-      setNewAccount(EMPTY_NEW_ACCOUNT);
-      setAdding(false);
-      loadAccounts();
-    } catch (err) {
-      setActionError(getFriendlyErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-6">
@@ -229,76 +187,13 @@ export default function PaymentSettingsTab() {
           ))}
 
           {adding && (
-            <div className="rounded-md border border-dashed border-neutral-blue-gray/50 p-4">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 nav:grid-cols-2">
-                  <div>
-                    <Label required>帳戶暱名</Label>
-                    <TextInput
-                      placeholder="例：付款用國泰世華內科分行"
-                      value={newAccount.nickname}
-                      onChange={e => setNewAccount(a => ({ ...a, nickname: e.target.value }))}
-                    />
-                    <p className="mt-1 text-xs text-neutral-mid">注意：請輸入公司行號名下戶頭</p>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
-                    <MoneyInput value={newAccount.balance} onChange={v => setNewAccount(a => ({ ...a, balance: v }))} />
-                    <p className="mt-1 text-xs text-neutral-mid">僅限於首次設定時使用，系統將不再詢問</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-3 nav:grid-cols-[1fr_120px_1fr_1fr]">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行名稱</label>
-                    <TextInput value={newAccount.bankName} onChange={e => setNewAccount(a => ({ ...a, bankName: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">銀行代碼</label>
-                    <TextInput
-                      value={newAccount.bankCode}
-                      inputMode="numeric"
-                      maxLength={3}
-                      onChange={e => setNewAccount(a => ({ ...a, bankCode: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                    />
-                  </div>
-                  <div>
-                    <Label required>銀行帳號</Label>
-                    <TextInput
-                      placeholder="請輸入完整帳號，不要輸入符號"
-                      value={newAccount.accountNumber}
-                      onChange={e => setNewAccount(a => ({ ...a, accountNumber: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">分行</label>
-                    <TextInput value={newAccount.bankBranch} onChange={e => setNewAccount(a => ({ ...a, bankBranch: e.target.value }))} />
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">備註</label>
-                  <Textarea
-                    placeholder="備註（選填）"
-                    value={newAccount.remark}
-                    onChange={e => setNewAccount(a => ({ ...a, remark: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="mt-5 flex justify-end gap-3">
-                <Button
-                  variant="danger"
-                  disabled={saving}
-                  onClick={() => {
-                    setAdding(false);
-                    setNewAccount(EMPTY_NEW_ACCOUNT);
-                  }}
-                >
-                  取消
-                </Button>
-                <Button variant="primary" onClick={saveNewAccount} disabled={saving}>
-                  {saving ? '儲存中…' : '儲存'}
-                </Button>
-              </div>
-            </div>
+            <BankAccountCreateForm
+              onCreated={() => {
+                setAdding(false);
+                loadAccounts();
+              }}
+              onCancel={() => setAdding(false)}
+            />
           )}
 
           {!adding && (

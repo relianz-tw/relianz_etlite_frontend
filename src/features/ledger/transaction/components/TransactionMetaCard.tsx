@@ -63,6 +63,8 @@ interface TransactionMetaCardProps {
   /** 標題列右側自訂內容，優先於「修改交易資訊」按鈕顯示；供純檢視情境（如營業稅中心憑證細節）
    *  改放「前往交易頁編輯」等導向連結使用 */
   headerAction?: ReactNode;
+  /** 新增銷項時通知父層「公司尚無啟用中銀行帳戶」，供父層顯示阻擋提示並停用送出 */
+  onBankAccountMissingChange?: (missing: boolean) => void;
 }
 
 const EMPTY_AI_FIELDS: ReadonlySet<keyof TransactionFormState> = new Set();
@@ -92,6 +94,19 @@ const NOT_WIRED_BADGE = (
     尚未串接
   </Badge>
 );
+
+/** 建立固定名稱「其他」的預設銷售管道（手動開通對話框與新增銷項自動開通共用） */
+function createOtherChannel(receivingAccountUuid: string): Promise<ChannelRuleDto> {
+  return createChannelRule({
+    channelName: '其他',
+    settlementStyle: SETTLEMENT_STYLE.WEEKLY,
+    settlementAmount: 1,
+    receivingAccountUuid,
+    remark: '',
+    isActive: true,
+    initDefaultOther: true,
+  });
+}
 
 /** BankAccountDto → BankAccountRecord，比照 PaymentSettingsTab 既有的轉換方式，供 ChannelRuleDialog 使用 */
 function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
@@ -126,6 +141,7 @@ export default function TransactionMetaCard({
   aiPickedSubject = false,
   aiFields = EMPTY_AI_FIELDS,
   headerAction,
+  onBankAccountMissingChange,
 }: TransactionMetaCardProps) {
   const [channelRules, setChannelRules] = useState<ChannelRuleDto[]>([]);
   const [channelError, setChannelError] = useState('');
@@ -145,16 +161,33 @@ export default function TransactionMetaCard({
 
   // 銷售管道改為串接真實「銷售管道規則」清單，取代原本的假資料選單；僅銷項需要，只載入一次
   // 「其他」管道（各公司 uuid 不同，但固定名稱為「其他」）固定排在清單最末，讓使用者優先看到具體管道
+  // 新增銷項時若公司尚未開通「其他」管道，有銀行帳戶就自動開通（收款帳戶優先用預設收款戶頭），
+  // 沒有帳戶則通知父層顯示阻擋提示；編輯舊資料時不自動寫入
   useEffect(() => {
     if (side !== 'sales') return;
-    listChannelRules()
-      .then(list => {
-        const active = list.filter(c => c.isActive);
-        const sorted = [...active.filter(c => c.channelName !== '其他'), ...active.filter(c => c.channelName === '其他')];
-        setChannelRules(sorted);
-      })
-      .catch(err => setChannelError(getFriendlyErrorMessage(err)));
-  }, [side]);
+    const load = async () => {
+      // 切換 side 或重新進入時先清除舊的缺帳戶狀態，避免殘留上次結果
+      onBankAccountMissingChange?.(false);
+      let list = await listChannelRules();
+      if (mode === 'create' && !list.some(c => c.channelName === '其他')) {
+        const accounts = (await listBankAccounts()).filter(a => a.isActive);
+        setBankAccounts(accounts.map(toBankAccountRecord));
+        setBankAccountsLoaded(true);
+        const receiving = accounts.find(a => a.isDefaultReceivingAccount) ?? accounts[0];
+        if (receiving) {
+          await createOtherChannel(receiving.bankAccountUuid);
+          list = await listChannelRules();
+        } else {
+          onBankAccountMissingChange?.(true);
+        }
+      }
+      const active = list.filter(c => c.isActive);
+      const sorted = [...active.filter(c => c.channelName !== '其他'), ...active.filter(c => c.channelName === '其他')];
+      setChannelRules(sorted);
+    };
+    load().catch(err => setChannelError(getFriendlyErrorMessage(err)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [side, mode]);
 
   // 廠商改為串接真實廠商名單（與設定頁「廠商管理」同一份 API），取代純文字輸入；僅進項新增需要，只載入一次
   // 清單沒有「其他」時自動開通一筆（比照設定頁 VendorSection），確保進項交易一定有「其他」可選
@@ -236,15 +269,7 @@ export default function TransactionMetaCard({
   // 各公司「其他」管道的 uuid 不同，但名稱固定為「其他」；尚未開通前強制先完成此步驟才能新增其他管道
   const hasOtherChannel = channelRules.some(c => c.channelName === '其他');
   const handleInitOtherChannel = async (receivingAccountUuid: string) => {
-    const created = await createChannelRule({
-      channelName: '其他',
-      settlementStyle: SETTLEMENT_STYLE.WEEKLY,
-      settlementAmount: 1,
-      receivingAccountUuid,
-      remark: '',
-      isActive: true,
-      initDefaultOther: true,
-    });
+    const created = await createOtherChannel(receivingAccountUuid);
     setChannelRules(list => [...list, created]);
     onChange({ channel: created.channelUuid });
   };

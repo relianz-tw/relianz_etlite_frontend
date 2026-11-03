@@ -23,12 +23,12 @@ import type {
   EntryDetailSettleEventDto,
 } from '@/api/types';
 import { listVendors } from '@/api/vendors';
-import Button from '@/components/ui/Button';
+import Button, { buttonClassName } from '@/components/ui/Button';
 import JournalCard from '@/components/ui/JournalCard';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { parseInvoicePeriodValue } from '@/lib/invoicePeriod';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -196,6 +196,9 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
   // 編輯任一欄位時，就把該欄位從集合中移除，提示立即消失（見 DESIGN.md AI 填入欄位提示）
   const [aiFields, setAiFields] = useState<ReadonlySet<keyof TransactionFormState>>(new Set());
   const identifyRequestIdRef = useRef(0);
+  // 新增銷項時公司尚無啟用中銀行帳戶（由 TransactionMetaCard 回報），此時無法建立「其他」管道，需阻擋送出
+  const [bankAccountMissing, setBankAccountMissing] = useState(false);
+  const blockedByNoBankAccount = mode === 'create' && side === 'sales' && !form.isAllowance && bankAccountMissing;
 
   // 編輯畫面掛載時向 GET /ael/ledger/entries/detail 取得真實資料；新增畫面不需要，維持 EMPTY_TRANSACTION_FORM
   const [detailLoading, setDetailLoading] = useState(mode === 'edit');
@@ -468,6 +471,19 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
           )}
         </div>
 
+        {blockedByNoBankAccount && (
+          <div role="alert" className="mb-5 flex flex-col gap-3 rounded-md border border-semantic-error bg-semantic-error/10 p-4 nav:flex-row nav:items-center">
+            <TriangleAlert size={20} className="shrink-0 text-semantic-error" />
+            <div>
+              <p className="text-sm font-bold text-semantic-error">尚未新增銀行帳戶</p>
+              <p className="text-[13px] leading-relaxed text-neutral-dark">新增銷項交易需要收款帳戶，請先新增公司名下銀行帳戶後再回來記帳。</p>
+            </div>
+            <Link href="/settings?tab=paymentSettings" className={buttonClassName('primary', 'sm', 'nav:ml-auto')}>
+              前往新增銀行帳戶
+            </Link>
+          </div>
+        )}
+
         {detailLoading ? (
           <div className="rounded-md bg-surface-cream p-6 text-center text-sm text-neutral-mid">載入中…</div>
         ) : detailError ? (
@@ -512,6 +528,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                 voidLabel={side === 'sales' ? '作廢' : '刪除'}
                 aiPickedSubject={aiPickedSubject}
                 aiFields={aiFields}
+                onBankAccountMissingChange={setBankAccountMissing}
               />
               {mode === 'edit' && isAllowance && (
                 <TransactionOriginCard
@@ -551,7 +568,7 @@ export default function TransactionFormView({ mode, side, transactionId, returnQ
                     variant="primary"
                     className="w-full nav:w-auto"
                     onClick={handleCreate}
-                    disabled={submitting || (form.isAllowance && !form.originLedgerUuid)}
+                    disabled={submitting || blockedByNoBankAccount || (form.isAllowance && !form.originLedgerUuid)}
                   >
                     {submitting ? '建立中…' : '建立交易'}
                   </Button>

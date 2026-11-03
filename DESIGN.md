@@ -333,6 +333,17 @@ Icon：lucide TriangleAlert size 16、mt-0.5 shrink-0
 對應元件：`src/features/initialization/components/FormIdentifyPanel.tsx`（未辨識到文件）、
 `src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目）。
 
+### Blocking Alert（阻擋型警示框）
+
+用途：缺少前置設定導致無法繼續的情境（如尚未新增銀行帳戶），**須搭配停用對應送出按鈕**。
+```
+容器：flex flex-col gap-3 nav:flex-row nav:items-center、rounded-md、border border-semantic-error、bg-semantic-error/10、p-4
+Icon：lucide TriangleAlert size 20、text-semantic-error、shrink-0
+標題：text-sm font-bold text-semantic-error；說明：text-[13px] leading-relaxed text-neutral-dark
+動作：buttonClassName('primary', 'sm') 套在 <Link>，置右（nav:ml-auto）
+```
+對應元件：`src/features/ledger/transaction/TransactionFormView.tsx`（新增銷項無銀行帳戶）。
+
 ### AI 填入欄位提示（AI-filled Field Indicator）
 
 用途：欄位由 AI／自動辨識（如憑證照片辨識）帶入值、使用者尚未手動修改前，需與一般手動輸入的欄位
