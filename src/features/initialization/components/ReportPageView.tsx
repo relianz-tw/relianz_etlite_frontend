@@ -143,7 +143,11 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
           </div>
         )}
         {blocked && <p className='text-xs text-semantic-error'>此期別為必填，請上傳文件或手動輸入資料後再前往下一份。</p>}
-        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} />}
+        {/* 封面頁不是可略過的文件，只在步驟 4 的選填頁提示 */}
+        {!spec.required && spec.key !== 'CIT_COVER' && (
+          <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
+        )}
+        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} acceptImages={!!spec.period} />}
       </StepPageHeader>
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}

@@ -5,20 +5,30 @@ import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, reso
 import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
-import { Loader2, TriangleAlert, Upload } from 'lucide-react';
+import { toJpegFile } from '@/lib/imageToJpeg';
+import { CircleCheck, Loader2, TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const MAX_SIZE_MB = 5;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
-type PanelStatus = 'idle' | 'recognizing' | 'done' | 'error';
+// empty：辨識成功但文件上沒抓到任何可用資訊，只提醒不阻擋，使用者仍可手動輸入
+type PanelStatus = 'idle' | 'recognizing' | 'done' | 'error' | 'empty';
 
 interface FormIdentifyPanelProps {
   /** 目前頁面的文件名稱，僅用於提示文案 */
   formTitle: string;
   /** 該頁必填（如必須上傳的 401 期別）時，文案不再寫「選填」 */
   required?: boolean;
+  /** 是否同時接受 JPG／PNG／HEIC 圖片（PNG、HEIC 會先轉成 JPG 再辨識），401／403 期別頁使用 */
+  acceptImages?: boolean;
+}
+
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
+
+function getExtension(name: string): string {
+  return name.split('.').pop()?.toLowerCase() ?? '';
 }
 
 function toValueMap(fields: IdentifiedField[]): Record<string, string | number> {
@@ -34,19 +44,21 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  * 逐頁表單上方的「上傳辨識」區（選填）：上傳一份 PDF 後呼叫 cit/identify，
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
-export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyPanelProps) {
+export function FormIdentifyPanel({ formTitle, required = false, acceptImages = false }: FormIdentifyPanelProps) {
   const { state, dispatch } = useInitialization();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
   const [message, setMessage] = useState('');
   const [fileName, setFileName] = useState('');
+  // 這次辨識實際帶入的文件名稱，成功後列給使用者看
+  const [appliedLabels, setAppliedLabels] = useState<string[]>([]);
 
   /**
    * 套用一張辨識結果。營所稅各表以 formCode 為 key；401／403 要依「民國年＋期別起始月」對到這次需要的期別頁，
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
    */
-  const applyForm = (form: IdentifiedForm): { applied: boolean; skipped?: string } => {
+  const applyForm = (form: IdentifiedForm): { applied: boolean; label?: string; skipped?: string } => {
     const values = toValueMap(form.fields);
     const rows = form.rows.map(row => toValueMap(row.fields));
 
@@ -59,27 +71,35 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
       }
       dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: page.key, formCode: form.formCode } });
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
-      return { applied: true };
+      return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}` };
     }
 
     dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: form.formCode, taxYear: form.taxYear, fields: values, rows } });
-    return { applied: true };
+    return { applied: true, label: FORM_LIST.find(f => f.formCode === form.formCode)?.title ?? form.formName };
   };
 
-  const handleFile = async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      toast.error(`「${file.name}」不是 PDF 檔案`);
-      return;
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      toast.error(`「${file.name}」超過 ${MAX_SIZE_MB}MB 上限`);
+  const handleFile = async (originalFile: File) => {
+    const isPdf = originalFile.type === 'application/pdf';
+    // HEIC 常拿到空的 file.type，圖片一律以副檔名判斷
+    const isImage = acceptImages && IMAGE_EXTENSIONS.includes(getExtension(originalFile.name));
+    if (!isPdf && !isImage) {
+      toast.error(acceptImages ? `「${originalFile.name}」格式不支援，請上傳 PDF、JPG、PNG 或 HEIC` : `「${originalFile.name}」不是 PDF 檔案`);
       return;
     }
 
-    setFileName(file.name);
+    setFileName(originalFile.name);
     setStatus('recognizing');
     setMessage('');
+    setAppliedLabels([]);
     try {
+      // PNG、HEIC 先轉成 JPG 再送；大小上限檢查轉檔後實際上傳的檔案
+      const file = isImage ? await toJpegFile(originalFile) : originalFile;
+      if (file.size > MAX_SIZE_BYTES) {
+        setStatus('idle');
+        toast.error(`「${originalFile.name}」超過 ${MAX_SIZE_MB}MB 上限`);
+        return;
+      }
+
       // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
       const openingYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
       const result = await identifyCit(file, openingYear);
@@ -95,14 +115,16 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
       ];
 
       if (appliedCount === 0) {
-        setStatus('error');
-        setMessage(notes.length > 0 ? notes.join('；') : '未在檔案中辨識到可用的文件，請確認檔案內容或改用手動輸入');
+        // 有略過／失敗原因就照實顯示；完全沒抓到東西則用提醒樣式（非錯誤）
+        setStatus(notes.length > 0 ? 'error' : 'empty');
+        setMessage(notes.join('；'));
         return;
       }
       setStatus('done');
-      // 成功不另顯示文字；只有部分略過或失敗時才提醒使用者
+      // 列出帶入了哪些文件；有部分略過或失敗時另以紅字提醒
+      setAppliedLabels(outcomes.flatMap(o => (o.label ? [o.label] : [])));
       setMessage(notes.join('；'));
-      toast.success('辨識完畢');
+      toast.success(`辨識完畢，已帶入 ${appliedCount} 份文件`);
     } catch (err) {
       setStatus('error');
       setMessage(getFriendlyErrorMessage(err, '辨識失敗，請重試或改用手動輸入'));
@@ -138,7 +160,10 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
           <div className='flex min-w-0 flex-col'>
             <span className='text-sm font-medium text-neutral-dark'>{recognizing ? `辨識中…${fileName}` : `上傳「${formTitle}」快速帶入${required ? '' : '（選填）'}`}</span>
             <span className='text-xs text-neutral-mid'>
-              {required ? '上傳文件或在下方手動輸入皆可' : '不上傳也可以直接在下方手動輸入'}，PDF {MAX_SIZE_MB}MB 以內
+              {required ? '上傳文件或在下方手動輸入皆可' : '不上傳也可以直接在下方手動輸入'}，{acceptImages ? 'PDF、JPG、PNG、HEIC' : 'PDF'} {MAX_SIZE_MB}MB 以內
+            </span>
+            <span className='text-xs text-neutral-mid'>
+              {acceptImages ? '上傳本期 401 或 403，會自動切換成辨識到的申報書' : '整份結算申報書 PDF 上傳一次，會同時帶入封面與各表'}
             </span>
           </div>
         </div>
@@ -149,7 +174,7 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
       <input
         ref={inputRef}
         type='file'
-        accept='.pdf'
+        accept={acceptImages ? '.pdf,.jpg,.jpeg,.png,.heic,.heif' : '.pdf'}
         className='hidden'
         disabled={recognizing}
         onChange={e => {
@@ -159,6 +184,21 @@ export function FormIdentifyPanel({ formTitle, required = false }: FormIdentifyP
         }}
       />
 
+      {status === 'empty' && (
+        <div className='flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3 text-semantic-warm-dark'>
+          <TriangleAlert size={16} className='mt-0.5 shrink-0' />
+          <div className='flex flex-col gap-0.5'>
+            <span className='text-sm font-bold'>未辨識到文件上的資訊</span>
+            <span className='text-[13px] leading-relaxed'>請確認檔案是否成功上傳、內容清晰且為本次需要的申報書。您仍可在下方手動輸入。</span>
+          </div>
+        </div>
+      )}
+      {status === 'done' && appliedLabels.length > 0 && (
+        <p className='flex items-start gap-1.5 text-xs text-semantic-success'>
+          <CircleCheck size={14} className='mt-0.5 shrink-0' />
+          <span>已帶入：{appliedLabels.join('、')}</span>
+        </p>
+      )}
       {(status === 'error' || (status === 'done' && message)) && (
         <p className='flex items-start gap-1.5 text-xs text-semantic-error'>
           <TriangleAlert size={14} className='mt-0.5 shrink-0' />

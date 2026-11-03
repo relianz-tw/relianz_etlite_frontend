@@ -308,6 +308,19 @@ Drag-over：border #005FA2、background rgba(0, 95, 162, 0.05)（brand-blue/5）
 `src/features/ledger/transaction/components/VoucherUpload.tsx`（憑證照片預覽）、
 `src/features/ledger/transaction/components/PassNumberDialog.tsx`（發票跳號作廢憑證照片，僅前端驗證格式與大小）。
 
+### Notice（非阻擋提醒框）
+
+用途：提醒使用者留意某件事，但**不阻擋流程**（如上傳辨識沒抓到資料、確認頁尚有未填項目）。
+真正的錯誤（驗證失敗、API 失敗）仍用 Error Message 紅字，不用此元件。
+```
+容器：flex items-start gap-2、rounded-md、border border-brand-tan/40、bg-brand-tan/10、p-3
+文字色：#84724D（semantic-warm-dark）
+Icon：lucide TriangleAlert size 16、mt-0.5 shrink-0
+標題：text-sm font-bold（可省略）；說明：text-[13px] leading-relaxed
+```
+對應元件：`src/features/initialization/components/FormIdentifyPanel.tsx`（未辨識到文件）、
+`src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目）。
+
 ### AI 填入欄位提示（AI-filled Field Indicator）
 
 用途：欄位由 AI／自動辨識（如憑證照片辨識）帶入值、使用者尚未手動修改前，需與一般手動輸入的欄位
