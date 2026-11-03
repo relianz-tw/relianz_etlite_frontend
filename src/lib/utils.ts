@@ -37,6 +37,27 @@ export function toRocYyyMmDd(isoDate: string): string {
 }
 
 /**
+ * 辨識結果的日期字串 → ISO YYYY-MM-DD。
+ * 後端 valueDate 格式不固定：7 碼民國（1140722）、8 碼西元（20250722）、114年07月22日、114/07/22、2025-07-22 都可能出現；
+ * 小於 1911 的年份視為民國年。無法解析或月日不合法回傳 undefined。
+ */
+export function normalizeDateToIso(value: string): string | undefined {
+  const text = value.trim();
+  const compact = /^(\d{3,4})(\d{2})(\d{2})$/.exec(text);
+  const separated = /^(\d{2,4})\s*[-/年.]\s*(\d{1,2})\s*[-/月.]\s*(\d{1,2})/.exec(text);
+  const match = compact ?? separated;
+  if (!match) return undefined;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const rawYear = Number(match[1]);
+  const year = rawYear < 1911 ? rawYear + 1911 : rawYear;
+  // 用 Date 反查，擋掉 2/30 這類不存在的日期
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
  * 月份（1-12）→ 營業稅雙月期別代碼（1/3/5/7/9/11），如 1-2 月為 1、3-4 月為 3……。
  * 統一供所有需要帶入「期別」查詢參數的 API 使用（如 GET /ael/invoice/trackRule 的 phase）。
  */
