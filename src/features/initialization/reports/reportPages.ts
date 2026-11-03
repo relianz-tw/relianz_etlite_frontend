@@ -64,22 +64,25 @@ export function formatPeriodLabel(rocYear: number, phase: number): string {
 }
 
 /**
- * 依開帳年度與進入日，算出要逐期上傳的 401 期別：
- * - 從開帳年度起到進入日所在年度，每期依進入日判斷：尚未開始的不出現；
- * - 開帳年度內「已結束」的期別必填，「進行中」的選填；
- * - 開帳年度之後年度的期別（已結束或進行中）一律選填。
+ * 依開帳年度、開帳基準日與進入日，算出要逐期上傳的 401 期別：
+ * - 起點是開帳基準日「所在的那一期」（含），基準日之前已結束的期別不需要；
+ * - 終點是進入日之前「已結束」的最後一期，進行中與尚未開始的不出現；
+ * - 開帳年度內的期別必填，之後年度的選填；
+ * - 尚未選開帳基準日（空字串）時不列任何期別。
  */
-export function buildVatPeriods(openYear: number, today: Date): VatPeriod[] {
+export function buildVatPeriods(openYear: number, baseDate: string, today: Date): VatPeriod[] {
+  if (!baseDate) return [];
+  const base = new Date(`${baseDate}T00:00:00`);
   const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const periods: VatPeriod[] = [];
   for (let rocYear = openYear; rocYear <= t.getFullYear() - ROC_YEAR_OFFSET; rocYear++) {
     const gregorianYear = rocYear + ROC_YEAR_OFFSET;
     for (const phase of PHASES) {
-      const start = new Date(gregorianYear, phase - 1, 1);
       // new Date(y, m, 0) 是「第 m 個月（1-based）的最後一天」，期別第二個月為 phase + 1，故這裡取到該期結束日
       const end = new Date(gregorianYear, phase + 1, 0);
-      if (t < start) continue;
-      periods.push({ rocYear, phase, required: rocYear === openYear && t > end });
+      // 結束日早於基準日 → 基準日之前的期別；今天尚未超過結束日 → 進行中或未開始
+      if (end < base || t <= end) continue;
+      periods.push({ rocYear, phase, required: rocYear === openYear });
     }
   }
   return periods;
@@ -88,7 +91,7 @@ export function buildVatPeriods(openYear: number, today: Date): VatPeriod[] {
 /**
  * 步驟 4 要逐頁核對的所有頁面，順序：營所稅各表 → 營業稅各期（由舊到新，每期擇一填 401 或 403）。
  */
-export function buildReportPages({ openYear, today, orgType = null }: { openYear: number; today: Date; orgType?: OrgType }): ReportPageSpec[] {
+export function buildReportPages({ openYear, baseDate, today, orgType = null }: { openYear: number; baseDate: string; today: Date; orgType?: OrgType }): ReportPageSpec[] {
   const cit: ReportPageSpec[] = CIT_PAGE_ORDER.filter(formCode => isFormApplicable(formCode, orgType)).map(formCode => ({
     key: formCode,
     formCode,
@@ -96,7 +99,7 @@ export function buildReportPages({ openYear, today, orgType = null }: { openYear
     required: false,
   }));
 
-  const vat: ReportPageSpec[] = buildVatPeriods(openYear, today).map(p => ({
+  const vat: ReportPageSpec[] = buildVatPeriods(openYear, baseDate, today).map(p => ({
     key: getVatPageKey(p.rocYear, p.phase),
     formCode: 'VAT_401',
     taxYear: p.rocYear,

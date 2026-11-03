@@ -86,7 +86,7 @@ export function Step2Operating() {
   const hasYear = state.openYear !== null;
 
   // 步驟 4 要逐頁核對的頁面（營所稅各表＋營業稅各期）；未滿一年不逐頁核對，為空
-  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, today, orgType: state.orgType }) : [];
+  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, baseDate: state.openingBalance.baseDate, today, orgType: state.orgType }) : [];
   const vatPages = plan.filter(p => p.period);
   const requiredVat = describePeriods(vatPages.filter(p => p.required));
   const optionalVat = describePeriods(vatPages.filter(p => !p.required));
