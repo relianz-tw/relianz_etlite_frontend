@@ -299,7 +299,7 @@ function PeriodDetail({ rocYear, period, onReload, onCreateBook, onImportInvoice
       </div>
 
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold text-neutral-dark">對帳明細</h3>
+        <h3 className="text-base font-semibold text-neutral-dark">比對表</h3>
         <CompareFormView formKind={data.formKind} taxYear={rocYear} diffs={data.diffs} />
         <p className="text-xs text-neutral-mid">差額＝帳簿試算 − 已申報。負數代表帳簿少於申報值，需補登。</p>
       </div>

@@ -148,7 +148,7 @@ export function deriveReconcile(result: VatCompareResult, bookCount: number): Pe
       id: 'review',
       kind: 'review',
       title: '部分欄位與申報書不一致',
-      description: '以下欄位的帳簿金額與申報書不同，請確認並補齊，完整欄位見下方對帳明細。',
+      description: '以下欄位的帳簿金額與申報書不同，請確認並補齊，完整欄位見下方比對表。',
       diffs: result.diffs.filter(isMismatch).map(d => ({ fieldName: d.fieldName, delta: hasDelta(d) ? (d.delta as number) : d.invoiceValue })),
     });
   }
