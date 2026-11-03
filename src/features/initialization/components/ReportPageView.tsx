@@ -148,7 +148,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         {!spec.required && spec.key !== 'CIT_COVER' && (
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
         )}
-        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} vatPeriod={!!spec.period} />}
+        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
         {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
       </StepPageHeader>
 
