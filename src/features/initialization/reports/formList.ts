@@ -80,8 +80,8 @@ export const CIT_PAGE_ORDER: SettlementReportId[] = FORM_LIST.filter(f => f.taxT
 export const ORG_TYPE_LABEL: Record<Exclude<OrgType, null>, string> = {
   share: '股份有限公司',
   limited: '有限公司',
-  sole: '獨資行號',
-  partnership: '合夥行號',
+  sole: '獨資商號',
+  partnership: '合夥商號',
 };
 
 /** 獨資或合夥（無股東名簿與未分配盈餘申報書，改填負責人／合夥人資料） */
