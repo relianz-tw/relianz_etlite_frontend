@@ -21,8 +21,10 @@ interface FormIdentifyPanelProps {
   formTitle: string;
   /** 該頁必填（如必須上傳的 401 期別）時，文案不再寫「選填」 */
   required?: boolean;
-  /** 是否為 401／403 期別頁，僅用於切換說明文案 */
+  /** 是否為 401／403 期別頁，用於切換說明文案 */
   vatPeriod?: boolean;
+  /** 目前頁面的 key；401／403 上傳的檔案一律掛在這一頁供預覽 */
+  pageKey?: string;
 }
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
@@ -44,7 +46,7 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  * 逐頁表單上方的「上傳辨識」區（選填）：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
-export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = false }: FormIdentifyPanelProps) {
+export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -72,7 +74,7 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
       }
       dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: page.key, formCode: form.formCode } });
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
-      // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
+      // 辨識到的是別期時，該期頁面也留一份供預覽
       setVatUpload(page.key, file);
       return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}` };
     }
@@ -102,6 +104,10 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
         toast.error(`「${originalFile.name}」超過 ${MAX_SIZE_MB}MB 上限`);
         return;
       }
+
+      // 不論辨識結果如何，檔案都掛在使用者上傳的這一頁，讓使用者自己確認（防辨識失誤），之後也要存後端
+      // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
+      if (vatPeriod && pageKey) setVatUpload(pageKey, file);
 
       // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
       const openingYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
