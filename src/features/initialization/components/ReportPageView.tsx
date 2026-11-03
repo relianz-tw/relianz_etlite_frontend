@@ -6,6 +6,7 @@ import { formatPeriodLabel, getFormItem, isPageFilled, resolveReportPage, type R
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
+import { UploadedFilePreview } from './UploadedFilePreview';
 import { BalanceSheetView } from './BalanceSheetView';
 import { PaperFormView } from './PaperFormView';
 import { ReportSections } from './ReportSections';
@@ -50,7 +51,7 @@ interface ReportPageViewProps {
  * 頁首卡片（標題、上一頁／下一頁、進度、上傳辨識）＋依 metadata API 動態產生的欄位卡片＋列明細表格＋頁底導覽。
  */
 export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, nextLabel, onNext }: ReportPageViewProps) {
-  const { state, dispatch } = useInitialization();
+  const { state, dispatch, vatUploads } = useInitialization();
   // 營業稅期別頁依使用者選的 401 或 403（預設 401）決定表單與資料 key，營所稅頁固定
   const { formCode, reportKey } = resolveReportPage(spec, state.vatChoices);
   const { formNo, title: fallbackTitle } = getFormItem(formCode);
@@ -148,6 +149,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
         )}
         {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} vatPeriod={!!spec.period} />}
+        {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
       </StepPageHeader>
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}

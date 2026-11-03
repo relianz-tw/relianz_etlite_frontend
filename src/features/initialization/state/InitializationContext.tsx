@@ -38,6 +38,9 @@ interface InitializationContextValue {
   state: InitializationState;
   dispatch: React.Dispatch<InitializationAction>;
   clearSession: () => void;
+  /** 401／403 各期別頁上傳辨識的檔案（key = 期別頁 key），僅存記憶體供預覽 */
+  vatUploads: Record<string, File>;
+  setVatUpload: (pageKey: string, file: File) => void;
 }
 
 const InitializationContext = createContext<InitializationContextValue | null>(null);
@@ -47,6 +50,11 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const [mounted, setMounted] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // File 無法序列化，不放進 reducer／sessionStorage；重新整理後會消失，待後端存檔 API 上線後改從後端取回
+  const [vatUploads, setVatUploads] = useState<Record<string, File>>({});
+  const setVatUpload = useCallback((pageKey: string, file: File) => {
+    setVatUploads(prev => ({ ...prev, [pageKey]: file }));
+  }, []);
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   // 取消離開時用 history.forward() 回到流程，會再觸發一次 popstate，需忽略
   const ignoreNextPopRef = useRef(false);
@@ -146,7 +154,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   }
 
   return (
-    <InitializationContext.Provider value={{ state, dispatch, clearSession }}>
+    <InitializationContext.Provider value={{ state, dispatch, clearSession, vatUploads, setVatUpload }}>
       {children}
       <ConfirmDialog
         open={leavePromptOpen}

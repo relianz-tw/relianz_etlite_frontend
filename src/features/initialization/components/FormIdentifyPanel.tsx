@@ -45,7 +45,7 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
 export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = false }: FormIdentifyPanelProps) {
-  const { state, dispatch } = useInitialization();
+  const { state, dispatch, setVatUpload } = useInitialization();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
@@ -57,8 +57,9 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
   /**
    * 套用一張辨識結果。營所稅各表以 formCode 為 key；401／403 要依「民國年＋期別起始月」對到這次需要的期別頁，
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
+   * file 為實際送出辨識的檔案（圖片已轉 JPG），401／403 套用成功時一併記到該期別頁供預覽。
    */
-  const applyForm = (form: IdentifiedForm): { applied: boolean; label?: string; skipped?: string } => {
+  const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string } => {
     const values = toValueMap(form.fields);
     const rows = form.rows.map(row => toValueMap(row.fields));
 
@@ -71,6 +72,8 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
       }
       dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: page.key, formCode: form.formCode } });
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
+      // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
+      setVatUpload(page.key, file);
       return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}` };
     }
 
@@ -107,7 +110,7 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
       const presentForms = result.forms.filter(f => f.present && !f.errorCode && knownCodes.has(f.formCode));
       const failedForms = result.forms.filter(f => f.errorCode && knownCodes.has(f.formCode));
 
-      const outcomes = presentForms.map(applyForm);
+      const outcomes = presentForms.map(form => applyForm(form, file));
       const appliedCount = outcomes.filter(o => o.applied).length;
       const notes = [
         ...outcomes.flatMap(o => (o.skipped ? [o.skipped] : [])),

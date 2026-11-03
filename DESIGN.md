@@ -308,6 +308,18 @@ Drag-over：border #005FA2、background rgba(0, 95, 162, 0.05)（brand-blue/5）
 `src/features/ledger/transaction/components/VoucherUpload.tsx`（憑證照片預覽）、
 `src/features/ledger/transaction/components/PassNumberDialog.tsx`（發票跳號作廢憑證照片，僅前端驗證格式與大小）。
 
+**已上傳檔案列＋預覽彈窗（Uploaded File Row）**（上傳辨識後讓使用者確認自己傳了什麼，如 401／403 期別頁的申報書）
+```
+檔案列：flex items-center gap-3、rounded-lg、border border-neutral-blue-gray/30、bg-white、px-4 py-3
+Icon：lucide FileCheck2 20px、#377456（semantic-success）、shrink-0
+檔名：text-sm font-medium、#3A3830（neutral-dark）、truncate；檔案大小：text-xs、#797C80（neutral-mid）
+右側：Button variant="outline" size="sm" icon={Eye}「預覽」，shrink-0
+預覽彈窗：沿用 Modal，widthClassName="max-w-[960px]"，標題為檔名
+  圖片：object-contain，max-h-[70vh]，保留完整內容不裁切
+  PDF：iframe，h-[70vh]、w-full
+```
+對應元件：`src/features/initialization/components/UploadedFilePreview.tsx`。
+
 ### Notice（非阻擋提醒框）
 
 用途：提醒使用者留意某件事，但**不阻擋流程**（如上傳辨識沒抓到資料、確認頁尚有未填項目）。
