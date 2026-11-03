@@ -17,7 +17,7 @@ export function Step4Reports() {
   useEffect(() => {
     if (total > 0) return;
     const today = resolveToday(state.simulatedDate);
-    dispatch({ type: 'APPLY_REPORT_PLAN', payload: buildReportPages({ openYear: state.openYear ?? getCurrentOpenYear(today), today, orgType: state.orgType }) });
+    dispatch({ type: 'APPLY_REPORT_PLAN', payload: buildReportPages({ openYear: state.openYear ?? getCurrentOpenYear(today), baseDate: state.openingBalance.baseDate, today, orgType: state.orgType }) });
   }, [total, state.simulatedDate, state.openYear, dispatch]);
 
   if (!spec) return null;
