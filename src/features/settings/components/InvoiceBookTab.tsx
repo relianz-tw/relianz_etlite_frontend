@@ -93,7 +93,7 @@ export default function InvoiceBookTab() {
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-md border border-neutral-blue-gray/30 bg-white px-4 py-3">
-        <Select widthClassName="max-w-[240px]" value={period} disabled={periodsLoading} onValueChange={setPeriod}>
+        <Select widthClassName="max-w-[300px]" value={period} disabled={periodsLoading} onValueChange={setPeriod}>
           {periods.length === 0 && (
             <option value="" disabled>
               {periodsLoading ? '載入中…' : '尚無可用期間'}
