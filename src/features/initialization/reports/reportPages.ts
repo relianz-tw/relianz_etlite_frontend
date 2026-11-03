@@ -1,4 +1,4 @@
-import { CIT_PAGE_ORDER, getDefaultFormYear, isFormApplicable, isSoleOrPartnership } from './formList';
+import { CIT_PAGE_ORDER, getDefaultFormYear, getFormItem, isFormApplicable, isSoleOrPartnership } from './formList';
 import type { OrgType, ReportData, SettlementReportId } from '../state/initializationReducer';
 
 /** 西元年換算民國年的差值 */
@@ -47,6 +47,15 @@ export function resolveReportPage(spec: ReportPageSpec, vatChoices: Record<strin
   if (!spec.period) return { formCode: spec.formCode, reportKey: spec.key };
   const formCode = vatChoices[spec.key] ?? 'VAT_401';
   return { formCode, reportKey: getVatReportKey(formCode, spec.period) };
+}
+
+/** 頁面的顯示名稱（確認頁未填清單用）：營所稅為文件名稱，營業稅為「401・民國…期別」 */
+export function getPageLabel(spec: ReportPageSpec, vatChoices: Record<string, VatFormCode>): string {
+  if (spec.kind === 'registration') return '登記文件';
+  if (spec.kind === 'partners') return '負責人及合夥人資料';
+  const { formCode } = resolveReportPage(spec, vatChoices);
+  if (spec.period) return `${formCode === 'VAT_403' ? '403' : '401'}・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}`;
+  return getFormItem(formCode).title;
 }
 
 /** 「民國 115 年 03–04 月」 */
