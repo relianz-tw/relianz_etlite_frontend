@@ -2,10 +2,9 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { completeInitialization } from '@/api/initialization';
-import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
-import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { ChevronRight, CircleCheck, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -30,27 +29,33 @@ export function Step6Done() {
   };
 
   return (
-    <>
-      <StepPageHeader kicker='完成' title={isUnderOneYear ? '已可開始使用' : '開帳設定完成'} nav={{ onNext: handleStart, nextLabel: '開始使用' }} />
+    <SectionCard className='items-center gap-4 py-12 text-center md:py-16'>
+      <CircleCheck size={48} className='text-semantic-success' />
+      <div className='flex flex-col gap-1.5'>
+        <span className='text-xs font-semibold text-brand-blue'>開帳設定完成</span>
+        <h1 className='text-2xl font-semibold text-neutral-dark md:text-3xl'>歡迎使用 Easytax Lite</h1>
+      </div>
+      <p className='max-w-md text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，現在就可以開始記帳。</p>
 
-      <SectionCard className='items-center gap-4 py-10 text-center'>
-        {isUnderOneYear ? (
-          <>
-            <TriangleAlert size={40} className='text-brand-tan' />
-            <p className='max-w-md text-sm text-neutral-mid'>
-              您尚未有結算申報書可供核對，帳務起點暫以 0 計算。日後結算申報完成，建議儘快補上申報書讓報表數字更準確。
-            </p>
-            <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })}>
-              前往上傳結算申報書
-            </Button>
-          </>
-        ) : (
-          <>
-            <CircleCheck size={40} className='text-semantic-success' />
-            <p className='max-w-md text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，即可開始使用 Easytax Lite 記帳。</p>
-          </>
+      {isUnderOneYear && (
+        <div className='flex max-w-md flex-col items-center gap-2'>
+          <TriangleAlert size={24} className='text-brand-tan' />
+          <p className='text-sm text-neutral-mid'>
+            您尚未有結算申報書可供核對，帳務起點暫以 0 計算。日後結算申報完成，建議儘快補上申報書讓報表數字更準確。
+          </p>
+        </div>
+      )}
+
+      <div className='mt-2 flex flex-col gap-3 sm:flex-row'>
+        {isUnderOneYear && (
+          <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })}>
+            前往上傳結算申報書
+          </Button>
         )}
-      </SectionCard>
-    </>
+        <Button icon={ChevronRight} iconPosition='right' onClick={handleStart}>
+          開始使用
+        </Button>
+      </div>
+    </SectionCard>
   );
 }
