@@ -469,7 +469,7 @@ Font: Noto Sans TC 12px, font-weight 600
   內容：表單類型（401/403，12px neutral-mid）、期別（Noto Serif TC 18px）、Badge
   Badge：已符合 → muted success；待處理 N → solid neutral；未上傳申報 → muted neutral
 
-對帳明細（CompareFormView）
+比對表（CompareFormView）
   沿用開帳 401／403 紙本對照版面（VatFormView）：大區塊卡片、小節標題、群組小標、圈號 chip、
   小計淡藍底與「＝」、扣除項「−」、金額｜稅額成對；每個欄位的輸入框改為唯讀三欄「帳簿試算｜已申報｜差額」
   有差額的列：bg-brand-tan/10 底，差額數字 bold；沒有任何數字的列預設收合，小計列一律顯示
