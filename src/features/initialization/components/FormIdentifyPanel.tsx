@@ -21,8 +21,8 @@ interface FormIdentifyPanelProps {
   formTitle: string;
   /** 該頁必填（如必須上傳的 401 期別）時，文案不再寫「選填」 */
   required?: boolean;
-  /** 是否同時接受 JPG／PNG／HEIC 圖片（PNG、HEIC 會先轉成 JPG 再辨識），401／403 期別頁使用 */
-  acceptImages?: boolean;
+  /** 是否為 401／403 期別頁，僅用於切換說明文案 */
+  vatPeriod?: boolean;
 }
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
@@ -41,11 +41,11 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
 }
 
 /**
- * 逐頁表單上方的「上傳辨識」區（選填）：上傳一份 PDF 後呼叫 cit/identify，
+ * 逐頁表單上方的「上傳辨識」區（選填）：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
-export function FormIdentifyPanel({ formTitle, required = false, acceptImages = false }: FormIdentifyPanelProps) {
-  const { state, dispatch } = useInitialization();
+export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = false }: FormIdentifyPanelProps) {
+  const { state, dispatch, setVatUpload } = useInitialization();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
@@ -57,8 +57,9 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
   /**
    * 套用一張辨識結果。營所稅各表以 formCode 為 key；401／403 要依「民國年＋期別起始月」對到這次需要的期別頁，
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
+   * file 為實際送出辨識的檔案（圖片已轉 JPG），401／403 套用成功時一併記到該期別頁供預覽。
    */
-  const applyForm = (form: IdentifiedForm): { applied: boolean; label?: string; skipped?: string } => {
+  const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string } => {
     const values = toValueMap(form.fields);
     const rows = form.rows.map(row => toValueMap(row.fields));
 
@@ -71,6 +72,8 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
       }
       dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: page.key, formCode: form.formCode } });
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
+      // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
+      setVatUpload(page.key, file);
       return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}` };
     }
 
@@ -81,9 +84,9 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
   const handleFile = async (originalFile: File) => {
     const isPdf = originalFile.type === 'application/pdf';
     // HEIC 常拿到空的 file.type，圖片一律以副檔名判斷
-    const isImage = acceptImages && IMAGE_EXTENSIONS.includes(getExtension(originalFile.name));
+    const isImage = IMAGE_EXTENSIONS.includes(getExtension(originalFile.name));
     if (!isPdf && !isImage) {
-      toast.error(acceptImages ? `「${originalFile.name}」格式不支援，請上傳 PDF、JPG、PNG 或 HEIC` : `「${originalFile.name}」不是 PDF 檔案`);
+      toast.error(`「${originalFile.name}」格式不支援，請上傳 PDF、JPG、PNG 或 HEIC`);
       return;
     }
 
@@ -107,7 +110,7 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
       const presentForms = result.forms.filter(f => f.present && !f.errorCode && knownCodes.has(f.formCode));
       const failedForms = result.forms.filter(f => f.errorCode && knownCodes.has(f.formCode));
 
-      const outcomes = presentForms.map(applyForm);
+      const outcomes = presentForms.map(form => applyForm(form, file));
       const appliedCount = outcomes.filter(o => o.applied).length;
       const notes = [
         ...outcomes.flatMap(o => (o.skipped ? [o.skipped] : [])),
@@ -160,10 +163,10 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
           <div className='flex min-w-0 flex-col'>
             <span className='text-sm font-medium text-neutral-dark'>{recognizing ? `辨識中…${fileName}` : `上傳「${formTitle}」快速帶入${required ? '' : '（選填）'}`}</span>
             <span className='text-xs text-neutral-mid'>
-              {required ? '上傳文件或在下方手動輸入皆可' : '不上傳也可以直接在下方手動輸入'}，{acceptImages ? 'PDF、JPG、PNG、HEIC' : 'PDF'} {MAX_SIZE_MB}MB 以內
+              {required ? '上傳文件或在下方手動輸入皆可' : '不上傳也可以直接在下方手動輸入'}，PDF、JPG、PNG、HEIC {MAX_SIZE_MB}MB 以內
             </span>
             <span className='text-xs text-neutral-mid'>
-              {acceptImages ? '上傳本期 401 或 403，會自動切換成辨識到的申報書' : '整份結算申報書 PDF 上傳一次，會同時帶入封面與各表'}
+              {vatPeriod ? '上傳本期 401 或 403，會自動切換成辨識到的申報書' : '整份結算申報書上傳一次，會同時帶入封面與各表'}
             </span>
           </div>
         </div>
@@ -174,7 +177,7 @@ export function FormIdentifyPanel({ formTitle, required = false, acceptImages = 
       <input
         ref={inputRef}
         type='file'
-        accept={acceptImages ? '.pdf,.jpg,.jpeg,.png,.heic,.heif' : '.pdf'}
+        accept='.pdf,.jpg,.jpeg,.png,.heic,.heif'
         className='hidden'
         disabled={recognizing}
         onChange={e => {
