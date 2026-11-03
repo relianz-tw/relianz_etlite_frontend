@@ -6,6 +6,7 @@ import TextInput from '@/components/ui/TextInput';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { Check, KeyRound, Pencil, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ORG_TYPE_LABEL } from '@/features/initialization/reports';
 import { BASIC_INFO_LABOR_RISK } from '../data';
 import ChangePasswordDialog from './ChangePasswordDialog';
 
@@ -161,10 +162,10 @@ export default function BasicInfoTab() {
 
       {saveError && <p className="mb-4 text-sm text-semantic-error">{saveError}</p>}
 
-      <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-2">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-3">
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">組織型態</label>
-          <TextInput value={readonlyFields.orgType} disabled readOnly />
+          <TextInput value={ORG_TYPE_LABEL[readonlyFields.orgType as keyof typeof ORG_TYPE_LABEL] ?? readonlyFields.orgType} disabled readOnly />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">統一編號</label>
@@ -211,7 +212,7 @@ export default function BasicInfoTab() {
 
       <div className="mt-6 rounded-md bg-surface-cream p-4">
         <h3 className="mb-4 text-sm font-semibold text-neutral-dark">聯絡資訊</h3>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 nav:grid-cols-[1fr_1fr_2fr]">
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">聯絡人全名</label>
             <TextInput
@@ -230,15 +231,15 @@ export default function BasicInfoTab() {
               readOnly={!editing}
             />
           </div>
-        </div>
-        <div className="mt-5">
-          <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">電子郵件信箱</label>
-          <TextInput
-            value={editableFields.contactEmail}
-            onChange={e => updateEditable({ contactEmail: e.target.value })}
-            disabled={!editing}
-            readOnly={!editing}
-          />
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">電子郵件信箱</label>
+            <TextInput
+              value={editableFields.contactEmail}
+              onChange={e => updateEditable({ contactEmail: e.target.value })}
+              disabled={!editing}
+              readOnly={!editing}
+            />
+          </div>
         </div>
       </div>
 
