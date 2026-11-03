@@ -8,6 +8,7 @@
  */
 import { apiFetch, apiFetchFile, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
+import { normalizeDateToIso } from '@/lib/utils';
 
 /** dataType：0 文字、1 金額元、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額） */
 export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4 | 5;
@@ -103,7 +104,8 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
     case 2: // 小數
       return field.valueDecimal ?? undefined;
     case 3: // 日期
-      return field.valueDate ?? undefined;
+      // 後端日期格式不固定（民國年原樣），統一轉成 ISO，畫面與 confirm 才能解析
+      return field.valueDate ? normalizeDateToIso(field.valueDate) : undefined;
     case 4: // 布林：畫面以 1／0 存放（見 ReportFieldRow boolean 分支）
       return field.valueBoolean === null ? undefined : field.valueBoolean ? 1 : 0;
     default:
