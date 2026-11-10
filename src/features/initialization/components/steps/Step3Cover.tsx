@@ -64,10 +64,10 @@ export function Step3Cover() {
       spec={coverSpec}
       taxYear={coverYear}
       kicker='封面'
-      // 封面頁尚未開始逐頁核對，進度為 0；一年內新設立無需核對各表，不顯示進度與上傳區
-      progress={isOverOneYear ? { value: 0, max: state.reportPages.length } : undefined}
+      // 封面算逐頁核對的第 1 份（進入就有已走一步的感覺），後面各頁再加 1；一年內新設立無需核對各表，不顯示進度與上傳區
+      progress={isOverOneYear ? { value: 1, max: state.reportPages.length + 1 } : undefined}
       showIdentify={isOverOneYear}
-      nextLabel='下一步'
+      nextLabel='下一頁'
       onNext={handleNext}
     />
   );

@@ -65,7 +65,7 @@ export function Step3CompanyInfo() {
         nav={{
           onPrev: () => dispatch({ type: 'PREV_STEP' }),
           onNext: () => dispatch({ type: 'NEXT_STEP' }),
-          nextLabel: '下一步',
+          nextLabel: '下一頁',
           nextDisabled: missingRequired || emailInvalid,
         }}
       >

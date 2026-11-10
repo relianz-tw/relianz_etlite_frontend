@@ -18,9 +18,9 @@ export function InitializationLayout({ children }: InitializationLayoutProps) {
 
       <main className='flex-1 min-h-0 overflow-hidden'>
         {/* id 供 initialization-client 切換步驟時把捲動位置歸零 */}
-        <div id='initialization-scroll' className='h-full overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden [scrollbar-width:none]'>
-          {/* 手機底部預留固定操作列的高度（pb-28） */}
-          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 pb-28 pt-2 md:gap-5 md:px-6 md:pb-8'>{children}</div>
+        <div id='initialization-scroll' className='h-full overflow-y-auto overscroll-contain [scrollbar-width:thin]'>
+          {/* 底部預留固定操作列的高度（含進度條，pb-40） */}
+          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 pb-40 pt-2 md:gap-5 md:px-6'>{children}</div>
         </div>
       </main>
     </div>

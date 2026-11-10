@@ -706,10 +706,24 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
   未達：#9AA7B9（neutral-blue-gray）
 ```
 
-**行動版（< md）**：不顯示橫向步驟列，改用單行文字「第 2 / 4 步．公司資料」置於頁首，
+**行動版（< md）**：不顯示橫向步驟列，改用單行文字「第 2 / 6 步．公司資料」置於頁首，
 字級 13px、色 #797C80（neutral-mid），不佔額外版面高度。
 
 對應元件：`src/components/ui/Stepper.tsx`。
+
+### Segmented Progress（分段進度條）
+
+用途：開帳精靈逐頁核對時，同一階段內「第幾份 / 共幾份」的進度。每份文件一段，比連續進度條更容易看出走了幾步。
+
+```
+容器：放在固定底部操作列內、上一頁／下一頁按鈕上方（gap-2），長表單捲動時仍可見
+分段：flex gap-0.5，每段 h-1.5 flex-1 rounded-full
+  已走到：bg #005FA2（brand-blue）
+  未走到：bg #9AA7B9/30（neutral-blue-gray）
+說明文字：「第 X / N 份」，12px、#797C80（neutral-mid），置於進度條下方
+```
+
+對應元件：`src/components/initialization/StepProgress.tsx`（由 `StepPageHeader` 的 `progress` 放在固定底部操作列）。
 
 ### Group Chip（沖帳管道／廠商選擇 chip）
 

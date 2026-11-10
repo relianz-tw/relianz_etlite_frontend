@@ -20,6 +20,10 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
   if (!preview) return null;
   // next/image 的 url 參數不會自動補 basePath，需自行帶上 '/etlite'（對齊 next.config.js）
   const src = `/etlite/form-previews/${preview.image}`;
+  // hover 時先把大圖抓進瀏覽器快取，點開時多半已載入完成
+  const prefetchLarge = () => {
+    new window.Image().src = src;
+  };
 
   return (
     <>
@@ -27,6 +31,7 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
         <button
           type='button'
           onClick={() => setOpen(true)}
+          onPointerEnter={prefetchLarge}
           aria-label={`查看${preview.pageLabel}大圖`}
           className={cn(
             'relative shrink-0 cursor-zoom-in overflow-hidden rounded border border-neutral-blue-gray/50 bg-white',
@@ -40,7 +45,7 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
           <span className='text-[15px] font-bold leading-snug text-neutral-dark'>{preview.pageLabel}</span>
           <span className='text-[13px] text-neutral-mid'>{preview.caption}</span>
         </div>
-        <Button variant='outline' size='sm' icon={ZoomIn} onClick={() => setOpen(true)}>
+        <Button variant='outline' size='sm' icon={ZoomIn} onClick={() => setOpen(true)} onPointerEnter={prefetchLarge}>
           查看大圖
         </Button>
       </div>
@@ -53,7 +58,8 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
           </div>
           <div className='min-h-0 flex-1 overflow-auto rounded-lg border border-neutral-blue-gray/30 bg-white'>
             {/* 大圖寬度跟著對話框，高度依原圖比例自然撐開，由外層捲動 */}
-            <Image src={src} alt={`${preview.pageLabel}範本`} width={1600} height={2263} sizes='(min-width: 1024px) 960px, 100vw' className='h-auto w-full' />
+            {/* 原圖已壓縮到 2000px，直接吃靜態檔，省掉 next/image 第一次請求的即時轉檔時間 */}
+            <Image src={src} alt={`${preview.pageLabel}範本`} width={1600} height={2263} unoptimized className='h-auto w-full' />
           </div>
         </DialogContent>
       </Dialog>

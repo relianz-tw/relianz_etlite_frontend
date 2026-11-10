@@ -30,7 +30,7 @@ export function Step5Confirm() {
   const balanceYear = state.reportYears.CIT_BALANCE_SHEET ?? getDefaultFormYear('CIT_BALANCE_SHEET', openYear);
   const { page: balancePage } = useFormMetadata(getFormItem('CIT_BALANCE_SHEET').formNo, balanceYear);
 
-  // 尚未填寫的頁面：只提醒不阻擋，點了可跳回該頁補填（補完用「下一份」走回確認頁）
+  // 尚未填寫的頁面：只提醒不阻擋，點了可跳回該頁補填（補完用「下一頁」走回確認頁）
   const missingPages = hasReports
     ? state.reportPages.flatMap((spec, index) => {
         let filled: boolean;
@@ -111,7 +111,7 @@ export function Step5Confirm() {
             <TriangleAlert size={16} className='mt-0.5 shrink-0' />
             <div className='flex flex-col gap-1.5'>
               <span className='text-sm font-bold'>以下 {missingPages.length} 份尚未填寫</span>
-              <span className='text-[13px] leading-relaxed'>不影響確認開帳，需要時可點選回去補填，補完按「下一份」即可走回此頁。</span>
+              <span className='text-[13px] leading-relaxed'>不影響確認開帳，需要時可點選回去補填，補完按「下一頁」即可走回此頁。</span>
               <ul className='flex flex-wrap gap-x-4 gap-y-1 text-[13px]'>
                 {missingPages.map(page => (
                   <li key={page.index}>
