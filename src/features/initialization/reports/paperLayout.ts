@@ -100,7 +100,9 @@ function buildTable(
     rowColumnsMatch = claimed.length > 0 && claimed.every(f => f.columnCode && columns.some(c => c.code === f.columnCode));
     rowColumns = rowColumnsMatch ? columns.map(c => claimed.find(f => f.columnCode === c.code)).filter((f): f is ReportFieldDef => !!f) : claimed;
   }
-  const groupBy = typeof t.groupBy === 'string' ? t.groupBy : t.groupBy?.fieldCodes?.[0];
+  // groupBy 舊格式為單一分組欄位的字串，新格式為物件；統一成物件
+  const groupBy = typeof t.groupBy === 'string' ? { fieldCodes: [t.groupBy] } : t.groupBy?.fieldCodes?.length ? t.groupBy : undefined;
+  const groupFields = (groupBy?.fieldCodes ?? []).map(code => defs.find(d => d.key === code)).filter((f): f is ReportFieldDef => !!f);
   return {
     code: t.tableCode,
     title: t.title ?? undefined,
@@ -110,7 +112,8 @@ function buildTable(
     rows: (t.rows ?? []).map(r => ({ rowNo: r.rowNo, label: r.rowLabel ?? undefined, group: r.rowGroup ?? undefined })),
     repeatable: !!t.rowRepeatable,
     rowNumber: t.rowNumber ? { title: t.rowNumber.title ?? undefined, pad: t.rowNumber.pad } : undefined,
-    groupBy,
+    groupBy: groupBy && { fieldCodes: groupBy.fieldCodes, headerTemplate: groupBy.headerTemplate ?? undefined, subtotalLabel: groupBy.subtotalLabel ?? undefined },
+    groupFields,
     cells,
     rowColumns,
     rowColumnsMatch,
@@ -190,7 +193,8 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
 
   const repeatableCount = (meta.tables ?? []).filter(t => t.rowRepeatable).length;
   const tables = (meta.tables ?? []).map(t => buildTable(t, defs, rowFields, repeatableCount === 1));
-  const claimedRowKeys = new Set(tables.flatMap(t => t.rowColumns.map(f => f.key)));
+  // 分組欄位由表格自己畫在分組標題列，也算被認領，不再退回卡片式明細
+  const claimedRowKeys = new Set(tables.flatMap(t => [...t.rowColumns, ...t.groupFields].map(f => f.key)));
   const unclaimed = rowFields.filter(f => !claimedRowKeys.has(f.key));
 
   // 區塊順序：依 sectionCode 在 fields[] 第一次出現的位置

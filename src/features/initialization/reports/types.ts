@@ -104,8 +104,10 @@ export interface ReportPaperTableDef {
   repeatable: boolean;
   /** 序號欄標題與補零位數，沒有序號欄為 undefined */
   rowNumber?: { title?: string; pad: number };
-  /** 分組欄 fieldCode（可重複表依此分組） */
-  groupBy?: string;
+  /** 資料列分組（可重複表）：依分組欄位的值把連續的列分組，每組上方畫標題列、下方畫小計列 */
+  groupBy?: { fieldCodes: string[]; headerTemplate?: string; subtotalLabel?: string };
+  /** groupBy 的分組欄位（layout=group，不佔欄，值仍存在每一列裡） */
+  groupFields: ReportFieldDef[];
   /** `${rowNo}|${columnCode}` → 固定格子欄位 */
   cells: Record<string, ReportFieldDef>;
   /** 可重複列的欄位（依 columns 順序）；欄位沒有 columnCode 對不上時為空，改用卡片式列 */
