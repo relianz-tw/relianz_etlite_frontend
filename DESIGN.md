@@ -368,17 +368,46 @@ POST /ael/invoice/identification/one 自動帶入的表單欄位。
 
 ### 紙本對照欄位列（Paper-aligned Row）
 
-開帳精靈的申報書頁（損益表、基本稅額、未分配盈餘、扣繳調節表、營業稅 401／403）逐列對照紙本欄位，實作見 `PaperFormView`、`VatFormView`。
+開帳精靈的申報書頁（營所稅各表、營業稅 401／403）與申報對帳頁，一律依後端 metadata 逐列對照紙本，
+實作見 `src/features/initialization/components/paper/`（`PaperForm`）。版面由 metadata 決定，前端不寫死區塊標題、欄位配對或加總。
 
-- **區塊標題**：`text-lg font-bold`，下方 `border-b-2 border-neutral-dark`；區塊內小節標題 `text-base font-bold`，旁可接 `text-[13px] text-neutral-mid` 的說明。
-- **一列**：`運算符號 ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。運算符號欄 24px，用 `−`（扣除項）、`＝`（小計／合計），`text-lg text-neutral-mid`。
-- **代號 chip**：`h-6 rounded bg-brand-blue/10 text-xs font-bold text-brand-blue`，內容為紙本官方欄位代號；營業稅另加圈號（如 `21 ①`），固定寬 `w-11` 讓金額框對齊。損益表置於標籤與金額之間（`min-w-12`，加括號）；營業稅置於各欄金額框左側（每列有「銷售額｜稅額」兩個代號）。
-- **成對欄位**：「帳載／調整後」「銷售額（金額）／稅額」並排，桌機每欄 170–200px，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
-- **小計／合計列**：`bg-brand-blue/5`、標籤與數字粗體，`mt-1` 與明細分開。
-- **群組小標**（如「統一發票扣抵聯」）：`text-[13px] font-bold`，其下明細縮排 `pl-5`。
-- **收合**：沒有金額的列預設收合，連結 `text-[13px] font-medium text-brand-blue` 附 `ChevronDown`。
+- **區塊標題**：取 `sections[].title`，`text-lg font-bold`，下方 `border-b-2 border-neutral-dark`；子區塊（`parentSectionCode`）改 `text-base font-bold`、無底線。沒有 `title` 的區塊不畫標題。
+- **一列**：`代號 chip ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。**不使用**「＋」「－」「＝」運算符號徽章與小計淡藍底；標籤一律用 `displayName`，減項只在金額欄語意標記（`isDeduction`），不自行加「減：」。
+- **代號 chip**：`h-6 rounded bg-brand-blue/10 text-xs font-bold text-brand-blue`，內容為 `officialFieldCode`；有 `refNo`（圈號）時接在後面（如 `21 ①`）。沒有代號時留白佔位讓金額框對齊。
+- **標籤附註**：`note` 為標籤後 `text-[13px] text-neutral-mid` 小字括號；`formula.text` 以括號接在標籤後，欄位唯讀（`isSubtotal`，後端計算，前端不加總）。
+- **成對欄位**：`column` 為 `BOOK`／`ADJ` 的欄位依 `rowCode` 合成一列，桌機並排 170px 兩欄，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
+- **行內／段落空格**：`labelTemplate` 與 `textBlocks[].template` 的 `{{field:}}` 畫成嵌在文字中的小輸入框（沿用輸入元件高度，寬 `w-36`），`{{ref:}}` 為唯讀值，`{{group:}}` 為行內勾選框。
+- **百分比**（`dataType: 6`）：輸入框尾端固定顯示 `%`，可輸入負號；數值為顯示值（20 代表 20%）。
+- **金額負值**：金額欄一律開放正負切換（`MoneyInput allowSign`）。
+- `groupCode` 只是分組代碼（metadata 沒有標題文字），不畫小標。
+- **收合**：辨識帶入後欄位很多的區塊，沒有金額的列預設收合，連結 `text-[13px] font-medium text-brand-blue` 附 `ChevronDown`。
 - **本期結果卡**（營業稅）：應繳 `border-brand-blue/35 bg-brand-blue/10`，留抵 `border-semantic-success/40 bg-semantic-success/5`；金額 `text-2xl font-bold`。
-- 合計與稅額計算一律取欄位值（辨識帶入或使用者輸入），前端不自行加總。
+- `hidden: true` 的欄位不畫，但值保留在 state 並照常送出；`visibleWhen` 條件成立才顯示。
+
+### 紙本表格（Paper Table）
+
+metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tableCode`、`rowNo`、`columnCode`）。
+
+- **外框**：`overflow-x-auto rounded-lg border border-neutral-blue-gray/30`，表頭 `bg-surface-cream text-xs font-bold text-neutral-dark`，格線 `border-neutral-blue-gray/30`。
+- **表頭**：`columns[].groups` 由上到下為多層合併表頭（相鄰相同的 group 合併為一格）；`corner` 為左上角斜線格，兩個標題分列對角；欄標題帶 `refNo` 時接在後面。
+- **列標題**：`rows[].rowLabel` 為最左欄，`rowGroup` 相同且相鄰的列合併成一格。
+- **斜線格**：表格內沒有對應欄位的格子（紙本斜線）畫斜線（`bg-surface-cream`，對角線 `linear-gradient`，以既有 `neutral-blue-gray` 色）。
+- **合計列**：`rowNo` 為 `TOTAL`／`SUBTOTAL` 的列字重加粗（`font-bold`），格子唯讀；格子的 `officialFieldCode` 顯示在格子左上角 `text-[11px] text-brand-blue`。
+- **可新增列**（`rowRepeatable`）：資料列在合計列之前，每列末端 `X` 刪除，表下方虛線「新增一列」按鈕（沿用既有樣式）；`rowNumber` 序號欄唯讀、不送出。
+- **分組**（`groupBy`）：每組上方一列標題列，下方小計列。
+- 手機：表格橫向捲動，不改版。
+
+### 勾選框群組（Checkbox Choice Group）
+
+`choiceGroups[]` 一律畫成並排勾選框（`Checkbox` 加文字），**不使用** tab 分段切換與下拉。
+
+- 題目為 `groupName`（紙本完整題目），有 `officialFieldCode` 時前置代號 chip，`note` 為 `text-[13px] text-neutral-mid` 小字。
+- `maxSelect = 1` 時互斥；再點已選項視為清除。
+- `columns` 控制每列並排數（grid），省略則 `flex-wrap gap-x-8 gap-y-2`。
+
+### 起訖日期（Date Range）
+
+`dateRanges[]` 的起、迄兩個日期並排為一組，標題用 `groupName`，中間以「至」相連；迄早於起時顯示後端回傳的錯誤訊息。
 
 ### Navigation — Sidebar（側邊欄導覽）
 
