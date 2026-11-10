@@ -1,110 +1,63 @@
-import { useInitialization } from '../state/InitializationContext';
-import type { ReportKey } from '../state/initializationReducer';
-import type { ReportTableDef } from '../reports/types';
-import DatePicker from '@/components/ui/DatePicker';
+'use client';
+
+import type { ReportFieldDef, ReportTableDef } from '../reports/types';
 import Label from '@/components/ui/Label';
-import MoneyInput from '@/components/ui/MoneyInput';
-import TextInput from '@/components/ui/TextInput';
 import { FIELD_LABEL_BASE, fieldLabelClass } from './fieldLabel';
-import { cn, formatLocalDate } from '@/lib/utils';
+import { FieldInput } from './paper/FieldInput';
+import { usePaperStore } from './paper/PaperStore';
+import { cn } from '@/lib/utils';
 import { Plus, X } from 'lucide-react';
 
-interface ReportTableProps {
-  reportId: ReportKey;
-  table: ReportTableDef;
+interface RowCardsProps {
+  columns: ReportFieldDef[];
+  addLabel: string;
 }
 
-/** 表格型報表（投資人明細、財產目錄）：逐列卡片呈現，可新增／刪除列，沒有資料留空即可 */
-export function ReportTable({ reportId, table }: ReportTableProps) {
-  const { state, dispatch } = useInitialization();
-  const rows = state.reports[reportId]?.rows ?? [];
+/** 可重複列的卡片式明細：每列一張卡片，可新增／刪除，沒有資料留空即可（metadata 沒有表格定義、或列欄位對不上表頭時使用） */
+export function RowCards({ columns, addLabel }: RowCardsProps) {
+  const store = usePaperStore();
+  const rows = store.rows;
 
   return (
     <div className='flex flex-col gap-4'>
-      {rows.length === 0 && <p className='text-sm text-neutral-mid'>尚無資料，如有請點擊下方「{table.addRowLabel}」新增一列。</p>}
+      {rows.length === 0 && <p className='text-sm text-neutral-mid'>尚無資料，如有請點擊下方「{addLabel}」新增一列。</p>}
 
       {rows.map((row, index) => (
         <div key={index} className='relative rounded-lg border border-neutral-blue-gray/30 bg-white p-4'>
           <button
             type='button'
-            onClick={() => dispatch({ type: 'REMOVE_REPORT_ROW', payload: { reportId, index } })}
+            onClick={() => store.removeRow(index)}
             aria-label='刪除此列'
             className='absolute right-3 top-3 rounded-full p-1 text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark'
           >
             <X size={16} />
           </button>
           <div className='grid grid-cols-1 gap-4 pr-8 sm:grid-cols-2'>
-            {table.columns.map(col => {
-              const data = row[col.key] ?? { value: '', aiFilled: false };
-              return (
-                <div key={col.key} className='flex min-w-0 items-center gap-3'>
-                  <Label className={cn(FIELD_LABEL_BASE, fieldLabelClass(col.label), '!mb-0 !font-medium')}>{col.label}</Label>
-                  <div className='min-w-0 flex-1'>
-                  {col.type === 'money' && (
-                    <MoneyInput
-                      value={typeof data.value === 'number' ? data.value : Number(data.value) || 0}
-                      allowSign={col.allowSign}
-                      aiFilled={data.aiFilled}
-                      onChange={value => dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value } })}
-                    />
-                  )}
-                  {col.type === 'text' && (
-                    <TextInput
-                      value={typeof data.value === 'string' ? data.value : String(data.value)}
-                      aiFilled={data.aiFilled}
-                      onChange={e => dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: e.target.value } })}
-                    />
-                  )}
-                  {col.type === 'integer' && (
-                    <TextInput
-                      inputMode='numeric'
-                      value={data.value === '' ? '' : String(data.value)}
-                      aiFilled={data.aiFilled}
-                      onChange={e => {
-                        const digits = e.target.value.replace(/\D/g, '');
-                        dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: digits === '' ? '' : Number(digits) } });
-                      }}
-                    />
-                  )}
-                  {col.type === 'decimal' && (
-                    <TextInput
-                      inputMode='decimal'
-                      value={typeof data.value === 'string' ? data.value : String(data.value)}
-                      aiFilled={data.aiFilled}
-                      onChange={e =>
-                        dispatch({
-                          type: 'SET_REPORT_ROW_FIELD',
-                          payload: { reportId, index, key: col.key, value: e.target.value.replace(/[^\d.]/g, '') },
-                        })
-                      }
-                    />
-                  )}
-                  {col.type === 'date' && (
-                    <DatePicker
-                      value={data.value ? new Date(data.value) : undefined}
-                      aiFilled={data.aiFilled}
-                      keepInputFocus
-                      onChange={date =>
-                        dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key: col.key, value: date ? formatLocalDate(date) : '' } })
-                      }
-                    />
-                  )}
-                  </div>
+            {columns.map(col => (
+              <div key={col.key} className='flex min-w-0 items-center gap-3'>
+                <Label className={cn(FIELD_LABEL_BASE, fieldLabelClass(col.label), '!mb-0 !font-medium')}>{col.label}</Label>
+                <div className='min-w-0 flex-1'>
+                  <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       ))}
 
       <button
         type='button'
-        onClick={() => dispatch({ type: 'ADD_REPORT_ROW', payload: { reportId, columns: table.columns } })}
+        onClick={() => store.addRow(columns)}
         className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
       >
         <Plus size={16} />
-        {table.addRowLabel}
+        {addLabel}
       </button>
     </div>
   );
+}
+
+/** metadata 沒有 tables[] 對應的列欄位（舊格式）：沿用卡片式明細 */
+export function ReportTable({ table }: { table: ReportTableDef }) {
+  return <RowCards columns={table.columns} addLabel={table.addRowLabel} />;
 }

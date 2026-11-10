@@ -8,14 +8,16 @@ import {
   LIABILITY_TOTAL_KEY,
   type BalanceBlockConfig,
 } from '../reports/balanceSheetLayout';
-import { ReportChoiceField } from './ReportChoiceField';
+import { ChoiceGroup } from './paper/ChoiceGroup';
+import { PaperForm } from './paper/PaperForm';
+import { PaperStoreProvider } from './paper/PaperStore';
+import { useInitPaperStore } from './paper/useInitPaperStore';
 import { ReportFieldRow } from './ReportFieldRow';
-import { ReportSections } from './ReportSections';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { CircleCheck, Clock, Info, TriangleAlert } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ReportFieldDef, ReportSectionDef } from '../reports/types';
+import type { ReportFieldDef, ReportPageDef, ReportSectionDef } from '../reports/types';
 import type { SettlementReportId } from '../state/initializationReducer';
 
 const REPORT_ID: SettlementReportId = 'CIT_BALANCE_SHEET';
@@ -27,6 +29,7 @@ const KNOWN_SECTION_KEYS: string[] = ['HEADER', 'TOTAL', ...Object.values(BALANC
 const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_150px] items-center gap-3 md:grid-cols-[minmax(0,1fr)_210px]';
 
 interface BalanceSheetViewProps {
+  page: ReportPageDef;
   sections: ReportSectionDef[];
 }
 
@@ -36,8 +39,9 @@ interface BalanceSheetViewProps {
  * 非流動負債、負債總額、權益與比對勾稽（欄位數差異大，不強迫列對列）。
  * 小計與總額取 metadata 的合計欄位（辨識帶入或使用者輸入），前端不自行加總。
  */
-export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
+export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   const { state, dispatch } = useInitialization();
+  const store = useInitPaperStore(REPORT_ID, page);
   const data = state.reports[REPORT_ID].fields;
 
   const fieldMap = new Map<string, ReportFieldDef>();
@@ -66,12 +70,12 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
         style={{ paddingLeft: depthOf(field) * 16 }}
         className={cn('break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}
       >
-        {field.isDeduction && !field.label.startsWith('減') && '減：'}
         {field.label}
       </span>
       <MoneyInput
         widthClassName='w-full'
         value={amount(field.key)}
+        allowSign
         aiFilled={data[field.key]?.aiFilled}
         onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value } })}
       />
@@ -119,9 +123,15 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
     <>
       {(headerChoices.length > 0 || headerFields.length > 0) && (
         <div className='grid grid-cols-1 gap-4 rounded-lg border border-neutral-blue-gray/30 bg-white p-5 md:grid-cols-2 md:gap-x-6 md:px-6'>
-          {headerChoices.map(choice => (
-            <ReportChoiceField key={choice.groupCode} reportId={REPORT_ID} title={choice.title} fields={choice.fields} />
-          ))}
+          {store && (
+            <PaperStoreProvider value={store}>
+              {headerChoices.map(choice => (
+                <div key={choice.groupCode} className='md:col-span-2'>
+                  <ChoiceGroup choice={choice} />
+                </div>
+              ))}
+            </PaperStoreProvider>
+          )}
           {headerFields.map(field => (
             <ReportFieldRow
               key={field.key}
@@ -193,7 +203,7 @@ export function BalanceSheetView({ sections }: BalanceSheetViewProps) {
         </div>
       </div>
 
-      <ReportSections reportId={REPORT_ID} sections={extraSections} />
+      {store && <PaperForm sections={extraSections} store={store} />}
 
       {/* 底部固定平衡列：捲到哪都看得到差額（手機需避開固定的上一頁／下一頁操作列） */}
       <section

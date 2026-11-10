@@ -2,15 +2,16 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
-import { getFormItem, type VatFormCode, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
+import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
 import { UploadedFilePreview } from './UploadedFilePreview';
 import { BalanceSheetView } from './BalanceSheetView';
-import { PaperFormView } from './PaperFormView';
-import { ReportSections } from './ReportSections';
-import { VatFormView } from './VatFormView';
+import { PaperForm } from './paper/PaperForm';
+import { PaperStoreProvider } from './paper/PaperStore';
+import { useInitPaperStore } from './paper/useInitPaperStore';
+import { VatResultCard } from './VatResultCard';
 import { VatPeriodPicker } from './VatPeriodPicker';
 import { ReportTable } from './ReportTable';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
@@ -29,9 +30,6 @@ const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
 
 /** 資產負債表用 T 字帳版面（BalanceSheetView），其餘文件頁用一般欄位卡片 */
 const BALANCE_SHEET_CODE: SettlementReportId = 'CIT_BALANCE_SHEET';
-
-/** 套用「紙本對照」逐列版型（代號 chip、小計、扣除項）的營所稅文件 */
-const PAPER_FORM_CODES: SettlementReportId[] = ['CIT_INCOME_TAX', 'CIT_AMT', 'CIT_INVESTORS', 'CIT_UE', 'CIT_WH_RECON'];
 
 interface ReportPageViewProps {
   /** 這一頁（營所稅各表、封面或某一期別的 401／403） */
@@ -74,7 +72,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   useEffect(() => {
     if (!rawPage) return;
     for (const [fieldKey, value] of Object.entries(autoValues)) {
-      const exists = rawPage.sections.some(s => s.fields.some(f => f.key === fieldKey));
+      const exists = !!rawPage.fieldMap[fieldKey];
       if (exists && String(reportFields?.[fieldKey]?.value ?? '') !== String(value)) {
         dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: reportKey, key: fieldKey, value } });
       }
@@ -90,11 +88,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
 
   // 區塊、欄位、分組完全依 metadata，只把自動填入的欄位拿掉（不給使用者輸入）
   const autoKeyList = autoKeys.join(',');
-  const sections = useMemo(() => {
-    if (!rawPage) return [];
-    const hidden = autoKeyList.split(',');
-    return rawPage.sections.map(s => ({ ...s, fields: s.fields.filter(f => !hidden.includes(f.key)) }));
-  }, [rawPage, autoKeyList]);
+  const sections = useMemo(() => (rawPage ? omitFields(rawPage.sections, autoKeyList.split(',')) : []), [rawPage, autoKeyList]);
+  const store = useInitPaperStore(reportKey, rawPage);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
   // 401／403 不顯示標籤（期別已在副標與期別卡片、必填／選填在卡片徽章）；其餘文件顯示年度
@@ -161,23 +156,20 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         </SectionCard>
       )}
 
-      {rawPage && (
+      {rawPage && store && (
         <>
           {formCode === BALANCE_SHEET_CODE ? (
-            <BalanceSheetView sections={sections} />
-          ) : spec.period ? (
-            <VatFormView reportId={reportKey} sections={sections} />
+            <BalanceSheetView page={rawPage} sections={sections} />
           ) : (
             <>
-              {PAPER_FORM_CODES.includes(formCode) ? (
-                <PaperFormView reportId={reportKey} formCode={formCode} sections={sections} />
-              ) : (
-                <ReportSections reportId={reportKey} sections={sections} />
-              )}
+              <PaperForm sections={sections} store={store} />
+              {spec.period && !!rawPage.fieldMap.TAX_PAYABLE && <VatResultCard reportId={reportKey} />}
               {rawPage.table && (
-                <SectionCard title='明細'>
-                  <ReportTable reportId={reportKey} table={rawPage.table} />
-                </SectionCard>
+                <PaperStoreProvider value={store}>
+                  <SectionCard title='明細'>
+                    <ReportTable table={rawPage.table} />
+                  </SectionCard>
+                </PaperStoreProvider>
               )}
             </>
           )}

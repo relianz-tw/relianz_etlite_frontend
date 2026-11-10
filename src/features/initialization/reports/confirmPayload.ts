@@ -11,12 +11,14 @@ function isFilled(field: ReportField | undefined): field is ReportField {
 
 /** 依 metadata dataType 把畫面值（字串或數字）轉成 confirm 要的 value* 欄位；無法轉換回傳 null */
 function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField | null {
-  const base = { fieldCode: meta.fieldCode };
+  // 辨識帶入後沒被改過的值為 false，使用者手填或修改過的值為 true（後端據此記錄資料來源）
+  const base = { fieldCode: meta.fieldCode, isManualAdjusted: !field.aiFilled };
   switch (meta.dataType) {
     case 0:
       return { ...base, valueText: String(field.value) };
     case 1: // 金額元
-    case 5: { // 純整數
+    case 5: // 純整數
+    case 6: { // 百分比：顯示值（20＝20%）
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueInt: Math.round(n) } : null;
     }
@@ -39,6 +41,8 @@ function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<
     const meta = metaByCode.get(code);
     // 欄位須存在於該年 metadata；可重複列欄位只出現在 rows，不能當純量欄送
     if (!meta || meta.isRow !== wantRow || !isFilled(field)) continue;
+    // 帶算式的小計由後端計算並寫入，前端不送
+    if (meta.formula) continue;
     const confirmField = toConfirmField(meta, field);
     if (confirmField) result.push(confirmField);
   }
@@ -106,7 +110,8 @@ export async function buildConfirmForms(state: InitializationState): Promise<Con
         formCode: source.formCode,
         present: true,
         taxYear: source.taxYear,
-        ...(source.periodStartMonth !== undefined && { periodStartMonth: source.periodStartMonth }),
+        // 營業稅期別 1／3／5…＝所屬起月
+        ...(source.periodStartMonth !== undefined && { periodStartMonth: source.periodStartMonth, cmsPhase: source.periodStartMonth }),
         fields: toConfirmFields(metaByCode, report?.fields ?? {}, false),
         rows,
       };

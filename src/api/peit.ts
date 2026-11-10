@@ -10,8 +10,8 @@ import { apiFetch, apiFetchFile, buildQuery } from './client';
 import { COMPANY_UUID } from './config';
 import { normalizeDateToIso } from '@/lib/utils';
 
-/** dataType：0 文字、1 金額元、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額） */
-export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4 | 5;
+/** dataType：0 文字、1 金額元（可負）、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額）、6 百分比（顯示值，20＝20%，可負） */
+export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface IdentifiedField {
   fieldCode: string;
@@ -53,32 +53,119 @@ export interface CitIdentifyResult {
   /** 開帳民國年（回傳請求帶入的 openingYear） */
   openingYear?: number;
   profile: Record<string, boolean | null>;
-  /** 固定 10 筆，請用 formCode 對應，不要用陣列下標 */
+  /** 固定 12 筆（10 張營所稅＋401＋403），請用 formCode 對應，不要用陣列下標 */
   forms: IdentifiedForm[];
 }
 
 export interface MetadataField {
+  /** 唯一鍵 */
   fieldCode: string;
+  /** 欄位名稱（保留現況，可能含「－帳載結算金額」等後綴） */
   fieldName: string;
+  /** 紙本顯示文字，去掉帳載／調整後等前後綴；畫面一律用它 */
+  displayName?: string;
+  /** 紙本紅色編號，同一張表可重複，不可當 key */
   officialFieldCode: string | null;
+  /** 紙本圈號（①②…），不是欄位代碼 */
+  refNo?: string | null;
+  /** true＝紙本沒有此欄：值照常讀寫與送出，但不畫 */
+  hidden?: boolean;
   dataType: IdentifiedFieldDataType;
   sectionCode: string | null;
   /** true＝可重複列欄位（列模板） */
   isRow: boolean;
   /** 父科目 fieldCode（目前僅資產負債表有），用於縮排呈現階層 */
   parentFieldCode?: string | null;
-  /** 扣除項（紙本以括號或「減：」表示） */
+  /** layout=inline 時指向主列的 rowCode */
+  parentRowCode?: string | null;
+  /** 減項標記（紙本沒印「減：」的也可能為 true），名稱以 displayName 為準 */
   isDeduction?: boolean;
-  /** 小計／合計列（非使用者直接輸入的明細） */
+  /** 小計／算式欄：後端計算，前端唯讀 */
   isSubtotal?: boolean;
+  /** 同一列共同代號，BOOK／ADJ 共用；單欄等於 fieldCode */
+  rowCode?: string;
+  /** BOOK＝帳載結算金額、ADJ＝自行依法調整後金額；單欄為 null */
+  column?: 'BOOK' | 'ADJ' | null;
+  /** row 一般列（預設）／inline 嵌在別列標題空格／cell 表格格子／text 段落內空格／group 分組標題列 */
+  layout?: 'row' | 'inline' | 'cell' | 'text' | 'group';
+  /** 列標題模板：{{field:fieldCode}}、{{group:groupCode}}，只放在該列第一個欄位 */
+  labelTemplate?: string | null;
+  /** 紙本標題後括號備註 */
+  note?: string | null;
+  /** 區塊內分組（如調節加項／減項） */
+  groupCode?: string | null;
+  /** 條件成立才顯示 */
+  visibleWhen?: { fieldCode: string; op: 'checked' | 'unchecked' | 'nonZero' } | null;
+  /** 有值必為 isSubtotal；text 給前端顯示，expr 由後端計算 */
+  formula?: { text: string; expr: string; scope?: 'table' | 'group' } | null;
+  tableCode?: string | null;
+  rowNo?: string | number | null;
+  columnCode?: string | null;
 }
 
 /** 互斥勾選組；maxSelect=1 表示二選一／多選一 */
 export interface MetadataChoiceGroup {
   groupCode: string;
+  /** 紙本完整題目 */
   groupName: string;
+  officialFieldCode?: string | null;
+  /** 題目旁括號提示 */
+  note?: string | null;
+  /** checkbox＝並排勾選框 */
+  display?: string | null;
+  /** 勾選框每列並排數；0 或省略表示不指定 */
+  columns?: number;
   maxSelect: number;
   fieldCodes: string[];
+}
+
+export interface MetadataTableColumn {
+  columnCode: string;
+  title: string;
+  /** 欄群組標題，由上到下；實測可能為 null */
+  groups?: string[] | null;
+  refNo?: string | null;
+  officialFieldCode?: string | null;
+}
+
+export interface MetadataTable {
+  tableCode: string;
+  title?: string | null;
+  note?: string | null;
+  sectionCode?: string | null;
+  /** TOP、某個 blockCode／tableCode／fieldCode，null 放該區塊最後 */
+  placeAfter?: string | null;
+  corner?: { column: string | null; row: string | null } | null;
+  columns: MetadataTableColumn[];
+  /** true＝使用者可新增列 */
+  rowRepeatable?: boolean;
+  /** 規格為物件，實測目前回分組欄 fieldCode 字串，兩種都接 */
+  groupBy?: string | { fieldCodes: string[]; headerTemplate?: string; subtotalLabel?: string } | null;
+  rowNumber?: { title: string | null; pad: number } | null;
+  /** 固定列（含 TOTAL／SUBTOTAL） */
+  rows?: { rowNo: string | number; rowLabel?: string | null; rowGroup?: string | null }[];
+}
+
+export interface MetadataTextBlock {
+  blockCode: string;
+  sectionCode?: string | null;
+  officialFieldCode?: string | null;
+  placeAfter?: string | null;
+  /** {{field:…}}、{{ref:…}}、{{group:…}} */
+  template: string;
+}
+
+export interface MetadataSection {
+  sectionCode: string;
+  title: string | null;
+  parentSectionCode?: string | null;
+}
+
+export interface MetadataDateRange {
+  groupCode: string;
+  groupName: string;
+  startFieldCode: string;
+  endFieldCode: string;
 }
 
 export interface FormMetadata {
@@ -91,6 +178,10 @@ export interface FormMetadata {
   taxType: number;
   fields: MetadataField[];
   choiceGroups: MetadataChoiceGroup[];
+  tables?: MetadataTable[];
+  textBlocks?: MetadataTextBlock[];
+  sections?: MetadataSection[];
+  dateRanges?: MetadataDateRange[];
 }
 
 /** 依 dataType 取出該欄位實際值；未辨識（皆為 null）回傳 undefined，畫面上維持留空 */
@@ -100,6 +191,7 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
       return field.valueText ?? undefined;
     case 1: // 金額元
     case 5: // 純整數
+    case 6: // 百分比：顯示值（15＝15%），同樣放在 valueInt
       return field.valueInt ?? undefined;
     case 2: // 小數
       return field.valueDecimal ?? undefined;
@@ -140,6 +232,8 @@ export interface ConfirmField {
   valueText?: string | null;
   valueDate?: string | null;
   valueBoolean?: boolean | null;
+  /** 使用者是否改過辨識值；true 後端記為人工調整 */
+  isManualAdjusted?: boolean;
 }
 
 export interface ConfirmRow {
@@ -152,6 +246,8 @@ export interface ConfirmForm {
   formCode: string;
   present: boolean;
   taxYear: number;
+  /** 僅 401／403：期別 1／3／5／7／9／11（可省略，後端由 periodStartMonth 推） */
+  cmsPhase?: number;
   /** 僅 401／403：所屬起月（1／3／5／7／9／11） */
   periodStartMonth?: number;
   fields: ConfirmField[];
