@@ -44,7 +44,7 @@ export function FieldInput({ field, data, onChange, readOnly }: FieldInputProps)
 
   switch (field.type) {
     case 'money':
-      return <MoneyInput widthClassName='w-full' value={typeof data.value === 'number' ? data.value : Number(data.value) || 0} allowSign={field.allowSign} aiFilled={data.aiFilled} onChange={onChange} />;
+      return <MoneyInput widthClassName='w-full' value={typeof data.value === 'number' ? data.value : Number(data.value) || 0} allowSign={field.allowSign} typedSign aiFilled={data.aiFilled} onChange={onChange} />;
     case 'integer':
       return (
         <TextInput

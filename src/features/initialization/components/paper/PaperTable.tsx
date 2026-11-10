@@ -100,7 +100,8 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
     return n;
   };
 
-  const addLabel = `新增一列${table.title ?? ''}明細`;
+  // 表名本身已以「明細」結尾（如「投資人明細」）就不再重複加字
+  const addLabel = `新增一列${table.title ?? ''}${table.title?.endsWith('明細') ? '' : '明細'}`;
   const border = 'border border-neutral-blue-gray/30';
 
   return (

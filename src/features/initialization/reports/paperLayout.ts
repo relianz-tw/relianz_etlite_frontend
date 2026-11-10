@@ -216,6 +216,9 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   const dateRangeByStart = new Map((meta.dateRanges ?? []).map(r => [r.startFieldCode, r]));
   const dateRangeEnds = new Set((meta.dateRanges ?? []).map(r => r.endFieldCode));
 
+  // 勾選群組整頁只畫一次：成員被後端分到不同區塊（如某個成員 sectionCode 為 null）時，不在後面的區塊重複畫整組
+  const renderedGroups = new Set<string>();
+
   const sections: ReportSectionDef[] = sectionOrder.map(code => {
     const sectionFields = fixedFields.filter(f => sectionOf(f.key) === code && !f.hidden);
     const adjByRow = new Map(sectionFields.filter(f => f.column === 'ADJ' && f.rowCode).map(f => [f.rowCode as string, f]));
@@ -238,7 +241,8 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
       const group = memberGroup.get(f.key);
       if (group) {
         if (refs.groups.has(group.groupCode)) continue;
-        if (!usedGroups.has(group.groupCode)) {
+        if (!renderedGroups.has(group.groupCode)) {
+          renderedGroups.add(group.groupCode);
           usedGroups.add(group.groupCode);
           raw.push({ item: { kind: 'choice', choice: group }, anchors: group.fields.map(m => m.key) });
         }
@@ -307,6 +311,10 @@ export function omitFields(sections: ReportSectionDef[], keys: string[]): Report
           case 'checks': {
             const fields = item.fields.filter(f => !hide.has(f.key));
             return fields.length > 0 ? { ...item, fields } : null;
+          }
+          case 'choice': {
+            const fields = item.choice.fields.filter(f => !hide.has(f.key));
+            return fields.length > 0 ? { ...item, choice: { ...item.choice, fields } } : null;
           }
           case 'dateRange':
             return hide.has(item.range.start.key) || hide.has(item.range.end.key) ? null : item;
