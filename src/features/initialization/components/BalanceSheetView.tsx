@@ -76,6 +76,7 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         widthClassName='w-full'
         value={amount(field.key)}
         allowSign
+        typedSign
         aiFilled={data[field.key]?.aiFilled}
         onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value } })}
       />

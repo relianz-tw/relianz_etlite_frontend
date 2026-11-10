@@ -18,6 +18,8 @@ interface MoneyInputProps {
   /** 設定後，allowSign 切換鈕固定顯示此方向且不可點（整組淡化），輸入的數字一律套用此正負號；
    *  用於業務上恆為扣款／恆為加項的欄位（如沖帳中心的電商平台扣款）。輸入框本身仍可編輯。 */
   lockedSign?: 1 | -1;
+  /** 不顯示正負切換鈕，改讓使用者直接在輸入框打「-」輸入負數（紙本對照表單用）；value 可為負數 */
+  typedSign?: boolean;
   /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
   aiFilled?: boolean;
 }
@@ -32,6 +34,7 @@ export default function MoneyInput({
   allowSign,
   negativeByDefault,
   lockedSign,
+  typedSign,
   aiFilled,
 }: MoneyInputProps) {
   // value 為 0 時正負號無法從數值本身判斷（0 與 -0 顯示相同），故另外保留一份「目前選定的正負號」，
@@ -39,7 +42,17 @@ export default function MoneyInput({
   const [zeroSign, setZeroSign] = useState<1 | -1>(negativeByDefault ? -1 : 1);
   const sign: 1 | -1 = lockedSign ?? (value !== 0 ? (value < 0 ? -1 : 1) : zeroSign);
 
+  // typedSign：剛打下「-」但還沒輸入數字時，value 仍是 0，需另外記住才能把「-」留在輸入框上
+  const [pendingMinus, setPendingMinus] = useState(false);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (typedSign) {
+      const num = Number(e.target.value.replace(/\D/g, '') || 0);
+      const negative = e.target.value.includes('-');
+      setPendingMinus(negative && num === 0);
+      onChange?.(num === 0 ? 0 : negative ? -num : num);
+      return;
+    }
     const digits = e.target.value.replace(/\D/g, '');
     const num = digits === '' ? 0 : Number(digits);
     onChange?.(num === 0 ? 0 : sign * num);
@@ -61,11 +74,19 @@ export default function MoneyInput({
   // 避免使用者點入後得先刪掉既有的 0 才能輸入
   // 唯讀／停用欄位多為計算結果（如總金額、折讓總額），0 是有意義的結果值，仍以實色顯示
   const isEmptyZero = value === 0 && !disabled && !readOnly;
-  const display = isEmptyZero ? '' : Math.abs(value).toLocaleString('en-US');
+  const display = typedSign
+    ? pendingMinus && value === 0
+      ? '-'
+      : isEmptyZero
+        ? ''
+        : value.toLocaleString('en-US')
+    : isEmptyZero
+      ? ''
+      : Math.abs(value).toLocaleString('en-US');
 
   return (
     <div className={cn('flex items-center gap-1.5', widthClassName)}>
-      {allowSign && (
+      {allowSign && !typedSign && (
         <div
           className={cn(
             'flex h-7 shrink-0 items-center gap-0.5 rounded-md bg-surface-cream p-0.5',
@@ -113,12 +134,13 @@ export default function MoneyInput({
         <span className="shrink-0 text-sm text-neutral-mid">$</span>
         <input
           type="text"
-          inputMode="numeric"
+          inputMode={typedSign ? 'text' : 'numeric'}
           disabled={disabled}
           readOnly={readOnly}
           value={display}
           onChange={handleChange}
           onFocus={handleFocus}
+          onBlur={() => setPendingMinus(false)}
           placeholder="0"
           className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
         />
