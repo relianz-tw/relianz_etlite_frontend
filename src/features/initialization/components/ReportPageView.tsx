@@ -12,8 +12,8 @@ import { PaperFormView } from './PaperFormView';
 import { ReportSections } from './ReportSections';
 import { VatFormView } from './VatFormView';
 import { ReportTable } from './ReportTable';
-import { StepNavButtons, StepPageHeader } from '@/components/initialization/StepPageHeader';
-import { StepProgress, type StepProgressValue } from '@/components/initialization/StepProgress';
+import { StepPageHeader } from '@/components/initialization/StepPageHeader';
+import type { StepProgressValue } from '@/components/initialization/StepProgress';
 import Button from '@/components/ui/Button';
 import { ChevronRight, Info } from 'lucide-react';
 import SectionCard from '@/components/ui/SectionCard';
@@ -114,9 +114,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
 
   return (
     <>
-      <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav}>
+      <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav} progress={progress}>
         <FormPaperPreview formCode={formCode} />
-        {progress && <StepProgress {...progress} />}
         {spec.period && (
           // 申報書種類提示條：預設 401，使用者可在這一期改用 403（上傳辨識到另一種也會自動切換）
           <div className='flex flex-col gap-3 rounded-lg bg-brand-blue/10 px-4 py-3 md:flex-row md:items-center md:justify-between'>
@@ -124,10 +123,10 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
               <Info size={18} className='mt-0.5 shrink-0 text-brand-blue' />
               <div className='flex min-w-0 flex-col'>
                 <span className='text-sm font-bold text-neutral-dark'>
-                  {formCode === 'VAT_403' ? '本期使用 403（有免稅或特種稅額計算的銷售）' : '本期使用 401（只有應稅及零稅率銷售）'}
+                  {formCode === 'VAT_403' ? '本期使用 403' : '本期使用 401'}
                 </span>
                 <span className='text-[13px] text-neutral-mid'>
-                  {formCode === 'VAT_403' ? '本期若只有應稅及零稅率銷售，可改用 401。' : '本期若有免稅或特種稅額計算的銷售額，需改用 403。'}
+                  {formCode === 'VAT_403' ? '只有應稅及零稅率銷售額，可改回 401' : '有免稅或特種稅額銷售額，請改用 403'}
                 </span>
               </div>
             </div>
@@ -143,7 +142,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
             </Button>
           </div>
         )}
-        {blocked && <p className='text-xs text-semantic-error'>此期別為必填，請上傳文件或手動輸入資料後再前往下一份。</p>}
+        {blocked && <p className='text-xs text-semantic-error'>此期別為必填，請上傳文件或手動輸入資料後再前往下一頁。</p>}
         {/* 封面頁不是可略過的文件，只在步驟 4 的選填頁提示 */}
         {!spec.required && spec.key !== 'CIT_COVER' && (
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
@@ -182,12 +181,6 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
               )}
             </>
           )}
-
-          {/* 長表單捲到底不用回頂端：桌機頁底再放一組上一頁／下一頁（手機已固定於畫面底部） */}
-          <div className='hidden items-center justify-between md:flex'>
-            <span className='text-[13px] text-neutral-mid'>{kicker}　{title}</span>
-            <StepNavButtons nav={nav} />
-          </div>
         </>
       )}
     </>

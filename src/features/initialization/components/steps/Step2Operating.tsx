@@ -3,7 +3,7 @@
 import { useInitialization } from '../../state/InitializationContext';
 import { FORM_LIST, ORG_TYPE_LABEL, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
 import { getRegistrationDocs } from '../../reports/registrationDocs';
-import { StepNavButtons, StepPageHeader, type StepNavProps } from '@/components/initialization/StepPageHeader';
+import { StepPageHeader, type StepNavProps } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePicker from '@/components/ui/DatePicker';
@@ -56,7 +56,7 @@ export function Step2Operating() {
   useEffect(() => {
     if (onlyYear === null || state.openYear === onlyYear) return;
     dispatch({ type: 'SET_OPEN_YEAR', payload: onlyYear });
-    // 舊年度被修正且有辨識過的文件時，同樣排定「下一步」時重設文件年度（不另跳提示，因為使用者沒有做選擇）
+    // 舊年度被修正且有辨識過的文件時，同樣排定「下一頁」時重設文件年度（不另跳提示，因為使用者沒有做選擇）
     if (state.openYear !== null && hasIdentifiedForms) dispatch({ type: 'SCHEDULE_YEAR_RESET' });
   }, [onlyYear, state.openYear, hasIdentifiedForms, dispatch]);
 
@@ -84,6 +84,14 @@ export function Step2Operating() {
 
   const isOverOneYear = state.operatingStatus === 'over_one_year';
   const hasYear = state.openYear !== null;
+
+  // 穩定經營一年以上固定從開帳年度 1/1 起記帳，基準日自動帶入且不可改（開帳年度變動時跟著更新）
+  const autoBaseDate = isOverOneYear && state.openYear !== null ? `${toGregorianYear(state.openYear)}-01-01` : null;
+  useEffect(() => {
+    if (autoBaseDate !== null && state.openingBalance.baseDate !== autoBaseDate) {
+      dispatch({ type: 'SET_BALANCE_BASE_DATE', payload: autoBaseDate });
+    }
+  }, [autoBaseDate, state.openingBalance.baseDate, dispatch]);
 
   // 步驟 4 要逐頁核對的頁面（營所稅各表＋營業稅各期）；未滿一年不逐頁核對，為空
   const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, baseDate: state.openingBalance.baseDate, today, orgType: state.orgType }) : [];
@@ -116,8 +124,8 @@ export function Step2Operating() {
           ? '請選擇開帳基準日。'
           : '';
 
-  // 此頁不提供「上一頁」；桌機的「下一步」放在卡片下方，手機沿用固定底部操作列
-  const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一步', nextDisabled: !ready };
+  // 此頁不提供「上一頁」
+  const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一頁', nextDisabled: !ready };
 
   return (
     <>
@@ -129,7 +137,7 @@ export function Step2Operating() {
         message={
           <>
             變更開帳年度後，已辨識文件的年度會重設為新年度的預設值（營利事業所得稅為前一年度、營業稅為開帳年度）。
-            重設會在您按下「下一步」時進行，已填寫的欄位內容不會被清除。
+            重設會在您按下「下一頁」時進行，已填寫的欄位內容不會被清除。
           </>
         }
         confirmLabel='確認變更'
@@ -139,7 +147,6 @@ export function Step2Operating() {
         kicker='營運狀況'
         title='開帳設定'
         nav={nav}
-        hideDesktopNav
       />
 
       {SHOW_DATE_SIMULATOR && (
@@ -222,7 +229,11 @@ export function Step2Operating() {
                     name='operatingStatus'
                     className='mt-1 h-[18px] w-[18px] shrink-0 accent-brand-blue'
                     checked={selected}
-                    onChange={() => dispatch({ type: 'SET_OPERATING_STATUS', payload: option.value })}
+                    onChange={() => {
+                      // 從穩定經營切回未滿一年時，清掉自動帶入的基準日，改由使用者自己選
+                      if (option.value === 'under_one_year' && isOverOneYear) dispatch({ type: 'SET_BALANCE_BASE_DATE', payload: '' });
+                      dispatch({ type: 'SET_OPERATING_STATUS', payload: option.value });
+                    }}
                   />
                   <span className='flex flex-col gap-0.5'>
                     <span className='text-[15px] font-bold text-neutral-dark'>{option.title}</span>
@@ -273,7 +284,9 @@ export function Step2Operating() {
               <StepBadge n={isOverOneYear ? 4 : 3} done={state.openingBalance.baseDate !== ''} />
               <div className='flex flex-col'>
                 <h2 className='text-lg font-bold text-neutral-dark'>開帳基準日</h2>
-                <span className='text-[13px] text-neutral-mid'>從這一天起開始記帳，作為日後帳務的起點</span>
+                <span className='text-[13px] text-neutral-mid'>
+                  {isOverOneYear ? '穩定經營一年以上，固定從開帳年度 1 月 1 日起開始記帳' : '從這一天起開始記帳，作為日後帳務的起點'}
+                </span>
               </div>
             </div>
             <div>
@@ -282,6 +295,7 @@ export function Step2Operating() {
                 value={state.openingBalance.baseDate ? new Date(`${state.openingBalance.baseDate}T00:00:00`) : undefined}
                 placeholder='選擇開帳基準日'
                 keepInputFocus
+                disabled={isOverOneYear}
                 onChange={date => dispatch({ type: 'SET_BALANCE_BASE_DATE', payload: date ? formatLocalDate(date) : '' })}
               />
             </div>
@@ -331,9 +345,6 @@ export function Step2Operating() {
           </div>
         )}
 
-        <div className='hidden justify-end py-6 md:flex'>
-          <StepNavButtons nav={nav} />
-        </div>
       </div>
     </>
   );

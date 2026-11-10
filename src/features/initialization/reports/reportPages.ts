@@ -120,7 +120,8 @@ export function describePeriods(specs: ReportPageSpec[]): string {
   for (const spec of specs) {
     if (!spec.period) continue;
     const list = byYear.get(spec.period.rocYear) ?? [];
-    list.push(`${spec.period.phase}–${spec.period.phase + 1}`);
+    // 月份補零，與文件頁的期別標示（formatPeriodLabel）一致
+    list.push(`${String(spec.period.phase).padStart(2, '0')}–${String(spec.period.phase + 1).padStart(2, '0')}`);
     byYear.set(spec.period.rocYear, list);
   }
   return Array.from(byYear, ([year, list]) => `民國 ${year} 年 ${list.join('、')} 月`).join('；');

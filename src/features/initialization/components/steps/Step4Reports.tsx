@@ -29,9 +29,10 @@ export function Step4Reports() {
     : spec.period
       ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}`
       : `營所稅結算申報・第 ${state.currentReportIndex + 1} / ${citTotal} 份`;
-  const nextLabel = state.currentReportIndex >= total - 1 ? '下一步：確認開帳' : '下一份';
+  const nextLabel = state.currentReportIndex >= total - 1 ? '下一頁：確認開帳' : '下一頁';
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel };
-  const progress = { value: state.currentReportIndex + 1, max: total };
+  // 封面算第 1 份，所以這裡各頁要再 +1
+  const progress = { value: state.currentReportIndex + 2, max: total + 1 };
   if (spec.kind === 'registration') return <RegistrationDocsPage kicker={kicker} nav={nav} progress={progress} />;
   if (spec.kind === 'partners') return <PartnersPage kicker={kicker} nav={nav} progress={progress} />;
 
