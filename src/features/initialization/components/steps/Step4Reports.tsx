@@ -24,10 +24,12 @@ export function Step4Reports() {
 
   // kicker 標出目前所在段落（營所稅／營業稅／登記資料），營所稅頁排在最前，索引即第幾份；整體進度由進度條呈現
   const citTotal = state.reportPages.filter(p => !p.period && !p.kind).length;
+  const vatPages = state.reportPages.filter(p => p.period);
+  const vatNo = vatPages.findIndex(p => p.key === spec.key) + 1;
   const kicker = spec.kind
     ? '登記資料'
     : spec.period
-      ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}`
+      ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}・第 ${vatNo} / ${vatPages.length} 期`
       : `營所稅結算申報・第 ${state.currentReportIndex + 1} / ${citTotal} 份`;
   const nextLabel = state.currentReportIndex >= total - 1 ? '下一頁：確認開帳' : '下一頁';
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel };

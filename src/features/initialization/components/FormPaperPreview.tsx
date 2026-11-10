@@ -3,8 +3,7 @@
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
 import Button from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog';
-import { cn } from '@/lib/utils';
-import { ZoomIn } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import type { SettlementReportId } from '../state/initializationReducer';
@@ -13,7 +12,7 @@ interface FormPaperPreviewProps {
   formCode: SettlementReportId;
 }
 
-/** 對應紙本：縮圖＋頁碼說明，點擊開啟可捲動的大圖，讓使用者對照紙本填寫 */
+/** 對應紙本：與標題同一排的按鈕；點擊開啟可捲動的大圖（含頁碼說明），讓使用者對照紙本填寫 */
 export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
   const [open, setOpen] = useState(false);
   const preview = PAPER_PREVIEWS[formCode];
@@ -27,28 +26,10 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
 
   return (
     <>
-      <div className='flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-neutral-blue-gray/40 bg-surface-off-white p-3'>
-        <button
-          type='button'
-          onClick={() => setOpen(true)}
-          onPointerEnter={prefetchLarge}
-          aria-label={`查看${preview.pageLabel}大圖`}
-          className={cn(
-            'relative shrink-0 cursor-zoom-in overflow-hidden rounded border border-neutral-blue-gray/50 bg-white',
-            preview.landscape ? 'h-[68px] w-24' : 'h-[90px] w-16'
-          )}
-        >
-          <Image src={src} alt='' fill sizes='96px' className='object-cover object-top' />
-        </button>
-        <div className='flex min-w-0 flex-1 basis-48 flex-col gap-0.5'>
-          <span className='text-xs text-neutral-mid'>對應紙本</span>
-          <span className='text-[15px] font-bold leading-snug text-neutral-dark'>{preview.pageLabel}</span>
-          <span className='text-[13px] text-neutral-mid'>{preview.caption}</span>
-        </div>
-        <Button variant='outline' size='sm' icon={ZoomIn} onClick={() => setOpen(true)} onPointerEnter={prefetchLarge}>
-          查看大圖
-        </Button>
-      </div>
+      {/* 用暖棕實心（warm）與藍色的上一頁／下一頁區隔，讓範例文件入口一眼可見 */}
+      <Button variant='warm' size='sm' icon={FileText} className='shrink-0 self-start' onClick={() => setOpen(true)} onPointerEnter={prefetchLarge}>
+        查看範例文件
+      </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className='flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-3 p-4 md:p-5'>

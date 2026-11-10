@@ -17,8 +17,6 @@ const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 type PanelStatus = 'idle' | 'recognizing' | 'done' | 'error' | 'empty';
 
 interface FormIdentifyPanelProps {
-  /** 目前頁面的文件名稱，僅用於提示文案 */
-  formTitle: string;
   /** 該頁必填（如必須上傳的 401 期別）時，文案不再寫「選填」 */
   required?: boolean;
   /** 是否為 401／403 期別頁，用於切換說明文案 */
@@ -43,10 +41,10 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
 }
 
 /**
- * 逐頁表單上方的「上傳辨識」區（選填）：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
+ * 逐頁表單的「上傳辨識」區（選填），放在固定底部操作列左側：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
-export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
+export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -143,7 +141,7 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
   const recognizing = status === 'recognizing';
 
   return (
-    <div className='flex flex-col gap-2 border-t border-neutral-blue-gray/30 pt-5'>
+    <div className='flex min-w-0 flex-col gap-1'>
       <div
         onDragOver={e => {
           e.preventDefault();
@@ -156,28 +154,26 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
           const file = e.dataTransfer.files[0];
           if (file && !recognizing) handleFile(file);
         }}
-        className={`flex flex-col gap-3 rounded-lg border-[1.5px] border-dashed px-4 py-3 transition-colors md:flex-row md:items-center md:justify-between ${
+        className={`flex items-center gap-3 rounded-lg border-[1.5px] border-dashed px-3 py-2 transition-colors ${
           dragging ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray bg-surface-off-white'
         }`}
       >
-        <div className='flex min-w-0 items-start gap-3'>
-          {recognizing ? (
-            <Loader2 size={22} className='mt-0.5 shrink-0 animate-spin text-brand-blue' />
-          ) : (
-            <Upload size={22} strokeWidth={1.75} className='mt-0.5 shrink-0 text-brand-blue' />
-          )}
-          <div className='flex min-w-0 flex-col'>
-            <span className='text-sm font-medium text-neutral-dark'>{recognizing ? `辨識中…${fileName}` : `上傳「${formTitle}」快速帶入${required ? '' : '（選填）'}`}</span>
-            <span className='text-xs text-neutral-mid'>
-              {required ? '上傳文件或在下方手動輸入皆可' : '不上傳也可以直接在下方手動輸入'}，PDF、JPG、PNG、HEIC {MAX_SIZE_MB}MB 以內
-            </span>
-            <span className='text-xs text-neutral-mid'>
-              {vatPeriod ? '上傳本期 401 或 403，會自動切換成辨識到的申報書' : '整份結算申報書上傳一次，會同時帶入封面與各表'}
-            </span>
-          </div>
+        {recognizing ? (
+          <Loader2 size={20} className='shrink-0 animate-spin text-brand-blue' />
+        ) : (
+          <Upload size={20} strokeWidth={1.75} className='shrink-0 text-brand-blue' />
+        )}
+        <div className='flex min-w-0 flex-1 flex-col'>
+          <span className='truncate text-sm font-medium text-neutral-dark'>
+            {recognizing ? `辨識中…${fileName}` : vatPeriod ? `上傳申報書檔案${required ? '' : '（選填）'}` : `上傳申報書快速帶入${required ? '' : '（選填）'}`}
+          </span>
+          {/* 營業稅申報書的檔案會留存於系統，說明手機也要看得到；其餘文件的格式提示只在桌機顯示 */}
+          <span className={`text-xs text-neutral-mid ${vatPeriod ? '' : 'hidden md:block'}`}>
+            {vatPeriod ? `上傳後會記錄在系統中・PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內` : `PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內`}
+          </span>
         </div>
         <Button variant='outline' size='sm' disabled={recognizing} onClick={() => inputRef.current?.click()} className='shrink-0'>
-          選擇檔案
+          {vatPeriod ? '上傳檔案' : '選擇檔案'}
         </Button>
       </div>
       <input
@@ -194,13 +190,10 @@ export function FormIdentifyPanel({ formTitle, required = false, vatPeriod = fal
       />
 
       {status === 'empty' && (
-        <div className='flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3 text-semantic-warm-dark'>
-          <TriangleAlert size={16} className='mt-0.5 shrink-0' />
-          <div className='flex flex-col gap-0.5'>
-            <span className='text-sm font-bold'>未辨識到文件上的資訊</span>
-            <span className='text-[13px] leading-relaxed'>請確認檔案是否成功上傳、內容清晰且為本次需要的申報書。您仍可在下方手動輸入。</span>
-          </div>
-        </div>
+        <p className='flex items-start gap-1.5 text-xs text-semantic-warm-dark'>
+          <TriangleAlert size={14} className='mt-0.5 shrink-0' />
+          <span>未辨識到文件資訊，請確認檔案內容，或直接手動輸入</span>
+        </p>
       )}
       {status === 'done' && appliedLabels.length > 0 && (
         <p className='flex items-start gap-1.5 text-xs text-semantic-success'>

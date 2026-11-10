@@ -2,7 +2,7 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
-import { formatPeriodLabel, getFormItem, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
+import { getFormItem, type VatFormCode, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
@@ -11,11 +11,12 @@ import { BalanceSheetView } from './BalanceSheetView';
 import { PaperFormView } from './PaperFormView';
 import { ReportSections } from './ReportSections';
 import { VatFormView } from './VatFormView';
+import { VatPeriodPicker } from './VatPeriodPicker';
 import { ReportTable } from './ReportTable';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import type { StepProgressValue } from '@/components/initialization/StepProgress';
 import Button from '@/components/ui/Button';
-import { ChevronRight, Info } from 'lucide-react';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import SectionCard from '@/components/ui/SectionCard';
 import { useEffect, useMemo } from 'react';
 import type { SettlementReportId } from '../state/initializationReducer';
@@ -96,9 +97,9 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   }, [rawPage, autoKeyList]);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
-  // 401／403 顯示期別與必填／選填；其餘文件顯示年度
+  // 401／403 不顯示標籤（期別已在副標與期別卡片、必填／選填在卡片徽章）；其餘文件顯示年度
   const badges = spec.period
-    ? ['一般稅額計算', formatPeriodLabel(spec.period.rocYear, spec.period.phase), spec.required ? '必填' : '選填']
+    ? undefined
     : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : `民國 ${taxYear} 年度`];
 
   // 必填的期別需要有資料（上傳辨識成功或手填皆可）才能前進；
@@ -110,45 +111,44 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     onNext,
     nextLabel,
     nextDisabled: blocked,
+    // 必填期別尚無資料時，提示放在底部上一頁／下一頁旁，按鈕反灰的原因就在手邊
+    hint: blocked ? (spec.period ? '此期別為必填，請上傳申報書檔案後再前往下一頁' : '此期別為必填，請上傳文件或手動輸入資料後再前往下一頁') : undefined,
   };
 
   return (
     <>
-      <StepPageHeader kicker={kicker} title={title} badges={badges} nav={nav} progress={progress}>
-        <FormPaperPreview formCode={formCode} />
+      <StepPageHeader
+        kicker={kicker}
+        title={title}
+        badges={badges}
+        nav={nav}
+        progress={progress}
+        titleAction={<FormPaperPreview formCode={formCode} />}
+        aside={showIdentify && <FormIdentifyPanel required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
+      >
         {spec.period && (
-          // 申報書種類提示條：預設 401，使用者可在這一期改用 403（上傳辨識到另一種也會自動切換）
-          <div className='flex flex-col gap-3 rounded-lg bg-brand-blue/10 px-4 py-3 md:flex-row md:items-center md:justify-between'>
-            <div className='flex min-w-0 items-start gap-2.5'>
-              <Info size={18} className='mt-0.5 shrink-0 text-brand-blue' />
-              <div className='flex min-w-0 flex-col'>
-                <span className='text-sm font-bold text-neutral-dark'>
-                  {formCode === 'VAT_403' ? '本期使用 403' : '本期使用 401'}
-                </span>
-                <span className='text-[13px] text-neutral-mid'>
-                  {formCode === 'VAT_403' ? '只有應稅及零稅率銷售額，可改回 401' : '有免稅或特種稅額銷售額，請改用 403'}
-                </span>
-              </div>
-            </div>
-            <Button
-              variant='outline'
+          // 申報書種類二選一：預設 401，該期有免稅銷售額改用 403（上傳辨識到另一種也會自動切換）
+          <div className='flex flex-wrap items-center gap-x-3 gap-y-2'>
+            <span className='text-sm font-medium text-neutral-dark'>申報書種類</span>
+            <SegmentedControl<VatFormCode>
+              fit
               size='sm'
-              iconPosition='right'
-              icon={ChevronRight}
-              className='shrink-0 self-start md:self-auto'
-              onClick={() => dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: spec.key, formCode: formCode === 'VAT_403' ? 'VAT_401' : 'VAT_403' } })}
-            >
-              {formCode === 'VAT_403' ? '改用 401' : '改用 403'}
-            </Button>
+              options={[
+                { value: 'VAT_401', label: '401' },
+                { value: 'VAT_403', label: '403' },
+              ]}
+              value={formCode === 'VAT_403' ? 'VAT_403' : 'VAT_401'}
+              onChange={value => dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: spec.key, formCode: value } })}
+            />
+            <span className='text-[13px] text-neutral-mid'>該期有免稅銷售額，則使用 403 申報書</span>
           </div>
         )}
-        {blocked && <p className='text-xs text-semantic-error'>此期別為必填，請上傳文件或手動輸入資料後再前往下一頁。</p>}
+        {spec.period && <VatPeriodPicker />}
+        {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
         {/* 封面頁不是可略過的文件，只在步驟 4 的選填頁提示 */}
         {!spec.required && spec.key !== 'CIT_COVER' && (
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
         )}
-        {showIdentify && <FormIdentifyPanel formTitle={title} required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
-        {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
       </StepPageHeader>
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}
