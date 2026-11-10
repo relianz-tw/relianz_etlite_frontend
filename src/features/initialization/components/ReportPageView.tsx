@@ -28,6 +28,9 @@ const TAX_YEAR_FIELD_KEY = 'HDR_TAX_YEAR';
 const PERIOD_START_FIELD_KEY = 'HDR_PERIOD_START_MONTH';
 const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
 
+/** 封面「股票發行狀況」勾選群組：只有股份有限公司才有股票發行，其他組織型態整組不顯示 */
+const STOCK_GROUP_CODE = 'STOCK';
+
 /** 資產負債表用 T 字帳版面（BalanceSheetView），其餘文件頁用一般欄位卡片 */
 const BALANCE_SHEET_CODE: SettlementReportId = 'CIT_BALANCE_SHEET';
 
@@ -88,7 +91,12 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
 
   // 區塊、欄位、分組完全依 metadata，只把自動填入的欄位拿掉（不給使用者輸入）
   const autoKeyList = autoKeys.join(',');
-  const sections = useMemo(() => (rawPage ? omitFields(rawPage.sections, autoKeyList.split(',')) : []), [rawPage, autoKeyList]);
+  const hideStock = formCode === 'CIT_COVER' && state.orgType !== 'share';
+  const sections = useMemo(() => {
+    if (!rawPage) return [];
+    const stockKeys = hideStock ? (rawPage.groupMap[STOCK_GROUP_CODE]?.fields ?? []).map(f => f.key) : [];
+    return omitFields(rawPage.sections, [...autoKeyList.split(','), ...stockKeys]);
+  }, [rawPage, autoKeyList, hideStock]);
   const store = useInitPaperStore(reportKey, rawPage);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；

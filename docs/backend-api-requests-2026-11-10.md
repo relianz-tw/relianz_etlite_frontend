@@ -54,6 +54,7 @@
 | 2 | 2.6 `TB_127_130` 段落，`INC_127`、`INC_130` 的 `sectionCode` 為 `null` | 沒有此段落；兩欄 `sectionCode` 仍為 `DISCLOSE` | 127、130 畫成「揭露事項」裡的一般列 |
 | 3 | 2.8 sections：`OPERATING`、`NONOP_INCOME`、`NONOP_LOSS`、`TAXABLE`（含 53–59）、`TAX`… | 仍是 `OPERATING`／`OPEX`／`NONOP`／`TAXABLE`；`INC_53` 在 `NONOP` | 區塊標題為「營業收入成本與毛利」「營業費用與營業淨利」「非營業損益與全年所得」，不是紙本標題 |
 | 4 | 2.7.1／2.7.2 `ORG_0_OTHER` 的 `officialFieldCode: "0"`、`sectionCode: HEADER`；`INV_K_OTHER` 的 `officialFieldCode: "k"` | 兩者 `officialFieldCode` 皆 `null`；`ORG_0_OTHER` 的 `sectionCode` 為 `null` | 「其他」沒有編號；組織種類的「其他」所屬區塊錯 |
+| 4b | C2 `BIZ_OTHER` 的 `sectionCode: BIZ` | `sectionCode` 為 `null` | 表 1「營業種類」勾選群組原本畫兩次（前端已改成整組只畫一次，仍請後端補 `BIZ`） |
 | 5 | 2.7.3／G8 `choiceGroups[].officialFieldCode`（`INV_*` 為 `"124"`） | 5 組全是 `null` | 124 題沒有編號標示 |
 | 6 | 2.4.1 調節說明 `groupCode`：`RECON_SUMMARY`／`RECON_ADD`／`RECON_SUB`／`RECON_RETURN`，加減項帶 `visibleWhen: INC_69 nonZero` | RECON 區欄位 `groupCode` 全是 `null`，無 `visibleWhen` | 70–87 沒有加項、減項分組；69 為 0 時也不收合 |
 | 7 | G4 `textBlocks[].sectionCode` 與內含欄位一致 | 表 2、11、12 全部為 `null` | 前端自行推算區塊（已容錯） |
