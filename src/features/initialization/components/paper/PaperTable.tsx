@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ReportFieldDef, ReportPaperTableDef, ReportTableColumnDef } from '../../reports/types';
@@ -60,6 +60,47 @@ function Cell({ field }: { field: ReportFieldDef }) {
   );
 }
 
+const GROUP_TOKEN = /(\{\{field:[^}]+\}\})/g;
+
+interface RowGroup {
+  /** 屬於這一組的資料列索引（store.rows 的位置） */
+  indices: number[];
+}
+
+/** 把連續且分組欄位值相同的列併成一組；分組欄位全空的列也併成連續一組（填入類別後才會分開） */
+function buildRowGroups(rows: Record<string, { value: string | number }>[], keys: string[]): RowGroup[] {
+  const groups: RowGroup[] = [];
+  let lastKey: string | null = null;
+  rows.forEach((row, index) => {
+    const key = keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+    if (key === lastKey) groups[groups.length - 1].indices.push(index);
+    else groups.push({ indices: [index] });
+    lastKey = key;
+  });
+  return groups;
+}
+
+/** 分組標題列：headerTemplate 的 {{field:X}} 畫成輸入框，改值時同組每一列一起改 */
+function GroupHeader({ template, fields, group }: { template: string; fields: ReportFieldDef[]; group: RowGroup }) {
+  const store = usePaperStore();
+  const first = store.rows[group.indices[0]];
+  return (
+    <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-neutral-dark'>
+      {template.split(GROUP_TOKEN).map((part, i) => {
+        const m = /^\{\{field:([^}]+)\}\}$/.exec(part);
+        if (!m) return <span key={i}>{part}</span>;
+        const field = fields.find(f => f.key === m[1]);
+        if (!field) return null;
+        return (
+          <span key={i} className='inline-block w-44 align-middle font-normal'>
+            <FieldInput field={field} data={first?.[field.key] ?? { value: '', aiFilled: false }} onChange={value => group.indices.forEach(index => store.setRowField(index, field.key, value))} />
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /** 紙本表格（metadata tables[]）：多層表頭、斜線角、斜線格、列標題合併、合計列、可新增列與序號 */
 export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   const store = usePaperStore();
@@ -81,7 +122,9 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   const rowFilled = (rowNo: string | number) => rowCells(rowNo).some(f => store.isFilled(f));
 
   // 對帳模式只列有數字的列
-  const fixedRows = table.rows.filter(r => (store.renderValue ? rowShown(r.rowNo) : true));
+  // 有分組時小計列改為每組各畫一列，固定列只留合計
+  const grouped = !!table.groupBy && gridRepeatable;
+  const fixedRows = table.rows.filter(r => (grouped && r.rowNo === 'SUBTOTAL' ? false : store.renderValue ? rowShown(r.rowNo) : true));
   const canCollapse = store.canCollapse && fixedRows.length > ROW_COLLAPSE_THRESHOLD;
   const isCollapsible = (rowNo: string | number) => !TOTAL_ROW_NOS.includes(String(rowNo)) && !rowFilled(rowNo);
   const visibleRows = canCollapse && !open ? fixedRows.filter(r => !isCollapsible(r.rowNo)) : fixedRows;
@@ -103,6 +146,38 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   // 表名本身已以「明細」結尾（如「投資人明細」）就不再重複加字
   const addLabel = `新增一列${table.title ?? ''}${table.title?.endsWith('明細') ? '' : '明細'}`;
   const border = 'border border-neutral-blue-gray/30';
+
+  const leadCols = (hasNumber ? 1 : 0) + (hasGroupCol ? 1 : 0) + (hasLabelCol ? 1 : 0);
+
+  const renderDataRow = (row: Record<string, { value: string | number; aiFilled: boolean }>, index: number) => (
+    <tr key={`data-${index}`}>
+      {hasNumber && <td className={cn(border, 'px-2 text-center tabular-nums text-neutral-mid')}>{String(index + 1).padStart(table.rowNumber?.pad || 1, '0')}</td>}
+      {hasGroupCol && <td className={border} />}
+      {hasLabelCol && <td className={border} />}
+      {table.columns.map(c => {
+        const col = table.rowColumns.find(f => f.columnCode === c.code);
+        return (
+          <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
+            {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />}
+          </td>
+        );
+      })}
+      <td className={cn(border, 'px-1 text-center')}>
+        <button type='button' onClick={() => store.removeRow(index)} aria-label='刪除此列' className='rounded-full p-1 text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark'>
+          <X size={16} />
+        </button>
+      </td>
+    </tr>
+  );
+
+  // 新增一列：有分組時沿用最後一組的分組欄位值（加進同一組）；新增類別則分組欄位留空，自成一組
+  const addDataRow = (inheritGroup: boolean) => {
+    const at = store.rows.length;
+    const last = store.rows[at - 1];
+    store.addRow([...table.rowColumns, ...table.groupFields]);
+    if (inheritGroup && last) for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
+  };
+
 
   return (
     <div className='flex min-w-0 flex-col gap-2'>
@@ -147,26 +222,36 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
               ))}
             </thead>
             <tbody>
-              {dataRows.map((row, index) => (
-                <tr key={`data-${index}`}>
-                  {hasNumber && <td className={cn(border, 'px-2 text-center tabular-nums text-neutral-mid')}>{String(index + 1).padStart(table.rowNumber?.pad || 1, '0')}</td>}
-                  {hasGroupCol && <td className={border} />}
-                  {hasLabelCol && <td className={border} />}
-                  {table.columns.map(c => {
-                    const col = table.rowColumns.find(f => f.columnCode === c.code);
-                    return (
-                      <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
-                        {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />}
-                      </td>
-                    );
-                  })}
-                  <td className={cn(border, 'px-1 text-center')}>
-                    <button type='button' onClick={() => store.removeRow(index)} aria-label='刪除此列' className='rounded-full p-1 text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark'>
-                      <X size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {grouped
+                ? buildRowGroups(dataRows, table.groupBy!.fieldCodes).map((group, gi) => (
+                    <Fragment key={`group-${gi}`}>
+                      <tr className='bg-surface-cream/60'>
+                        <td colSpan={leadCols + table.columns.length + 1} className={cn(border, 'px-2 py-2')}>
+                          {table.groupBy!.headerTemplate && <GroupHeader template={table.groupBy!.headerTemplate} fields={table.groupFields} group={group} />}
+                        </td>
+                      </tr>
+                      {group.indices.map(index => renderDataRow(dataRows[index], index))}
+                      <tr className='font-bold'>
+                        {Array.from({ length: leadCols }).map((_, i) => (
+                          <td key={i} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
+                            {i === leadCols - 1 ? table.groupBy!.subtotalLabel : null}
+                          </td>
+                        ))}
+                        {table.columns.map(c =>
+                          cellOf('SUBTOTAL', c.code) ? (
+                            <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
+                              {/* 各組小計由後端算（formula.scope=group），欄位只有一個值，無法逐組顯示，這裡固定顯示「—」 */}
+                              <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm text-neutral-dark'>—</div>
+                            </td>
+                          ) : (
+                            <td key={c.code} className={cn(border, SLASH_CLASS)} />
+                          )
+                        )}
+                        <td className={border} />
+                      </tr>
+                    </Fragment>
+                  ))
+                : dataRows.map((row, index) => renderDataRow(row, index))}
               {visibleRows.map((row, index) => {
                 const total = TOTAL_ROW_NOS.includes(String(row.rowNo));
                 const span = groupSpan(index);
@@ -209,14 +294,26 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
       {cardFallback && <RowCards columns={table.rowColumns} addLabel={addLabel} />}
 
       {gridRepeatable && !store.renderValue && (
-        <button
-          type='button'
-          onClick={() => store.addRow(table.rowColumns)}
-          className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
-        >
-          <Plus size={16} />
-          {addLabel}
-        </button>
+        <div className={cn('grid gap-2', grouped ? 'sm:grid-cols-2' : 'grid-cols-1')}>
+          <button
+            type='button'
+            onClick={() => addDataRow(true)}
+            className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+          >
+            <Plus size={16} />
+            {addLabel}
+          </button>
+          {grouped && (
+            <button
+              type='button'
+              onClick={() => addDataRow(false)}
+              className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+            >
+              <Plus size={16} />
+              新增類別
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

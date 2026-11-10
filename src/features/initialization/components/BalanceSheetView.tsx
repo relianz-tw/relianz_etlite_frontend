@@ -115,7 +115,9 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   // 表頭：metadata 的 HEADER 區塊完整呈現（財產目錄填報方式、公司名稱、統編、收件編號；自動填入的資產負債表日已由上層排除）
   const headerSection = sectionMap.get('HEADER');
   const headerChoices = headerSection?.choices ?? [];
-  const headerFields = headerSection?.fields ?? [];
+  // 勾選群組的成員已由 ChoiceGroup 畫過，不再當一般欄位重複畫
+  const choiceKeys = new Set(headerChoices.flatMap(c => c.fields.map(f => f.key)));
+  const headerFields = (headerSection?.fields ?? []).filter(f => !choiceKeys.has(f.key));
 
   // 不在 T 字帳配置內的區塊（metadata 日後新增時）以一般欄位卡片補在下方，確保 metadata 的欄位都有呈現
   const extraSections = sections.filter(s => !s.key || !KNOWN_SECTION_KEYS.includes(s.key));
