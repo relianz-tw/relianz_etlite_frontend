@@ -1,14 +1,17 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ReportFieldDef, ReportPaperTableDef, ReportTableColumnDef } from '../../reports/types';
 import { RowCards } from '../ReportTable';
+import { computeFieldValue, computeRowFieldValue } from '../../reports/formula';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { isFieldShown, usePaperStore } from './PaperStore';
 
 /** 紙本斜線（不可填的格子、左上角斜線格）：對角線用既有 neutral-blue-gray token */
+/** 左上角表頭格的斜線：由左上到右下（欄名在右上、列名在左下），與不可填格子的「／」方向相反 */
+const CORNER_SLASH_CLASS = 'bg-[linear-gradient(to_top_right,transparent_calc(50%-0.5px),theme(colors.neutral.blue-gray)_50%,transparent_calc(50%+0.5px))]';
 const SLASH_CLASS = 'bg-[linear-gradient(to_bottom_right,transparent_calc(50%-0.5px),theme(colors.neutral.blue-gray)_50%,transparent_calc(50%+0.5px))]';
 
 /** 固定列超過此數量且有辨識值時，沒有值的列預設收合 */
@@ -49,13 +52,15 @@ function buildHeader(columns: ReportTableColumnDef[]): HeaderCell[][] {
   return rows;
 }
 
-/** 格子：左上角顯示紙本編號，下方是輸入框（對帳模式為三值） */
-function Cell({ field }: { field: ReportFieldDef }) {
-  const hasCode = field.officialCode || field.refNo;
+/** 格子：紙本編號放輸入框左側同一行（對帳模式為三值）；欄標題已經有代號時格子不再重複顯示 */
+function Cell({ field, hideCode }: { field: ReportFieldDef; hideCode?: boolean }) {
+  const hasCode = !hideCode && (field.officialCode || field.refNo);
   return (
-    <div className={cn('relative min-w-[120px]', hasCode && 'pt-4')}>
-      {hasCode && <span className='absolute left-0.5 top-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
-      <StoreFieldInput field={field} />
+    <div className='flex min-w-[120px] items-center gap-1.5'>
+      {hasCode && <span className='shrink-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
+      <div className='min-w-0 flex-1'>
+        <StoreFieldInput field={field} />
+      </div>
     </div>
   );
 }
@@ -68,11 +73,16 @@ interface RowGroup {
 }
 
 /** 把連續且分組欄位值相同的列併成一組；分組欄位全空的列也併成連續一組（填入類別後才會分開） */
+/** 分組標記：只存在畫面狀態（不在 metadata，送出時會被略過），記錄「新增類別」開出來的新組 */
+const GROUP_MARK = '__group';
+
 function buildRowGroups(rows: Record<string, { value: string | number }>[], keys: string[]): RowGroup[] {
   const groups: RowGroup[] = [];
   let lastKey: string | null = null;
   rows.forEach((row, index) => {
-    const key = keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+    // 分組欄位（類別編號、名稱）都還沒填時，用「新增類別」時記下的群組標記區分，不然新增的類別會和上一個空白類別併成同一組
+    const empty = keys.every(k => String(row[k]?.value ?? '') === '');
+    const key = empty ? `\u0001${String(row[GROUP_MARK]?.value ?? '')}` : keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
     if (key === lastKey) groups[groups.length - 1].indices.push(index);
     else groups.push({ indices: [index] });
     lastKey = key;
@@ -93,7 +103,7 @@ function GroupHeader({ template, fields, group }: { template: string; fields: Re
         if (!field) return null;
         return (
           <span key={i} className='inline-block w-44 align-middle font-normal'>
-            <FieldInput field={field} data={first?.[field.key] ?? { value: '', aiFilled: false }} onChange={value => group.indices.forEach(index => store.setRowField(index, field.key, value))} />
+            <FieldInput field={field} placeholder={field.label} data={first?.[field.key] ?? { value: '', aiFilled: false }} onChange={value => group.indices.forEach(index => store.setRowField(index, field.key, value))} />
           </span>
         );
       })}
@@ -105,6 +115,14 @@ function GroupHeader({ template, fields, group }: { template: string; fields: Re
 export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   const store = usePaperStore();
   const [open, setOpen] = useState(false);
+
+  // 可重複列的表格一進來預設有一列空白列（只在進頁時補，之後使用者可以刪光）；對帳頁不補、列欄位對不上表頭改用卡片的也不補
+  useEffect(() => {
+    const grid = table.repeatable && (table.rowColumnsMatch || table.rowColumns.length === 0);
+    if (grid && !store.renderValue && store.rows.length === 0) store.addRow([...table.rowColumns, ...table.groupFields]);
+    // 只在進頁時執行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const header = buildHeader(table.columns);
   const hasGroupCol = table.rows.some(r => r.group);
@@ -158,7 +176,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
         const col = table.rowColumns.find(f => f.columnCode === c.code);
         return (
           <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
-            {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />}
+            {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} autoValue={computeRowFieldValue(col, table.rowColumns, row)} onChange={value => store.setRowField(index, col.key, value)} />}
           </td>
         );
       })}
@@ -175,16 +193,31 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
     const at = store.rows.length;
     const last = store.rows[at - 1];
     store.addRow([...table.rowColumns, ...table.groupFields]);
-    if (inheritGroup && last) for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
+    if (inheritGroup && last) {
+      for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
+      store.setRowField(at, GROUP_MARK, last[GROUP_MARK]?.value ?? '');
+    }
+    // 新增類別：給新的群組標記，類別編號、名稱留空也會自成一組
+    if (!inheritGroup) store.setRowField(at, GROUP_MARK, `${Date.now()}`);
+  };
+
+  // 在某一組（類別）的最後一列後面插入新的一列，沿用該組的類別編號、名稱與群組標記
+  const addRowToGroup = (group: RowGroup) => {
+    const lastIndex = group.indices[group.indices.length - 1];
+    const source = store.rows[group.indices[0]];
+    const at = lastIndex + 1;
+    store.addRow([...table.rowColumns, ...table.groupFields], at);
+    for (const f of table.groupFields) store.setRowField(at, f.key, source?.[f.key]?.value ?? '');
+    store.setRowField(at, GROUP_MARK, source?.[GROUP_MARK]?.value ?? '');
   };
 
 
   return (
     <div className='flex min-w-0 flex-col gap-2'>
-      {(table.title || table.note) && (
+      {/* 表格的說明文字（table.note）是純說明，不顯示 */}
+      {table.title && (
         <div className='flex flex-wrap items-baseline gap-x-3'>
-          {table.title && <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>}
-          {table.note && <span className='text-[13px] text-neutral-mid'>{table.note}</span>}
+          <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>
         </div>
       )}
 
@@ -201,7 +234,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                   )}
                   {level === 0 && hasGroupCol && <th rowSpan={headerDepth} className={cn(border, 'px-2 py-2')} />}
                   {level === 0 && hasLabelCol && (
-                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[140px] p-0', table.corner && SLASH_CLASS)}>
+                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[140px] p-0', table.corner && CORNER_SLASH_CLASS)}>
                       {table.corner && (
                         <div className='flex h-full min-h-14 flex-col justify-between px-2 py-1'>
                           <span className='text-right'>{table.corner.column}</span>
@@ -231,6 +264,16 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         </td>
                       </tr>
                       {group.indices.map(index => renderDataRow(dataRows[index], index))}
+                      {!store.renderValue && (
+                        <tr>
+                          <td colSpan={leadCols + table.columns.length + 1} className={cn(border, 'px-2 py-1')}>
+                            <button type='button' onClick={() => addRowToGroup(group)} className='flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline'>
+                              <Plus size={14} />
+                              在此類別新增一列
+                            </button>
+                          </td>
+                        </tr>
+                      )}
                       <tr className='font-bold'>
                         {Array.from({ length: leadCols }).map((_, i) => (
                           <td key={i} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
@@ -240,8 +283,16 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         {table.columns.map(c =>
                           cellOf('SUBTOTAL', c.code) ? (
                             <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
-                              {/* 各組小計由後端算（formula.scope=group），欄位只有一個值，無法逐組顯示，這裡固定顯示「—」 */}
-                              <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm text-neutral-dark'>—</div>
+                              {/* 小計欄位在 metadata 裡只有一個，存不下每一組各自的值，所以各組小計只是依該組各列即時算出來的唯讀數字，沒有數字時顯示「—」 */}
+                              {(() => {
+                                const sub = cellOf('SUBTOTAL', c.code) as ReportFieldDef;
+                                const value = computeFieldValue(sub, Object.values(store.page.fieldMap), key => store.get(key).value, group.indices.map(i => store.rows[i]));
+                                return (
+                                  <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm tabular-nums text-neutral-dark'>
+                                    {value === null ? '—' : value.toLocaleString('en-US')}
+                                  </div>
+                                );
+                              })()}
                             </td>
                           ) : (
                             <td key={c.code} className={cn(border, SLASH_CLASS)} />
@@ -263,15 +314,24 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         {row.group}
                       </td>
                     )}
-                    {hasGroupCol && !row.group && <td className={border} />}
-                    {hasLabelCol && <td className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
+                    {/* 沒有分組標題的列（如免稅收入、減：退回及折讓、合計）：標題放在最左邊那格，跨過分組欄與標籤欄 */}
+                    {hasGroupCol && !row.group && hasLabelCol && row.label ? (
+                      <td colSpan={2} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
+                        {row.label}
+                      </td>
+                    ) : (
+                      <>
+                        {hasGroupCol && !row.group && <td className={border} />}
+                        {hasLabelCol && <td className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
+                      </>
+                    )}
                     {table.columns.map(c => {
                       const f = cellOf(row.rowNo, c.code);
                       // 紙本斜線：沒有欄位的格子畫斜線；對帳模式下有欄位但沒有數字的格子留白
                       if (!f || f.hidden) return <td key={c.code} className={cn(border, SLASH_CLASS)} />;
                       return (
                         <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
-                          {isFieldShown(f, store) && <Cell field={f} />}
+                          {isFieldShown(f, store) && <Cell field={f} hideCode={!!(c.refNo || c.officialCode)} />}
                         </td>
                       );
                     })}
@@ -294,15 +354,18 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
       {cardFallback && <RowCards columns={table.rowColumns} addLabel={addLabel} />}
 
       {gridRepeatable && !store.renderValue && (
-        <div className={cn('grid gap-2', grouped ? 'sm:grid-cols-2' : 'grid-cols-1')}>
-          <button
-            type='button'
-            onClick={() => addDataRow(true)}
-            className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
-          >
-            <Plus size={16} />
-            {addLabel}
-          </button>
+        <div className='grid grid-cols-1 gap-2'>
+          {/* 有分組時，新增明細按鈕在每一組裡（在此類別新增一列），這裡只留新增類別 */}
+          {!grouped && (
+            <button
+              type='button'
+              onClick={() => addDataRow(true)}
+              className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+            >
+              <Plus size={16} />
+              {addLabel}
+            </button>
+          )}
           {grouped && (
             <button
               type='button'

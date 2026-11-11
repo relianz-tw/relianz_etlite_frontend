@@ -80,7 +80,9 @@ export interface MetadataField {
   parentRowCode?: string | null;
   /** 減項標記（紙本沒印「減：」的也可能為 true），名稱以 displayName 為準 */
   isDeduction?: boolean;
-  /** 小計／算式欄：後端計算，前端唯讀 */
+  /** 紙本填在「合計」欄的科目（資產負債表），標題粗體 */
+  isTotalColumn?: boolean;
+  /** 小計／算式欄：欄位可編輯，沒有值時前端依 formula.expr 試算顯示 */
   isSubtotal?: boolean;
   /** 同一列共同代號，BOOK／ADJ 共用；單欄等於 fieldCode */
   rowCode?: string;

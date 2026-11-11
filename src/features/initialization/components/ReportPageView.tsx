@@ -6,6 +6,7 @@ import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportP
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
+import { PAPER_PREVIEWS } from '../reports/paperPreviews';
 import { UploadedFilePreview } from './UploadedFilePreview';
 import { BalanceSheetView } from './BalanceSheetView';
 import { PaperForm } from './paper/PaperForm';
@@ -97,13 +98,14 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     const stockKeys = hideStock ? (rawPage.groupMap[STOCK_GROUP_CODE]?.fields ?? []).map(f => f.key) : [];
     return omitFields(rawPage.sections, [...autoKeyList.split(','), ...stockKeys]);
   }, [rawPage, autoKeyList, hideStock]);
-  const store = useInitPaperStore(reportKey, rawPage);
+  const store = useInitPaperStore(reportKey, rawPage, autoKeys);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
   // 401／403 不顯示標籤（期別已在副標與期別卡片、必填／選填在卡片徽章）；其餘文件顯示年度
+  const paperPage = PAPER_PREVIEWS[formCode]?.paperPage;
   const badges = spec.period
     ? undefined
-    : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : `民國 ${taxYear} 年度`];
+    : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : `民國 ${taxYear} 年度`, ...(paperPage ? [`紙本${paperPage}`] : [])];
 
   // 必填的期別需要有資料（上傳辨識成功或手填皆可）才能前進；
   // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死

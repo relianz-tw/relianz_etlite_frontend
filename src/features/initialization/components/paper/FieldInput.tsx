@@ -7,14 +7,19 @@ import TextInput from '@/components/ui/TextInput';
 import { cn, formatLocalDate } from '@/lib/utils';
 import type { ReportField } from '../../state/initializationReducer';
 import type { ReportFieldDef } from '../../reports/types';
+import { computeFieldValue } from '../../reports/formula';
 import { usePaperStore, type PaperStore } from './PaperStore';
 
 interface FieldInputProps {
   field: ReportFieldDef;
   data: ReportField;
   onChange: (value: string | number) => void;
-  /** 強制唯讀（預設：帶 formula 的算式欄位唯讀，由後端計算） */
+  /** 強制唯讀 */
   readOnly?: boolean;
+  /** 算式欄位的前端試算值：欄位沒有值時顯示它（不存進欄位），有值以欄位值為主 */
+  autoValue?: number | null;
+  /** 文字欄位的提示字（沒有標籤可看時用，如分組標題列裡的類別編號、類別名稱） */
+  placeholder?: string;
 }
 
 /** 百分比輸入：只留數字、小數點與開頭的負號 */
@@ -25,9 +30,10 @@ function sanitizePercent(raw: string): string {
 }
 
 /** 單一欄位的輸入元件（依 type 選元件），標籤由呼叫端負責 */
-export function FieldInput({ field, data, onChange, readOnly }: FieldInputProps) {
-  // 帶 formula 的欄位由後端算出，前端唯讀；還沒有值（辨識沒帶、尚未送出）顯示「—」而不是 0，避免誤以為算出來是 0
-  if (readOnly ?? !!field.formulaText) {
+export function FieldInput({ field, data: stored, onChange, readOnly, autoValue, placeholder }: FieldInputProps) {
+  // 算式欄位可編輯：有值（辨識帶入或使用者輸入）以該值為主，沒有值才顯示試算結果
+  const data = stored.value === '' && autoValue != null ? { ...stored, value: autoValue } : stored;
+  if (readOnly) {
     const empty = data.value === '' || data.value === undefined;
     const text = empty ? '—' : field.type === 'money' ? Number(data.value).toLocaleString('en-US') : String(data.value);
     return (
@@ -76,7 +82,7 @@ export function FieldInput({ field, data, onChange, readOnly }: FieldInputProps)
     case 'boolean':
       return <Checkbox checked={Number(data.value) === 1} onChange={() => onChange(Number(data.value) === 1 ? 0 : 1)} aria-label={field.label} />;
     default:
-      return <TextInput widthClassName='w-full' value={typeof data.value === 'string' ? data.value : String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value)} />;
+      return <TextInput widthClassName='w-full' placeholder={placeholder} value={typeof data.value === 'string' ? data.value : String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value)} />;
   }
 }
 
@@ -88,5 +94,6 @@ export function StoreFieldInput({ field }: { field: ReportFieldDef }) {
 
 function StoreFieldInputWith({ field, store }: { field: ReportFieldDef; store: PaperStore }) {
   if (store.renderValue) return <>{store.renderValue(field)}</>;
-  return <FieldInput field={field} data={store.get(field.key)} onChange={value => store.set(field.key, value)} />;
+  const autoValue = field.formulaExpr ? computeFieldValue(field, Object.values(store.page.fieldMap), key => store.get(key).value, store.rows) : null;
+  return <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} readOnly={store.readOnlyKeys?.includes(field.key)} onChange={value => store.set(field.key, value)} />;
 }

@@ -212,7 +212,7 @@ export type InitializationAction =
         rows: Record<string, string | number>[];
       };
     }
-  | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[] } }
+  | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[]; /** 插在這個位置（不給＝加在最後） */ at?: number } }
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
   | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: ReportKey; index: number; key: string; value: string | number } }
 
@@ -453,8 +453,9 @@ export function initializationReducer(state: InitializationState, action: Initia
     }
 
     case 'ADD_REPORT_ROW': {
-      const { reportId, columns } = action.payload;
-      const rows = [...getReport(state.reports, reportId).rows, buildEmptyRow(columns)];
+      const { reportId, columns, at } = action.payload;
+      const rows = [...getReport(state.reports, reportId).rows];
+      rows.splice(at ?? rows.length, 0, buildEmptyRow(columns));
       return { ...state, reports: setReportRows(state.reports, reportId, rows) };
     }
 

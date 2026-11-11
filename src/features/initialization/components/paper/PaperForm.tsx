@@ -4,13 +4,15 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import Checkbox from '@/components/ui/Checkbox';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
-import type { ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
+import type { ReportChoiceDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
 import { ReportFieldRow } from '../ReportFieldRow';
 import { fieldLabelClass, FIELD_LABEL_BASE } from '../fieldLabel';
 import { ChoiceGroup } from './ChoiceGroup';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
-import { PaperStoreProvider, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
+import { PaperStoreProvider, effectiveNumber, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
+import { BOLD_CHECK_KEYS, DIVIDER_BEFORE_SECTIONS, EXEMPT_COLLAPSE } from './exemptRules';
+import { RECON_DIFF_FIELD, RECON_GROUPS, itemGroupCode, splitItemsByGroup } from './reconGroups';
 import { PaperTable } from './PaperTable';
 import { TemplateText } from './TemplateText';
 
@@ -19,6 +21,9 @@ const COLUMN_HEADS = { BOOK: '帳載結算金額', ADJ: '自行依法調整後�
 
 /** 對帳模式只呈現有數字的金額列與表格，其餘（輸入欄、勾選、段落）不畫 */
 const COMPARE_KINDS: ReportSectionItem['kind'][] = ['amountRows', 'table'];
+
+/** 段落模板內有 {{field:}}（輸入框）或 {{group:}}（勾選框）才算有要填的內容 */
+const HAS_INPUT_TOKEN = /\{\{(field|group):/;
 
 function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
   if (store.renderValue && !COMPARE_KINDS.includes(item.kind)) return false;
@@ -30,6 +35,9 @@ function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
       return item.fields.some(f => isFieldShown(f, store));
     case 'table':
       return store.renderValue ? Object.values(item.table.cells).some(f => isFieldShown(f, store)) : true;
+    case 'text':
+      // 純說明文字（沒有要輸入的欄位或勾選）不顯示，只有內嵌輸入框／勾選框的段落才畫
+      return HAS_INPUT_TOKEN.test(item.block.template);
     default:
       return true;
   }
@@ -75,16 +83,18 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
             className='grid grid-cols-1 items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5 md:[grid-template-columns:var(--cols)]'
             style={{ '--cols': cols } as CSSProperties}
           >
-            <div className='flex min-w-0 items-start gap-2'>
-              {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder className='mt-px' />}
-              <div className={cn('min-w-0 break-words text-sm leading-snug text-neutral-dark', main.isSubtotal ? 'font-bold' : 'font-medium')}>
+            <div className='flex min-w-0 items-center gap-2'>
+              {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder />}
+              <div className='min-w-0 break-words text-sm font-medium leading-7 text-neutral-dark'>
+                {/* 減項標籤本身沒有「減：」時（紙本縮排在「減：」那列底下的子項），前面補「減：」 */}
+                {main.isDeduction && !main.label.startsWith('減') && '減：'}
                 {main.labelTemplate ? <TemplateText template={main.labelTemplate} /> : main.label}
                 {main.note && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.note}）</span>}
                 {main.formulaText && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.formulaText}）</span>}
               </div>
             </div>
-            {/* 成對區塊裡沒有另一半的欄位，輸入框放在「帳載」那一欄對齊 */}
-            <div className={cn('grid gap-2', adj ? 'grid-cols-2 md:contents' : 'grid-cols-1', hasPairs && !adj && 'md:col-span-1')}>
+            {/* 成對區塊裡沒有另一半的欄位，輸入框依自己的欄放：帳載（BOOK）放第一欄，調整後（ADJ，如 137 帳載斜線）放第二欄 */}
+            <div className={cn('grid gap-2', adj ? 'grid-cols-2 md:contents' : 'grid-cols-1', hasPairs && !adj && (main.column === 'ADJ' ? 'md:col-start-3' : 'md:col-span-1'))}>
               <ValueCell field={main} head={hasPairs ? (main.column ? COLUMN_HEADS[main.column] : undefined) : undefined} />
               {adj && <ValueCell field={adj} head={COLUMN_HEADS.ADJ} />}
             </div>
@@ -135,13 +145,22 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
             // 勾選項文字內嵌輸入框（如「…利息支出合計數 ___ 元」）：勾選框後接模板文字
             f.labelTemplate ? (
               <label key={f.key} className='flex w-full items-center gap-2 text-sm leading-9 text-neutral-dark'>
+                <CodeChip official={f.officialCode} refNo={f.refNo} />
                 <Checkbox checked={Number(store.get(f.key).value) === 1} onChange={() => store.set(f.key, Number(store.get(f.key).value) === 1 ? 0 : 1)} aria-label={f.label} />
                 <span className='min-w-0'>
                   <TemplateText template={f.labelTemplate} />
                 </span>
               </label>
+            ) : BOLD_CHECK_KEYS.includes(f.key) ? (
+              <label key={f.key} className='flex w-full cursor-pointer items-center gap-2 text-sm font-bold leading-9 text-neutral-dark'>
+                <Checkbox checked={Number(store.get(f.key).value) === 1} onChange={() => store.set(f.key, Number(store.get(f.key).value) === 1 ? 0 : 1)} aria-label={f.label} />
+                <span className='min-w-0'>{f.label}</span>
+              </label>
             ) : (
-              <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
+              <div key={f.key} className='flex items-center gap-2'>
+                <CodeChip official={f.officialCode} refNo={f.refNo} />
+                <ReportFieldRow field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
+              </div>
             )
           )}
         </div>
@@ -151,14 +170,16 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
     case 'dateRange': {
       const { range } = item;
       return (
-        <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2'>
-          <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title), 'md:w-[19%]')}>{range.title}</span>
+        // 寬度與一般輸入欄（兩欄 grid 的一欄）相同，標籤與輸入框左緣才對得齊
+        <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 md:max-w-[calc(50%-0.75rem)] md:flex-nowrap'>
+          <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
+          {/* 兩個日期框同一排，各佔剩餘寬度的一半（最寬約 11rem），不撐滿整列、也不換行 */}
           <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <div className='min-w-0 flex-1'>
+            <div className='min-w-0 max-w-44 flex-1'>
               <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
             </div>
-            <span className='text-sm text-neutral-mid'>至</span>
-            <div className='min-w-0 flex-1'>
+            <span className='shrink-0 text-sm text-neutral-mid'>至</span>
+            <div className='min-w-0 max-w-44 flex-1'>
               <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
             </div>
           </div>
@@ -167,8 +188,9 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
     }
     case 'text':
       return (
-        <p key={index} className='flex flex-wrap items-center gap-x-1 text-sm leading-9 text-neutral-dark'>
-          {item.block.officialCode && <CodeChip official={item.block.officialCode} className='mr-1' />}
+        // 一般行內排版（不用 flex），長文字接著輸入框才會同一行折行，不會把輸入框擠到下一排
+        <p key={index} className='text-sm leading-9 text-neutral-dark'>
+          {item.block.officialCode && <CodeChip official={item.block.officialCode} className='mr-1 align-middle' />}
           <TemplateText template={item.block.template} />
         </p>
       );
@@ -177,17 +199,111 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
   }
 }
 
-function SectionBlock({ section, all, store, depth }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number }) {
-  const children = all.filter(s => s.parentKey === section.key && isSectionShown(s, all, store));
+/** 401／403 右上角「註記欄」：核准按月申報、核准合併總繳單位（總機構彙總總繳、各單位分別申報），畫成紙本那個框 */
+const NOTE_BOX_MONTHLY_KEY = 'HDR_MONTHLY_FILING';
+const NOTE_BOX_UNIT_GROUP = 'VAT_UNIT';
+
+function NoteColumnBox({ monthly, unit }: { monthly: ReportFieldDef; unit: ReportChoiceDef }) {
+  const store = usePaperStore();
+  const isOn = (key: string) => Number(store.get(key).value) === 1;
+  const toggleUnit = (key: string) => {
+    const next = !isOn(key);
+    // 總機構彙總與各單位分別申報二選一
+    if (next) for (const f of unit.fields) if (f.key !== key) store.set(f.key, 0);
+    store.set(key, next ? 1 : 0);
+  };
+  const cell = 'flex items-center gap-2 px-3 py-2 text-sm text-neutral-dark';
   return (
-    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2')}>
+    <div className='grid w-fit max-w-full grid-cols-[auto_auto_1fr] overflow-hidden rounded-md border border-neutral-blue-gray/50 text-sm'>
+      <div className='row-span-3 flex items-center justify-center border-r border-neutral-blue-gray/50 bg-surface-cream px-3 font-bold text-neutral-dark'>註記欄</div>
+      <label className={cn(cell, 'col-span-2 cursor-pointer border-b border-neutral-blue-gray/50 font-medium')}>
+        <Checkbox checked={isOn(monthly.key)} onChange={() => store.set(monthly.key, isOn(monthly.key) ? 0 : 1)} aria-label={monthly.label} />
+        {monthly.label}
+      </label>
+      <div className='row-span-2 flex items-center border-r border-neutral-blue-gray/50 px-3 font-medium text-neutral-dark'>{unit.title}</div>
+      {unit.fields.map((f, i) => (
+        <label key={f.key} className={cn(cell, 'cursor-pointer', i === 0 && 'border-b border-neutral-blue-gray/50')}>
+          <Checkbox checked={isOn(f.key)} onChange={() => toggleUnit(f.key)} aria-label={f.label} />
+          {f.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** 內容項目；調節說明的加項／減項分組畫標題並可折疊，其餘項目照順序渲染 */
+function SectionItems({ items, store }: { items: ReportSectionItem[]; store: PaperStore }) {
+  const [override, setOverride] = useState<Record<string, boolean>>({});
+  const diff = effectiveNumber(RECON_DIFF_FIELD, store);
+  const nodes: ReactNode[] = [];
+  const noteUnit = items.find((i): i is Extract<ReportSectionItem, { kind: 'choice' }> => i.kind === 'choice' && i.choice.groupCode === NOTE_BOX_UNIT_GROUP)?.choice;
+  const noteMonthly = items.flatMap(i => (i.kind === 'checks' ? i.fields : [])).find(f => f.key === NOTE_BOX_MONTHLY_KEY);
+  const noteBox = !store.renderValue && noteUnit && noteMonthly;
+  // 註記欄合併畫成一個框：放在「核准按月申報」原本的位置，核准合併總繳單位那組不再單獨畫
+  const NOTE = 'note' as const;
+  const visible: (ReportSectionItem | typeof NOTE)[] = [];
+  for (const item of splitItemsByGroup(items)) {
+    if (noteBox && item.kind === 'choice' && item.choice.groupCode === NOTE_BOX_UNIT_GROUP) continue;
+    if (noteBox && item.kind === 'checks' && item.fields.some(f => f.key === NOTE_BOX_MONTHLY_KEY)) {
+      visible.push(NOTE);
+      const rest = item.fields.filter(f => f.key !== NOTE_BOX_MONTHLY_KEY);
+      if (rest.length > 0 && isItemShown({ ...item, fields: rest }, store)) visible.push({ ...item, fields: rest });
+      continue;
+    }
+    if (isItemShown(item, store)) visible.push(item);
+  }
+
+  for (let i = 0; i < visible.length; ) {
+    const current = visible[i];
+    if (current === NOTE) {
+      nodes.push(<NoteColumnBox key='note-column' monthly={noteMonthly as ReportFieldDef} unit={noteUnit as ReportChoiceDef} />);
+      i++;
+      continue;
+    }
+    const code = itemGroupCode(current);
+    const group = code ? RECON_GROUPS[code] : undefined;
+    if (!code || !group || store.renderValue) {
+      nodes.push(renderItem(current, i, store));
+      i++;
+      continue;
+    }
+    let end = i;
+    while (end < visible.length && itemGroupCode(visible[end] as ReportSectionItem) === code) end++;
+    const collapsed = override[code] ?? (diff !== null && group.collapseWhen(diff));
+    nodes.push(
+      <div key={`group-${code}-${i}`} className='flex flex-col gap-2'>
+        <button type='button' aria-expanded={!collapsed} onClick={() => setOverride(prev => ({ ...prev, [code]: !collapsed }))} className='flex items-center gap-1 self-start text-sm font-bold text-neutral-dark'>
+          <ChevronDown size={14} className={cn('transition-transform', collapsed && '-rotate-90')} />
+          {group.label}
+        </button>
+        {!collapsed && (visible.slice(i, end) as ReportSectionItem[]).map((item, k) => renderItem(item, i + k, store))}
+      </div>
+    );
+    i = end;
+  }
+  return <>{nodes}</>;
+}
+
+/** 上方分隔線：第一個區塊沒有；連續兩個無標題的內容區塊（如盈餘計算接稅額計算）視為同一塊，不加線；表頭、勾選區塊與前後都分開 */
+function dividerBefore(section: ReportSectionDef, prev: ReportSectionDef | undefined): 'line' | 'merged' | 'none' {
+  if (!prev) return 'none';
+  const isFrame = (s: ReportSectionDef) => s.key === 'HEADER' || s.key === 'FLAGS';
+  return !section.title && !prev.title && !isFrame(section) && !isFrame(prev) ? 'merged' : 'line';
+}
+
+function SectionBlock({ section, all, store, depth, divider = 'none' }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number; divider?: 'line' | 'merged' | 'none' }) {
+  // 勾了免填，它底下歸屬的區塊收起來
+  const collapsedKeys = Object.entries(EXEMPT_COLLAPSE).flatMap(([flag, keys]) => (!store.renderValue && Number(store.get(flag).value) === 1 ? keys : []));
+  const children = all.filter(s => s.parentKey === section.key && !collapsedKeys.includes(s.key) && isSectionShown(s, all, store));
+  return (
+    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
       {section.title &&
         (depth === 0 ? (
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{section.title}</h2>
         ) : (
           <h3 className='text-base font-bold text-neutral-dark'>{section.title}</h3>
         ))}
-      {section.items.filter(i => isItemShown(i, store)).map((item, i) => renderItem(item, i, store))}
+      <SectionItems items={section.items} store={store} />
       {children.map(c => (
         <SectionBlock key={c.key} section={c} all={all} store={store} depth={depth + 1} />
       ))}
@@ -204,14 +320,26 @@ interface PaperFormProps {
  * 紙本對照表單（營所稅各表、營業稅 401／403、申報對帳共用）：依 metadata 排好的 sections／items 逐項渲染，
  * 區塊標題、列配對、表格、段落、勾選框都由後端決定；小計與算式欄唯讀，前端不加總。
  */
+/**
+ * 整份可免填的勾選（如未分配盈餘申報書「符合背面申報須知二免申報情形之一，本年度得免填報本申報表」）：
+ * 勾選放最上方，勾起來後下面的表單（含表頭的營利事業名稱、統編、收件編號）全部收起，只留這個勾選。
+ */
+const EXEMPT_FLAG_KEYS = ['UE_EXEMPT'];
+
 export function PaperForm({ sections, store }: PaperFormProps) {
-  const roots = sections.filter(s => (!s.parentKey || !sections.some(p => p.key === s.parentKey)) && isSectionShown(s, sections, store));
+  const shown = sections.filter(s => (!s.parentKey || !sections.some(p => p.key === s.parentKey)) && isSectionShown(s, sections, store));
+  const exemptKey = EXEMPT_FLAG_KEYS.find(k => store.page.fieldMap[k]);
+  const flagRoot = exemptKey ? shown.find(s => s.fields.some(f => f.key === exemptKey)) : undefined;
+  const exempt = !!exemptKey && !store.renderValue && Number(store.get(exemptKey).value) === 1;
+  // 免填勾選排最上方；勾起來時只留勾選
+  const ordered = flagRoot ? [flagRoot, ...shown.filter(s => s !== flagRoot)] : shown;
+  const roots = exempt ? ordered.filter(s => s === flagRoot) : ordered;
   if (roots.length === 0) return null;
   return (
     <PaperStoreProvider value={store}>
-      <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white'>
-        {roots.map(s => (
-          <SectionBlock key={s.key} section={s} all={sections} store={store} depth={0} />
+      <div className='flex flex-col rounded-lg border border-neutral-blue-gray/30 bg-white'>
+        {roots.map((s, i) => (
+          <SectionBlock key={s.key} section={s} all={sections} store={store} depth={0} divider={dividerBefore(s, roots[i - 1])} />
         ))}
       </div>
     </PaperStoreProvider>

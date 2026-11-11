@@ -35,15 +35,18 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
   }
 }
 
-function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<string, ReportField>, wantRow: boolean): ConfirmField[] {
+/**
+ * @param negateDeductions 資產負債表：減項科目（累計折舊、備抵呆帳等，紙本以（）表示負值）一律存負值，
+ *   畫面上輸入的是正數，辨識帶入的值也可能是正數，這裡統一轉成負數；其他表的減項（如損益表 02）仍是正數
+ */
+function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<string, ReportField>, wantRow: boolean, negateDeductions = false): ConfirmField[] {
   const result: ConfirmField[] = [];
   for (const [code, field] of Object.entries(fields)) {
     const meta = metaByCode.get(code);
     // 欄位須存在於該年 metadata；可重複列欄位只出現在 rows，不能當純量欄送
     if (!meta || meta.isRow !== wantRow || !isFilled(field)) continue;
-    // 帶算式的小計由後端計算並寫入，前端不送
-    if (meta.formula) continue;
-    const confirmField = toConfirmField(meta, field);
+    // 帶算式的小計只送有值的（辨識帶入或使用者輸入）；只是畫面試算出來的不存進欄位，沒送的由後端計算
+    const confirmField = toConfirmField(meta, negateDeductions && meta.isDeduction && meta.dataType === 1 ? { ...field, value: -Math.abs(Number(field.value) || 0) } : field);
     if (confirmField) result.push(confirmField);
   }
   return result;
@@ -112,7 +115,7 @@ export async function buildConfirmForms(state: InitializationState): Promise<Con
         taxYear: source.taxYear,
         // 營業稅期別 1／3／5…＝所屬起月
         ...(source.periodStartMonth !== undefined && { periodStartMonth: source.periodStartMonth, cmsPhase: source.periodStartMonth }),
-        fields: toConfirmFields(metaByCode, report?.fields ?? {}, false),
+        fields: toConfirmFields(metaByCode, report?.fields ?? {}, false, source.formCode === 'CIT_BALANCE_SHEET'),
         rows,
       };
     })

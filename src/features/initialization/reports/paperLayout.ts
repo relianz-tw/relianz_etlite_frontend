@@ -41,10 +41,12 @@ function toFieldDef(f: MetadataField): ReportFieldDef {
     parentKey: f.parentFieldCode ?? undefined,
     isDeduction: f.isDeduction || undefined,
     isSubtotal: f.isSubtotal || undefined,
+    isTotalColumn: f.isTotalColumn || undefined,
     officialCode: f.officialFieldCode ?? undefined,
     refNo: f.refNo ?? undefined,
     note: f.note ?? undefined,
     formulaText: f.formula?.text,
+    formulaExpr: f.formula?.expr,
     rowCode: f.rowCode,
     column: f.column ?? undefined,
     layout: f.layout,
@@ -130,6 +132,8 @@ function insertPlaced(base: RawItem[], placed: { code: string; placeAfter?: stri
   const tops = placed.filter(p => p.placeAfter === 'TOP');
   const tails = placed.filter(p => !p.placeAfter);
   result.unshift(...tops.map(p => ({ item: p.item, anchors: [p.code] })));
+  // placeAfter 為 null 的先依序放最後；其他項目可能接在它們後面（如段落接在 placeAfter 為 null 的表格後），所以要先放進去才找得到
+  result.push(...tails.map(p => ({ item: p.item, anchors: [p.code] })));
   // 被引用的項目可能是另一個剛插入的段落，所以重複掃到沒有進展為止
   let progressed = true;
   while (pending.length > 0 && progressed) {
@@ -145,7 +149,7 @@ function insertPlaced(base: RawItem[], placed: { code: string; placeAfter?: stri
     }
   }
   // 找不到被引用項目的，退回放區塊最後，不讓內容消失
-  result.push(...[...pending, ...tails].map(p => ({ item: p.item, anchors: [p.code] })));
+  result.push(...pending.map(p => ({ item: p.item, anchors: [p.code] })));
   return result;
 }
 
@@ -159,6 +163,18 @@ function mergeRuns(raw: RawItem[]): ReportSectionItem[] {
     else out.push(item.kind === 'amountRows' ? { kind: 'amountRows', rows: [...item.rows] } : item.kind === 'inputs' ? { kind: 'inputs', fields: [...item.fields] } : item.kind === 'checks' ? { kind: 'checks', fields: [...item.fields] } : item);
   }
   return out;
+}
+
+/**
+ * 說明欄（文字欄位、parentFieldCode 指向同區塊的主欄位，如 75「其他」的說明）排在主欄位那一列的下一排，
+ * 不管後端 fields[] 把它放在哪；沒標 groupCode 時沿用主欄位的分組，加項／減項折疊時才會一起收起來。
+ */
+function withNotesAfterParent(fields: ReportFieldDef[]): ReportFieldDef[] {
+  const keys = new Set(fields.map(f => f.key));
+  const isNote = (f: ReportFieldDef) => !!f.parentKey && keys.has(f.parentKey) && f.type === 'text';
+  return fields
+    .filter(f => !isNote(f))
+    .flatMap(f => [f, ...fields.filter(n => isNote(n) && n.parentKey === f.key).map(n => ({ ...n, groupCode: n.groupCode ?? f.groupCode }))]);
 }
 
 /**
@@ -207,15 +223,38 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   const sectionOf = (key: string) => meta.fields.find(m => m.fieldCode === key)?.sectionCode ?? DEFAULT_SECTION_CODE;
   // 只有表格沒有固定欄位的區塊也要出現
   for (const t of meta.tables ?? []) if (t.sectionCode && !sectionOrder.includes(t.sectionCode)) sectionOrder.push(t.sectionCode);
-  for (const b of textBlocks) if (b.sectionCode && !sectionOrder.includes(b.sectionCode)) sectionOrder.push(b.sectionCode);
   if (sectionOrder.length === 0) sectionOrder.push(DEFAULT_SECTION_CODE);
 
-  // 段落沒標 sectionCode 時，歸到它第一個引用欄位所在的區塊，再不行歸第一個區塊
+  // 段落沒標 sectionCode（紙本無標題）時，跟著它引用的欄位走：{{field:}} 取該欄位的區塊，
+  // 只引用 {{group:}}（如 124 存貨計價）取勾選組成員的區塊；這些欄位多半也沒標區塊，
+  // 就一起落在無標題區塊，不會被塞進第一個有標題的區塊（如營業淨利）
   const blockSection = (b: (typeof textBlocks)[number]) => {
+    // 接在別的區塊的表格後面（如 403 銷售額總計接在特種稅額表後）：歸到那張表所在的區塊，才排得在表格後面
+    const anchorTable = b.placeAfter ? (meta.tables ?? []).find(t => t.tableCode === b.placeAfter) : undefined;
+    if (anchorTable?.sectionCode) return anchorTable.sectionCode;
     if (b.sectionCode) return b.sectionCode;
-    const first = Array.from(b.template.matchAll(TEMPLATE_TOKEN)).find(m => m[1] !== 'group' && fieldMap[m[2]]);
-    return first ? sectionOf(first[2]) : sectionOrder[0];
+    const refs = Array.from(b.template.matchAll(TEMPLATE_TOKEN));
+    const fieldRef = refs.find(m => m[1] !== 'group' && fieldMap[m[2]]);
+    if (fieldRef) return sectionOf(fieldRef[2]);
+    const groupRef = refs.find(m => m[1] === 'group' && groupMap[m[2]]?.fields[0]);
+    return groupRef ? sectionOf(groupMap[groupRef[2]].fields[0].key) : DEFAULT_SECTION_CODE;
   };
+  // 無標題區塊沒有任何固定欄位時（段落是它唯一的內容）也要出現
+  for (const b of textBlocks) if (!sectionOrder.includes(blockSection(b))) sectionOrder.push(blockSection(b));
+
+  // 子區塊（parentSectionCode）的父區塊排在第一個子區塊的位置：父區塊自己沒有欄位時不會出現在 fields[] 裡，
+  // 不補的話子區塊會變成最上層，或父區塊被排到最後面把所有子區塊一起帶到最下面
+  for (const child of [...sectionOrder]) {
+    const parent = sectionTitles.get(child)?.parentSectionCode;
+    if (!parent) continue;
+    const at = sectionOrder.indexOf(child);
+    const parentAt = sectionOrder.indexOf(parent);
+    if (parentAt === -1) sectionOrder.splice(at, 0, parent);
+    else if (parentAt > at) {
+      sectionOrder.splice(parentAt, 1);
+      sectionOrder.splice(at, 0, parent);
+    }
+  }
 
   const dateRangeByStart = new Map((meta.dateRanges ?? []).map(r => [r.startFieldCode, r]));
   const dateRangeEnds = new Set((meta.dateRanges ?? []).map(r => r.endFieldCode));
@@ -230,7 +269,7 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
     const usedGroups = new Set<string>();
     const raw: RawItem[] = [];
 
-    for (const f of sectionFields) {
+    for (const f of withNotesAfterParent(sectionFields)) {
       // 表格格子、分組標題欄由 tables[] 畫；被模板引用的欄位嵌在文字裡
       if (f.layout === 'cell' || f.layout === 'group') continue;
       if (refs.fields.has(f.key)) continue;
@@ -254,7 +293,8 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
         if (group.fields.length > 1) continue;
       }
 
-      if (isAmountType(f.type)) {
+      // 表頭區塊（名稱、期間、頁次、收件編號等）一律是一般輸入欄，不論型別都不畫成金額列
+      if (isAmountType(f.type) && code !== 'HEADER') {
         // 帳載／調整後成對：ADJ 併進同列的 BOOK，沒有 BOOK 的 ADJ 自己成列
         if (f.column === 'ADJ' && f.rowCode && bookRows.has(f.rowCode)) continue;
         const row: ReportRowDef = { main: f, adj: f.column === 'BOOK' && f.rowCode ? adjByRow.get(f.rowCode) : undefined };

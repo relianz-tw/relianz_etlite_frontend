@@ -372,16 +372,16 @@ POST /ael/invoice/identification/one 自動帶入的表單欄位。
 實作見 `src/features/initialization/components/paper/`（`PaperForm`）。版面由 metadata 決定，前端不寫死區塊標題、欄位配對或加總。
 
 - **區塊標題**：取 `sections[].title`，`text-lg font-bold`，下方 `border-b-2 border-neutral-dark`；子區塊（`parentSectionCode`）改 `text-base font-bold`、無底線。沒有 `title` 的區塊不畫標題。
-- **一列**：`代號 chip ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。**不使用**「＋」「－」「＝」運算符號徽章與小計淡藍底；標籤一律用 `displayName`，減項只在金額欄語意標記（`isDeduction`），不自行加「減：」。
-- **代號 chip**：`h-6 rounded bg-brand-blue/10 text-xs font-bold text-brand-blue`，內容為 `officialFieldCode`；有 `refNo`（圈號）時接在後面（如 `21 ①`）。沒有代號時留白佔位讓金額框對齊。
+- **一列**：`代號 chip ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。**不使用**「＋」「－」「＝」運算符號徽章與小計淡藍底；標籤一律用 `displayName`，字重一律 `font-medium`（小計與一般列相同），減項（`isDeduction`）後端標籤已帶「減：」的不重複；標籤本身沒有「減：」的減項，前端在標籤前補「減：」（金額框內不加標記）。
+- **代號**：無底色，`h-6 text-sm font-bold text-brand-blue`，與輸入框上下置中（列用 `items-center`），內容為 `officialFieldCode`；有 `refNo`（圈號）時接在後面（如 `21 ①`）。沒有代號時留白佔位讓金額框對齊。
 - **標籤附註**：`note` 為標籤後 `text-[13px] text-neutral-mid` 小字括號；`formula.text` 以括號接在標籤後，欄位唯讀（`isSubtotal`，後端計算，前端不加總）。
 - **成對欄位**：`column` 為 `BOOK`／`ADJ` 的欄位依 `rowCode` 合成一列，桌機並排 170px 兩欄，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
-- **行內／段落空格**：`labelTemplate` 與 `textBlocks[].template` 的 `{{field:}}` 畫成嵌在文字中的小輸入框（沿用輸入元件高度，寬 `w-36`），`{{ref:}}` 為唯讀值，`{{group:}}` 為行內勾選框。
+- **行內／段落空格**：`labelTemplate` 與 `textBlocks[].template` 的 `{{field:}}` 畫成嵌在文字中的小輸入框（沿用輸入元件高度，寬 `w-36`），`{{ref:}}` 為唯讀值，`{{group:}}` 為行內勾選框。沒有 `{{field:}}`、`{{group:}}` 的純說明段落，以及表格的 `note` 說明文字，一律不顯示；只有要輸入文字或勾選的說明才出現。
 - **百分比**（`dataType: 6`）：輸入框尾端固定顯示 `%`，可輸入負號；數值為顯示值（20 代表 20%）。
 - **金額負值**：金額欄一律開放正負切換（`MoneyInput allowSign`）。
 - `groupCode` 只是分組代碼（metadata 沒有標題文字），不畫小標。
 - **收合**：辨識帶入後欄位很多的區塊，沒有金額的列預設收合，連結 `text-[13px] font-medium text-brand-blue` 附 `ChevronDown`。
-- **本期結果卡**（營業稅）：應繳 `border-brand-blue/35 bg-brand-blue/10`，留抵 `border-semantic-success/40 bg-semantic-success/5`；金額 `text-2xl font-bold`。
+- **本期結果卡**（營業稅）：精簡一塊，`rounded-lg border border-neutral-blue-gray/30 bg-surface-cream px-4 py-3`，不用藍／綠底色；只有圖示分色（應繳 `Wallet` 藍、留抵 `CircleCheck` 綠，`size 20`）；標題 `text-[13px] font-bold`、金額 `text-lg font-bold`、說明 `text-xs text-neutral-mid`。
 - `hidden: true` 的欄位不畫，但值保留在 state 並照常送出；`visibleWhen` 條件成立才顯示。
 
 ### 紙本表格（Paper Table）
