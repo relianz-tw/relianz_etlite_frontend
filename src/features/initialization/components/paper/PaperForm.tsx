@@ -11,6 +11,7 @@ import { ChoiceGroup } from './ChoiceGroup';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { PaperStoreProvider, effectiveNumber, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
+import { BOLD_CHECK_KEYS, DIVIDER_BEFORE_SECTIONS, EXEMPT_COLLAPSE } from './exemptRules';
 import { RECON_DIFF_FIELD, RECON_GROUPS, itemGroupCode, splitItemsByGroup } from './reconGroups';
 import { PaperTable } from './PaperTable';
 import { TemplateText } from './TemplateText';
@@ -20,6 +21,9 @@ const COLUMN_HEADS = { BOOK: '帳載結算金額', ADJ: '自行依法調整後�
 
 /** 對帳模式只呈現有數字的金額列與表格，其餘（輸入欄、勾選、段落）不畫 */
 const COMPARE_KINDS: ReportSectionItem['kind'][] = ['amountRows', 'table'];
+
+/** 段落模板內有 {{field:}}（輸入框）或 {{group:}}（勾選框）才算有要填的內容 */
+const HAS_INPUT_TOKEN = /\{\{(field|group):/;
 
 function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
   if (store.renderValue && !COMPARE_KINDS.includes(item.kind)) return false;
@@ -31,6 +35,9 @@ function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
       return item.fields.some(f => isFieldShown(f, store));
     case 'table':
       return store.renderValue ? Object.values(item.table.cells).some(f => isFieldShown(f, store)) : true;
+    case 'text':
+      // 純說明文字（沒有要輸入的欄位或勾選）不顯示，只有內嵌輸入框／勾選框的段落才畫
+      return HAS_INPUT_TOKEN.test(item.block.template);
     default:
       return true;
   }
@@ -138,13 +145,22 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
             // 勾選項文字內嵌輸入框（如「…利息支出合計數 ___ 元」）：勾選框後接模板文字
             f.labelTemplate ? (
               <label key={f.key} className='flex w-full items-center gap-2 text-sm leading-9 text-neutral-dark'>
+                <CodeChip official={f.officialCode} refNo={f.refNo} />
                 <Checkbox checked={Number(store.get(f.key).value) === 1} onChange={() => store.set(f.key, Number(store.get(f.key).value) === 1 ? 0 : 1)} aria-label={f.label} />
                 <span className='min-w-0'>
                   <TemplateText template={f.labelTemplate} />
                 </span>
               </label>
+            ) : BOLD_CHECK_KEYS.includes(f.key) ? (
+              <label key={f.key} className='flex w-full cursor-pointer items-center gap-2 text-sm font-bold leading-9 text-neutral-dark'>
+                <Checkbox checked={Number(store.get(f.key).value) === 1} onChange={() => store.set(f.key, Number(store.get(f.key).value) === 1 ? 0 : 1)} aria-label={f.label} />
+                <span className='min-w-0'>{f.label}</span>
+              </label>
             ) : (
-              <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
+              <div key={f.key} className='flex items-center gap-2'>
+                <CodeChip official={f.officialCode} refNo={f.refNo} />
+                <ReportFieldRow field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
+              </div>
             )
           )}
         </div>
@@ -222,9 +238,11 @@ function dividerBefore(section: ReportSectionDef, prev: ReportSectionDef | undef
 }
 
 function SectionBlock({ section, all, store, depth, divider = 'none' }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number; divider?: 'line' | 'merged' | 'none' }) {
-  const children = all.filter(s => s.parentKey === section.key && isSectionShown(s, all, store));
+  // 勾了免填，它底下歸屬的區塊收起來
+  const collapsedKeys = Object.entries(EXEMPT_COLLAPSE).flatMap(([flag, keys]) => (!store.renderValue && Number(store.get(flag).value) === 1 ? keys : []));
+  const children = all.filter(s => s.parentKey === section.key && !collapsedKeys.includes(s.key) && isSectionShown(s, all, store));
   return (
-    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
+    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
       {section.title &&
         (depth === 0 ? (
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{section.title}</h2>

@@ -131,6 +131,8 @@ function insertPlaced(base: RawItem[], placed: { code: string; placeAfter?: stri
   const tops = placed.filter(p => p.placeAfter === 'TOP');
   const tails = placed.filter(p => !p.placeAfter);
   result.unshift(...tops.map(p => ({ item: p.item, anchors: [p.code] })));
+  // placeAfter 為 null 的先依序放最後；其他項目可能接在它們後面（如段落接在 placeAfter 為 null 的表格後），所以要先放進去才找得到
+  result.push(...tails.map(p => ({ item: p.item, anchors: [p.code] })));
   // 被引用的項目可能是另一個剛插入的段落，所以重複掃到沒有進展為止
   let progressed = true;
   while (pending.length > 0 && progressed) {
@@ -146,7 +148,7 @@ function insertPlaced(base: RawItem[], placed: { code: string; placeAfter?: stri
     }
   }
   // 找不到被引用項目的，退回放區塊最後，不讓內容消失
-  result.push(...[...pending, ...tails].map(p => ({ item: p.item, anchors: [p.code] })));
+  result.push(...pending.map(p => ({ item: p.item, anchors: [p.code] })));
   return result;
 }
 

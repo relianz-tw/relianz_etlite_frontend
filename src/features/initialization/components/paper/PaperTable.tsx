@@ -10,6 +10,8 @@ import { FieldInput, StoreFieldInput } from './FieldInput';
 import { isFieldShown, usePaperStore } from './PaperStore';
 
 /** 紙本斜線（不可填的格子、左上角斜線格）：對角線用既有 neutral-blue-gray token */
+/** 左上角表頭格的斜線：由左上到右下（欄名在右上、列名在左下），與不可填格子的「／」方向相反 */
+const CORNER_SLASH_CLASS = 'bg-[linear-gradient(to_top_right,transparent_calc(50%-0.5px),theme(colors.neutral.blue-gray)_50%,transparent_calc(50%+0.5px))]';
 const SLASH_CLASS = 'bg-[linear-gradient(to_bottom_right,transparent_calc(50%-0.5px),theme(colors.neutral.blue-gray)_50%,transparent_calc(50%+0.5px))]';
 
 /** 固定列超過此數量且有辨識值時，沒有值的列預設收合 */
@@ -192,10 +194,10 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
 
   return (
     <div className='flex min-w-0 flex-col gap-2'>
-      {(table.title || table.note) && (
+      {/* 表格的說明文字（table.note）是純說明，不顯示 */}
+      {table.title && (
         <div className='flex flex-wrap items-baseline gap-x-3'>
-          {table.title && <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>}
-          {table.note && <span className='text-[13px] text-neutral-mid'>{table.note}</span>}
+          <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>
         </div>
       )}
 
@@ -212,7 +214,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                   )}
                   {level === 0 && hasGroupCol && <th rowSpan={headerDepth} className={cn(border, 'px-2 py-2')} />}
                   {level === 0 && hasLabelCol && (
-                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[140px] p-0', table.corner && SLASH_CLASS)}>
+                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[140px] p-0', table.corner && CORNER_SLASH_CLASS)}>
                       {table.corner && (
                         <div className='flex h-full min-h-14 flex-col justify-between px-2 py-1'>
                           <span className='text-right'>{table.corner.column}</span>

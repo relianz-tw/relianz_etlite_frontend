@@ -20,6 +20,8 @@ interface ChoiceGroupProps {
 export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
   const store = usePaperStore();
   const isOn = (key: string) => Number(store.get(key).value) === 1;
+  // 是／否題：紙本是「□是 □否：題目」同一行，勾選框在題目前面
+  const yesNo = !inline && choice.fields.length === 2 && choice.fields[0].label === '是' && choice.fields[1].label === '否';
 
   const toggle = (key: string) => {
     const next = !isOn(key);
@@ -31,7 +33,7 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
 
   const options = (
     <div
-      className={cn(!choice.columns && 'flex flex-wrap gap-x-8 gap-y-2', inline && 'inline-flex items-center align-middle')}
+      className={cn(!choice.columns && 'flex flex-wrap gap-x-8 gap-y-2', yesNo && 'shrink-0 flex-nowrap gap-x-4', inline && 'inline-flex items-center align-middle')}
       style={choice.columns ? { display: 'grid', gridTemplateColumns: `repeat(${choice.columns}, minmax(0, 1fr))`, columnGap: 32, rowGap: 8 } : undefined}
     >
       {choice.fields.map(f => {
@@ -51,6 +53,17 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
   );
 
   if (inline) return options;
+
+  if (yesNo) {
+    return (
+      <div className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1'>
+        {choice.officialCode && <CodeChip official={choice.officialCode} />}
+        {options}
+        <span className='min-w-0 text-sm font-medium text-neutral-dark'>{choice.title}</span>
+        {choice.note && <span className='min-w-0 text-[13px] text-neutral-mid'>{choice.note}</span>}
+      </div>
+    );
+  }
 
   return (
     <div className='flex min-w-0 flex-col gap-2'>
