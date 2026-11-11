@@ -22,6 +22,8 @@ export interface ReportFieldDef {
   parentKey?: string;
   /** 扣除項語意標記（名稱以 label 為準，不自行加「減：」） */
   isDeduction?: boolean;
+  /** 紙本填在「合計」欄的科目（資產負債表），標題粗體 */
+  isTotalColumn?: boolean;
   /** 小計／算式欄：欄位可編輯；沒有帶入值也沒輸入時，前端依 formulaExpr 試算顯示 */
   isSubtotal?: boolean;
   /** 紙本編號（同一張表可重複，不可當 key） */

@@ -41,6 +41,7 @@ function toFieldDef(f: MetadataField): ReportFieldDef {
     parentKey: f.parentFieldCode ?? undefined,
     isDeduction: f.isDeduction || undefined,
     isSubtotal: f.isSubtotal || undefined,
+    isTotalColumn: f.isTotalColumn || undefined,
     officialCode: f.officialFieldCode ?? undefined,
     refNo: f.refNo ?? undefined,
     note: f.note ?? undefined,

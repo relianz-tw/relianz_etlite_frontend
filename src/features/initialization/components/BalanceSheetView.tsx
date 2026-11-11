@@ -71,13 +71,13 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
     return Math.max(0, depth - 1);
   };
 
-  // 頂層科目（沒有父科目：小計、資本公積、減：庫藏股票等，與紙本區塊標題同一層）標題粗體
+  // 紙本填在「合計」欄的科目（後端 isTotalColumn：小計、資本公積、減：庫藏股票等）標題粗體
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
     <div key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
       <span style={{ paddingLeft: depthOf(field) * 16 }} className='flex min-w-0 items-center gap-2'>
         {/* 紙本科目編號（如 1111）；沒有編號的科目留空不佔位 */}
         <CodeChip official={field.officialCode} refNo={field.refNo} />
-        <span className={cn('min-w-0 break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal || !field.parentKey ? 'font-bold' : 'font-normal')}>
+        <span className={cn('min-w-0 break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal || field.isTotalColumn ? 'font-bold' : 'font-normal')}>
           {field.labelTemplate && store ? (
             <PaperStoreProvider value={store}>
               <TemplateText template={field.labelTemplate} />
