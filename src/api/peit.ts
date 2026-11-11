@@ -189,8 +189,11 @@ export interface FormMetadata {
 /** 依 dataType 取出該欄位實際值；未辨識（皆為 null）回傳 undefined，畫面上維持留空 */
 export function pickIdentifiedValue(field: IdentifiedField): string | number | undefined {
   switch (field.dataType) {
-    case 0: // 文字
-      return field.valueText ?? undefined;
+    case 0: {
+      // 文字：辨識結果常夾帶空白（如統編「6064 1234」、姓名中間有空格），一律移除所有空白（含全形空白與零寬字元）
+      const text = field.valueText?.replace(/[\s\u200B-\u200D\uFEFF]+/g, '');
+      return text ? text : undefined;
+    }
     case 1: // 金額元
     case 5: // 純整數
     case 6: // 百分比：顯示值（15＝15%），同樣放在 valueInt
