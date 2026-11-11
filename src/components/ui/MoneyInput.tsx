@@ -22,6 +22,8 @@ interface MoneyInputProps {
   typedSign?: boolean;
   /** 由 AI／自動辨識帶入值且使用者尚未修改時為 true，顯示綠框＋閃電提示（見 DESIGN.md AI 填入欄位提示） */
   aiFilled?: boolean;
+  /** 輸入框內金額前後顯示括號（$ ( 1,000 )），會計上代表負值（紙本以（）表示的減項）；輸入的仍是正數，正負由呼叫端處理 */
+  parentheses?: boolean;
 }
 
 export default function MoneyInput({
@@ -36,6 +38,7 @@ export default function MoneyInput({
   lockedSign,
   typedSign,
   aiFilled,
+  parentheses,
 }: MoneyInputProps) {
   // value 為 0 時正負號無法從數值本身判斷（0 與 -0 顯示相同），故另外保留一份「目前選定的正負號」，
   // 供使用者尚未輸入數字前先切換方向，之後輸入的數字即套用此方向
@@ -131,7 +134,7 @@ export default function MoneyInput({
         )}
       >
         {aiFilled && <Zap aria-hidden="true" size={14} className="shrink-0 fill-semantic-success text-semantic-success" />}
-        <span className="shrink-0 text-sm text-neutral-mid">$</span>
+        <span className="shrink-0 text-sm text-neutral-mid">{parentheses ? '$ (' : '$'}</span>
         <input
           type="text"
           inputMode={typedSign ? 'text' : 'numeric'}
@@ -144,6 +147,7 @@ export default function MoneyInput({
           placeholder="0"
           className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
         />
+        {parentheses && <span className="shrink-0 text-sm text-neutral-mid">)</span>}
       </div>
     </div>
   );

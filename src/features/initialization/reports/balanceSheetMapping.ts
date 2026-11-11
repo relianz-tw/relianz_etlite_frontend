@@ -29,7 +29,9 @@ export function toOpeningBalancePayload(balanceSheetFields: Record<string, Repor
     if (!group) continue;
     for (const field of section.fields) {
       if (field.type !== 'money' || field.isSubtotal || subtotalKeys.has(field.key) || parentKeys.has(field.key)) continue;
-      payload[group][field.key] = Number(balanceSheetFields[field.key]?.value) || 0;
+      const value = Number(balanceSheetFields[field.key]?.value) || 0;
+      // 減項科目（紙本以（）表示）一律存負值，與畫面輸入正數、辨識帶入正數的情況一致
+      payload[group][field.key] = field.isDeduction ? -Math.abs(value) : value;
     }
   }
   return payload;

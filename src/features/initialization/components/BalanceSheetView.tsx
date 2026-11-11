@@ -17,8 +17,7 @@ import { useInitPaperStore } from './paper/useInitPaperStore';
 import { ReportFieldRow } from './ReportFieldRow';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { cn, fmtCurrency } from '@/lib/utils';
-import { CircleCheck, Clock, Info, TriangleAlert } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { CircleCheck, Clock, TriangleAlert } from 'lucide-react';
 import type { ReportFieldDef, ReportPageDef, ReportSectionDef } from '../reports/types';
 import type { SettlementReportId } from '../state/initializationReducer';
 
@@ -72,12 +71,13 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
     return Math.max(0, depth - 1);
   };
 
+  // 頂層科目（沒有父科目：小計、資本公積、減：庫藏股票等，與紙本區塊標題同一層）標題粗體
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
     <div key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
       <span style={{ paddingLeft: depthOf(field) * 16 }} className='flex min-w-0 items-center gap-2'>
         {/* 紙本科目編號（如 1111）；沒有編號的科目留空不佔位 */}
         <CodeChip official={field.officialCode} refNo={field.refNo} />
-        <span className={cn('min-w-0 break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}>
+        <span className={cn('min-w-0 break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal || !field.parentKey ? 'font-bold' : 'font-normal')}>
           {field.labelTemplate && store ? (
             <PaperStoreProvider value={store}>
               <TemplateText template={field.labelTemplate} />
@@ -87,14 +87,25 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
           )}
         </span>
       </span>
-      <MoneyInput
-        widthClassName='w-full'
-        value={amount(field.key)}
-        allowSign
-        typedSign
-        aiFilled={data[field.key]?.aiFilled}
-        onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value } })}
-      />
+      {field.isDeduction ? (
+        // 減項：紙本以（）表示負值。括號在輸入框內（$ ( 金額 )），輸入正數，存進狀態時一律轉成負值
+        <MoneyInput
+          widthClassName='w-full'
+          parentheses
+          value={Math.abs(amount(field.key))}
+          aiFilled={data[field.key]?.aiFilled}
+          onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value: value === 0 ? 0 : -Math.abs(value) } })}
+        />
+      ) : (
+        <MoneyInput
+          widthClassName='w-full'
+          value={amount(field.key)}
+          allowSign
+          typedSign
+          aiFilled={data[field.key]?.aiFilled}
+          onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value } })}
+        />
+      )}
     </div>
   );
 
@@ -180,9 +191,6 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
             <div className='p-5 md:px-6'>{renderBlock(BALANCE_BLOCKS.nonCurrentLiabilities)}</div>
             {liabilityTotalField && <div className='border-t border-neutral-blue-gray/30 bg-surface-off-white p-5 md:px-6'>{renderRow(liabilityTotalField, true)}</div>}
             <div className='border-t border-neutral-blue-gray/30 p-5 md:px-6'>{renderBlock(BALANCE_BLOCKS.equity)}</div>
-            <div className='border-t border-neutral-blue-gray/30 p-5 md:px-6'>
-              <BalanceChecks amount={amount} />
-            </div>
           </div>
         </div>
 
@@ -253,69 +261,5 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         </span>
       </section>
     </>
-  );
-}
-
-type CheckTone = 'ok' | 'error' | 'info' | 'pending';
-
-const TONE_STYLE: Record<CheckTone, { icon: LucideIcon; iconClass: string; pillClass: string }> = {
-  ok: { icon: CircleCheck, iconClass: 'text-semantic-success', pillClass: 'bg-semantic-success/10 text-semantic-success' },
-  error: { icon: TriangleAlert, iconClass: 'text-semantic-error', pillClass: 'bg-semantic-error/10 text-semantic-error' },
-  info: { icon: Info, iconClass: 'text-brand-blue', pillClass: 'bg-brand-blue/10 text-brand-blue' },
-  pending: { icon: Clock, iconClass: 'text-neutral-mid', pillClass: 'border border-neutral-blue-gray/50 bg-white text-neutral-mid' },
-};
-
-/** 比對與勾稽：只比對本頁已填的合計欄位，皆為唯讀即時計算 */
-function BalanceChecks({ amount }: { amount: (key: string) => number }) {
-  const assets = amount(ASSET_TOTAL_KEY);
-  const liabilities = amount(LIABILITY_TOTAL_KEY);
-  const equity = amount(BALANCE_BLOCKS.equity.subtotalKey);
-  const currentAssets = amount(BALANCE_BLOCKS.currentAssets.subtotalKey);
-  const currentLiabilities = amount(BALANCE_BLOCKS.currentLiabilities.subtotalKey);
-
-  const equationPending = assets === 0 && liabilities === 0 && equity === 0;
-  const equationDiff = assets - liabilities - equity;
-  const workingPending = currentAssets === 0 && currentLiabilities === 0;
-
-  const checks: { label: string; detail: string; status: string; tone: CheckTone }[] = [
-    {
-      label: '資產 − 負債 = 權益',
-      detail: equationPending
-        ? '資產總計、負債合計、權益總計填完後比對'
-        : equationDiff === 0
-          ? `${fmtCurrency(assets)} − ${fmtCurrency(liabilities)} = ${fmtCurrency(equity)}，與權益總計一致`
-          : `${fmtCurrency(assets)} − ${fmtCurrency(liabilities)} = ${fmtCurrency(assets - liabilities)}，與權益總計相差 ${fmtCurrency(equationDiff)}`,
-      status: equationPending ? '待填' : equationDiff === 0 ? '一致' : '不一致',
-      tone: equationPending ? 'pending' : equationDiff === 0 ? 'ok' : 'error',
-    },
-    {
-      label: '營運資金（流動資產 − 流動負債）',
-      detail: workingPending ? '流動資產合計、流動負債合計填完後顯示' : `${fmtCurrency(currentAssets)} − ${fmtCurrency(currentLiabilities)} = ${fmtCurrency(currentAssets - currentLiabilities)}`,
-      status: workingPending ? '待填' : '參考',
-      tone: workingPending ? 'pending' : 'info',
-    },
-  ];
-
-  return (
-    <div className='flex flex-col gap-3'>
-      <div className='flex flex-col gap-0.5'>
-        <h3 className='text-[15px] font-bold text-neutral-dark'>比對與勾稽</h3>
-        <span className='text-xs text-neutral-mid'>跟著上方填寫的數字即時計算</span>
-      </div>
-      {checks.map(check => {
-        const tone = TONE_STYLE[check.tone];
-        const Icon = tone.icon;
-        return (
-          <div key={check.label} className='flex items-start gap-2.5 rounded-lg bg-surface-off-white px-3.5 py-3'>
-            <Icon size={16} className={cn('mt-1 shrink-0', tone.iconClass)} />
-            <div className='flex min-w-0 flex-1 flex-col'>
-              <span className='text-sm font-medium text-neutral-dark'>{check.label}</span>
-              <span className='text-xs tabular-nums text-neutral-mid'>{check.detail}</span>
-            </div>
-            <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold', tone.pillClass)}>{check.status}</span>
-          </div>
-        );
-      })}
-    </div>
   );
 }
