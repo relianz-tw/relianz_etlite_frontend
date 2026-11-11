@@ -62,6 +62,28 @@
 
 若短期不改成表格，至少請依第 3 點排好欄位順序。
 
+## 6. 進項區塊下方：每個項目各自一行
+
+進項表格下方有幾個欄位（不得扣抵比例、得扣抵之進項稅額、進口免稅貨物、購買國外勞務），目前每份文件都只有一個段落，把它們接在同一段文字裡，在畫面上擠在一起折行。
+請拆成獨立的 `textBlocks`（`sectionCode: INPUT`），每個項目一個，每個一行：
+
+**【403】**（現況 `TB_IN_RATIO` 一個段落，`placeAfter: VAT_INPUT`）拆成三個：
+
+| 段落 | 模板 | `placeAfter` |
+|------|------|--------------|
+| `TB_IN_RATIO` | `不得扣抵比例（④＋⑤－⑧）／（⑦－⑧）50 {{field:IN_NONDEDUCT_RATIO}} %` | `VAT_INPUT` |
+| `TB_IN_DEDUCTIBLE` | `得扣抵之進項稅額（⑨＋⑩）×（1－⑪）51 {{field:IN_DEDUCTIBLE_TAX}} 元` | `TB_IN_RATIO` |
+| `TB_IN_IMPORT` | `進口免稅貨物 73 {{field:IN_IMPORT_TAX_FREE}} 元` | `TB_IN_DEDUCTIBLE` |
+
+**【401】**（現況 `TB_IN_IMPORT` 一個段落，`placeAfter: VAT_INPUT`）拆成兩個：
+
+| 段落 | 模板 | `placeAfter` |
+|------|------|--------------|
+| `TB_IN_IMPORT` | `進口免稅貨物 73 {{field:IN_IMPORT_TAX_FREE}} 元` | `VAT_INPUT` |
+| `TB_IN_FOREIGN` | `購買國外勞務 74 {{field:IN_FOREIGN_SERVICES}} 元` | `TB_IN_IMPORT` |
+
+（段落代碼只是建議，後端可自訂；原則是一個編號一個段落。）
+
 ## 前端處理
 
 前端只依 `fields[]` 順序、`sectionCode` 與 `placeAfter` 排版，不自行調整，後端調整後不需要改前端。
