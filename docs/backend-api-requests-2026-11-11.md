@@ -177,3 +177,24 @@ staging 實測畫面：表頭欄位在 `fields[]` 的位置排在文件內容之
 3. `fields[]` 裡該欄位的位置不影響畫面，可留在原處。
 
 前端依 `placeAfter` 排版，不需要另外改動。
+
+---
+
+# 損益表表頭：收件編號與所得期間同一排、房地合一勾選移到最下方
+
+## 需要後端調整（formNo 2，`HEADER` 區塊的 `fields[]` 順序）
+
+目前順序：`HDR_PERIOD_START`、`HDR_PERIOD_END`、`FLAG_REAL_ESTATE`（申報適用房地合一稅制者）、`HDR_COMPANY_NAME`、`HDR_VAT_NO`、`ORG_*`（組織種類）、`HDR_RECEIPT_NO`（收件編號）、`FLAG_INNOVATION_ACT`、`HDR_TAX_YEAR`。
+
+請改成：
+
+1. `HDR_PERIOD_START`、`HDR_PERIOD_END`（所得期間）
+2. `HDR_RECEIPT_NO`（收件編號）← 緊接在所得期間後面，前端會把它和所得期間放同一排
+3. `HDR_COMPANY_NAME`、`HDR_VAT_NO`（營利事業名稱、統一編號，同一排）
+4. `ORG_*`（組織種類）
+5. `FLAG_REAL_ESTATE`（申報適用房地合一稅制者）← 移到表頭最下方
+6. `HDR_TAX_YEAR`（前端自動帶入，不顯示）
+
+`FLAG_INNOVATION_ACT` 不再放表頭，改放營業收入分類表下方（見上一段）。
+
+前端已支援「所得期間後面緊接收件編號就同一排」，後端調整順序後即可生效。
