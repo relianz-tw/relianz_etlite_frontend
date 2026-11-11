@@ -11,6 +11,8 @@ import {
 import { ChoiceGroup } from './paper/ChoiceGroup';
 import { PaperForm } from './paper/PaperForm';
 import { PaperStoreProvider } from './paper/PaperStore';
+import { CodeChip } from './paper/CodeChip';
+import { TemplateText } from './paper/TemplateText';
 import { useInitPaperStore } from './paper/useInitPaperStore';
 import { ReportFieldRow } from './ReportFieldRow';
 import MoneyInput from '@/components/ui/MoneyInput';
@@ -53,6 +55,12 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
 
   const amount = (key: string) => Number(data[key]?.value) || 0;
 
+  // 被列標題模板（labelTemplate）用 {{field:}} 嵌進別列標題的欄位（如 1510 無形資產「包括商譽金額 ＿ 元」），不再單獨畫成一列
+  const embeddedKeys = new Set<string>();
+  for (const f of fieldMap.values()) {
+    if (f.labelTemplate) for (const m of f.labelTemplate.matchAll(/\{\{field:([^}]+)\}\}/g)) embeddedKeys.add(m[1]);
+  }
+
   // 依父科目（parentFieldCode）算縮排層級：區塊小計（BS_1100 等）以外，每往下一層縮 16px，最多三層
   const depthOf = (field: ReportFieldDef): number => {
     let depth = 0;
@@ -65,12 +73,19 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   };
 
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
-    <label key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
-      <span
-        style={{ paddingLeft: depthOf(field) * 16 }}
-        className={cn('break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}
-      >
-        {field.label}
+    <div key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
+      <span style={{ paddingLeft: depthOf(field) * 16 }} className='flex min-w-0 items-center gap-2'>
+        {/* 紙本科目編號（如 1111）；沒有編號的科目留空不佔位 */}
+        <CodeChip official={field.officialCode} refNo={field.refNo} />
+        <span className={cn('min-w-0 break-words leading-snug text-neutral-dark', field.label.length > 16 ? 'text-xs' : 'text-sm', emphasized || field.isSubtotal ? 'font-bold' : 'font-normal')}>
+          {field.labelTemplate && store ? (
+            <PaperStoreProvider value={store}>
+              <TemplateText template={field.labelTemplate} />
+            </PaperStoreProvider>
+          ) : (
+            field.label
+          )}
+        </span>
       </span>
       <MoneyInput
         widthClassName='w-full'
@@ -80,14 +95,14 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         aiFilled={data[field.key]?.aiFilled}
         onChange={value => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: REPORT_ID, key: field.key, value } })}
       />
-    </label>
+    </div>
   );
 
   const renderBlock = (config: BalanceBlockConfig) => {
     const section = sectionMap.get(config.sectionKey);
     const subtotal = fieldMap.get(config.subtotalKey);
     if (!section) return null;
-    const rows = section.fields.filter(f => f.key !== config.subtotalKey);
+    const rows = section.fields.filter(f => f.key !== config.subtotalKey && !embeddedKeys.has(f.key));
     return (
       <div className='flex h-full flex-col gap-2'>
         <div className='flex items-baseline gap-2'>
