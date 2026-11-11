@@ -89,8 +89,25 @@ export function isSoleOrPartnership(orgType: OrgType): boolean {
   return orgType === 'sole' || orgType === 'partnership';
 }
 
-/** 該文件對此組織型態是否需要（獨資／合夥沒有未分配盈餘申報書與股東名簿；尚未選擇時視為公司） */
-export function isFormApplicable(formCode: SettlementReportId, orgType: OrgType): boolean {
-  if (!isSoleOrPartnership(orgType)) return true;
-  return formCode !== 'CIT_UE' && formCode !== 'CIT_SHAREHOLDERS';
+/** 判斷文件是否需要時用到的開帳資訊（設立年度只有公司會問） */
+export interface FormApplicableContext {
+  /** 開帳年度（民國） */
+  openYear?: number | null;
+  /** 公司的設立年度（民國） */
+  establishYear?: number | null;
+}
+
+/**
+ * 該文件對此組織型態是否需要：
+ * - 股東名簿：不是逐頁核對的文件（公司改成上傳檔案）
+ * - 前一年度未分配盈餘申報書：只有公司才有；開帳年度的前一年就是設立年度時沒有前一年度可申報，不顯示；獨資、合夥不用
+ * - 其他營所稅文件（含基本稅額申報表）：各組織型態都要
+ */
+export function isFormApplicable(formCode: SettlementReportId, orgType: OrgType, ctx: FormApplicableContext = {}): boolean {
+  if (formCode === 'CIT_SHAREHOLDERS') return false;
+  if (formCode === 'CIT_UE') {
+    if (isSoleOrPartnership(orgType)) return false;
+    return !(ctx.openYear != null && ctx.establishYear != null && ctx.establishYear === ctx.openYear - 1);
+  }
+  return true;
 }

@@ -77,6 +77,8 @@ export interface InitializationState {
   operatingStatus: OperatingStatus;
   /** 開帳年度（民國年），預設值見 reports/formList.ts getCurrentOpenYear；尚未進入步驟 2 前為 null */
   openYear: number | null;
+  /** 公司的設立年度（民國）；開帳年度前一年等於它就沒有前一年度未分配盈餘申報書 */
+  establishYear: number | null;
   /** 辨識後各表自己的民國年；未辨識的表退回 getDefaultFormYear 的預設年度 */
   reportYears: Partial<Record<ReportKey, number>>;
   /** 營業稅各期使用的申報書：key 為期別頁 key（`VAT:115-3`），值為 401 或 403（擇一）；沒選過視為 401 */
@@ -139,6 +141,7 @@ export const initialState: InitializationState = {
   orgType: null,
   operatingStatus: null,
   openYear: null,
+  establishYear: null,
   reportYears: {},
   vatChoices: {},
   reportPages: [],
@@ -189,6 +192,7 @@ export type InitializationAction =
   | { type: 'SET_ORG_TYPE'; payload: OrgType }
   | { type: 'SET_OPERATING_STATUS'; payload: OperatingStatus }
   | { type: 'SET_OPEN_YEAR'; payload: number | null }
+  | { type: 'SET_ESTABLISH_YEAR'; payload: number | null }
   | { type: 'SET_SIMULATED_DATE'; payload: string | null }
   | { type: 'SET_VAT_CHOICE'; payload: { pageKey: string; formCode: VatFormCode } }
   | { type: 'APPLY_REPORT_PLAN'; payload: ReportPageSpec[] }
@@ -389,6 +393,9 @@ export function initializationReducer(state: InitializationState, action: Initia
 
     case 'SET_OPEN_YEAR':
       return { ...state, openYear: action.payload };
+
+    case 'SET_ESTABLISH_YEAR':
+      return { ...state, establishYear: action.payload };
 
     case 'SET_SIMULATED_DATE':
       return { ...state, simulatedDate: action.payload };

@@ -8,8 +8,8 @@ import type { PaperStore } from './PaperStore';
 
 const EMPTY_FIELD: ReportField = { value: '', aiFilled: false };
 
-/** 區塊列數超過此數量，且已有辨識帶入的值時，沒有值的列預設收合 */
-const COLLAPSE_THRESHOLD = 12;
+/** 區塊列數超過此數量，且已有辨識帶入的值時，金額是 0 或空白的列預設收合 */
+const COLLAPSE_THRESHOLD = 6;
 
 /** 開帳精靈用的 PaperStore：讀寫 InitializationContext 裡該頁（reportId）的欄位與可重複列 */
 export function useInitPaperStore(reportId: ReportKey, page: ReportPageDef | null, readOnlyKeys?: string[]): PaperStore | null {

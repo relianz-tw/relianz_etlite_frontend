@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePicker from '@/components/ui/DatePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import TextInput from '@/components/ui/TextInput';
 import { cn, formatLocalDate } from '@/lib/utils';
 import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -22,10 +23,10 @@ const STATUS_OPTIONS: { value: Exclude<OperatingStatus, null>; title: string; de
 ];
 
 const ORG_OPTIONS: { value: Exclude<OrgType, null>; title: string; desc: string }[] = [
-  { value: 'share', title: ORG_TYPE_LABEL.share, desc: '需備股東名簿與未分配盈餘申報書' },
-  { value: 'limited', title: ORG_TYPE_LABEL.limited, desc: '需備股東名簿與未分配盈餘申報書' },
-  { value: 'sole', title: ORG_TYPE_LABEL.sole, desc: '改填負責人資料，不需股東名簿' },
-  { value: 'partnership', title: ORG_TYPE_LABEL.partnership, desc: '改填負責人及合夥人資料，不需股東名簿' },
+  { value: 'share', title: ORG_TYPE_LABEL.share, desc: '需備登記事項表、公司章程與股東名簿' },
+  { value: 'limited', title: ORG_TYPE_LABEL.limited, desc: '需備登記事項表、公司章程與股東名簿' },
+  { value: 'sole', title: ORG_TYPE_LABEL.sole, desc: '改填負責人資料，需備商業抄本' },
+  { value: 'partnership', title: ORG_TYPE_LABEL.partnership, desc: '改填負責人及合夥人資料，需備商業抄本與合夥契約' },
 ];
 
 
@@ -94,7 +95,7 @@ export function Step2Operating() {
   }, [autoBaseDate, state.openingBalance.baseDate, dispatch]);
 
   // 步驟 4 要逐頁核對的頁面（營所稅各表＋營業稅各期）；未滿一年不逐頁核對，為空
-  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, baseDate: state.openingBalance.baseDate, today, orgType: state.orgType }) : [];
+  const plan = isOverOneYear && state.openYear !== null ? buildReportPages({ openYear: state.openYear, baseDate: state.openingBalance.baseDate, today, orgType: state.orgType, establishYear: state.establishYear }) : [];
   const vatPages = plan.filter(p => p.period);
   const requiredVat = describePeriods(vatPages.filter(p => p.required));
   const optionalVat = describePeriods(vatPages.filter(p => !p.required));
@@ -110,7 +111,10 @@ export function Step2Operating() {
   // 穩定經營需再選年度才算完成；開帳基準日兩種營運狀況都必填（確認開帳時會寫入後端開帳日）
   const hasOrgType = state.orgType !== null;
   const hasBaseDate = state.openingBalance.baseDate !== '';
-  const ready = hasOrgType && hasBaseDate && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear));
+  // 公司還要填設立年度（民國），要早於開帳年度，才知道有沒有前一年度的未分配盈餘申報書（獨資、合夥沒有這份文件，不用問）
+  const asksEstablishYear = isOverOneYear && state.orgType !== null && !isSoleOrPartnership(state.orgType);
+  const establishYearValid = state.establishYear !== null && state.openYear !== null && state.establishYear >= 1 && state.establishYear < state.openYear;
+  const ready = hasOrgType && hasBaseDate && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear && (!asksEstablishYear || establishYearValid)));
   const registrationDocs = getRegistrationDocs(state.orgType);
 
   const hint =
@@ -120,9 +124,11 @@ export function Step2Operating() {
       ? '選擇營運狀況後，會顯示接下來需要準備的文件。'
       : isOverOneYear && !hasYear
         ? '選擇開帳年度後，會顯示需要準備的文件。'
-        : !hasBaseDate
-          ? '請選擇開帳基準日。'
-          : '';
+        : asksEstablishYear && !establishYearValid
+          ? '請填寫公司設立年度（要早於開帳年度），會依此決定要不要前一年度的未分配盈餘申報書。'
+          : !hasBaseDate
+            ? '請選擇開帳基準日。'
+            : '';
 
   // 此頁不提供「上一頁」
   const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一頁', nextDisabled: !ready };
@@ -309,17 +315,46 @@ export function Step2Operating() {
           </div>
         )}
 
+        {asksEstablishYear && hasYear && state.openYear !== null && (
+          <div className='flex flex-col gap-4 py-6'>
+            <div className='flex items-center gap-3'>
+              <StepBadge n={5} done={establishYearValid} />
+              <div className='flex flex-col'>
+                <h2 className='text-lg font-bold text-neutral-dark'>公司設立年度</h2>
+                <span className='text-[13px] text-neutral-mid'>開帳年度的前一年若就是設立年度，沒有前一年度可申報，就不需要未分配盈餘申報書</span>
+              </div>
+            </div>
+            <div className='flex items-center gap-2'>
+              <span className='text-sm text-neutral-dark'>民國</span>
+              <div className='w-28'>
+                <TextInput
+                  inputMode='numeric'
+                  widthClassName='w-full'
+                  value={state.establishYear === null ? '' : String(state.establishYear)}
+                  placeholder='例如 110'
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 3);
+                    dispatch({ type: 'SET_ESTABLISH_YEAR', payload: digits === '' ? null : Number(digits) });
+                  }}
+                />
+              </div>
+              <span className='text-sm text-neutral-dark'>年</span>
+            </div>
+            {state.establishYear !== null && !establishYearValid && <p className='text-xs text-semantic-error'>設立年度要早於開帳年度（民國 {state.openYear} 年）。</p>}
+          </div>
+        )}
+
         {isOverOneYear && hasYear && state.openYear !== null && (
           <div className='flex flex-col gap-3.5 py-6'>
             <div className='flex items-center gap-3'>
-              <StepBadge n={5} done />
+              <StepBadge n={asksEstablishYear ? 6 : 5} done />
               <h2 className='text-lg font-bold text-neutral-dark'>請先備齊以下文件</h2>
             </div>
             <p className='text-[15px] text-neutral-mid'>
               請準備民國 {state.openYear - 1} 年度的結算申報資料。接下來會一頁一頁呈現表單，每一頁都可以上傳文件快速帶入資料，也可以直接手動輸入。
             </p>
             <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark md:grid-cols-2'>
-              {FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType)).map(form => (
+              {FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType, { openYear: state.openYear, establishYear: state.establishYear })).map(form => (
                 <li key={form.formNo}>
                   {form.title}
                   {form.optional && '（如有）'}

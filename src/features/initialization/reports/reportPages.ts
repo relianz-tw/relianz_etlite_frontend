@@ -91,8 +91,8 @@ export function buildVatPeriods(openYear: number, baseDate: string, today: Date)
 /**
  * 步驟 4 要逐頁核對的所有頁面，順序：營所稅各表 → 營業稅各期（由舊到新，每期擇一填 401 或 403）。
  */
-export function buildReportPages({ openYear, baseDate, today, orgType = null }: { openYear: number; baseDate: string; today: Date; orgType?: OrgType }): ReportPageSpec[] {
-  const cit: ReportPageSpec[] = CIT_PAGE_ORDER.filter(formCode => isFormApplicable(formCode, orgType)).map(formCode => ({
+export function buildReportPages({ openYear, baseDate, today, orgType = null, establishYear = null }: { openYear: number; baseDate: string; today: Date; orgType?: OrgType; establishYear?: number | null }): ReportPageSpec[] {
+  const cit: ReportPageSpec[] = CIT_PAGE_ORDER.filter(formCode => isFormApplicable(formCode, orgType, { openYear, establishYear })).map(formCode => ({
     key: formCode,
     formCode,
     taxYear: getDefaultFormYear(formCode, openYear),

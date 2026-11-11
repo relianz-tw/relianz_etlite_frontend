@@ -154,3 +154,47 @@ staging 實測畫面：表頭欄位在 `fields[]` 的位置排在文件內容之
    所得期間（起、迄）→ 申報適用房地合一稅制者 → 營利事業名稱、統一編號 → 組織種類 → 收件編號 →
    「適用產業創新條例第23條之1規定之有限合夥組織創業投資事業」勾選，**放在表頭最後**。
    其他文件的表頭欄位同樣依紙本由左到右、由上到下的順序。
+
+---
+
+# 「適用產業創新條例第23條之1規定之有限合夥組織創業投資事業」要在營業收入分類表最下方
+
+## 問題
+
+損益及稅額計算表（formNo 2）的 `FLAG_INNOVATION_ACT`（「適用產業創新條例第23條之1規定之有限合夥組織創業投資事業」勾選）目前歸在表頭 `HEADER` 區塊最後面。
+產品要求它放在「營業收入分類表」（`tables[]` 的 `INC_CLASS`，`sectionCode: RATES`）區塊的**最下方**，也就是表格下面。
+
+## 需要後端調整
+
+欄位只能依 `fields[]` 順序排在表格前面，不能排在表格後面（表格 `placeAfter` 為 `null` 時放區塊最後，欄位列在表格之前）。
+請把這個勾選改成段落（`textBlocks`），讓它可以用 `placeAfter` 接在表格後面：
+
+1. `FLAG_INNOVATION_ACT` 的 `sectionCode` 改為 `RATES`。
+2. 新增 `textBlocks`：
+   - `blockCode: TB_INNOVATION_ACT`、`sectionCode: RATES`、`placeAfter: INC_CLASS`
+   - `template: {{field:FLAG_INNOVATION_ACT}} 適用產業創新條例第23條之1規定之有限合夥組織創業投資事業`
+   （欄位被段落引用後，前端不會再單獨畫成一列，勾選框會接在文字前面。）
+3. `fields[]` 裡該欄位的位置不影響畫面，可留在原處。
+
+前端依 `placeAfter` 排版，不需要另外改動。
+
+---
+
+# 損益表表頭：收件編號與所得期間同一排、房地合一勾選移到最下方
+
+## 需要後端調整（formNo 2，`HEADER` 區塊的 `fields[]` 順序）
+
+目前順序：`HDR_PERIOD_START`、`HDR_PERIOD_END`、`FLAG_REAL_ESTATE`（申報適用房地合一稅制者）、`HDR_COMPANY_NAME`、`HDR_VAT_NO`、`ORG_*`（組織種類）、`HDR_RECEIPT_NO`（收件編號）、`FLAG_INNOVATION_ACT`、`HDR_TAX_YEAR`。
+
+請改成：
+
+1. `HDR_PERIOD_START`、`HDR_PERIOD_END`（所得期間）
+2. `HDR_RECEIPT_NO`（收件編號）← 緊接在所得期間後面，前端會把它和所得期間放同一排
+3. `HDR_COMPANY_NAME`、`HDR_VAT_NO`（營利事業名稱、統一編號，同一排）
+4. `ORG_*`（組織種類）
+5. `FLAG_REAL_ESTATE`（申報適用房地合一稅制者）← 移到表頭最下方
+6. `HDR_TAX_YEAR`（前端自動帶入，不顯示）
+
+`FLAG_INNOVATION_ACT` 不再放表頭，改放營業收入分類表下方（見上一段）。
+
+前端已支援「所得期間後面緊接收件編號就同一排」，後端調整順序後即可生效。
