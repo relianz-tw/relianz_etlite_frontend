@@ -134,6 +134,7 @@ export function describePeriods(specs: ReportPageSpec[]): string {
 export function isPageFilled(reports: Record<string, ReportData>, reportKey: string): boolean {
   const report = reports[reportKey];
   if (!report) return false;
-  if (report.rows.length > 0) return true;
+  // 表格預設會有一列空白列，整列都沒填不算有資料
+  if (report.rows.some(row => Object.values(row).some(field => field.value !== '' && field.value !== 0))) return true;
   return Object.entries(report.fields).some(([key, field]) => !key.startsWith('HDR_') && field.value !== '' && field.value !== 0);
 }

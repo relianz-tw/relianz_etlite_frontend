@@ -1,10 +1,11 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ReportFieldDef, ReportPaperTableDef, ReportTableColumnDef } from '../../reports/types';
 import { RowCards } from '../ReportTable';
+import { computeRowFieldValue } from '../../reports/formula';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { isFieldShown, usePaperStore } from './PaperStore';
 
@@ -108,6 +109,14 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   const store = usePaperStore();
   const [open, setOpen] = useState(false);
 
+  // 可重複列的表格一進來預設有一列空白列（只在進頁時補，之後使用者可以刪光）；對帳頁不補、列欄位對不上表頭改用卡片的也不補
+  useEffect(() => {
+    const grid = table.repeatable && (table.rowColumnsMatch || table.rowColumns.length === 0);
+    if (grid && !store.renderValue && store.rows.length === 0) store.addRow([...table.rowColumns, ...table.groupFields]);
+    // 只在進頁時執行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const header = buildHeader(table.columns);
   const hasGroupCol = table.rows.some(r => r.group);
   const hasLabelCol = table.rows.some(r => r.label) || !!table.corner;
@@ -160,7 +169,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
         const col = table.rowColumns.find(f => f.columnCode === c.code);
         return (
           <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
-            {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />}
+            {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} autoValue={computeRowFieldValue(col, table.rowColumns, row)} onChange={value => store.setRowField(index, col.key, value)} />}
           </td>
         );
       })}

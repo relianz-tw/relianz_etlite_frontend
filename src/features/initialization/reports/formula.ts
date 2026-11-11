@@ -204,3 +204,28 @@ export function computeFieldValue(field: ReportFieldDef, fields: ReportFieldDef[
   if (value === null) return null;
   return field.type === 'money' || field.type === 'integer' ? Math.round(value) : Math.round(value * 100) / 100;
 }
+
+/**
+ * 可重複列（投資人明細等）同一列內的算式試算，如 23＝5－22（ROW_DIST_AMT - ROW_RE_INCOME）。
+ * 運算元用該列欄位的 fieldCode；規則同 computeFieldValue：有值以值為主，運算元都沒填過不試算。
+ * @param columns 該表的列欄位（依後端回傳順序）
+ */
+export function computeRowFieldValue(field: ReportFieldDef, columns: ReportFieldDef[], row: Record<string, { value: string | number }>): number | null {
+  if (!field.formulaExpr) return null;
+  const isFilled = (key: string) => row[key] !== undefined && row[key].value !== '';
+
+  const effective = (target: ReportFieldDef, depth: number): Operand => {
+    if (isFilled(target.key)) return { value: Number(row[target.key].value) || 0, touched: true };
+    if (!target.formulaExpr || depth > MAX_DEPTH) return { value: 0, touched: false };
+    const value = evaluateFormula(target.formulaExpr, { resolve, range: () => null });
+    return value === null ? { value: 0, touched: false } : { value, touched: true };
+  };
+  const resolve = (id: string): Operand | null => {
+    const target = columns.find(c => c.key === id);
+    return target ? effective(target, 1) : null;
+  };
+
+  const value = evaluateFormula(field.formulaExpr, { resolve, range: () => null });
+  if (value === null) return null;
+  return field.type === 'money' || field.type === 'integer' ? Math.round(value) : Math.round(value * 100) / 100;
+}
