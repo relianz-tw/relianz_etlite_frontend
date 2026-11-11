@@ -28,6 +28,10 @@ export interface IdentifiedField {
 export interface IdentifiedRow {
   /** 列序，從 1 起 */
   rowIndex: number;
+  /** 財產目錄的列種：DETAIL 明細、SUBTOTAL 類別小計；省略視為 DETAIL */
+  rowKind?: 'DETAIL' | 'SUBTOTAL' | null;
+  /** 財產目錄類別列的分組鍵（類別編號）；明細列、小計列沒有 */
+  groupKey?: string | null;
   fields: IdentifiedField[];
 }
 
@@ -53,7 +57,7 @@ export interface CitIdentifyResult {
   /** 開帳民國年（回傳請求帶入的 openingYear） */
   openingYear?: number;
   profile: Record<string, boolean | null>;
-  /** 固定 12 筆（10 張營所稅＋401＋403），請用 formCode 對應，不要用陣列下標 */
+  /** 固定 13 筆（11 張營所稅＋401＋403），請用 formCode 對應，不要用陣列下標 */
   forms: IdentifiedForm[];
 }
 
@@ -103,6 +107,8 @@ export interface MetadataField {
   tableCode?: string | null;
   rowNo?: string | number | null;
   columnCode?: string | null;
+  /** 財產目錄列欄位的列種：DETAIL 明細、SUBTOTAL 類別小計；其餘為 null */
+  rowKind?: 'DETAIL' | 'SUBTOTAL' | null;
 }
 
 /** 互斥勾選組；maxSelect=1 表示二選一／多選一 */
@@ -244,6 +250,10 @@ export interface ConfirmField {
 export interface ConfirmRow {
   /** 列序，≥0；前端依畫面順序從 0 起 */
   rowIndex: number;
+  /** 財產目錄的列種：小計列送 SUBTOTAL；明細列省略（視為 DETAIL） */
+  rowKind?: 'SUBTOTAL';
+  /** 財產目錄類別列的分組鍵（類別編號），與辨識回傳一致 */
+  groupKey?: string;
   fields: ConfirmField[];
 }
 

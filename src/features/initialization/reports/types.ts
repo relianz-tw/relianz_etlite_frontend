@@ -48,6 +48,8 @@ export interface ReportFieldDef {
   tableCode?: string;
   rowNo?: string | number;
   columnCode?: string;
+  /** 財產目錄可重複列的列種：DETAIL 明細、SUBTOTAL 類別小計（小計金額欄位存在小計列，不是固定格） */
+  rowKind?: 'DETAIL' | 'SUBTOTAL';
 }
 
 /** 金額一列：單欄只有 main，帳載／調整後成對時 adj 為調整後欄 */
@@ -118,6 +120,8 @@ export interface ReportPaperTableDef {
   rowColumns: ReportFieldDef[];
   /** 可重複列欄位是否全部對得上 columns（對得上才能畫成真正的表格） */
   rowColumnsMatch: boolean;
+  /** 有分組時每一組的小計欄位（rowKind=SUBTOTAL，依 columnCode 對應欄；可輸入，值存在該組的小計列） */
+  subtotalColumns: ReportFieldDef[];
 }
 
 /** 區塊內依顯示順序排好的內容 */

@@ -27,6 +27,7 @@ export const PAPER_PREVIEWS: Record<SettlementReportId, PaperPreview> = {
   CIT_PROPERTY: { image: 'cit-property.webp', pageLabel: '財產目錄', caption: '財產目錄範本（含未攤銷費用）', landscape: true },
   CIT_SHAREHOLDERS: { image: 'cit-shareholders.webp', pageLabel: '股東名簿', caption: '股東名簿範本', landscape: true },
   CIT_UNAMORTIZED: { image: 'cit-unamortized.webp', pageLabel: '未攤銷費用明細表', caption: '未攤銷費用明細表範本', landscape: true },
+  CIT_WH_RETURN: { image: 'cit-wh-return.webp', pageLabel: '各類所得扣繳暨免扣繳憑單申報書', caption: '各類所得扣繳暨免扣繳憑單申報書範本' },
   VAT_401: { image: 'vat-401.webp', pageLabel: '營業人銷售額與稅額申報書(401)', caption: '401 範本', landscape: true },
   VAT_403: { image: 'vat-403.webp', pageLabel: '營業人銷售額與稅額申報書(403)', caption: '403 範本', landscape: true },
 };

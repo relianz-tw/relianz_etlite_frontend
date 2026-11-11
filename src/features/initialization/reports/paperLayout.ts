@@ -58,6 +58,7 @@ function toFieldDef(f: MetadataField): ReportFieldDef {
     tableCode: f.tableCode ?? undefined,
     rowNo: f.rowNo ?? undefined,
     columnCode: f.columnCode ?? undefined,
+    rowKind: f.rowKind ?? undefined,
   };
 }
 
@@ -96,9 +97,10 @@ function buildTable(
   let rowColumns: ReportFieldDef[] = [];
   let rowColumnsMatch = false;
   if (t.rowRepeatable) {
-    let claimed = rowFields.filter(f => f.tableCode === t.tableCode);
+    // 小計欄位（rowKind=SUBTOTAL）另外放，不當明細列的欄
+    let claimed = rowFields.filter(f => f.tableCode === t.tableCode && f.rowKind !== 'SUBTOTAL');
     // 後端沒有為列欄位標 tableCode 時，整頁只有一張可重複表就全數歸它
-    if (claimed.length === 0 && soleRepeatable) claimed = rowFields.filter(f => !f.tableCode);
+    if (claimed.length === 0 && soleRepeatable) claimed = rowFields.filter(f => !f.tableCode && f.rowKind !== 'SUBTOTAL');
     rowColumnsMatch = claimed.length > 0 && claimed.every(f => f.columnCode && columns.some(c => c.code === f.columnCode));
     rowColumns = rowColumnsMatch ? columns.map(c => claimed.find(f => f.columnCode === c.code)).filter((f): f is ReportFieldDef => !!f) : claimed;
   }
@@ -119,6 +121,7 @@ function buildTable(
     cells,
     rowColumns,
     rowColumnsMatch,
+    subtotalColumns: rowFields.filter(f => f.tableCode === t.tableCode && f.rowKind === 'SUBTOTAL'),
   };
 }
 
@@ -210,8 +213,9 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   const repeatableCount = (meta.tables ?? []).filter(t => t.rowRepeatable).length;
   const tables = (meta.tables ?? []).map(t => buildTable(t, defs, rowFields, repeatableCount === 1));
   // 分組欄位由表格自己畫在分組標題列，也算被認領，不再退回卡片式明細
-  const claimedRowKeys = new Set(tables.flatMap(t => [...t.rowColumns, ...t.groupFields].map(f => f.key)));
-  const unclaimed = rowFields.filter(f => !claimedRowKeys.has(f.key));
+  // 各組小計欄位（subtotalColumns）也由表格自己畫在小計列，同樣算被認領；後端標 hidden 的列欄位（如 ROW_LINE_TYPE）不顯示
+  const claimedRowKeys = new Set(tables.flatMap(t => [...t.rowColumns, ...t.groupFields, ...t.subtotalColumns].map(f => f.key)));
+  const unclaimed = rowFields.filter(f => !claimedRowKeys.has(f.key) && !f.hidden);
 
   // 區塊順序：依 sectionCode 在 fields[] 第一次出現的位置
   const sectionTitles = new Map((meta.sections ?? []).map(s => [s.sectionCode, s]));
@@ -228,10 +232,16 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   // 段落沒標 sectionCode（紙本無標題）時，跟著它引用的欄位走：{{field:}} 取該欄位的區塊，
   // 只引用 {{group:}}（如 124 存貨計價）取勾選組成員的區塊；這些欄位多半也沒標區塊，
   // 就一起落在無標題區塊，不會被塞進第一個有標題的區塊（如營業淨利）
-  const blockSection = (b: (typeof textBlocks)[number]) => {
+  const blockSection = (b: (typeof textBlocks)[number]): string => {
     // 接在別的區塊的表格後面（如 403 銷售額總計接在特種稅額表後）：歸到那張表所在的區塊，才排得在表格後面
     const anchorTable = b.placeAfter ? (meta.tables ?? []).find(t => t.tableCode === b.placeAfter) : undefined;
     if (anchorTable?.sectionCode) return anchorTable.sectionCode;
+    // 接在別的區塊的段落後面（如 401 附 1～8 接在保稅區 82 段落後面）：跟著那個段落的區塊走，才排得在它後面
+    const anchorBlock = b.placeAfter ? textBlocks.find(o => o.blockCode === b.placeAfter && o !== b) : undefined;
+    if (anchorBlock && b.sectionCode) {
+      const anchorSection = blockSection(anchorBlock);
+      if (anchorSection !== b.sectionCode) return anchorSection;
+    }
     if (b.sectionCode) return b.sectionCode;
     const refs = Array.from(b.template.matchAll(TEMPLATE_TOKEN));
     const fieldRef = refs.find(m => m[1] !== 'group' && fieldMap[m[2]]);

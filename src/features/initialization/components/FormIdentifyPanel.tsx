@@ -2,7 +2,7 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
-import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm } from '@/api/peit';
+import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { toJpegFile } from '@/lib/imageToJpeg';
@@ -29,6 +29,32 @@ const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
 
 function getExtension(name: string): string {
   return name.split('.').pop()?.toLowerCase() ?? '';
+}
+
+/**
+ * 辨識回傳的可重複列轉成畫面的列。財產目錄的列有三種（ROW_LINE_TYPE）：
+ * category 類別標題列（只有類別編號、名稱）、item 明細列、subtotal 小計列（rowKind=SUBTOTAL）；
+ * 明細列、小計列自己沒有類別欄位，靠前面最近的類別列歸組。畫面每一列自己帶類別編號、名稱，類別列本身不當成一列明細。
+ */
+function toRowValues(rows: IdentifiedRow[]): Record<string, string | number>[] {
+  const result: Record<string, string | number>[] = [];
+  let category: { code?: string | number; name?: string | number } | null = null;
+  for (const row of rows) {
+    const values = toValueMap(row.fields);
+    const lineType = values.ROW_LINE_TYPE;
+    if (lineType === 'category') {
+      category = { code: values.ROW_CATEGORY_CODE ?? row.groupKey ?? undefined, name: values.ROW_CATEGORY_NAME };
+      continue;
+    }
+    delete values.ROW_LINE_TYPE;
+    if (category) {
+      if (values.ROW_CATEGORY_CODE === undefined && category.code !== undefined) values.ROW_CATEGORY_CODE = category.code;
+      if (values.ROW_CATEGORY_NAME === undefined && category.name !== undefined) values.ROW_CATEGORY_NAME = category.name;
+    }
+    // 小計列帶 __kind 標記，畫面才知道它是哪一組的小計格
+    result.push(row.rowKind === 'SUBTOTAL' || lineType === 'subtotal' ? { ...values, __kind: 'SUBTOTAL' } : values);
+  }
+  return result;
 }
 
 function toValueMap(fields: IdentifiedField[]): Record<string, string | number> {
@@ -61,7 +87,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
    */
   const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string } => {
     const values = toValueMap(form.fields);
-    const rows = form.rows.map(row => toValueMap(row.fields));
+    const rows = toRowValues(form.rows);
 
     if (form.formCode === 'VAT_401' || form.formCode === 'VAT_403') {
       const code = form.formCode === 'VAT_401' ? '401' : '403';
