@@ -34,6 +34,8 @@ interface EvalContext {
   resolve: (id: string) => Operand | null;
   /** SUM(A:B)：fields 回傳順序中 A 到 B（含）的運算元 */
   range: (from: string, to: string) => Operand[] | null;
+  /** SUM(欄位)：可重複列欄位在所有資料列（或同一組）的值 */
+  sumColumn?: (id: string) => Operand[] | null;
 }
 
 class Parser {
@@ -118,6 +120,12 @@ class Parser {
     this.eat('(');
     if (name === 'SUM') {
       const from = this.take();
+      if (this.peek()?.text === ')') {
+        this.pos++;
+        const operands = this.ctx.sumColumn?.(from.text);
+        if (!operands) throw new Error('unsupported column sum');
+        return operands.reduce((sum, o) => sum + this.operand(o), 0);
+      }
       this.eat(':');
       const to = this.take();
       this.eat(')');
@@ -166,7 +174,13 @@ const MAX_DEPTH = 20;
  * @param fields metadata 欄位（依後端回傳順序）
  * @param getStored 讀取某欄位目前存的值（辨識帶入或使用者輸入），空字串代表沒有
  */
-export function computeFieldValue(field: ReportFieldDef, fields: ReportFieldDef[], getStored: (key: string) => string | number | undefined): number | null {
+export function computeFieldValue(
+  field: ReportFieldDef,
+  fields: ReportFieldDef[],
+  getStored: (key: string) => string | number | undefined,
+  /** 可重複列的資料（合計列 SUM(欄位) 用）；算各組小計時只傳該組的列 */
+  rows?: Record<string, { value: string | number }>[]
+): number | null {
   const isFilled = (key: string) => {
     const v = getStored(key);
     return v !== undefined && v !== '';
@@ -183,6 +197,11 @@ export function computeFieldValue(field: ReportFieldDef, fields: ReportFieldDef[
     // 運算元用 rowCode：帳載欄只取帳載、調整後欄只取調整後；沒有 rowCode 就用 fieldCode
     const find = (id: string) => fields.find(f => !f.isRow && f.rowCode === id && (!owner.column || f.column === owner.column)) ?? fields.find(f => f.key === id);
     return {
+      sumColumn: id => {
+        const target = fields.find(f => f.key === id && f.isRow);
+        if (!target || !rows) return null;
+        return rows.map(row => ({ value: Number(row[id]?.value) || 0, touched: row[id] !== undefined && row[id].value !== '' }));
+      },
       resolve: id => {
         const target = find(id);
         return target && !target.isRow ? effective(target, depth) : null;

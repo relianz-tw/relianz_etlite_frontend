@@ -18,6 +18,8 @@ interface FieldInputProps {
   readOnly?: boolean;
   /** 算式欄位的前端試算值：欄位沒有值時顯示它（不存進欄位），有值以欄位值為主 */
   autoValue?: number | null;
+  /** 文字欄位的提示字（沒有標籤可看時用，如分組標題列裡的類別編號、類別名稱） */
+  placeholder?: string;
 }
 
 /** 百分比輸入：只留數字、小數點與開頭的負號 */
@@ -28,7 +30,7 @@ function sanitizePercent(raw: string): string {
 }
 
 /** 單一欄位的輸入元件（依 type 選元件），標籤由呼叫端負責 */
-export function FieldInput({ field, data: stored, onChange, readOnly, autoValue }: FieldInputProps) {
+export function FieldInput({ field, data: stored, onChange, readOnly, autoValue, placeholder }: FieldInputProps) {
   // 算式欄位可編輯：有值（辨識帶入或使用者輸入）以該值為主，沒有值才顯示試算結果
   const data = stored.value === '' && autoValue != null ? { ...stored, value: autoValue } : stored;
   if (readOnly) {
@@ -80,7 +82,7 @@ export function FieldInput({ field, data: stored, onChange, readOnly, autoValue 
     case 'boolean':
       return <Checkbox checked={Number(data.value) === 1} onChange={() => onChange(Number(data.value) === 1 ? 0 : 1)} aria-label={field.label} />;
     default:
-      return <TextInput widthClassName='w-full' value={typeof data.value === 'string' ? data.value : String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value)} />;
+      return <TextInput widthClassName='w-full' placeholder={placeholder} value={typeof data.value === 'string' ? data.value : String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value)} />;
   }
 }
 
@@ -92,6 +94,6 @@ export function StoreFieldInput({ field }: { field: ReportFieldDef }) {
 
 function StoreFieldInputWith({ field, store }: { field: ReportFieldDef; store: PaperStore }) {
   if (store.renderValue) return <>{store.renderValue(field)}</>;
-  const autoValue = field.formulaExpr ? computeFieldValue(field, Object.values(store.page.fieldMap), key => store.get(key).value) : null;
+  const autoValue = field.formulaExpr ? computeFieldValue(field, Object.values(store.page.fieldMap), key => store.get(key).value, store.rows) : null;
   return <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} onChange={value => store.set(field.key, value)} />;
 }

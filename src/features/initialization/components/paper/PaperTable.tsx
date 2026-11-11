@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import type { ReportFieldDef, ReportPaperTableDef, ReportTableColumnDef } from '../../reports/types';
 import { RowCards } from '../ReportTable';
-import { computeRowFieldValue } from '../../reports/formula';
+import { computeFieldValue, computeRowFieldValue } from '../../reports/formula';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { isFieldShown, usePaperStore } from './PaperStore';
 
@@ -73,11 +73,16 @@ interface RowGroup {
 }
 
 /** 把連續且分組欄位值相同的列併成一組；分組欄位全空的列也併成連續一組（填入類別後才會分開） */
+/** 分組標記：只存在畫面狀態（不在 metadata，送出時會被略過），記錄「新增類別」開出來的新組 */
+const GROUP_MARK = '__group';
+
 function buildRowGroups(rows: Record<string, { value: string | number }>[], keys: string[]): RowGroup[] {
   const groups: RowGroup[] = [];
   let lastKey: string | null = null;
   rows.forEach((row, index) => {
-    const key = keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+    // 分組欄位（類別編號、名稱）都還沒填時，用「新增類別」時記下的群組標記區分，不然新增的類別會和上一個空白類別併成同一組
+    const empty = keys.every(k => String(row[k]?.value ?? '') === '');
+    const key = empty ? `\u0001${String(row[GROUP_MARK]?.value ?? '')}` : keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
     if (key === lastKey) groups[groups.length - 1].indices.push(index);
     else groups.push({ indices: [index] });
     lastKey = key;
@@ -98,7 +103,7 @@ function GroupHeader({ template, fields, group }: { template: string; fields: Re
         if (!field) return null;
         return (
           <span key={i} className='inline-block w-44 align-middle font-normal'>
-            <FieldInput field={field} data={first?.[field.key] ?? { value: '', aiFilled: false }} onChange={value => group.indices.forEach(index => store.setRowField(index, field.key, value))} />
+            <FieldInput field={field} placeholder={field.label} data={first?.[field.key] ?? { value: '', aiFilled: false }} onChange={value => group.indices.forEach(index => store.setRowField(index, field.key, value))} />
           </span>
         );
       })}
@@ -188,7 +193,22 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
     const at = store.rows.length;
     const last = store.rows[at - 1];
     store.addRow([...table.rowColumns, ...table.groupFields]);
-    if (inheritGroup && last) for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
+    if (inheritGroup && last) {
+      for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
+      store.setRowField(at, GROUP_MARK, last[GROUP_MARK]?.value ?? '');
+    }
+    // 新增類別：給新的群組標記，類別編號、名稱留空也會自成一組
+    if (!inheritGroup) store.setRowField(at, GROUP_MARK, `${Date.now()}`);
+  };
+
+  // 在某一組（類別）的最後一列後面插入新的一列，沿用該組的類別編號、名稱與群組標記
+  const addRowToGroup = (group: RowGroup) => {
+    const lastIndex = group.indices[group.indices.length - 1];
+    const source = store.rows[group.indices[0]];
+    const at = lastIndex + 1;
+    store.addRow([...table.rowColumns, ...table.groupFields], at);
+    for (const f of table.groupFields) store.setRowField(at, f.key, source?.[f.key]?.value ?? '');
+    store.setRowField(at, GROUP_MARK, source?.[GROUP_MARK]?.value ?? '');
   };
 
 
@@ -244,6 +264,16 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         </td>
                       </tr>
                       {group.indices.map(index => renderDataRow(dataRows[index], index))}
+                      {!store.renderValue && (
+                        <tr>
+                          <td colSpan={leadCols + table.columns.length + 1} className={cn(border, 'px-2 py-1')}>
+                            <button type='button' onClick={() => addRowToGroup(group)} className='flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline'>
+                              <Plus size={14} />
+                              在此類別新增一列
+                            </button>
+                          </td>
+                        </tr>
+                      )}
                       <tr className='font-bold'>
                         {Array.from({ length: leadCols }).map((_, i) => (
                           <td key={i} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
@@ -253,8 +283,16 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         {table.columns.map(c =>
                           cellOf('SUBTOTAL', c.code) ? (
                             <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
-                              {/* 各組小計由後端算（formula.scope=group），欄位只有一個值，無法逐組顯示，這裡固定顯示「—」 */}
-                              <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm text-neutral-dark'>—</div>
+                              {/* 小計欄位在 metadata 裡只有一個，存不下每一組各自的值，所以各組小計只是依該組各列即時算出來的唯讀數字，沒有數字時顯示「—」 */}
+                              {(() => {
+                                const sub = cellOf('SUBTOTAL', c.code) as ReportFieldDef;
+                                const value = computeFieldValue(sub, Object.values(store.page.fieldMap), key => store.get(key).value, group.indices.map(i => store.rows[i]));
+                                return (
+                                  <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm tabular-nums text-neutral-dark'>
+                                    {value === null ? '—' : value.toLocaleString('en-US')}
+                                  </div>
+                                );
+                              })()}
                             </td>
                           ) : (
                             <td key={c.code} className={cn(border, SLASH_CLASS)} />
@@ -307,15 +345,18 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
       {cardFallback && <RowCards columns={table.rowColumns} addLabel={addLabel} />}
 
       {gridRepeatable && !store.renderValue && (
-        <div className={cn('grid gap-2', grouped ? 'sm:grid-cols-2' : 'grid-cols-1')}>
-          <button
-            type='button'
-            onClick={() => addDataRow(true)}
-            className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
-          >
-            <Plus size={16} />
-            {addLabel}
-          </button>
+        <div className='grid grid-cols-1 gap-2'>
+          {/* 有分組時，新增明細按鈕在每一組裡（在此類別新增一列），這裡只留新增類別 */}
+          {!grouped && (
+            <button
+              type='button'
+              onClick={() => addDataRow(true)}
+              className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+            >
+              <Plus size={16} />
+              {addLabel}
+            </button>
+          )}
           {grouped && (
             <button
               type='button'

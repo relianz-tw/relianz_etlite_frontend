@@ -24,7 +24,7 @@ export function useInitPaperStore(reportId: ReportKey, page: ReportPageDef | nul
       get: key => fields[key] ?? EMPTY_FIELD,
       set: (key, value) => dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId, key, value } }),
       rows: report?.rows ?? [],
-      addRow: columns => dispatch({ type: 'ADD_REPORT_ROW', payload: { reportId, columns } }),
+      addRow: (columns, at) => dispatch({ type: 'ADD_REPORT_ROW', payload: { reportId, columns, at } }),
       removeRow: index => dispatch({ type: 'REMOVE_REPORT_ROW', payload: { reportId, index } }),
       setRowField: (index, key, value) => dispatch({ type: 'SET_REPORT_ROW_FIELD', payload: { reportId, index, key, value } }),
       isFilled: field => {

@@ -170,15 +170,16 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
     case 'dateRange': {
       const { range } = item;
       return (
-        <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2'>
-          <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title), 'md:w-[19%]')}>{range.title}</span>
-          {/* 日期框固定寬度（約 11rem），不撐滿整列 */}
-          <div className='flex min-w-0 flex-wrap items-center gap-2'>
-            <div className='w-44 max-w-full'>
+        // 寬度與一般輸入欄（兩欄 grid 的一欄）相同，標籤與輸入框左緣才對得齊
+        <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 md:max-w-[calc(50%-0.75rem)] md:flex-nowrap'>
+          <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
+          {/* 兩個日期框同一排，各佔剩餘寬度的一半（最寬約 11rem），不撐滿整列、也不換行 */}
+          <div className='flex min-w-0 flex-1 items-center gap-2'>
+            <div className='min-w-0 max-w-44 flex-1'>
               <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
             </div>
-            <span className='text-sm text-neutral-mid'>至</span>
-            <div className='w-44 max-w-full'>
+            <span className='shrink-0 text-sm text-neutral-mid'>至</span>
+            <div className='min-w-0 max-w-44 flex-1'>
               <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
             </div>
           </div>

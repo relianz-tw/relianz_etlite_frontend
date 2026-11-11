@@ -276,7 +276,8 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
         if (group.fields.length > 1) continue;
       }
 
-      if (isAmountType(f.type)) {
+      // 表頭區塊（名稱、期間、頁次、收件編號等）一律是一般輸入欄，不論型別都不畫成金額列
+      if (isAmountType(f.type) && code !== 'HEADER') {
         // 帳載／調整後成對：ADJ 併進同列的 BOOK，沒有 BOOK 的 ADJ 自己成列
         if (f.column === 'ADJ' && f.rowCode && bookRows.has(f.rowCode)) continue;
         const row: ReportRowDef = { main: f, adj: f.column === 'BOOK' && f.rowCode ? adjByRow.get(f.rowCode) : undefined };

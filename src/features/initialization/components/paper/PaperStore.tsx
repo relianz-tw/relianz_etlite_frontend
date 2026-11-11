@@ -17,7 +17,8 @@ export interface PaperStore {
   set: (key: string, value: string | number) => void;
   /** 可重複列資料 */
   rows: Record<string, ReportField>[];
-  addRow: (columns: ReportFieldDef[]) => void;
+  /** at：插在這個位置，不給就加在最後 */
+  addRow: (columns: ReportFieldDef[], at?: number) => void;
   removeRow: (index: number) => void;
   setRowField: (index: number, key: string, value: string | number) => void;
   /** 該欄位是否有值（0 與空白視為沒有），收合沒有金額的列用 */
