@@ -31,7 +31,7 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
 
   const options = (
     <div
-      className={cn(!choice.columns && 'flex flex-wrap gap-x-8 gap-y-2', inline && 'inline-flex align-middle')}
+      className={cn(!choice.columns && 'flex flex-wrap gap-x-8 gap-y-2', inline && 'inline-flex items-center align-middle')}
       style={choice.columns ? { display: 'grid', gridTemplateColumns: `repeat(${choice.columns}, minmax(0, 1fr))`, columnGap: 32, rowGap: 8 } : undefined}
     >
       {choice.fields.map(f => {

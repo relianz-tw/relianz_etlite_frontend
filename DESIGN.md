@@ -372,8 +372,8 @@ POST /ael/invoice/identification/one 自動帶入的表單欄位。
 實作見 `src/features/initialization/components/paper/`（`PaperForm`）。版面由 metadata 決定，前端不寫死區塊標題、欄位配對或加總。
 
 - **區塊標題**：取 `sections[].title`，`text-lg font-bold`，下方 `border-b-2 border-neutral-dark`；子區塊（`parentSectionCode`）改 `text-base font-bold`、無底線。沒有 `title` 的區塊不畫標題。
-- **一列**：`代號 chip ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。**不使用**「＋」「－」「＝」運算符號徽章與小計淡藍底；標籤一律用 `displayName`，減項只在金額欄語意標記（`isDeduction`），不自行加「減：」。
-- **代號 chip**：`h-6 rounded bg-brand-blue/10 text-xs font-bold text-brand-blue`，內容為 `officialFieldCode`；有 `refNo`（圈號）時接在後面（如 `21 ①`）。沒有代號時留白佔位讓金額框對齊。
+- **一列**：`代號 chip ｜ 標籤 ｜ 金額`，列內 `rounded-md px-3 py-1.5`。**不使用**「＋」「－」「＝」運算符號徽章與小計淡藍底；標籤一律用 `displayName`，字重一律 `font-medium`（小計與一般列相同），減項只在金額欄語意標記（`isDeduction`），不自行加「減：」。
+- **代號**：無底色，`h-6 text-sm font-bold text-brand-blue`，與輸入框上下置中（列用 `items-center`），內容為 `officialFieldCode`；有 `refNo`（圈號）時接在後面（如 `21 ①`）。沒有代號時留白佔位讓金額框對齊。
 - **標籤附註**：`note` 為標籤後 `text-[13px] text-neutral-mid` 小字括號；`formula.text` 以括號接在標籤後，欄位唯讀（`isSubtotal`，後端計算，前端不加總）。
 - **成對欄位**：`column` 為 `BOOK`／`ADJ` 的欄位依 `rowCode` 合成一列，桌機並排 170px 兩欄，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
 - **行內／段落空格**：`labelTemplate` 與 `textBlocks[].template` 的 `{{field:}}` 畫成嵌在文字中的小輸入框（沿用輸入元件高度，寬 `w-36`），`{{ref:}}` 為唯讀值，`{{group:}}` 為行內勾選框。

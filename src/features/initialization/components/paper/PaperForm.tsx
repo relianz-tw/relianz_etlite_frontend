@@ -10,7 +10,8 @@ import { fieldLabelClass, FIELD_LABEL_BASE } from '../fieldLabel';
 import { ChoiceGroup } from './ChoiceGroup';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
-import { PaperStoreProvider, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
+import { PaperStoreProvider, effectiveNumber, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
+import { RECON_DIFF_FIELD, RECON_GROUPS, itemGroupCode, splitItemsByGroup } from './reconGroups';
 import { PaperTable } from './PaperTable';
 import { TemplateText } from './TemplateText';
 
@@ -75,16 +76,16 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
             className='grid grid-cols-1 items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5 md:[grid-template-columns:var(--cols)]'
             style={{ '--cols': cols } as CSSProperties}
           >
-            <div className='flex min-w-0 items-start gap-2'>
-              {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder className='mt-px' />}
-              <div className={cn('min-w-0 break-words text-sm leading-snug text-neutral-dark', main.isSubtotal ? 'font-bold' : 'font-medium')}>
+            <div className='flex min-w-0 items-center gap-2'>
+              {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder />}
+              <div className='min-w-0 break-words text-sm font-medium leading-snug text-neutral-dark'>
                 {main.labelTemplate ? <TemplateText template={main.labelTemplate} /> : main.label}
                 {main.note && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.note}）</span>}
                 {main.formulaText && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.formulaText}）</span>}
               </div>
             </div>
-            {/* 成對區塊裡沒有另一半的欄位，輸入框放在「帳載」那一欄對齊 */}
-            <div className={cn('grid gap-2', adj ? 'grid-cols-2 md:contents' : 'grid-cols-1', hasPairs && !adj && 'md:col-span-1')}>
+            {/* 成對區塊裡沒有另一半的欄位，輸入框依自己的欄放：帳載（BOOK）放第一欄，調整後（ADJ，如 137 帳載斜線）放第二欄 */}
+            <div className={cn('grid gap-2', adj ? 'grid-cols-2 md:contents' : 'grid-cols-1', hasPairs && !adj && (main.column === 'ADJ' ? 'md:col-start-3' : 'md:col-span-1'))}>
               <ValueCell field={main} head={hasPairs ? (main.column ? COLUMN_HEADS[main.column] : undefined) : undefined} />
               {adj && <ValueCell field={adj} head={COLUMN_HEADS.ADJ} />}
             </div>
@@ -153,12 +154,13 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
       return (
         <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2'>
           <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title), 'md:w-[19%]')}>{range.title}</span>
-          <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <div className='min-w-0 flex-1'>
+          {/* 日期框固定寬度（約 11rem），不撐滿整列 */}
+          <div className='flex min-w-0 flex-wrap items-center gap-2'>
+            <div className='w-44 max-w-full'>
               <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
             </div>
             <span className='text-sm text-neutral-mid'>至</span>
-            <div className='min-w-0 flex-1'>
+            <div className='w-44 max-w-full'>
               <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
             </div>
           </div>
@@ -167,14 +169,47 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
     }
     case 'text':
       return (
-        <p key={index} className='flex flex-wrap items-center gap-x-1 text-sm leading-9 text-neutral-dark'>
-          {item.block.officialCode && <CodeChip official={item.block.officialCode} className='mr-1' />}
+        // 一般行內排版（不用 flex），長文字接著輸入框才會同一行折行，不會把輸入框擠到下一排
+        <p key={index} className='text-sm leading-9 text-neutral-dark'>
+          {item.block.officialCode && <CodeChip official={item.block.officialCode} className='mr-1 align-middle' />}
           <TemplateText template={item.block.template} />
         </p>
       );
     case 'table':
       return <PaperTable key={index} table={item.table} />;
   }
+}
+
+/** 內容項目；調節說明的加項／減項分組畫標題並可折疊，其餘項目照順序渲染 */
+function SectionItems({ items, store }: { items: ReportSectionItem[]; store: PaperStore }) {
+  const [override, setOverride] = useState<Record<string, boolean>>({});
+  const diff = effectiveNumber(RECON_DIFF_FIELD, store);
+  const nodes: ReactNode[] = [];
+  const visible = splitItemsByGroup(items).filter(i => isItemShown(i, store));
+
+  for (let i = 0; i < visible.length; ) {
+    const code = itemGroupCode(visible[i]);
+    const group = code ? RECON_GROUPS[code] : undefined;
+    if (!code || !group || store.renderValue) {
+      nodes.push(renderItem(visible[i], i, store));
+      i++;
+      continue;
+    }
+    let end = i;
+    while (end < visible.length && itemGroupCode(visible[end]) === code) end++;
+    const collapsed = override[code] ?? (diff !== null && group.collapseWhen(diff));
+    nodes.push(
+      <div key={`group-${code}-${i}`} className='flex flex-col gap-2'>
+        <button type='button' aria-expanded={!collapsed} onClick={() => setOverride(prev => ({ ...prev, [code]: !collapsed }))} className='flex items-center gap-1 self-start text-sm font-bold text-neutral-dark'>
+          <ChevronDown size={14} className={cn('transition-transform', collapsed && '-rotate-90')} />
+          {group.label}
+        </button>
+        {!collapsed && visible.slice(i, end).map((item, k) => renderItem(item, i + k, store))}
+      </div>
+    );
+    i = end;
+  }
+  return <>{nodes}</>;
 }
 
 function SectionBlock({ section, all, store, depth }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number }) {
@@ -187,7 +222,7 @@ function SectionBlock({ section, all, store, depth }: { section: ReportSectionDe
         ) : (
           <h3 className='text-base font-bold text-neutral-dark'>{section.title}</h3>
         ))}
-      {section.items.filter(i => isItemShown(i, store)).map((item, i) => renderItem(item, i, store))}
+      <SectionItems items={section.items} store={store} />
       {children.map(c => (
         <SectionBlock key={c.key} section={c} all={all} store={store} depth={depth + 1} />
       ))}

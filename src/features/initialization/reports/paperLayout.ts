@@ -45,6 +45,7 @@ function toFieldDef(f: MetadataField): ReportFieldDef {
     refNo: f.refNo ?? undefined,
     note: f.note ?? undefined,
     formulaText: f.formula?.text,
+    formulaExpr: f.formula?.expr,
     rowCode: f.rowCode,
     column: f.column ?? undefined,
     layout: f.layout,
@@ -162,6 +163,18 @@ function mergeRuns(raw: RawItem[]): ReportSectionItem[] {
 }
 
 /**
+ * 說明欄（文字欄位、parentFieldCode 指向同區塊的主欄位，如 75「其他」的說明）排在主欄位那一列的下一排，
+ * 不管後端 fields[] 把它放在哪；沒標 groupCode 時沿用主欄位的分組，加項／減項折疊時才會一起收起來。
+ */
+function withNotesAfterParent(fields: ReportFieldDef[]): ReportFieldDef[] {
+  const keys = new Set(fields.map(f => f.key));
+  const isNote = (f: ReportFieldDef) => !!f.parentKey && keys.has(f.parentKey) && f.type === 'text';
+  return fields
+    .filter(f => !isNote(f))
+    .flatMap(f => [f, ...fields.filter(n => isNote(n) && n.parentKey === f.key).map(n => ({ ...n, groupCode: n.groupCode ?? f.groupCode }))]);
+}
+
+/**
  * 依 metadata API 回傳組出畫面渲染用的 ReportPageDef（步驟 3 封面頁、步驟 4 報表核對頁共用）。
  * 區塊標題取 sections[]、同一 rowCode 的 BOOK／ADJ 合成一列、模板引用的欄位不單獨成列、
  * tables／textBlocks 依 placeAfter 插入，版面一律依後端，前端不寫死。
@@ -210,12 +223,19 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   for (const b of textBlocks) if (b.sectionCode && !sectionOrder.includes(b.sectionCode)) sectionOrder.push(b.sectionCode);
   if (sectionOrder.length === 0) sectionOrder.push(DEFAULT_SECTION_CODE);
 
-  // 段落沒標 sectionCode 時，歸到它第一個引用欄位所在的區塊，再不行歸第一個區塊
+  // 段落沒標 sectionCode（紙本無標題）時，跟著它引用的欄位走：{{field:}} 取該欄位的區塊，
+  // 只引用 {{group:}}（如 124 存貨計價）取勾選組成員的區塊；這些欄位多半也沒標區塊，
+  // 就一起落在無標題區塊，不會被塞進第一個有標題的區塊（如營業淨利）
   const blockSection = (b: (typeof textBlocks)[number]) => {
     if (b.sectionCode) return b.sectionCode;
-    const first = Array.from(b.template.matchAll(TEMPLATE_TOKEN)).find(m => m[1] !== 'group' && fieldMap[m[2]]);
-    return first ? sectionOf(first[2]) : sectionOrder[0];
+    const refs = Array.from(b.template.matchAll(TEMPLATE_TOKEN));
+    const fieldRef = refs.find(m => m[1] !== 'group' && fieldMap[m[2]]);
+    if (fieldRef) return sectionOf(fieldRef[2]);
+    const groupRef = refs.find(m => m[1] === 'group' && groupMap[m[2]]?.fields[0]);
+    return groupRef ? sectionOf(groupMap[groupRef[2]].fields[0].key) : DEFAULT_SECTION_CODE;
   };
+  // 無標題區塊沒有任何固定欄位時（段落是它唯一的內容）也要出現
+  for (const b of textBlocks) if (!sectionOrder.includes(blockSection(b))) sectionOrder.push(blockSection(b));
 
   const dateRangeByStart = new Map((meta.dateRanges ?? []).map(r => [r.startFieldCode, r]));
   const dateRangeEnds = new Set((meta.dateRanges ?? []).map(r => r.endFieldCode));
@@ -230,7 +250,7 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
     const usedGroups = new Set<string>();
     const raw: RawItem[] = [];
 
-    for (const f of sectionFields) {
+    for (const f of withNotesAfterParent(sectionFields)) {
       // 表格格子、分組標題欄由 tables[] 畫；被模板引用的欄位嵌在文字裡
       if (f.layout === 'cell' || f.layout === 'group') continue;
       if (refs.fields.has(f.key)) continue;

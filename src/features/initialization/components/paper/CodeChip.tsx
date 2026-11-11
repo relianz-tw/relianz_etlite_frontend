@@ -10,12 +10,12 @@ interface CodeChipProps {
   className?: string;
 }
 
-/** 代號 chip：紙本官方欄位代號，有圈號時接在後面（如 21 ①） */
+/** 代號：紙本官方欄位代號，有圈號時接在後面（如 21 ①）；無底色，只用藍色粗體字 */
 export function CodeChip({ official, refNo, placeholder, className }: CodeChipProps) {
   const text = [official, refNo].filter(Boolean).join(' ');
   if (!text && !placeholder) return null;
   return (
-    <span className={cn('inline-flex h-6 min-w-11 shrink-0 items-center justify-center whitespace-nowrap rounded bg-brand-blue/10 px-1.5 text-xs font-bold text-brand-blue', !text && 'invisible', className)}>
+    <span className={cn('inline-flex h-6 min-w-9 shrink-0 items-center justify-center whitespace-nowrap text-sm font-bold text-brand-blue', !text && 'invisible', className)}>
       {text || '0'}
     </span>
   );

@@ -41,8 +41,7 @@ function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<
     const meta = metaByCode.get(code);
     // 欄位須存在於該年 metadata；可重複列欄位只出現在 rows，不能當純量欄送
     if (!meta || meta.isRow !== wantRow || !isFilled(field)) continue;
-    // 帶算式的小計由後端計算並寫入，前端不送
-    if (meta.formula) continue;
+    // 帶算式的小計只送有值的（辨識帶入或使用者輸入）；只是畫面試算出來的不存進欄位，沒送的由後端計算
     const confirmField = toConfirmField(meta, field);
     if (confirmField) result.push(confirmField);
   }

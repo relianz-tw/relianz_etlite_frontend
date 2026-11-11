@@ -3,6 +3,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { ReportField } from '../../state/initializationReducer';
 import type { ReportFieldDef, ReportPageDef } from '../../reports/types';
+import { computeFieldValue } from '../../reports/formula';
+import { RECON_GROUPS } from './reconGroups';
 
 /**
  * PaperForm 讀寫資料的介面：開帳精靈綁 InitializationContext（見 InitPaperStore），
@@ -40,10 +42,19 @@ export function usePaperStore(): PaperStore {
   return store;
 }
 
-/** visibleWhen 判斷：條件欄位勾選／未勾選／非 0 才顯示 */
+/** 欄位目前的數值：有存值用存值；算式欄位沒有存值時用畫面試算值；都沒有回 null */
+export function effectiveNumber(code: string, store: PaperStore): number | null {
+  const stored = store.get(code).value;
+  if (stored !== '') return Number(stored) || 0;
+  const target = store.page.fieldMap[code];
+  return target?.formulaExpr ? computeFieldValue(target, Object.values(store.page.fieldMap), key => store.get(key).value) : null;
+}
+
+/** visibleWhen 判斷：條件欄位勾選／未勾選／非 0 才顯示（調節說明加減項分組一律顯示，只做折疊） */
 export function isFieldVisible(field: ReportFieldDef, store: PaperStore): boolean {
   if (!field.visibleWhen) return true;
-  const value = store.get(field.visibleWhen.fieldCode).value;
+  if (field.groupCode && RECON_GROUPS[field.groupCode]) return true;
+  const value = effectiveNumber(field.visibleWhen.fieldCode, store) ?? store.get(field.visibleWhen.fieldCode).value;
   switch (field.visibleWhen.op) {
     case 'checked':
       return Number(value) === 1;

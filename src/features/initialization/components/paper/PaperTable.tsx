@@ -49,13 +49,15 @@ function buildHeader(columns: ReportTableColumnDef[]): HeaderCell[][] {
   return rows;
 }
 
-/** 格子：左上角顯示紙本編號，下方是輸入框（對帳模式為三值） */
+/** 格子：紙本編號放輸入框左側同一行（對帳模式為三值） */
 function Cell({ field }: { field: ReportFieldDef }) {
   const hasCode = field.officialCode || field.refNo;
   return (
-    <div className={cn('relative min-w-[120px]', hasCode && 'pt-4')}>
-      {hasCode && <span className='absolute left-0.5 top-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
-      <StoreFieldInput field={field} />
+    <div className='flex min-w-[120px] items-center gap-1.5'>
+      {hasCode && <span className='shrink-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
+      <div className='min-w-0 flex-1'>
+        <StoreFieldInput field={field} />
+      </div>
     </div>
   );
 }
