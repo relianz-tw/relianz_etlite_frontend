@@ -50,9 +50,9 @@ function buildHeader(columns: ReportTableColumnDef[]): HeaderCell[][] {
   return rows;
 }
 
-/** 格子：紙本編號放輸入框左側同一行（對帳模式為三值） */
-function Cell({ field }: { field: ReportFieldDef }) {
-  const hasCode = field.officialCode || field.refNo;
+/** 格子：紙本編號放輸入框左側同一行（對帳模式為三值）；欄標題已經有代號時格子不再重複顯示 */
+function Cell({ field, hideCode }: { field: ReportFieldDef; hideCode?: boolean }) {
+  const hasCode = !hideCode && (field.officialCode || field.refNo);
   return (
     <div className='flex min-w-[120px] items-center gap-1.5'>
       {hasCode && <span className='shrink-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
@@ -282,7 +282,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                       if (!f || f.hidden) return <td key={c.code} className={cn(border, SLASH_CLASS)} />;
                       return (
                         <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
-                          {isFieldShown(f, store) && <Cell field={f} />}
+                          {isFieldShown(f, store) && <Cell field={f} hideCode={!!(c.refNo || c.officialCode)} />}
                         </td>
                       );
                     })}

@@ -78,7 +78,9 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
           >
             <div className='flex min-w-0 items-center gap-2'>
               {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder />}
-              <div className='min-w-0 break-words text-sm font-medium leading-snug text-neutral-dark'>
+              <div className='min-w-0 break-words text-sm font-medium leading-7 text-neutral-dark'>
+                {/* 減項標籤本身沒有「減：」時（紙本縮排在「減：」那列底下的子項），前面補「減：」 */}
+                {main.isDeduction && !main.label.startsWith('減') && '減：'}
                 {main.labelTemplate ? <TemplateText template={main.labelTemplate} /> : main.label}
                 {main.note && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.note}）</span>}
                 {main.formulaText && <span className='ml-1 text-[13px] font-normal text-neutral-mid'>（{main.formulaText}）</span>}
@@ -212,10 +214,17 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
   return <>{nodes}</>;
 }
 
-function SectionBlock({ section, all, store, depth }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number }) {
+/** 上方分隔線：第一個區塊沒有；連續兩個無標題的內容區塊（如盈餘計算接稅額計算）視為同一塊，不加線；表頭、勾選區塊與前後都分開 */
+function dividerBefore(section: ReportSectionDef, prev: ReportSectionDef | undefined): 'line' | 'merged' | 'none' {
+  if (!prev) return 'none';
+  const isFrame = (s: ReportSectionDef) => s.key === 'HEADER' || s.key === 'FLAGS';
+  return !section.title && !prev.title && !isFrame(section) && !isFrame(prev) ? 'merged' : 'line';
+}
+
+function SectionBlock({ section, all, store, depth, divider = 'none' }: { section: ReportSectionDef; all: ReportSectionDef[]; store: PaperStore; depth: number; divider?: 'line' | 'merged' | 'none' }) {
   const children = all.filter(s => s.parentKey === section.key && isSectionShown(s, all, store));
   return (
-    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2')}>
+    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
       {section.title &&
         (depth === 0 ? (
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{section.title}</h2>
@@ -239,14 +248,26 @@ interface PaperFormProps {
  * 紙本對照表單（營所稅各表、營業稅 401／403、申報對帳共用）：依 metadata 排好的 sections／items 逐項渲染，
  * 區塊標題、列配對、表格、段落、勾選框都由後端決定；小計與算式欄唯讀，前端不加總。
  */
+/**
+ * 整份可免填的勾選（如未分配盈餘申報書「符合背面申報須知二免申報情形之一，本年度得免填報本申報表」）：
+ * 勾選放最上方，勾起來後下面的表單（含表頭的營利事業名稱、統編、收件編號）全部收起，只留這個勾選。
+ */
+const EXEMPT_FLAG_KEYS = ['UE_EXEMPT'];
+
 export function PaperForm({ sections, store }: PaperFormProps) {
-  const roots = sections.filter(s => (!s.parentKey || !sections.some(p => p.key === s.parentKey)) && isSectionShown(s, sections, store));
+  const shown = sections.filter(s => (!s.parentKey || !sections.some(p => p.key === s.parentKey)) && isSectionShown(s, sections, store));
+  const exemptKey = EXEMPT_FLAG_KEYS.find(k => store.page.fieldMap[k]);
+  const flagRoot = exemptKey ? shown.find(s => s.fields.some(f => f.key === exemptKey)) : undefined;
+  const exempt = !!exemptKey && !store.renderValue && Number(store.get(exemptKey).value) === 1;
+  // 免填勾選排最上方；勾起來時只留勾選
+  const ordered = flagRoot ? [flagRoot, ...shown.filter(s => s !== flagRoot)] : shown;
+  const roots = exempt ? ordered.filter(s => s === flagRoot) : ordered;
   if (roots.length === 0) return null;
   return (
     <PaperStoreProvider value={store}>
-      <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white'>
-        {roots.map(s => (
-          <SectionBlock key={s.key} section={s} all={sections} store={store} depth={0} />
+      <div className='flex flex-col rounded-lg border border-neutral-blue-gray/30 bg-white'>
+        {roots.map((s, i) => (
+          <SectionBlock key={s.key} section={s} all={sections} store={store} depth={0} divider={dividerBefore(s, roots[i - 1])} />
         ))}
       </div>
     </PaperStoreProvider>
