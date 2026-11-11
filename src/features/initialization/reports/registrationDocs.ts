@@ -9,7 +9,7 @@ export interface RegistrationDoc {
 const APPROVAL_LETTER: RegistrationDoc = { code: 'APPROVAL_LETTER', title: '最新設立或變更核准函' };
 const INVOICE_PERMIT: RegistrationDoc = { code: 'INVOICE_PERMIT', title: '最新統一發票購票證或國稅局核准公文' };
 
-/** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表與章程，行號看商業抄本，合夥另加合夥契約） */
+/** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表、章程與股東名簿；行號看商業抄本，合夥另加合夥契約） */
 export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
   switch (orgType) {
     case 'sole':
@@ -17,6 +17,13 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
     case 'partnership':
       return [APPROVAL_LETTER, { code: 'BUSINESS_TRANSCRIPT', title: '最新設立或變更商業抄本' }, { code: 'PARTNERSHIP_AGREEMENT', title: '最新合夥契約' }, INVOICE_PERMIT];
     default:
-      return [APPROVAL_LETTER, { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表' }, { code: 'ARTICLES', title: '最新公司章程' }, INVOICE_PERMIT];
+      return [
+        APPROVAL_LETTER,
+        { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表' },
+        { code: 'ARTICLES', title: '最新公司章程' },
+        INVOICE_PERMIT,
+        // 股東名簿不逐頁核對，公司（不論營運是否滿一年）一律上傳檔案
+        { code: 'SHAREHOLDER_LIST', title: '股東名簿' },
+      ];
   }
 }

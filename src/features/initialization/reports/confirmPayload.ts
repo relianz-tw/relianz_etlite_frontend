@@ -68,7 +68,7 @@ function listFormSources(state: InitializationState): FormSource[] {
 
   const openYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
 
-  const cit: FormSource[] = FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType)).map(form => ({
+  const cit: FormSource[] = FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType, { openYear, establishYear: state.establishYear })).map(form => ({
     formCode: form.formCode,
     reportKey: form.formCode,
     taxYear: state.reportYears[form.formCode] ?? getDefaultFormYear(form.formCode, openYear),

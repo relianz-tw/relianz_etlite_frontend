@@ -36,6 +36,15 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
   // 出資額加總應等於資產負債表 3110 欄（資本額）；資產負債表尚未填（為 0）時無從比對，不擋
   const totalCapital = partners.reduce((sum, p) => sum + p.capital, 0);
   const balanceCapital = Number(state.reports.CIT_BALANCE_SHEET?.fields.BS_3110?.value) || 0;
+
+  // 獨資只有負責人一人，資產負債表 3110 有值時，負責人出資額還沒填就先帶入（合夥要分給多人，不帶入）
+  const ownerCapital = partners.find(p => p.title === '負責人')?.capital ?? 0;
+  useEffect(() => {
+    if (isPartnership || balanceCapital === 0 || ownerCapital !== 0) return;
+    dispatch({ type: 'SET_PARTNERS', payload: partners.map(p => (p.title === '負責人' ? { ...p, capital: balanceCapital } : p)) });
+    // 只在資產負債表資本額變動或首次進入時補值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balanceCapital]);
   const mismatch = balanceCapital !== 0 && totalCapital !== balanceCapital;
 
   const update = (index: number, patch: Partial<Partner>) => dispatch({ type: 'SET_PARTNERS', payload: partners.map((p, i) => (i === index ? { ...p, ...patch } : p)) });
