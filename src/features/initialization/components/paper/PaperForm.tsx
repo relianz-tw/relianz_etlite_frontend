@@ -4,7 +4,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import Checkbox from '@/components/ui/Checkbox';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
-import type { ReportChoiceDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
+import type { ReportChoiceDef, ReportDateRangeDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
 import { ReportFieldRow } from '../ReportFieldRow';
 import { fieldLabelClass, FIELD_LABEL_BASE } from '../fieldLabel';
 import { ChoiceGroup } from './ChoiceGroup';
@@ -56,8 +56,13 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
   const hasPairs = shown.some(r => r.adj);
   const hasChip = shown.some(r => r.main.officialCode || r.main.refNo);
 
-  // 辨識帶入後欄位很多的區塊，沒有金額的列預設收合，只留有值與小計
-  const collapsible = (r: ReportRowDef) => !r.main.isSubtotal && !store.isFilled(r.main) && !(r.adj && store.isFilled(r.adj));
+  // 辨識帶入後欄位很多的區塊，沒有金額（0 或空白）的列預設收合，只留有數字的列
+  // 算式欄位（小計、合計）也一樣：帶入的是 0 或試算結果是 0 就收起來；有數字（帶入、輸入或試算出來）才留著
+  const hasAmount = (f: ReportFieldDef) => {
+    const n = effectiveNumber(f.key, store);
+    return n !== null && n !== 0;
+  };
+  const collapsible = (r: ReportRowDef) => !hasAmount(r.main) && !(r.adj && hasAmount(r.adj));
   const canCollapse = store.canCollapse && shown.length > store.collapseThreshold;
   const visible = canCollapse && !open ? shown.filter(r => !collapsible(r)) : shown;
   const hiddenCount = shown.length - visible.length;
@@ -121,6 +126,28 @@ function ValueCell({ field, head }: { field: ReportFieldDef; head?: string }) {
   );
 }
 
+/** 起訖日期一排：標籤＋兩個日期框；寬度與兩欄輸入格的一欄相同，標籤與輸入框左緣才對得齊 */
+function DateRangeRow({ range, store, paired }: { range: ReportDateRangeDef; store: PaperStore; paired?: boolean }) {
+  return (
+    <div className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 md:flex-nowrap', !paired && 'md:max-w-[calc(50%-0.75rem)]')}>
+      <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
+      {/* 兩個日期框同一排，各佔剩餘寬度的一半（最寬約 11rem），不撐滿整列、也不換行 */}
+      <div className='flex min-w-0 flex-1 items-center gap-2'>
+        <div className='min-w-0 max-w-44 flex-1'>
+          <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
+        </div>
+        <span className='shrink-0 text-sm text-neutral-mid'>至</span>
+        <div className='min-w-0 max-w-44 flex-1'>
+          <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 和起訖日期同一排的欄位（損益表「所得期間」旁邊放收件編號） */
+const PAIRED_WITH_DATE_RANGE_KEY = 'HDR_RECEIPT_NO';
+
 function InputGrid({ fields }: { fields: ReportFieldDef[] }) {
   const store = usePaperStore();
   return (
@@ -167,25 +194,8 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
       );
     case 'choice':
       return <ChoiceGroup key={index} choice={item.choice} />;
-    case 'dateRange': {
-      const { range } = item;
-      return (
-        // 寬度與一般輸入欄（兩欄 grid 的一欄）相同，標籤與輸入框左緣才對得齊
-        <div key={index} className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 md:max-w-[calc(50%-0.75rem)] md:flex-nowrap'>
-          <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
-          {/* 兩個日期框同一排，各佔剩餘寬度的一半（最寬約 11rem），不撐滿整列、也不換行 */}
-          <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <div className='min-w-0 max-w-44 flex-1'>
-              <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
-            </div>
-            <span className='shrink-0 text-sm text-neutral-mid'>至</span>
-            <div className='min-w-0 max-w-44 flex-1'>
-              <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
-            </div>
-          </div>
-        </div>
-      );
-    }
+    case 'dateRange':
+      return <DateRangeRow key={index} range={item.range} store={store} />;
     case 'text':
       return (
         // 一般行內排版（不用 flex），長文字接著輸入框才會同一行折行，不會把輸入框擠到下一排
@@ -255,6 +265,21 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
 
   for (let i = 0; i < visible.length; ) {
     const current = visible[i];
+    // 起訖日期後面緊接收件編號：兩個放同一排（日期在左、收件編號在右），其餘輸入欄接著另起一組
+    const next = visible[i + 1];
+    if (current !== NOTE && current.kind === 'dateRange' && next && next !== NOTE && next.kind === 'inputs' && next.fields[0]?.key === PAIRED_WITH_DATE_RANGE_KEY) {
+      const [receipt, ...rest] = next.fields;
+      nodes.push(
+        <div key={`range-${i}`} className='grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6'>
+          <DateRangeRow range={current.range} store={store} paired />
+          <ReportFieldRow field={receipt} data={store.get(receipt.key)} onChange={value => store.set(receipt.key, value)} />
+        </div>
+      );
+      if (rest.length > 0) visible.splice(i + 1, 1, { ...next, fields: rest });
+      else visible.splice(i + 1, 1);
+      i++;
+      continue;
+    }
     if (current === NOTE) {
       nodes.push(<NoteColumnBox key='note-column' monthly={noteMonthly as ReportFieldDef} unit={noteUnit as ReportChoiceDef} />);
       i++;

@@ -14,6 +14,7 @@ import { PaperStoreProvider } from './paper/PaperStore';
 import { useInitPaperStore } from './paper/useInitPaperStore';
 import { VatResultCard } from './VatResultCard';
 import { VatPeriodPicker } from './VatPeriodPicker';
+import { TriangleAlert } from 'lucide-react';
 import { ReportTable } from './ReportTable';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import type { StepProgressValue } from '@/components/initialization/StepProgress';
@@ -108,6 +109,17 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     ? undefined
     : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : formCode === 'CIT_UE' ? `民國 ${taxYear - 1} 年度` : `民國 ${taxYear} 年度`, ...(paperPage ? [`紙本${paperPage}`] : [])];
 
+  // 收件編號：同一年度的申報書每一頁都一樣。這一頁和多數頁不同時提醒使用者確認是不是這個年度的申報書
+  // （各頁以出現次數最多的值為準，次數相同以最早填的頁為準）
+  const receiptNo = String(reportFields?.HDR_RECEIPT_NO?.value ?? '').trim();
+  const receiptCounts = new Map<string, number>();
+  for (const report of Object.values(state.reports)) {
+    const value = String(report?.fields?.HDR_RECEIPT_NO?.value ?? '').trim();
+    if (value) receiptCounts.set(value, (receiptCounts.get(value) ?? 0) + 1);
+  }
+  const mainReceiptNo = [...receiptCounts.entries()].reduce<[string, number] | null>((best, entry) => (best === null || entry[1] > best[1] ? entry : best), null)?.[0];
+  const receiptMismatch = receiptNo !== '' && mainReceiptNo !== undefined && receiptNo !== mainReceiptNo;
+
   // 必填的期別需要有資料（上傳辨識成功或手填皆可）才能前進；
   // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死
   const blocked = spec.required && !error && !isPageFilled(state.reports, reportKey);
@@ -156,6 +168,15 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
         )}
       </StepPageHeader>
+
+      {receiptMismatch && (
+        <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
+          <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
+          <p className='text-sm text-neutral-dark'>
+            這一頁的收件編號（{receiptNo}）和其他頁（{mainReceiptNo}）不同。同一年度的申報書收件編號應該一致，請確認這一頁是不是民國 {taxYear} 年度的申報書。
+          </p>
+        </div>
+      )}
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}
       {error && (
