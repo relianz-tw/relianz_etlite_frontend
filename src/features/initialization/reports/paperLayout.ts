@@ -222,13 +222,15 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   const sectionOf = (key: string) => meta.fields.find(m => m.fieldCode === key)?.sectionCode ?? DEFAULT_SECTION_CODE;
   // 只有表格沒有固定欄位的區塊也要出現
   for (const t of meta.tables ?? []) if (t.sectionCode && !sectionOrder.includes(t.sectionCode)) sectionOrder.push(t.sectionCode);
-  for (const b of textBlocks) if (b.sectionCode && !sectionOrder.includes(b.sectionCode)) sectionOrder.push(b.sectionCode);
   if (sectionOrder.length === 0) sectionOrder.push(DEFAULT_SECTION_CODE);
 
   // 段落沒標 sectionCode（紙本無標題）時，跟著它引用的欄位走：{{field:}} 取該欄位的區塊，
   // 只引用 {{group:}}（如 124 存貨計價）取勾選組成員的區塊；這些欄位多半也沒標區塊，
   // 就一起落在無標題區塊，不會被塞進第一個有標題的區塊（如營業淨利）
   const blockSection = (b: (typeof textBlocks)[number]) => {
+    // 接在別的區塊的表格後面（如 403 銷售額總計接在特種稅額表後）：歸到那張表所在的區塊，才排得在表格後面
+    const anchorTable = b.placeAfter ? (meta.tables ?? []).find(t => t.tableCode === b.placeAfter) : undefined;
+    if (anchorTable?.sectionCode) return anchorTable.sectionCode;
     if (b.sectionCode) return b.sectionCode;
     const refs = Array.from(b.template.matchAll(TEMPLATE_TOKEN));
     const fieldRef = refs.find(m => m[1] !== 'group' && fieldMap[m[2]]);
@@ -238,6 +240,20 @@ export function buildReportPage(meta: FormMetadata): ReportPageDef {
   };
   // 無標題區塊沒有任何固定欄位時（段落是它唯一的內容）也要出現
   for (const b of textBlocks) if (!sectionOrder.includes(blockSection(b))) sectionOrder.push(blockSection(b));
+
+  // 子區塊（parentSectionCode）的父區塊排在第一個子區塊的位置：父區塊自己沒有欄位時不會出現在 fields[] 裡，
+  // 不補的話子區塊會變成最上層，或父區塊被排到最後面把所有子區塊一起帶到最下面
+  for (const child of [...sectionOrder]) {
+    const parent = sectionTitles.get(child)?.parentSectionCode;
+    if (!parent) continue;
+    const at = sectionOrder.indexOf(child);
+    const parentAt = sectionOrder.indexOf(parent);
+    if (parentAt === -1) sectionOrder.splice(at, 0, parent);
+    else if (parentAt > at) {
+      sectionOrder.splice(parentAt, 1);
+      sectionOrder.splice(at, 0, parent);
+    }
+  }
 
   const dateRangeByStart = new Map((meta.dateRanges ?? []).map(r => [r.startFieldCode, r]));
   const dateRangeEnds = new Set((meta.dateRanges ?? []).map(r => r.endFieldCode));

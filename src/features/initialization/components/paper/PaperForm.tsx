@@ -4,7 +4,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import Checkbox from '@/components/ui/Checkbox';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
-import type { ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
+import type { ReportChoiceDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
 import { ReportFieldRow } from '../ReportFieldRow';
 import { fieldLabelClass, FIELD_LABEL_BASE } from '../fieldLabel';
 import { ChoiceGroup } from './ChoiceGroup';
@@ -199,23 +199,76 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
   }
 }
 
+/** 401／403 右上角「註記欄」：核准按月申報、核准合併總繳單位（總機構彙總總繳、各單位分別申報），畫成紙本那個框 */
+const NOTE_BOX_MONTHLY_KEY = 'HDR_MONTHLY_FILING';
+const NOTE_BOX_UNIT_GROUP = 'VAT_UNIT';
+
+function NoteColumnBox({ monthly, unit }: { monthly: ReportFieldDef; unit: ReportChoiceDef }) {
+  const store = usePaperStore();
+  const isOn = (key: string) => Number(store.get(key).value) === 1;
+  const toggleUnit = (key: string) => {
+    const next = !isOn(key);
+    // 總機構彙總與各單位分別申報二選一
+    if (next) for (const f of unit.fields) if (f.key !== key) store.set(f.key, 0);
+    store.set(key, next ? 1 : 0);
+  };
+  const cell = 'flex items-center gap-2 px-3 py-2 text-sm text-neutral-dark';
+  return (
+    <div className='grid w-fit max-w-full grid-cols-[auto_auto_1fr] overflow-hidden rounded-md border border-neutral-blue-gray/50 text-sm'>
+      <div className='row-span-3 flex items-center justify-center border-r border-neutral-blue-gray/50 bg-surface-cream px-3 font-bold text-neutral-dark'>註記欄</div>
+      <label className={cn(cell, 'col-span-2 cursor-pointer border-b border-neutral-blue-gray/50 font-medium')}>
+        <Checkbox checked={isOn(monthly.key)} onChange={() => store.set(monthly.key, isOn(monthly.key) ? 0 : 1)} aria-label={monthly.label} />
+        {monthly.label}
+      </label>
+      <div className='row-span-2 flex items-center border-r border-neutral-blue-gray/50 px-3 font-medium text-neutral-dark'>{unit.title}</div>
+      {unit.fields.map((f, i) => (
+        <label key={f.key} className={cn(cell, 'cursor-pointer', i === 0 && 'border-b border-neutral-blue-gray/50')}>
+          <Checkbox checked={isOn(f.key)} onChange={() => toggleUnit(f.key)} aria-label={f.label} />
+          {f.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 /** 內容項目；調節說明的加項／減項分組畫標題並可折疊，其餘項目照順序渲染 */
 function SectionItems({ items, store }: { items: ReportSectionItem[]; store: PaperStore }) {
   const [override, setOverride] = useState<Record<string, boolean>>({});
   const diff = effectiveNumber(RECON_DIFF_FIELD, store);
   const nodes: ReactNode[] = [];
-  const visible = splitItemsByGroup(items).filter(i => isItemShown(i, store));
+  const noteUnit = items.find((i): i is Extract<ReportSectionItem, { kind: 'choice' }> => i.kind === 'choice' && i.choice.groupCode === NOTE_BOX_UNIT_GROUP)?.choice;
+  const noteMonthly = items.flatMap(i => (i.kind === 'checks' ? i.fields : [])).find(f => f.key === NOTE_BOX_MONTHLY_KEY);
+  const noteBox = !store.renderValue && noteUnit && noteMonthly;
+  // 註記欄合併畫成一個框：放在「核准按月申報」原本的位置，核准合併總繳單位那組不再單獨畫
+  const NOTE = 'note' as const;
+  const visible: (ReportSectionItem | typeof NOTE)[] = [];
+  for (const item of splitItemsByGroup(items)) {
+    if (noteBox && item.kind === 'choice' && item.choice.groupCode === NOTE_BOX_UNIT_GROUP) continue;
+    if (noteBox && item.kind === 'checks' && item.fields.some(f => f.key === NOTE_BOX_MONTHLY_KEY)) {
+      visible.push(NOTE);
+      const rest = item.fields.filter(f => f.key !== NOTE_BOX_MONTHLY_KEY);
+      if (rest.length > 0 && isItemShown({ ...item, fields: rest }, store)) visible.push({ ...item, fields: rest });
+      continue;
+    }
+    if (isItemShown(item, store)) visible.push(item);
+  }
 
   for (let i = 0; i < visible.length; ) {
-    const code = itemGroupCode(visible[i]);
+    const current = visible[i];
+    if (current === NOTE) {
+      nodes.push(<NoteColumnBox key='note-column' monthly={noteMonthly as ReportFieldDef} unit={noteUnit as ReportChoiceDef} />);
+      i++;
+      continue;
+    }
+    const code = itemGroupCode(current);
     const group = code ? RECON_GROUPS[code] : undefined;
     if (!code || !group || store.renderValue) {
-      nodes.push(renderItem(visible[i], i, store));
+      nodes.push(renderItem(current, i, store));
       i++;
       continue;
     }
     let end = i;
-    while (end < visible.length && itemGroupCode(visible[end]) === code) end++;
+    while (end < visible.length && itemGroupCode(visible[end] as ReportSectionItem) === code) end++;
     const collapsed = override[code] ?? (diff !== null && group.collapseWhen(diff));
     nodes.push(
       <div key={`group-${code}-${i}`} className='flex flex-col gap-2'>
@@ -223,7 +276,7 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
           <ChevronDown size={14} className={cn('transition-transform', collapsed && '-rotate-90')} />
           {group.label}
         </button>
-        {!collapsed && visible.slice(i, end).map((item, k) => renderItem(item, i + k, store))}
+        {!collapsed && (visible.slice(i, end) as ReportSectionItem[]).map((item, k) => renderItem(item, i + k, store))}
       </div>
     );
     i = end;

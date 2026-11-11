@@ -95,5 +95,5 @@ export function StoreFieldInput({ field }: { field: ReportFieldDef }) {
 function StoreFieldInputWith({ field, store }: { field: ReportFieldDef; store: PaperStore }) {
   if (store.renderValue) return <>{store.renderValue(field)}</>;
   const autoValue = field.formulaExpr ? computeFieldValue(field, Object.values(store.page.fieldMap), key => store.get(key).value, store.rows) : null;
-  return <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} onChange={value => store.set(field.key, value)} />;
+  return <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} readOnly={store.readOnlyKeys?.includes(field.key)} onChange={value => store.set(field.key, value)} />;
 }

@@ -314,8 +314,17 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                         {row.group}
                       </td>
                     )}
-                    {hasGroupCol && !row.group && <td className={border} />}
-                    {hasLabelCol && <td className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
+                    {/* 沒有分組標題的列（如免稅收入、減：退回及折讓、合計）：標題放在最左邊那格，跨過分組欄與標籤欄 */}
+                    {hasGroupCol && !row.group && hasLabelCol && row.label ? (
+                      <td colSpan={2} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
+                        {row.label}
+                      </td>
+                    ) : (
+                      <>
+                        {hasGroupCol && !row.group && <td className={border} />}
+                        {hasLabelCol && <td className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
+                      </>
+                    )}
                     {table.columns.map(c => {
                       const f = cellOf(row.rowNo, c.code);
                       // 紙本斜線：沒有欄位的格子畫斜線；對帳模式下有欄位但沒有數字的格子留白

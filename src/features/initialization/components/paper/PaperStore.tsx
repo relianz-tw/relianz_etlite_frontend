@@ -27,6 +27,8 @@ export interface PaperStore {
   collapseThreshold: number;
   /** 目前是否啟用收合（開帳：辨識帶入後；對帳：一律） */
   canCollapse: boolean;
+  /** 這些欄位由頁面自動填入（如 401／403 的所屬年月份），畫成唯讀 */
+  readOnlyKeys?: string[];
   /** 對帳模式：整個欄位改由此函式畫（回 null 代表該欄位不顯示），並只呈現金額列與表格 */
   renderValue?: (field: ReportFieldDef) => ReactNode | null;
   /** 對帳模式：每個數值欄位佔用的寬度 class */

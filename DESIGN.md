@@ -381,7 +381,7 @@ POST /ael/invoice/identification/one 自動帶入的表單欄位。
 - **金額負值**：金額欄一律開放正負切換（`MoneyInput allowSign`）。
 - `groupCode` 只是分組代碼（metadata 沒有標題文字），不畫小標。
 - **收合**：辨識帶入後欄位很多的區塊，沒有金額的列預設收合，連結 `text-[13px] font-medium text-brand-blue` 附 `ChevronDown`。
-- **本期結果卡**（營業稅）：應繳 `border-brand-blue/35 bg-brand-blue/10`，留抵 `border-semantic-success/40 bg-semantic-success/5`；金額 `text-2xl font-bold`。
+- **本期結果卡**（營業稅）：精簡一塊，`rounded-lg border border-neutral-blue-gray/30 bg-surface-cream px-4 py-3`，不用藍／綠底色；只有圖示分色（應繳 `Wallet` 藍、留抵 `CircleCheck` 綠，`size 20`）；標題 `text-[13px] font-bold`、金額 `text-lg font-bold`、說明 `text-xs text-neutral-mid`。
 - `hidden: true` 的欄位不畫，但值保留在 state 並照常送出；`visibleWhen` 條件成立才顯示。
 
 ### 紙本表格（Paper Table）

@@ -12,7 +12,7 @@ const EMPTY_FIELD: ReportField = { value: '', aiFilled: false };
 const COLLAPSE_THRESHOLD = 12;
 
 /** 開帳精靈用的 PaperStore：讀寫 InitializationContext 裡該頁（reportId）的欄位與可重複列 */
-export function useInitPaperStore(reportId: ReportKey, page: ReportPageDef | null): PaperStore | null {
+export function useInitPaperStore(reportId: ReportKey, page: ReportPageDef | null, readOnlyKeys?: string[]): PaperStore | null {
   const { state, dispatch } = useInitialization();
   const report = state.reports[reportId];
 
@@ -31,9 +31,12 @@ export function useInitPaperStore(reportId: ReportKey, page: ReportPageDef | nul
         const value = fields[field.key]?.value;
         return value !== undefined && value !== '' && Number(value) !== 0;
       },
+      readOnlyKeys,
       collapseThreshold: COLLAPSE_THRESHOLD,
       // 沒有辨識帶入時使用者可能要逐欄手填，不收合
       canCollapse: Object.values(fields).some(f => f.aiFilled),
     };
-  }, [page, report, reportId, dispatch]);
+    // readOnlyKeys 每次 render 都是新陣列，用內容當依賴
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, report, reportId, dispatch, readOnlyKeys?.join(',')]);
 }
