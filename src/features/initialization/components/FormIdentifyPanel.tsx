@@ -32,24 +32,30 @@ function getExtension(name: string): string {
 }
 
 /**
- * 辨識回傳的可重複列轉成畫面的列。財產目錄的列有三種（ROW_LINE_TYPE）：
- * category 類別標題列（只有類別編號、名稱）、item 明細列、subtotal 小計列（rowKind=SUBTOTAL）；
- * 明細列、小計列自己沒有類別欄位，靠前面最近的類別列歸組。畫面每一列自己帶類別編號、名稱，類別列本身不當成一列明細。
+ * 辨識回傳的可重複列轉成畫面的列。財產目錄的列有明細（rowKind 省略）與小計（rowKind=SUBTOTAL），可能另有類別標題列（ROW_LINE_TYPE=category，後端不保證有）；
+ * 類別編號取列自己的 ROW_CATEGORY_CODE、groupKey，都沒有就沿用上一列。畫面每一列自己帶類別編號、名稱，類別列本身不當成一列明細。
  */
 function toRowValues(rows: IdentifiedRow[]): Record<string, string | number>[] {
+  const maps = rows.map(row => ({ row, values: toValueMap(row.fields) }));
+  // 類別名稱：同一個類別編號的任一列（類別列或小計列）有帶就沿用到整組
+  const names = new Map<string, string | number>();
+  for (const { row, values } of maps) {
+    const code = values.ROW_CATEGORY_CODE ?? row.groupKey ?? undefined;
+    if (code !== undefined && values.ROW_CATEGORY_NAME !== undefined) names.set(String(code), values.ROW_CATEGORY_NAME);
+  }
   const result: Record<string, string | number>[] = [];
-  let category: { code?: string | number; name?: string | number } | null = null;
-  for (const row of rows) {
-    const values = toValueMap(row.fields);
+  let code: string | number | undefined;
+  for (const { row, values } of maps) {
     const lineType = values.ROW_LINE_TYPE;
-    if (lineType === 'category') {
-      category = { code: values.ROW_CATEGORY_CODE ?? row.groupKey ?? undefined, name: values.ROW_CATEGORY_NAME };
-      continue;
-    }
+    // 類別編號：列自己帶的 > groupKey > 沿用上一列（後端不保證有獨立類別列）
+    code = values.ROW_CATEGORY_CODE ?? row.groupKey ?? code;
+    // 類別列只用來更新目前類別，不當成一列明細
+    if (lineType === 'category') continue;
     delete values.ROW_LINE_TYPE;
-    if (category) {
-      if (values.ROW_CATEGORY_CODE === undefined && category.code !== undefined) values.ROW_CATEGORY_CODE = category.code;
-      if (values.ROW_CATEGORY_NAME === undefined && category.name !== undefined) values.ROW_CATEGORY_NAME = category.name;
+    if (code !== undefined) {
+      values.ROW_CATEGORY_CODE = code;
+      const name = names.get(String(code));
+      if (name !== undefined) values.ROW_CATEGORY_NAME = name;
     }
     // 小計列帶 __kind 標記，畫面才知道它是哪一組的小計格
     result.push(row.rowKind === 'SUBTOTAL' || lineType === 'subtotal' ? { ...values, __kind: 'SUBTOTAL' } : values);
@@ -85,7 +91,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
    * file 為實際送出辨識的檔案（圖片已轉 JPG），401／403 套用成功時一併記到該期別頁供預覽。
    */
-  const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string } => {
+  const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
     const values = toValueMap(form.fields);
     const rows = toRowValues(form.rows);
 
@@ -100,7 +106,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
       // 辨識到的是別期時，該期頁面也留一份供預覽
       setVatUpload(page.key, file);
-      return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}` };
+      return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}`, vatPageIndex: state.reportPages.indexOf(page) };
     }
 
     dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: form.formCode, taxYear: form.taxYear, fields: values, rows } });
@@ -142,6 +148,9 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
 
       const outcomes = presentForms.map(form => applyForm(form, file));
       const appliedCount = outcomes.filter(o => o.applied).length;
+      // 401／403 實際帶入的是別一期時，跳到那一期，申報書種類（401／403）與帶入的資料才會顯示出來
+      const targetIndex = outcomes.find(o => o.vatPageIndex !== undefined && o.vatPageIndex >= 0)?.vatPageIndex;
+      if (targetIndex !== undefined && targetIndex !== state.currentReportIndex) dispatch({ type: 'GO_TO_STEP', payload: { step: 4, reportIndex: targetIndex } });
       const notes = [
         ...outcomes.flatMap(o => (o.skipped ? [o.skipped] : [])),
         ...(failedForms.length > 0 ? [`${failedForms.length} 份文件辨識失敗，請手動輸入`] : []),

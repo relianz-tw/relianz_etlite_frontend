@@ -17,12 +17,12 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
     case 0:
       return { ...base, valueText: String(field.value) };
     case 1: // 金額元
-    case 5: // 純整數
-    case 6: { // 百分比：顯示值（20＝20%）
+    case 5: { // 純整數
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueInt: Math.round(n) } : null;
     }
-    case 2: {
+    case 2:
+    case 6: { // 小數；百分比為顯示值（79.28＝79.28%），同樣放在 valueDecimal
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueDecimal: n } : null;
     }

@@ -202,10 +202,11 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
     }
     case 1: // 金額元
     case 5: // 純整數
-    case 6: // 百分比：顯示值（15＝15%），同樣放在 valueInt
       return field.valueInt ?? undefined;
     case 2: // 小數
       return field.valueDecimal ?? undefined;
+    case 6: // 百分比：顯示值（79.28＝79.28%）放在 valueDecimal；舊格式只有 valueInt 時沿用
+      return field.valueDecimal ?? field.valueInt ?? undefined;
     case 3: // 日期
       // 後端日期格式不固定（民國年原樣），統一轉成 ISO，畫面與 confirm 才能解析
       return field.valueDate ? normalizeDateToIso(field.valueDate) : undefined;
