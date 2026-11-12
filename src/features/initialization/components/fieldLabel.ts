@@ -3,8 +3,8 @@ export function fieldLabelClass(label: string): string {
   return label.length > 14 ? 'text-xs' : 'text-[13px]';
 }
 
-/** 欄位標籤與輸入框同一行時，標籤的共用寬度與換行樣式 */
-export const FIELD_LABEL_BASE = 'w-[var(--label-w,max(12%,5.5rem))] shrink-0 break-words font-medium leading-snug text-neutral-dark';
+/** 欄位標籤的共用寬度與換行樣式：手機標籤獨佔一行（輸入框在下方全寬），桌機與輸入框同一行並共用寬度 */
+export const FIELD_LABEL_BASE = 'w-full break-words nav:w-[var(--label-w,max(12%,5.5rem))] nav:shrink-0 font-medium leading-snug text-neutral-dark';
 
 /**
  * 一個區塊內所有標籤的共同寬度：依最長標籤的字數決定（中文一字約一個字級寬），

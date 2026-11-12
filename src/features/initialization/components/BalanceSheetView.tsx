@@ -27,7 +27,7 @@ const REPORT_ID: SettlementReportId = 'CIT_BALANCE_SHEET';
 const KNOWN_SECTION_KEYS: string[] = ['HEADER', 'TOTAL', ...Object.values(BALANCE_BLOCKS).map(b => b.sectionKey)];
 
 /** 欄位列：標籤在左、輸入在右同一行（輸入欄桌機固定 210px，左右兩側金額欄切齊） */
-const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_150px] items-center gap-3 md:grid-cols-[minmax(0,1fr)_210px]';
+const ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_150px] items-center gap-3 nav:grid-cols-[minmax(0,1fr)_210px]';
 
 interface BalanceSheetViewProps {
   page: ReportPageDef;
@@ -73,7 +73,8 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
 
   // 紙本填在「合計」欄的科目（後端 isTotalColumn：小計、資本公積、減：庫藏股票等）標題粗體
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
-    <div key={field.key} className={cn(ROW_GRID, emphasized && 'font-bold')}>
+    // 標籤內嵌輸入框（如「包括商譽金額 ＿ 元」）的列，手機標籤整列、金額欄在下，內嵌輸入框才放得下、不蓋到金額欄
+    <div key={field.key} className={cn(ROW_GRID, field.labelTemplate && '!grid-cols-1 nav:!grid-cols-[minmax(0,1fr)_210px]', emphasized && 'font-bold')}>
       <span style={{ paddingLeft: depthOf(field) * 16 }} className='flex min-w-0 items-center gap-2'>
         {/* 紙本科目編號（如 1111）；沒有編號的科目留空不佔位 */}
         <CodeChip official={field.officialCode} refNo={field.refNo} />
@@ -136,7 +137,7 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   const assetTotalField = fieldMap.get(ASSET_TOTAL_KEY);
   const liabilityEquityTotalField = fieldMap.get(LIABILITY_EQUITY_TOTAL_KEY);
 
-  const cell = 'border-t border-neutral-blue-gray/30 p-5 md:px-6';
+  const cell = 'border-t border-neutral-blue-gray/30 p-5 nav:px-6';
 
   // 表頭：metadata 的 HEADER 區塊完整呈現（財產目錄填報方式、公司名稱、統編、收件編號；自動填入的資產負債表日已由上層排除）
   const headerSection = sectionMap.get('HEADER');
@@ -151,11 +152,11 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   return (
     <>
       {(headerChoices.length > 0 || headerFields.length > 0) && (
-        <div className='grid grid-cols-1 gap-4 rounded-lg border border-neutral-blue-gray/30 bg-white p-5 md:grid-cols-2 md:gap-x-6 md:px-6'>
+        <div className='grid grid-cols-1 gap-4 rounded-lg border border-neutral-blue-gray/30 bg-white p-5 nav:grid-cols-2 nav:gap-x-6 nav:px-6'>
           {store && (
             <PaperStoreProvider value={store}>
               {headerChoices.map(choice => (
-                <div key={choice.groupCode} className='md:col-span-2'>
+                <div key={choice.groupCode} className='nav:col-span-2'>
                   <ChoiceGroup choice={choice} />
                 </div>
               ))}
@@ -173,7 +174,7 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
       )}
 
       <div className='overflow-hidden rounded-lg border border-neutral-blue-gray/30 bg-white'>
-        <div className='hidden grid-cols-2 border-b border-neutral-blue-gray/30 bg-surface-off-white md:grid'>
+        <div className='hidden grid-cols-2 border-b border-neutral-blue-gray/30 bg-surface-off-white nav:grid'>
           <div className='border-r border-neutral-blue-gray/30 px-6 py-3.5'>
             <h2 className='text-[17px] font-bold text-neutral-dark'>資產</h2>
           </div>
@@ -183,14 +184,14 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         </div>
 
         {/* DOM 順序即手機堆疊順序（資產 → 負債 → 權益 → 勾稽）；桌機用明確格位排成 T 字帳 */}
-        <div className='grid grid-cols-1 md:grid-cols-2'>
-          <div className={cn(cell, 'border-t-0 md:col-start-1 md:row-start-1 md:border-r')}>{renderBlock(BALANCE_BLOCKS.currentAssets)}</div>
-          <div className={cn(cell, 'md:col-start-1 md:row-start-2 md:border-r')}>{renderBlock(BALANCE_BLOCKS.nonCurrentAssets)}</div>
-          <div className={cn(cell, 'md:col-start-2 md:row-start-1 md:border-t-0')}>{renderBlock(BALANCE_BLOCKS.currentLiabilities)}</div>
-          <div className='border-t border-neutral-blue-gray/30 md:col-start-2 md:row-start-2'>
-            <div className='p-5 md:px-6'>{renderBlock(BALANCE_BLOCKS.nonCurrentLiabilities)}</div>
-            {liabilityTotalField && <div className='border-t border-neutral-blue-gray/30 bg-surface-off-white p-5 md:px-6'>{renderRow(liabilityTotalField, true)}</div>}
-            <div className='border-t border-neutral-blue-gray/30 p-5 md:px-6'>{renderBlock(BALANCE_BLOCKS.equity)}</div>
+        <div className='grid grid-cols-1 nav:grid-cols-2'>
+          <div className={cn(cell, 'border-t-0 nav:col-start-1 nav:row-start-1 nav:border-r')}>{renderBlock(BALANCE_BLOCKS.currentAssets)}</div>
+          <div className={cn(cell, 'nav:col-start-1 nav:row-start-2 nav:border-r')}>{renderBlock(BALANCE_BLOCKS.nonCurrentAssets)}</div>
+          <div className={cn(cell, 'nav:col-start-2 nav:row-start-1 nav:border-t-0')}>{renderBlock(BALANCE_BLOCKS.currentLiabilities)}</div>
+          <div className='border-t border-neutral-blue-gray/30 nav:col-start-2 nav:row-start-2'>
+            <div className='p-5 nav:px-6'>{renderBlock(BALANCE_BLOCKS.nonCurrentLiabilities)}</div>
+            {liabilityTotalField && <div className='border-t border-neutral-blue-gray/30 bg-surface-off-white p-5 nav:px-6'>{renderRow(liabilityTotalField, true)}</div>}
+            <div className='border-t border-neutral-blue-gray/30 p-5 nav:px-6'>{renderBlock(BALANCE_BLOCKS.equity)}</div>
           </div>
         </div>
 
@@ -198,11 +199,11 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         {/* 底色放在整列（含中間的等號欄），平衡為綠色、不平衡為紅色、尚未填寫為灰色 */}
         <div
           className={cn(
-            'grid grid-cols-1 border-t-2 border-neutral-dark md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center',
+            'grid grid-cols-1 border-t-2 border-neutral-dark nav:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] nav:items-center',
             isBalanced ? 'bg-semantic-success/5' : hasTotals ? 'bg-semantic-error/5' : 'bg-surface-off-white'
           )}
         >
-          <div className='p-5 md:px-6'>
+          <div className='p-5 nav:px-6'>
             {assetTotalField && (
               <div className='flex flex-col gap-1.5'>
                 {renderRow(assetTotalField, true)}
@@ -213,13 +214,13 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
             role='img'
             aria-label={isBalanced ? '左右相等' : hasTotals ? '左右不相等' : '尚未填寫'}
             className={cn(
-              'mx-auto my-2 hidden h-9 w-9 items-center justify-center rounded-full text-xl font-bold text-white md:flex',
+              'mx-auto my-2 hidden h-9 w-9 items-center justify-center rounded-full text-xl font-bold text-white nav:flex',
               isBalanced ? 'bg-semantic-success' : hasTotals ? 'bg-semantic-error' : 'bg-neutral-blue-gray'
             )}
           >
             {hasTotals && !isBalanced ? '≠' : '='}
           </span>
-          <div className='border-t border-neutral-blue-gray/30 p-5 md:border-t-0 md:px-6'>
+          <div className='border-t border-neutral-blue-gray/30 p-5 nav:border-t-0 nav:px-6'>
             {liabilityEquityTotalField && (
               <div className='flex flex-col gap-1.5'>
                 {renderRow(liabilityEquityTotalField, true)}
@@ -231,15 +232,15 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
 
       {store && <PaperForm sections={extraSections} store={store} />}
 
-      {/* 底部固定平衡列：捲到哪都看得到差額（手機需避開固定的上一頁／下一頁操作列） */}
+      {/* 底部固定平衡列：捲到哪都看得到差額（依固定操作列的實際高度 --init-action-bar-h 往上讓開） */}
       <section
         aria-live='polite'
         className={cn(
-          'sticky bottom-20 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white px-5 py-3.5 shadow-level1 md:bottom-4',
+          'sticky bottom-[calc(var(--init-action-bar-h,0px)+0.75rem)] z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white px-4 py-2.5 shadow-level1 nav:px-5 nav:py-3.5',
           isBalanced ? 'border-semantic-success/45' : hasTotals ? 'border-semantic-error/45' : 'border-neutral-blue-gray/30'
         )}
       >
-        <div className='flex flex-wrap items-center gap-x-7 gap-y-1 text-sm tabular-nums'>
+        <div className='flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[13px] tabular-nums nav:gap-x-7 nav:text-sm'>
           <span>
             資產 <strong className='font-bold'>{fmtCurrency(assetTotal)}</strong>
           </span>
@@ -252,7 +253,7 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
         </div>
         <span
           className={cn(
-            'flex items-center gap-1.5 text-sm font-bold',
+            'flex items-center gap-1.5 text-[13px] font-bold nav:text-sm',
             isBalanced ? 'text-semantic-success' : hasTotals ? 'text-semantic-error' : 'text-neutral-mid'
           )}
         >

@@ -10,10 +10,10 @@ export function InitializationHeader() {
   const stepIndex = getStepperIndex(state);
 
   return (
-    <header className='flex flex-col gap-2 px-4 py-2 md:flex-row md:items-center md:justify-between md:px-6 md:py-3 bg-surface-off-white'>
+    <header className='flex flex-col gap-2 px-4 py-2 nav:flex-row nav:items-center nav:justify-between nav:px-6 nav:py-3 bg-surface-off-white'>
       {/* 全站慣例用原生 img，不使用 next/image（見 AppShell.tsx） */}
-      <img src='/etlite/logo.png' alt='RELIANZ' width={140} height={30} className='object-contain w-[100px] md:w-[140px]' fetchPriority='high' />
-      <Stepper steps={INITIALIZATION_STEPPER_ITEMS} currentIndex={stepIndex} className='md:w-[600px]' />
+      <img src='/etlite/logo.png' alt='RELIANZ' width={140} height={30} className='object-contain w-[100px] nav:w-[140px]' fetchPriority='high' />
+      <Stepper steps={INITIALIZATION_STEPPER_ITEMS} currentIndex={stepIndex} className='nav:w-[600px]' />
     </header>
   );
 }

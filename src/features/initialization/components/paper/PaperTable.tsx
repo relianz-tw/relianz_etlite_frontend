@@ -85,11 +85,19 @@ function GroupSubtotalCell({ table, group, sub }: { table: ReportPaperTableDef; 
   return <FieldInput field={sub} data={stored ?? { value: '', aiFilled: false }} autoValue={autoValue} onChange={handleChange} />;
 }
 
+/** 格子最小寬度：日期要放得下「114/05/10」加日曆圖示、金額要放得下「$ 12,345,678」加閃電圖示，否則數字被輸入框截掉 */
+function cellMinWidthClass(field: ReportFieldDef): string {
+  if (field.type === 'date') return 'min-w-[176px]';
+  if (field.type === 'money') return 'min-w-[176px]';
+  if (field.type === 'percent' || field.type === 'decimal' || field.type === 'integer') return 'min-w-[132px]';
+  return 'min-w-[144px]';
+}
+
 /** 格子：紙本編號放輸入框左側同一行（對帳模式為三值）；欄標題已經有代號時格子不再重複顯示 */
 function Cell({ field, hideCode }: { field: ReportFieldDef; hideCode?: boolean }) {
   const hasCode = !hideCode && (field.officialCode || field.refNo);
   return (
-    <div className='flex min-w-[120px] items-center gap-1.5'>
+    <div className={cn('flex items-center gap-1.5', cellMinWidthClass(field))}>
       {hasCode && <span className='shrink-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
       <div className='min-w-0 flex-1'>
         <StoreFieldInput field={field} />
@@ -208,7 +216,9 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
 
   // 表名本身已以「明細」結尾（如「投資人明細」）就不再重複加字
   const addLabel = `新增一列${table.title ?? ''}${table.title?.endsWith('明細') ? '' : '明細'}`;
-  const border = 'border border-neutral-blue-gray/30';
+  /** 手機橫向捲動時，左側標籤欄黏在左邊（不透明底色），往右捲仍看得到這一列是什麼項目；桌機表格不捲動、不需要 */
+const STICKY_LABEL = 'sticky left-0 z-[1] bg-white nav:static nav:z-auto';
+const border = 'border border-neutral-blue-gray/30';
 
   const leadCols = (hasNumber ? 1 : 0) + (hasGroupCol ? 1 : 0) + (hasLabelCol ? 1 : 0);
 
@@ -216,17 +226,17 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
     <tr key={`data-${index}`}>
       {hasNumber && <td className={cn(border, 'px-2 text-center tabular-nums text-neutral-mid')}>{String(index + 1).padStart(table.rowNumber?.pad || 1, '0')}</td>}
       {hasGroupCol && <td className={border} />}
-      {hasLabelCol && <td className={border} />}
+      {hasLabelCol && <td className={cn(border, STICKY_LABEL)} />}
       {table.columns.map(c => {
         const col = table.rowColumns.find(f => f.columnCode === c.code);
         return (
-          <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
+          <td key={c.code} className={cn(border, col ? cellMinWidthClass(col) : 'min-w-[144px]', 'p-1.5 align-middle')}>
             {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} autoValue={computeRowFieldValue(col, table.rowColumns, row)} onChange={value => store.setRowField(index, col.key, value)} />}
           </td>
         );
       })}
       <td className={cn(border, 'px-1 text-center')}>
-        <button type='button' onClick={() => store.removeRow(index)} aria-label='刪除此列' className='rounded-full p-1 text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark'>
+        <button type='button' onClick={() => store.removeRow(index)} aria-label='刪除此列' className='rounded-full p-3.5 text-neutral-mid hover:bg-surface-cream hover:text-neutral-dark nav:p-1'>
           <X size={16} />
         </button>
       </td>
@@ -279,7 +289,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                   )}
                   {level === 0 && hasGroupCol && <th rowSpan={headerDepth} className={cn(border, 'px-2 py-2')} />}
                   {level === 0 && hasLabelCol && (
-                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[140px] p-0', table.corner && CORNER_SLASH_CLASS)}>
+                    <th rowSpan={headerDepth} className={cn(border, 'min-w-[96px] p-0 nav:min-w-[140px]', hasLabelCol && 'sticky left-0 z-[2] bg-surface-cream nav:static nav:z-auto', table.corner && CORNER_SLASH_CLASS)}>
                       {table.corner && (
                         <div className='flex h-full min-h-14 flex-col justify-between px-2 py-1'>
                           <span className='text-right'>{table.corner.column}</span>
@@ -295,7 +305,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                       {c.refNo && <span className='ml-1 text-brand-blue'>{c.refNo}</span>}
                     </th>
                   ))}
-                  {level === 0 && gridRepeatable && !store.renderValue && <th rowSpan={headerDepth} className={cn(border, 'w-10')} />}
+                  {level === 0 && gridRepeatable && !store.renderValue && <th rowSpan={headerDepth} className={cn(border, 'w-14 nav:w-10')} />}
                 </tr>
               ))}
             </thead>
@@ -312,7 +322,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                       {!store.renderValue && (
                         <tr>
                           <td colSpan={leadCols + table.columns.length + 1} className={cn(border, 'px-2 py-1')}>
-                            <button type='button' onClick={() => addRowToGroup(group)} className='flex items-center gap-1 px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline'>
+                            <button type='button' onClick={() => addRowToGroup(group)} className='flex min-h-11 items-center gap-1 px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline nav:min-h-0'>
                               <Plus size={14} />
                               在此類別新增一列
                             </button>
@@ -321,7 +331,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                       )}
                       <tr className='font-bold'>
                         {Array.from({ length: leadCols }).map((_, i) => (
-                          <td key={i} className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>
+                          <td key={i} className={cn(border, i === leadCols - 1 && STICKY_LABEL, 'px-2 py-1.5 align-middle text-neutral-dark')}>
                             {i === leadCols - 1 ? table.groupBy!.subtotalLabel : null}
                           </td>
                         ))}
@@ -359,7 +369,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                     ) : (
                       <>
                         {hasGroupCol && !row.group && <td className={border} />}
-                        {hasLabelCol && <td className={cn(border, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
+                        {hasLabelCol && <td className={cn(border, STICKY_LABEL, 'px-2 py-1.5 align-middle text-neutral-dark')}>{row.label}</td>}
                       </>
                     )}
                     {table.columns.map(c => {
@@ -382,7 +392,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
       )}
 
       {canCollapse && (hiddenCount > 0 || (open && fixedRows.some(r => isCollapsible(r.rowNo)))) && (
-        <button type='button' onClick={() => setOpen(v => !v)} className='flex items-center gap-1 self-start px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline'>
+        <button type='button' onClick={() => setOpen(v => !v)} className='flex min-h-11 items-center gap-1 self-start px-1 py-1 text-[13px] font-medium text-brand-blue hover:underline nav:min-h-0'>
           <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
           {open ? '收合沒有金額的列' : `顯示其餘 ${hiddenCount} 列沒有金額的項目`}
         </button>
@@ -397,7 +407,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
             <button
               type='button'
               onClick={() => addDataRow(true)}
-              className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+              className='flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
             >
               <Plus size={16} />
               {addLabel}
@@ -407,7 +417,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
             <button
               type='button'
               onClick={() => addDataRow(false)}
-              className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+              className='flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
             >
               <Plus size={16} />
               新增類別

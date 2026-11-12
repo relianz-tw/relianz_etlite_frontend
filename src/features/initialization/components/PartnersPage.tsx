@@ -51,7 +51,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
 
   return (
     <>
-      <StepPageHeader kicker={kicker} title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch }} progress={progress}>
+      <StepPageHeader kicker={kicker} title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch, hint: mismatch ? '出資額合計與資產負債表資本額不符，請調整後再前往下一頁' : undefined }} progress={progress}>
         <p className='text-sm text-neutral-mid'>{isPartnership ? '合夥需填負責人及每位合夥人，出資額加總應等於資產負債表資本額 (3110)。' : '請填寫負責人資料與出資額。'}</p>
         {mismatch && (
           <p className='text-xs text-semantic-error'>
@@ -62,7 +62,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
 
       {partners.map((p, index) => (
         <SectionCard key={index} title={p.title === '負責人' ? '負責人' : `合夥人 ${index}`}>
-          <div className='grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6'>
+          <div className='grid grid-cols-1 gap-4 nav:grid-cols-2 nav:gap-x-6'>
             <Field label='姓名'>
               <TextInput value={p.name} onChange={e => update(index, { name: e.target.value })} />
             </Field>
@@ -80,7 +80,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
             <button
               type='button'
               onClick={() => dispatch({ type: 'SET_PARTNERS', payload: partners.filter((_, i) => i !== index) })}
-              className='flex items-center gap-1 self-end text-[13px] text-neutral-mid hover:text-semantic-error'
+              className='flex min-h-11 items-center gap-1 self-end px-2 text-[13px] text-neutral-mid hover:text-semantic-error'
             >
               <X size={14} />
               移除此合夥人
@@ -93,7 +93,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
         <button
           type='button'
           onClick={() => dispatch({ type: 'SET_PARTNERS', payload: [...partners, EMPTY_PARTNER] })}
-          className='flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
+          className='flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-blue-gray/50 py-3 text-sm font-medium text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5'
         >
           <Plus size={16} />
           新增合夥人

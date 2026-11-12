@@ -36,8 +36,8 @@ export function ReportFieldRow({ field, data, onChange }: ReportFieldRowProps) {
   }
 
   return (
-    // 標籤與輸入框同一行；名稱太長時標籤換行、字級縮小一級
-    <div className='flex min-w-0 items-center gap-3'>
+    // 桌機標籤與輸入框同一行、手機標籤在上輸入框在下；名稱太長時字級縮小一級
+    <div className='flex min-w-0 flex-col gap-1.5 nav:flex-row nav:items-center nav:gap-3'>
       <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(field.label))}>{field.label}</span>
       <div className='min-w-0 flex-1'>
         <FieldInput field={field} data={data} onChange={onChange} />

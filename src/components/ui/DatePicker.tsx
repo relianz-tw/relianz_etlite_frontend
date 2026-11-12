@@ -83,7 +83,7 @@ export default function DatePicker({ value, onChange, placeholder = '選擇日�
       <PopoverTrigger asChild>
         <div
           className={cn(
-            'flex h-10 w-full items-center gap-2 rounded-lg border-[1.5px] bg-white px-3 transition-colors',
+            'flex h-11 w-full items-center gap-2 rounded-lg nav:h-10 border-[1.5px] bg-white px-3 transition-colors',
             'focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/15',
             error ? 'border-semantic-error' : aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
             disabled && 'pointer-events-none bg-surface-cream',

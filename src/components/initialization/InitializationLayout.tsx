@@ -19,8 +19,8 @@ export function InitializationLayout({ children }: InitializationLayoutProps) {
       <main className='flex-1 min-h-0 overflow-hidden'>
         {/* id 供 initialization-client 切換步驟時把捲動位置歸零 */}
         <div id='initialization-scroll' className='h-full overflow-y-auto overscroll-contain [scrollbar-width:thin]'>
-          {/* 底部預留固定操作列的高度（含進度條，pb-40） */}
-          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 pb-40 pt-2 md:gap-5 md:px-6'>{children}</div>
+          {/* 底部預留固定操作列的實際高度（StepPageHeader 量測後寫入 --init-action-bar-h）；沒有操作列的頁面只留一般間距 */}
+          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-4 pb-[calc(var(--init-action-bar-h,0px)+1.5rem)] pt-2 nav:gap-5 nav:px-6'>{children}</div>
         </div>
       </main>
     </div>

@@ -28,7 +28,7 @@ export function VatPeriodPicker() {
             aria-pressed={active}
             onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 4, reportIndex: index } })}
             className={cn(
-              'flex min-h-[88px] flex-col items-start gap-1.5 rounded-lg border-2 bg-white px-3 py-3 text-left transition-colors nav:px-4',
+              'flex min-h-[72px] flex-col items-start gap-1 rounded-lg border-2 bg-white px-3 py-2 text-left nav:min-h-[88px] nav:gap-1.5 nav:py-3 transition-colors nav:px-4',
               active ? 'border-brand-primary' : 'border-neutral-blue-gray/30 hover:border-neutral-blue-gray'
             )}
           >

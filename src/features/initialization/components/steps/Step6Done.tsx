@@ -52,11 +52,11 @@ export function Step6Done() {
   const canStart = hasActiveAccount || !!bankLoadError;
 
   return (
-    <SectionCard className='items-center gap-4 py-12 text-center md:py-16'>
+    <SectionCard className='items-center gap-4 py-12 text-center nav:py-16'>
       <CircleCheck size={48} className='text-semantic-success' />
       <div className='flex flex-col gap-1.5'>
         <span className='text-xs font-semibold text-brand-blue'>開帳設定完成</span>
-        <h1 className='text-2xl font-semibold text-neutral-dark md:text-3xl'>歡迎使用 Easytax Lite</h1>
+        <h1 className='text-2xl font-semibold text-neutral-dark nav:text-3xl'>歡迎使用 Easytax Lite</h1>
       </div>
       <p className='max-w-md text-sm text-neutral-mid'>公司資料與期初餘額已設定完成，接著新增收款銀行帳戶就可以開始記帳。</p>
 

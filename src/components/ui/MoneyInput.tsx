@@ -68,6 +68,13 @@ export default function MoneyInput({
     else setZeroSign(nextSign);
   };
 
+  // typedSign 的正負切換鈕：有金額就直接反號；還沒輸入時先記住方向，之後輸入的數字套用
+  const showSignToggle = !!typedSign && !!allowSign && !parentheses && !disabled && !readOnly;
+  const toggleTypedSign = () => {
+    if (value !== 0) onChange?.(-value);
+    else setPendingMinus(prev => !prev);
+  };
+
   // 游標點入時全選現有數字，方便直接輸入覆寫既有金額
   const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
     e.target.select();
@@ -126,7 +133,7 @@ export default function MoneyInput({
       )}
       <div
         className={cn(
-          'flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border-[1.5px] px-3 transition-colors',
+          'flex h-11 min-w-0 flex-1 items-center gap-1 rounded-lg nav:h-10 border-[1.5px] px-3 transition-colors',
           'focus-within:border-brand-blue focus-within:ring-2 focus-within:ring-brand-blue/15',
           aiFilled ? 'border-semantic-success bg-semantic-success/5' : 'border-neutral-blue-gray/50',
           !aiFilled && (disabled ? 'bg-surface-cream' : 'bg-white'),
@@ -137,7 +144,8 @@ export default function MoneyInput({
         <span className="shrink-0 text-sm text-neutral-mid">{parentheses ? '$ (' : '$'}</span>
         <input
           type="text"
-          inputMode={typedSign ? 'text' : 'numeric'}
+          // 手機一律數字鍵盤（iOS 數字鍵盤沒有負號，負值改用輸入框旁的 ± 鈕切換，見下方 showSignToggle）
+          inputMode="numeric"
           disabled={disabled}
           readOnly={readOnly}
           value={display}
@@ -145,9 +153,24 @@ export default function MoneyInput({
           onFocus={handleFocus}
           onBlur={() => setPendingMinus(false)}
           placeholder="0"
-          className="w-full min-w-0 bg-transparent text-right text-base text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
+          className="w-full min-w-0 bg-transparent text-right text-base tabular-nums text-neutral-dark outline-none placeholder:text-neutral-mid disabled:text-neutral-mid nav:text-sm"
         />
         {parentheses && <span className="shrink-0 text-sm text-neutral-mid">)</span>}
+        {showSignToggle && (
+          // 觸控裝置專用：數字鍵盤打不出負號，點這顆在正負之間切換（滑鼠裝置直接在輸入框打「-」）
+          <button
+            type="button"
+            onClick={toggleTypedSign}
+            aria-label="切換正負號"
+            aria-pressed={value < 0 || pendingMinus}
+            className={cn(
+              'hidden h-8 w-8 shrink-0 items-center justify-center rounded-[4px] text-sm font-bold transition-colors [@media(hover:none)]:flex',
+              value < 0 || pendingMinus ? 'bg-brand-blue text-white' : 'bg-surface-cream text-neutral-mid',
+            )}
+          >
+            ±
+          </button>
+        )}
       </div>
     </div>
   );

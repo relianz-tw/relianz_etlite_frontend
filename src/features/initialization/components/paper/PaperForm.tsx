@@ -73,7 +73,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
   return (
     <div className='flex flex-col'>
       {hasPairs && (
-        <div className='hidden gap-x-3 px-3 pb-1.5 text-xs font-bold text-neutral-mid md:grid md:[grid-template-columns:var(--cols)]' style={{ '--cols': cols } as CSSProperties}>
+        <div className='hidden gap-x-3 px-3 pb-1.5 text-xs font-bold text-neutral-mid nav:grid nav:[grid-template-columns:var(--cols)]' style={{ '--cols': cols } as CSSProperties}>
           <span>項目</span>
           <span className='text-right'>{COLUMN_HEADS.BOOK}</span>
           <span className='text-right'>{COLUMN_HEADS.ADJ}</span>
@@ -85,7 +85,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
           <div
             key={main.key}
             aria-label={main.isDeduction ? `${main.label}（減項）` : undefined}
-            className='grid grid-cols-1 items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5 md:[grid-template-columns:var(--cols)]'
+            className='grid grid-cols-1 items-center gap-x-3 gap-y-1.5 rounded-md px-3 py-1.5 nav:[grid-template-columns:var(--cols)]'
             style={{ '--cols': cols } as CSSProperties}
           >
             <div className='flex min-w-0 items-center gap-2'>
@@ -99,7 +99,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
               </div>
             </div>
             {/* 成對區塊裡沒有另一半的欄位，輸入框依自己的欄放：帳載（BOOK）放第一欄，調整後（ADJ，如 137 帳載斜線）放第二欄 */}
-            <div className={cn('grid gap-2', adj ? 'grid-cols-2 md:contents' : 'grid-cols-1', hasPairs && !adj && (main.column === 'ADJ' ? 'md:col-start-3' : 'md:col-span-1'))}>
+            <div className={cn('grid gap-2', adj ? 'grid-cols-2 nav:contents' : 'grid-cols-1', hasPairs && !adj && (main.column === 'ADJ' ? 'nav:col-start-3' : 'nav:col-span-1'))}>
               <ValueCell field={main} head={hasPairs ? (main.column ? COLUMN_HEADS[main.column] : undefined) : undefined} />
               {adj && <ValueCell field={adj} head={COLUMN_HEADS.ADJ} />}
             </div>
@@ -107,7 +107,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
         );
       })}
       {canCollapse && (hiddenCount > 0 || (open && shown.some(collapsible))) && (
-        <button type='button' onClick={() => setOpen(v => !v)} className='mt-2 flex items-center gap-1 self-start px-3 py-1 text-[13px] font-medium text-brand-blue hover:underline'>
+        <button type='button' onClick={() => setOpen(v => !v)} className='mt-2 flex min-h-11 items-center gap-1 self-start px-3 py-1 text-[13px] font-medium text-brand-blue hover:underline nav:min-h-0'>
           <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
           {open ? '收合沒有金額的項目' : `顯示其餘 ${hiddenCount} 個沒有金額的項目`}
         </button>
@@ -120,7 +120,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
 function ValueCell({ field, head }: { field: ReportFieldDef; head?: string }) {
   return (
     <div className='flex min-w-0 flex-col gap-1'>
-      {head && <span className='text-xs text-neutral-mid md:hidden'>{head}</span>}
+      {head && <span className='text-xs text-neutral-mid nav:hidden'>{head}</span>}
       <StoreFieldInput field={field} />
     </div>
   );
@@ -129,15 +129,15 @@ function ValueCell({ field, head }: { field: ReportFieldDef; head?: string }) {
 /** 起訖日期一排：標籤＋兩個日期框；寬度與兩欄輸入格的一欄相同，標籤與輸入框左緣才對得齊 */
 function DateRangeRow({ range, store, paired }: { range: ReportDateRangeDef; store: PaperStore; paired?: boolean }) {
   return (
-    <div className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 md:flex-nowrap', !paired && 'md:max-w-[calc(50%-0.75rem)]')}>
+    <div className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 nav:flex-nowrap', !paired && 'nav:max-w-[calc(50%-0.75rem)]')}>
       <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
-      {/* 兩個日期框同一排，各佔剩餘寬度的一半（最寬約 11rem），不撐滿整列、也不換行 */}
+      {/* 兩個日期框同一排，各佔剩餘寬度的一半；桌機最寬約 11rem、不撐滿整列，手機標籤獨佔一行、兩框各半寬 */}
       <div className='flex min-w-0 flex-1 items-center gap-2'>
-        <div className='min-w-0 max-w-44 flex-1'>
+        <div className='min-w-0 flex-1 nav:max-w-44'>
           <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
         </div>
         <span className='shrink-0 text-sm text-neutral-mid'>至</span>
-        <div className='min-w-0 max-w-44 flex-1'>
+        <div className='min-w-0 flex-1 nav:max-w-44'>
           <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
         </div>
       </div>
@@ -151,7 +151,7 @@ const PAIRED_WITH_DATE_RANGE_KEY = 'HDR_RECEIPT_NO';
 function InputGrid({ fields }: { fields: ReportFieldDef[] }) {
   const store = usePaperStore();
   return (
-    <div className='grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6'>
+    <div className='grid grid-cols-1 gap-4 nav:grid-cols-2 nav:gap-x-6'>
       {fields.filter(f => isFieldShown(f, store)).map(f => (
         <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
       ))}
@@ -222,15 +222,16 @@ function NoteColumnBox({ monthly, unit }: { monthly: ReportFieldDef; unit: Repor
     if (next) for (const f of unit.fields) if (f.key !== key) store.set(f.key, 0);
     store.set(key, next ? 1 : 0);
   };
-  const cell = 'flex items-center gap-2 px-3 py-2 text-sm text-neutral-dark';
+  const cell = 'flex min-h-11 items-center gap-2 px-3 py-2 text-sm text-neutral-dark nav:min-h-0';
   return (
-    <div className='grid w-fit max-w-full grid-cols-[auto_auto_1fr] overflow-hidden rounded-md border border-neutral-blue-gray/50 text-sm'>
-      <div className='row-span-3 flex items-center justify-center border-r border-neutral-blue-gray/50 bg-surface-cream px-3 font-bold text-neutral-dark'>註記欄</div>
-      <label className={cn(cell, 'col-span-2 cursor-pointer border-b border-neutral-blue-gray/50 font-medium')}>
+    // 手機單欄由上而下堆疊（三欄合計比手機寬），桌機維持紙本的合併儲存格版型
+    <div className='grid w-full grid-cols-1 overflow-hidden rounded-md border border-neutral-blue-gray/50 text-sm nav:w-fit nav:max-w-full nav:grid-cols-[auto_auto_1fr]'>
+      <div className='flex items-center justify-center border-b border-neutral-blue-gray/50 bg-surface-cream px-3 py-2 font-bold text-neutral-dark nav:row-span-3 nav:border-b-0 nav:border-r nav:py-0'>註記欄</div>
+      <label className={cn(cell, 'cursor-pointer border-b border-neutral-blue-gray/50 font-medium nav:col-span-2')}>
         <Checkbox checked={isOn(monthly.key)} onChange={() => store.set(monthly.key, isOn(monthly.key) ? 0 : 1)} aria-label={monthly.label} />
         {monthly.label}
       </label>
-      <div className='row-span-2 flex items-center border-r border-neutral-blue-gray/50 px-3 font-medium text-neutral-dark'>{unit.title}</div>
+      <div className='flex items-center border-b border-neutral-blue-gray/50 px-3 py-2 font-medium text-neutral-dark nav:row-span-2 nav:border-b-0 nav:border-r nav:py-0'>{unit.title}</div>
       {unit.fields.map((f, i) => (
         <label key={f.key} className={cn(cell, 'cursor-pointer', i === 0 && 'border-b border-neutral-blue-gray/50')}>
           <Checkbox checked={isOn(f.key)} onChange={() => toggleUnit(f.key)} aria-label={f.label} />
@@ -270,7 +271,7 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
     if (current !== NOTE && current.kind === 'dateRange' && next && next !== NOTE && next.kind === 'inputs' && next.fields[0]?.key === PAIRED_WITH_DATE_RANGE_KEY) {
       const [receipt, ...rest] = next.fields;
       nodes.push(
-        <div key={`range-${i}`} className='grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6'>
+        <div key={`range-${i}`} className='grid grid-cols-1 gap-4 nav:grid-cols-2 nav:gap-x-6'>
           <DateRangeRow range={current.range} store={store} paired />
           <ReportFieldRow field={receipt} data={store.get(receipt.key)} onChange={value => store.set(receipt.key, value)} />
         </div>
@@ -297,7 +298,7 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
     const collapsed = override[code] ?? (diff !== null && group.collapseWhen(diff));
     nodes.push(
       <div key={`group-${code}-${i}`} className='flex flex-col gap-2'>
-        <button type='button' aria-expanded={!collapsed} onClick={() => setOverride(prev => ({ ...prev, [code]: !collapsed }))} className='flex items-center gap-1 self-start text-sm font-bold text-neutral-dark'>
+        <button type='button' aria-expanded={!collapsed} onClick={() => setOverride(prev => ({ ...prev, [code]: !collapsed }))} className='flex min-h-11 items-center gap-1 self-start text-sm font-bold text-neutral-dark nav:min-h-0'>
           <ChevronDown size={14} className={cn('transition-transform', collapsed && '-rotate-90')} />
           {group.label}
         </button>
@@ -323,7 +324,7 @@ function SectionBlock({ section, all, store, depth, divider = 'none' }: { sectio
   // 區塊內輸入欄位與起訖日期的標籤共用同一寬度（依最長標籤），不換行
   const labelWidth = labelWidthFor(section.items.flatMap(item => (item.kind === 'inputs' ? item.fields.map(f => f.label) : item.kind === 'dateRange' ? [item.range.title] : [])));
   return (
-    <section style={labelWidth ? ({ '--label-w': labelWidth } as CSSProperties) : undefined} className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
+    <section style={labelWidth ? ({ '--label-w': labelWidth } as CSSProperties) : undefined} className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 nav:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
       {section.title &&
         (depth === 0 ? (
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{section.title}</h2>
