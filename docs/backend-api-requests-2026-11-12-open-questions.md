@@ -2,6 +2,18 @@
 
 整理日期：2026-11-12。對照 staging metadata（`/ael/peit/form/metadata`）與 apidog 規格（`/ael/peit/cit/confirm`、`/ael/peit/cit/identify`）逐項核對後端上一輪的調整。
 
+## 阻擋中（優先）
+
+### 0. 財產目錄 confirm 一律回 0003「含有未定義的 fieldCode：ROW_COST_NET」
+
+2026-11-12 對 staging 實測 `POST /ael/peit/cit/confirm`（`companyUuid` 用 demo 公司，`taxYear: 114`、`formCode: CIT_PROPERTY`）：
+
+- 送完整資料（兩個類別、三筆明細、兩列小計），回 `errorCode: 0003`，`message`：「資料格式、規則驗證錯誤：CIT_PROPERTY：含有未定義的 fieldCode：ROW_COST_NET」。
+- 只送一列、一個欄位（`ROW_NO`）也是同樣錯誤；明確帶 `ROW_COST_NET` 也一樣。
+
+`ROW_COST_NET` 存在於 `/ael/peit/form/metadata?formNo=8&taxYear=114`（`formula: ROW_COST - ROW_SALVAGE`），request 內容也沒有送它，
+推測是後端重算列算式欄位時，用來驗證的欄位清單缺少 `ROW_COST_NET`。請確認並修正，修好前財產目錄無法確認送出。
+
 ## 已確認完成（不需要再處理）
 
 | 項目 | 確認方式 |
@@ -26,7 +38,7 @@
 
 ### 2. 財產目錄 confirm 的列格式
 
-前端目前依辨識回傳結構送回，依類別分組為「類別列 → 明細列… → 小計列」，並帶 `rowKind`、`groupKey`、`ROW_LINE_TYPE`（細節見 `backend-api-requests-2026-11-11-pending-merged.md` 1.1）。請確認：
+前端目前依辨識回傳結構送回，依類別分組為「類別列 → 明細列… → 小計列」，並帶 `rowKind`、`groupKey`、`ROW_LINE_TYPE`（細節見 `archive/backend-api-requests-2026-11-11-pending-merged.md` 1.1）。請確認：
 
 1. 後端是否接受這個結構；若不是，請給實際要的格式（小計列靠順序還是靠自帶類別欄位對應所屬類別、是否要送類別列）。
 2. `ROW_LINE_TYPE`：metadata 仍存在（`hidden: true`），辨識也仍每列帶。要保留還是移除？

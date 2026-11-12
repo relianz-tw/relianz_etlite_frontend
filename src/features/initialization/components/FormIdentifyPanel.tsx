@@ -35,7 +35,7 @@ function getExtension(name: string): string {
  * 辨識回傳的可重複列轉成畫面的列。財產目錄的列有明細（rowKind 省略）與小計（rowKind=SUBTOTAL），可能另有類別標題列（ROW_LINE_TYPE=category，後端不保證有）；
  * 類別編號取列自己的 ROW_CATEGORY_CODE、groupKey，都沒有就沿用上一列。畫面每一列自己帶類別編號、名稱，類別列本身不當成一列明細。
  */
-function toRowValues(rows: IdentifiedRow[]): Record<string, string | number>[] {
+export function toRowValues(rows: IdentifiedRow[]): Record<string, string | number>[] {
   const maps = rows.map(row => ({ row, values: toValueMap(row.fields) }));
   // 類別名稱：同一個類別編號的任一列（類別列或小計列）有帶就沿用到整組
   const names = new Map<string, string | number>();
