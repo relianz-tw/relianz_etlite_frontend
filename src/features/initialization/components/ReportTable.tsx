@@ -34,7 +34,7 @@ export function RowCards({ columns, addLabel }: RowCardsProps) {
           </button>
           <div className='grid grid-cols-1 gap-4 pr-8 sm:grid-cols-2'>
             {columns.map(col => (
-              <div key={col.key} className='flex min-w-0 items-center gap-3'>
+              <div key={col.key} className='flex min-w-0 flex-col gap-1.5 nav:flex-row nav:items-center nav:gap-3'>
                 <Label className={cn(FIELD_LABEL_BASE, fieldLabelClass(col.label), '!mb-0 !font-medium')}>{col.label}</Label>
                 <div className='min-w-0 flex-1'>
                   <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} onChange={value => store.setRowField(index, col.key, value)} />

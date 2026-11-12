@@ -42,7 +42,7 @@ export function RegistrationDocsPage({ kicker, nav, progress }: { kicker: string
 function DocRow({ title, fileName, onPick, onClear }: { title: string; fileName?: string; onPick: (file: File) => void; onClear: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className='flex flex-col gap-2 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between'>
+    <div className='flex flex-col gap-2 py-4 first:pt-0 last:pb-0 nav:flex-row nav:items-center nav:justify-between'>
       <div className='flex min-w-0 items-center gap-3'>
         {fileName ? <CircleCheck size={20} className='shrink-0 text-semantic-success' /> : <FileText size={20} className='shrink-0 text-neutral-mid' />}
         <div className='flex min-w-0 flex-col'>
@@ -52,11 +52,11 @@ function DocRow({ title, fileName, onPick, onClear }: { title: string; fileName?
       </div>
       <div className='flex shrink-0 gap-2'>
         {fileName && (
-          <Button variant='ghost' size='sm' icon={X} onClick={onClear}>
+          <Button variant='ghost' size='sm' icon={X} onClick={onClear} className='min-h-11 nav:min-h-0'>
             移除
           </Button>
         )}
-        <Button variant='outline' size='sm' icon={Upload} onClick={() => inputRef.current?.click()}>
+        <Button variant='outline' size='sm' icon={Upload} onClick={() => inputRef.current?.click()} className='min-h-11 nav:min-h-0'>
           {fileName ? '更換檔案' : '選擇檔案'}
         </Button>
       </div>

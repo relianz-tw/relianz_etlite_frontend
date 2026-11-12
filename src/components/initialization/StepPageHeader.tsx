@@ -4,7 +4,7 @@ import { StepProgress, type StepProgressValue } from './StepProgress';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 export interface StepNavProps {
   /** 不傳則不顯示「上一頁」（如第一步、完成頁） */
@@ -37,16 +37,40 @@ interface StepPageHeaderProps {
  * 開帳精靈每一頁共用的頁首卡片：標題資訊與上傳區放在同一塊。
  * 進度與上一頁／下一頁在桌機與手機都固定於畫面底部，長表單捲到哪都看得到、按得到。
  */
+/** 捲動區的 id（InitializationLayout 設定）；固定操作列的實際高度寫在它身上，內容底部留白與 sticky 元件依此避開 */
+const SCROLL_CONTAINER_ID = 'initialization-scroll';
+export const ACTION_BAR_HEIGHT_VAR = '--init-action-bar-h';
+
+/** 量固定操作列的實際高度（會隨進度條、提示文字、安全區變動），寫成 CSS 變數；操作列消失時移除 */
+function useActionBarHeight(active: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const scroller = document.getElementById(SCROLL_CONTAINER_ID);
+    const bar = ref.current;
+    if (!active || !scroller || !bar) return;
+    const update = () => scroller.style.setProperty(ACTION_BAR_HEIGHT_VAR, `${bar.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      scroller.style.removeProperty(ACTION_BAR_HEIGHT_VAR);
+    };
+  }, [active]);
+  return ref;
+}
+
 export function StepPageHeader({ kicker, title, badges, nav, progress, titleAction, aside, children }: StepPageHeaderProps) {
+  const barRef = useActionBarHeight(Boolean(nav));
   return (
     <>
-      <SectionCard className='gap-5 md:p-6'>
-        <div className='flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4'>
+      <SectionCard className='gap-5 nav:p-6'>
+        <div className='flex flex-col gap-3 nav:flex-row nav:items-start nav:justify-between nav:gap-4'>
           <div className='flex min-w-0 flex-col gap-1.5'>
             {kicker && <span className='text-xs font-semibold text-brand-blue'>{kicker}</span>}
             {/* 報表名稱含頓號等標點，用序體排版可能出現字重/標點對不齊的問題，改用正文黑體 */}
             <div className='flex flex-wrap items-center gap-x-4 gap-y-2'>
-              <h1 className='text-xl font-bold text-neutral-dark md:text-2xl'>{title}</h1>
+              <h1 className='text-xl font-bold text-neutral-dark nav:text-2xl'>{title}</h1>
               {titleAction}
             </div>
             {badges && badges.length > 0 && (
@@ -65,19 +89,19 @@ export function StepPageHeader({ kicker, title, badges, nav, progress, titleActi
       </SectionCard>
 
       {nav && (
-        <div className={`fixed inset-x-0 bottom-0 z-40 border-t border-surface-cream bg-white pb-[max(1.25rem,env(safe-area-inset-bottom))] ${progress ? 'pt-4' : 'pt-5'}`}>
+        <div ref={barRef} className='fixed inset-x-0 bottom-0 z-40 border-t border-surface-cream bg-white pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3'>
           {/* 與 InitializationLayout 內容欄同寬；進度在上、按鈕在下，桌機按鈕靠右對齊卡片右緣 */}
-          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 md:px-6'>
+          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 nav:px-6'>
             {progress && <StepProgress {...progress} />}
-            <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-end md:gap-4'>
-              {nav.hint && <p className='text-xs text-semantic-error md:text-right'>{nav.hint}</p>}
+            <div className='flex flex-col gap-2 nav:flex-row nav:items-center nav:justify-end nav:gap-4'>
+              {nav.hint && <p className='text-xs text-semantic-error nav:text-right'>{nav.hint}</p>}
               <div className='flex gap-3'>
                 {nav.onPrev && (
                   <Button variant='ghost' icon={ChevronLeft} onClick={nav.onPrev}>
                     上一頁
                   </Button>
                 )}
-                <Button icon={ChevronRight} iconPosition='right' onClick={nav.onNext} disabled={nav.nextDisabled} className='flex-1 md:flex-none'>
+                <Button icon={ChevronRight} iconPosition='right' onClick={nav.onNext} disabled={nav.nextDisabled} className='flex-1 nav:flex-none'>
                   {nav.nextLabel}
                 </Button>
               </div>

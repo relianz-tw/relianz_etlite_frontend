@@ -189,7 +189,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
           const file = e.dataTransfer.files[0];
           if (file && !recognizing) handleFile(file);
         }}
-        className={`flex items-center gap-3 rounded-lg border-[1.5px] border-dashed px-3 py-2 transition-colors ${
+        className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-[1.5px] border-dashed px-3 py-2 transition-colors ${
           dragging ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray bg-surface-off-white'
         }`}
       >
@@ -198,16 +198,17 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
         ) : (
           <Upload size={20} strokeWidth={1.75} className='shrink-0 text-brand-blue' />
         )}
-        <div className='flex min-w-0 flex-1 flex-col'>
-          <span className='truncate text-sm font-medium text-neutral-dark'>
+        <div className='flex min-w-0 flex-1 basis-40 flex-col'>
+          {/* 手機文字可換行（辨識中的檔名、「上傳申報書快速帶入（選填）」要看得到全文），桌機單行截斷 */}
+          <span className='break-words text-sm font-medium text-neutral-dark nav:truncate'>
             {recognizing ? `辨識中…${fileName}` : vatPeriod ? `上傳申報書檔案${required ? '' : '（選填）'}` : `上傳申報書快速帶入${required ? '' : '（選填）'}`}
           </span>
           {/* 營業稅申報書的檔案會留存於系統，說明手機也要看得到；其餘文件的格式提示只在桌機顯示 */}
-          <span className={`text-xs text-neutral-mid ${vatPeriod ? '' : 'hidden md:block'}`}>
+          <span className={`text-xs text-neutral-mid ${vatPeriod ? '' : 'hidden nav:block'}`}>
             {vatPeriod ? `上傳後會記錄在系統中・PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內` : `PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內`}
           </span>
         </div>
-        <Button variant='outline' size='sm' disabled={recognizing} onClick={() => inputRef.current?.click()} className='shrink-0'>
+        <Button variant='outline' size='sm' disabled={recognizing} onClick={() => inputRef.current?.click()} className='min-h-11 w-full shrink-0 nav:min-h-0 nav:w-auto'>
           {vatPeriod ? '上傳檔案' : '選擇檔案'}
         </Button>
       </div>

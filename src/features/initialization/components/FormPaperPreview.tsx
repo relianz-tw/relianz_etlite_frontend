@@ -27,12 +27,12 @@ export function FormPaperPreview({ formCode }: FormPaperPreviewProps) {
   return (
     <>
       {/* 用暖棕實心（warm）與藍色的上一頁／下一頁區隔，讓範例文件入口一眼可見 */}
-      <Button variant='warm' size='sm' icon={FileText} className='shrink-0 self-start' onClick={() => setOpen(true)} onPointerEnter={prefetchLarge}>
+      <Button variant='warm' size='sm' icon={FileText} className='min-h-11 shrink-0 self-start nav:min-h-0' onClick={() => setOpen(true)} onPointerEnter={prefetchLarge}>
         查看範例文件
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className='flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-3 p-4 md:p-5'>
+        <DialogContent className='flex max-h-[92vh] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-3 p-4 nav:p-5'>
           <div className='flex flex-col gap-1 pr-8'>
             <DialogTitle className='leading-snug'>{preview.pageLabel}</DialogTitle>
             <DialogDescription>{preview.caption}・可捲動查看完整頁面</DialogDescription>

@@ -13,7 +13,7 @@ export const btnPrimary = 'w-full rounded bg-brand-blue text-white py-3 font-med
 export const btnPrimaryDisableable = `${btnPrimary} disabled:opacity-40 disabled:cursor-not-allowed`;
 
 /** 左側面板上一頁按鈕（手機版隱藏，改由 MobileBackBar 顯示） */
-export const btnBack = 'hidden md:flex items-center gap-1 text-sm text-white hover:text-white/80 transition-colors';
+export const btnBack = 'hidden nav:flex items-center gap-1 text-sm text-white hover:text-white/80 transition-colors';
 
 /** 文字型次要操作（如：稍後再設定、手動輸入） */
 export const btnTextLink = 'text-sm text-neutral-dark/50 underline underline-offset-2 text-center hover:text-neutral-dark';

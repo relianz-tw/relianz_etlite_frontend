@@ -720,7 +720,7 @@ aria-hidden：true（順序資訊由視覺呈現，不重複報讀）
 Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、不可互相取代。
 
 ```
-容器（桌機 ≥ md）：flex items-center justify-center，步驟間以連接線相連
+容器（桌機 ≥ nav 1000px）：flex items-center justify-center，步驟間以連接線相連
 連接線：h-px flex-1
   未達：bg #9AA7B9/40（neutral-blue-gray）
   已完成（左側步驟已完成時）：bg #005FA2（brand-blue）
@@ -735,7 +735,7 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
   未達：#9AA7B9（neutral-blue-gray）
 ```
 
-**行動版（< md）**：不顯示橫向步驟列，改用單行文字「第 2 / 6 步．公司資料」置於頁首，
+**行動版（< nav 1000px）**：不顯示橫向步驟列，改用單行文字「第 2 / 6 步．公司資料」置於頁首，
 字級 13px、色 #797C80（neutral-mid），不佔額外版面高度。
 
 對應元件：`src/components/ui/Stepper.tsx`。

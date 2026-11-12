@@ -36,14 +36,20 @@ export function UploadedFilePreview({ file }: { file: File }) {
           <span className='truncate text-sm font-medium text-neutral-dark'>{file.name}</span>
           <span className='text-xs text-neutral-mid'>{formatFileSize(file.size)}</span>
         </div>
-        <Button variant='outline' size='sm' icon={Eye} className='shrink-0' onClick={() => setOpen(true)}>
+        <Button variant='outline' size='sm' icon={Eye} className='min-h-11 shrink-0 nav:min-h-0' onClick={() => setOpen(true)}>
           預覽
         </Button>
       </div>
       <Modal open={open} onClose={() => setOpen(false)} title={file.name} widthClassName='max-w-[960px]'>
         {url &&
           (isPdf ? (
-            <iframe src={url} title={file.name} className='h-[70vh] w-full rounded-md' />
+            <>
+              <iframe src={url} title={file.name} className='h-[70vh] w-full rounded-md' />
+              {/* iOS Safari 的 iframe 常只顯示 PDF 第一頁且不能捲動，另提供在新分頁開啟 */}
+              <a href={url} target='_blank' rel='noreferrer' className='mt-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-blue hover:underline nav:hidden'>
+                在新分頁開啟完整檔案
+              </a>
+            </>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element -- 來源是本地 object URL，next/image 無法最佳化
             <img src={url} alt={file.name} className='mx-auto max-h-[70vh] object-contain' />

@@ -10,6 +10,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import TextInput from '@/components/ui/TextInput';
 import { cn, formatLocalDate } from '@/lib/utils';
+import { useIsNavDesktop } from '@/lib/useNavBreakpoint';
 import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { OperatingStatus, OrgType } from '../../state/initializationReducer';
@@ -46,6 +47,7 @@ function StepBadge({ n, done }: { n: number; done: boolean }) {
 
 export function Step2Operating() {
   const { state, dispatch } = useInitialization();
+  const isNavDesktop = useIsNavDesktop();
   // 使用者想改成的年度；已有辨識過的文件時，先跳提示確認才會真的變更
   const [pendingYear, setPendingYear] = useState<number | null>(null);
 
@@ -156,7 +158,7 @@ export function Step2Operating() {
       />
 
       {SHOW_DATE_SIMULATOR && (
-        <div className='flex flex-col gap-3 rounded-lg border border-dashed border-neutral-blue-gray bg-white p-4 md:flex-row md:items-center md:justify-between'>
+        <div className='flex flex-col gap-3 rounded-lg border border-dashed border-neutral-blue-gray bg-white p-4 nav:flex-row nav:items-center nav:justify-between'>
           <div className='flex flex-col'>
             <span className='text-sm font-bold text-neutral-dark'>測試用：模擬今天日期</span>
             <span className='text-xs text-neutral-mid'>
@@ -180,13 +182,13 @@ export function Step2Operating() {
       )}
 
       {/* 三個步驟放在同一張卡片，用分隔線區分 */}
-      <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white px-5 md:px-6'>
+      <div className='flex flex-col divide-y divide-neutral-blue-gray/30 rounded-lg border border-neutral-blue-gray/30 bg-white px-5 nav:px-6'>
         <div className='flex flex-col gap-4 py-6'>
           <div className='flex items-center gap-3'>
             <StepBadge n={1} done={hasOrgType} />
             <h2 className='text-lg font-bold text-neutral-dark'>請選擇組織型態</h2>
           </div>
-          <div role='radiogroup' aria-label='組織型態' className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+          <div role='radiogroup' aria-label='組織型態' className='grid grid-cols-1 gap-3 nav:grid-cols-2'>
             {ORG_OPTIONS.map(option => {
               const selected = state.orgType === option.value;
               return (
@@ -219,7 +221,7 @@ export function Step2Operating() {
             <StepBadge n={2} done={state.operatingStatus !== null} />
             <h2 className='text-lg font-bold text-neutral-dark'>請選擇您的營運狀況</h2>
           </div>
-          <div role='radiogroup' aria-label='營運狀況' className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+          <div role='radiogroup' aria-label='營運狀況' className='grid grid-cols-1 gap-3 nav:grid-cols-2'>
             {STATUS_OPTIONS.map(option => {
               const selected = state.operatingStatus === option.value;
               return (
@@ -253,7 +255,7 @@ export function Step2Operating() {
 
         {/* 開帳年度與開帳基準日在桌面並排，手機直向堆疊 */}
         {state.operatingStatus !== null && (
-        <div className='grid grid-cols-1 gap-x-8 gap-y-6 py-6 md:grid-cols-2'>
+        <div className='grid grid-cols-1 gap-x-8 gap-y-6 py-6 nav:grid-cols-2'>
         {isOverOneYear && (
           <div className='flex flex-col gap-4'>
             <div className='flex items-center gap-3'>
@@ -265,7 +267,7 @@ export function Step2Operating() {
             </div>
             {onlyYear !== null ? (
               // 只有一個年度時不需要選擇，改為資訊列，避免看起來像可點的按鈕
-              <div className='flex h-12 items-center justify-between gap-3 rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white px-4'>
+              <div className='flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-neutral-blue-gray/30 bg-surface-off-white px-4 py-2'>
                 <span className='text-base font-bold text-neutral-dark'>
                   {toGregorianYear(onlyYear)} 年（民國 {onlyYear} 年）
                 </span>
@@ -277,6 +279,8 @@ export function Step2Operating() {
             ) : (
               <SegmentedControl
               size='lg'
+              // 手機寬度每個選項只有約 120px，「2025 年（民國 114 年）」放不下，允許換行並縮小字級
+              wrapOptions={!isNavDesktop}
               options={yearOptions.map(year => ({ value: String(year), label: `${toGregorianYear(year)} 年（民國 ${year} 年）` }))}
               value={state.openYear === null ? '' : String(state.openYear)}
               onChange={value => handleSelectYear(Number(value))}
@@ -356,7 +360,7 @@ export function Step2Operating() {
             <p className='text-[15px] text-neutral-mid'>
               請準備民國 {state.openYear - 1} 年度的結算申報資料。接下來會一頁一頁呈現表單，每一頁都可以上傳文件快速帶入資料，也可以直接手動輸入。
             </p>
-            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark md:grid-cols-2'>
+            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark nav:grid-cols-2'>
               {FORM_LIST.filter(form => form.taxType === 'cit' && isFormApplicable(form.formCode, state.orgType, { openYear: state.openYear, establishYear: state.establishYear })).map(form => (
                 <li key={form.formNo}>
                   {form.title}
@@ -364,7 +368,7 @@ export function Step2Operating() {
                 </li>
               ))}
               {vatPages.length > 0 && (
-                <li className='md:col-span-2'>
+                <li className='nav:col-span-2'>
                   營業人銷售額與稅額申報書（每一期擇一填 401 或 403）
                   <ul className='mt-1 flex list-none flex-col gap-0.5 pl-5 text-[13px] text-neutral-mid'>
                     {requiredVat && <li>必備：{requiredVat}</li>}
@@ -374,7 +378,7 @@ export function Step2Operating() {
               )}
             </ul>
             <p className='text-[15px] font-medium text-neutral-dark'>登記資料（逐頁核對的最後會請您上傳）</p>
-            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark md:grid-cols-2'>
+            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark nav:grid-cols-2'>
               {registrationDocs.map(doc => (
                 <li key={doc.code}>{doc.title}</li>
               ))}
