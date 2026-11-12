@@ -4,4 +4,14 @@ export function fieldLabelClass(label: string): string {
 }
 
 /** 欄位標籤與輸入框同一行時，標籤的共用寬度與換行樣式 */
-export const FIELD_LABEL_BASE = 'w-[max(12%,5.5rem)] shrink-0 break-words font-medium leading-snug text-neutral-dark';
+export const FIELD_LABEL_BASE = 'w-[var(--label-w,max(12%,5.5rem))] shrink-0 break-words font-medium leading-snug text-neutral-dark';
+
+/**
+ * 一個區塊內所有標籤的共同寬度：依最長標籤的字數決定（中文一字約一個字級寬），
+ * 標籤不換行、輸入框左緣又能上下切齊；區塊裡沒有標籤時回 undefined 沿用預設寬度。
+ */
+export function labelWidthFor(labels: string[]): string | undefined {
+  if (labels.length === 0) return undefined;
+  const em = Math.max(...labels.map(l => [...l].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 255 ? 1 : 0.6), 0)));
+  return `${Math.ceil(em * 13) + 4}px`;
+}

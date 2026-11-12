@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 import type { ReportChoiceDef, ReportDateRangeDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
 import { ReportFieldRow } from '../ReportFieldRow';
-import { fieldLabelClass, FIELD_LABEL_BASE } from '../fieldLabel';
+import { fieldLabelClass, FIELD_LABEL_BASE, labelWidthFor } from '../fieldLabel';
 import { ChoiceGroup } from './ChoiceGroup';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
@@ -320,8 +320,10 @@ function SectionBlock({ section, all, store, depth, divider = 'none' }: { sectio
   // 勾了免填，它底下歸屬的區塊收起來
   const collapsedKeys = Object.entries(EXEMPT_COLLAPSE).flatMap(([flag, keys]) => (!store.renderValue && Number(store.get(flag).value) === 1 ? keys : []));
   const children = all.filter(s => s.parentKey === section.key && !collapsedKeys.includes(s.key) && isSectionShown(s, all, store));
+  // 區塊內輸入欄位與起訖日期的標籤共用同一寬度（依最長標籤），不換行
+  const labelWidth = labelWidthFor(section.items.flatMap(item => (item.kind === 'inputs' ? item.fields.map(f => f.label) : item.kind === 'dateRange' ? [item.range.title] : [])));
   return (
-    <section className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
+    <section style={labelWidth ? ({ '--label-w': labelWidth } as CSSProperties) : undefined} className={cn('flex flex-col gap-4', depth === 0 ? 'p-5 md:px-6' : 'pt-2', DIVIDER_BEFORE_SECTIONS.includes(section.key) && 'border-t border-neutral-blue-gray/30 pt-4', divider === 'line' && 'border-t border-neutral-blue-gray/30', divider === 'merged' && 'pt-0')}>
       {section.title &&
         (depth === 0 ? (
           <h2 className='border-b-2 border-neutral-dark pb-2 text-[17px] font-bold text-neutral-dark'>{section.title}</h2>
