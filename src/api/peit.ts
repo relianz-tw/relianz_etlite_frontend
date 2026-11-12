@@ -28,6 +28,10 @@ export interface IdentifiedField {
 export interface IdentifiedRow {
   /** 列序，從 1 起 */
   rowIndex: number;
+  /** 財產目錄的列種：DETAIL 明細、SUBTOTAL 類別小計；省略視為 DETAIL */
+  rowKind?: 'DETAIL' | 'SUBTOTAL' | null;
+  /** 財產目錄類別列的分組鍵（類別編號）；明細列、小計列沒有 */
+  groupKey?: string | null;
   fields: IdentifiedField[];
 }
 
@@ -53,7 +57,7 @@ export interface CitIdentifyResult {
   /** 開帳民國年（回傳請求帶入的 openingYear） */
   openingYear?: number;
   profile: Record<string, boolean | null>;
-  /** 固定 12 筆（10 張營所稅＋401＋403），請用 formCode 對應，不要用陣列下標 */
+  /** 固定 13 筆（11 張營所稅＋401＋403），請用 formCode 對應，不要用陣列下標 */
   forms: IdentifiedForm[];
 }
 
@@ -103,6 +107,8 @@ export interface MetadataField {
   tableCode?: string | null;
   rowNo?: string | number | null;
   columnCode?: string | null;
+  /** 財產目錄列欄位的列種：DETAIL 明細、SUBTOTAL 類別小計；其餘為 null */
+  rowKind?: 'DETAIL' | 'SUBTOTAL' | null;
 }
 
 /** 互斥勾選組；maxSelect=1 表示二選一／多選一 */
@@ -196,10 +202,11 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
     }
     case 1: // 金額元
     case 5: // 純整數
-    case 6: // 百分比：顯示值（15＝15%），同樣放在 valueInt
       return field.valueInt ?? undefined;
     case 2: // 小數
       return field.valueDecimal ?? undefined;
+    case 6: // 百分比：顯示值（79.28＝79.28%）放在 valueDecimal；舊格式只有 valueInt 時沿用
+      return field.valueDecimal ?? field.valueInt ?? undefined;
     case 3: // 日期
       // 後端日期格式不固定（民國年原樣），統一轉成 ISO，畫面與 confirm 才能解析
       return field.valueDate ? normalizeDateToIso(field.valueDate) : undefined;
@@ -244,6 +251,10 @@ export interface ConfirmField {
 export interface ConfirmRow {
   /** 列序，≥0；前端依畫面順序從 0 起 */
   rowIndex: number;
+  /** 財產目錄的列種：小計列送 SUBTOTAL；明細列省略（視為 DETAIL） */
+  rowKind?: 'SUBTOTAL';
+  /** 財產目錄類別列的分組鍵（類別編號），與辨識回傳一致 */
+  groupKey?: string;
   fields: ConfirmField[];
 }
 

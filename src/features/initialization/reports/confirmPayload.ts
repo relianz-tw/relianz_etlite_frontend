@@ -1,7 +1,7 @@
 import { loadFormMetadata } from '../hooks/useFormMetadata';
 import { FORM_LIST, getCurrentOpenYear, getDefaultFormYear, isFormApplicable, resolveToday } from './formList';
 import { isPageFilled, resolveReportPage } from './reportPages';
-import type { ConfirmField, ConfirmForm, ConfirmRow, MetadataField } from '@/api/peit';
+import type { ConfirmField, ConfirmForm, ConfirmRow, MetadataField, MetadataTable } from '@/api/peit';
 import type { InitializationState, ReportField, SettlementReportId } from '../state/initializationReducer';
 
 /** 欄位值是否已填（空字串與未設定視為空，0 與 false 是有意義的值） */
@@ -17,12 +17,12 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
     case 0:
       return { ...base, valueText: String(field.value) };
     case 1: // 金額元
-    case 5: // 純整數
-    case 6: { // 百分比：顯示值（20＝20%）
+    case 5: { // 純整數
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueInt: Math.round(n) } : null;
     }
-    case 2: {
+    case 2:
+    case 6: { // 小數；百分比為顯示值（79.28＝79.28%），同樣放在 valueDecimal
       const n = Number(field.value);
       return Number.isFinite(n) ? { ...base, valueDecimal: n } : null;
     }
@@ -50,6 +50,58 @@ function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<
     if (confirmField) result.push(confirmField);
   }
   return result;
+}
+
+type StateRow = Record<string, ReportField>;
+
+/** 一般可重複列（投資人、股東、未攤銷）：整列都沒填的空白列不送；列序保留畫面順序，從 0 起（規格 rowIndex ≥ 0） */
+function buildPlainRows(stateRows: StateRow[], metaByCode: Map<string, MetadataField>): ConfirmRow[] {
+  const rows: ConfirmRow[] = [];
+  stateRows.forEach((row, index) => {
+    const fields = toConfirmFields(metaByCode, row, true);
+    if (fields.length > 0) rows.push({ rowIndex: index, fields });
+  });
+  return rows;
+}
+
+const textField = (value: string): ReportField => ({ value, aiFilled: false });
+
+/**
+ * 財產目錄的列有三種（ROW_LINE_TYPE，與辨識回傳同一格式）：
+ * category 類別標題列（類別編號、名稱，groupKey＝類別編號）、item 明細列、subtotal 小計列（rowKind=SUBTOTAL）。
+ * 畫面每一列自己帶類別編號、名稱，送出時依類別（依畫面順序）整理成「類別列 → 明細列… → 小計列」。
+ * 沒填的空白明細列、沒有小計金額的小計列不送。
+ */
+function buildLineTypedRows(stateRows: StateRow[], metaByCode: Map<string, MetadataField>, meta: { tables?: MetadataTable[] }): ConfirmRow[] {
+  const groupBy = meta.tables?.find(t => t.rowRepeatable)?.groupBy;
+  const groupKeys = typeof groupBy === 'string' ? [groupBy] : (groupBy?.fieldCodes ?? []);
+  const keyOf = (row: StateRow) => groupKeys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+  const withoutGroup = (row: StateRow) => Object.fromEntries(Object.entries(row).filter(([k]) => !groupKeys.includes(k)));
+
+  // 依分組鍵保持第一次出現的順序：分組欄位空白的明細列（還沒填類別）沿用畫面上的 __group 標記區分
+  const groups = new Map<string, { head: StateRow; items: StateRow[]; subtotal?: StateRow }>();
+  for (const row of stateRows) {
+    const empty = groupKeys.every(k => String(row[k]?.value ?? '') === '');
+    const key = empty ? `\u0001${String(row.__group?.value ?? '')}` : keyOf(row);
+    const group = groups.get(key) ?? { head: row, items: [] };
+    if (row.__kind?.value === 'SUBTOTAL') group.subtotal = row;
+    else group.items.push(row);
+    groups.set(key, group);
+  }
+
+  const rows: ConfirmRow[] = [];
+  const push = (row: Omit<ConfirmRow, 'rowIndex'>) => rows.push({ rowIndex: rows.length, ...row });
+  for (const group of groups.values()) {
+    const categoryFields = toConfirmFields(metaByCode, { ROW_LINE_TYPE: textField('category'), ...Object.fromEntries(groupKeys.map(k => [k, group.head[k]]).filter(([, v]) => v)) }, true);
+    const items = group.items.map(row => toConfirmFields(metaByCode, { ROW_LINE_TYPE: textField('item'), ...withoutGroup(row) }, true)).filter(fields => fields.length > 1);
+    const subtotalFields = group.subtotal ? toConfirmFields(metaByCode, { ROW_LINE_TYPE: textField('subtotal'), ...withoutGroup(group.subtotal) }, true) : [];
+    const hasSubtotal = subtotalFields.some(f => metaByCode.get(f.fieldCode)?.rowKind === 'SUBTOTAL');
+    if (categoryFields.length <= 1 && items.length === 0 && !hasSubtotal) continue;
+    if (categoryFields.length > 1) push({ groupKey: String(group.head[groupKeys[0]]?.value ?? ''), fields: categoryFields });
+    for (const fields of items) push({ fields });
+    if (hasSubtotal) push({ rowKind: 'SUBTOTAL', fields: subtotalFields });
+  }
+  return rows;
 }
 
 interface FormSource {
@@ -102,12 +154,7 @@ export async function buildConfirmForms(state: InitializationState): Promise<Con
       const metaByCode = new Map(meta.fields.map(f => [f.fieldCode, f]));
       const report = state.reports[source.reportKey];
 
-      const rows: ConfirmRow[] = [];
-      (report?.rows ?? []).forEach((row, index) => {
-        const fields = toConfirmFields(metaByCode, row, true);
-        // 整列都沒填的空白列不送；列序保留畫面順序，從 0 起（規格 rowIndex ≥ 0）
-        if (fields.length > 0) rows.push({ rowIndex: index, fields });
-      });
+      const rows: ConfirmRow[] = metaByCode.has('ROW_LINE_TYPE') ? buildLineTypedRows(report?.rows ?? [], metaByCode, meta) : buildPlainRows(report?.rows ?? [], metaByCode);
 
       return {
         formCode: source.formCode,

@@ -285,6 +285,37 @@ export function Step2Operating() {
           </div>
         )}
 
+          {asksEstablishYear ? (
+            // 穩定經營的開帳基準日固定是開帳年度 1/1（自動帶入），公司這一格改成輸入設立年度
+            <div className='flex flex-col gap-4'>
+              <div className='flex items-center gap-3'>
+                <StepBadge n={4} done={establishYearValid} />
+                <div className='flex flex-col'>
+                  <h2 className='text-lg font-bold text-neutral-dark'>公司設立年度</h2>
+                  <span className='text-[13px] text-neutral-mid'>開帳年度的前一年若就是設立年度，沒有前一年度可申報，就不需要未分配盈餘申報書</span>
+                </div>
+              </div>
+              <div className='flex flex-col gap-2'>
+                <div className='flex items-center gap-2'>
+                  <span className='text-sm text-neutral-dark'>民國</span>
+                  <div className='w-28'>
+                    <TextInput
+                      inputMode='numeric'
+                      widthClassName='w-full'
+                      value={state.establishYear === null ? '' : String(state.establishYear)}
+                      placeholder='例如 110'
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 3);
+                        dispatch({ type: 'SET_ESTABLISH_YEAR', payload: digits === '' ? null : Number(digits) });
+                      }}
+                    />
+                  </div>
+                  <span className='text-sm text-neutral-dark'>年</span>
+                </div>
+                {state.establishYear !== null && !establishYearValid && state.openYear !== null && <p className='text-xs text-semantic-error'>設立年度要早於開帳年度（民國 {state.openYear} 年）。</p>}
+              </div>
+            </div>
+          ) : (
           <div className='flex flex-col gap-4'>
             <div className='flex items-center gap-3'>
               <StepBadge n={isOverOneYear ? 4 : 3} done={state.openingBalance.baseDate !== ''} />
@@ -306,6 +337,7 @@ export function Step2Operating() {
               />
             </div>
           </div>
+          )}
         </div>
         )}
 
@@ -315,39 +347,10 @@ export function Step2Operating() {
           </div>
         )}
 
-        {asksEstablishYear && hasYear && state.openYear !== null && (
-          <div className='flex flex-col gap-4 py-6'>
-            <div className='flex items-center gap-3'>
-              <StepBadge n={5} done={establishYearValid} />
-              <div className='flex flex-col'>
-                <h2 className='text-lg font-bold text-neutral-dark'>公司設立年度</h2>
-                <span className='text-[13px] text-neutral-mid'>開帳年度的前一年若就是設立年度，沒有前一年度可申報，就不需要未分配盈餘申報書</span>
-              </div>
-            </div>
-            <div className='flex items-center gap-2'>
-              <span className='text-sm text-neutral-dark'>民國</span>
-              <div className='w-28'>
-                <TextInput
-                  inputMode='numeric'
-                  widthClassName='w-full'
-                  value={state.establishYear === null ? '' : String(state.establishYear)}
-                  placeholder='例如 110'
-                  onChange={e => {
-                    const digits = e.target.value.replace(/\D/g, '').slice(0, 3);
-                    dispatch({ type: 'SET_ESTABLISH_YEAR', payload: digits === '' ? null : Number(digits) });
-                  }}
-                />
-              </div>
-              <span className='text-sm text-neutral-dark'>年</span>
-            </div>
-            {state.establishYear !== null && !establishYearValid && <p className='text-xs text-semantic-error'>設立年度要早於開帳年度（民國 {state.openYear} 年）。</p>}
-          </div>
-        )}
-
         {isOverOneYear && hasYear && state.openYear !== null && (
           <div className='flex flex-col gap-3.5 py-6'>
             <div className='flex items-center gap-3'>
-              <StepBadge n={asksEstablishYear ? 6 : 5} done />
+              <StepBadge n={5} done />
               <h2 className='text-lg font-bold text-neutral-dark'>請先備齊以下文件</h2>
             </div>
             <p className='text-[15px] text-neutral-mid'>

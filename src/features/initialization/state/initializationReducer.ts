@@ -23,7 +23,7 @@ export interface Partner {
 export type OperatingStatus = 'under_one_year' | 'over_one_year' | null;
 
 /**
- * 12 份申報文件的 formCode（見 reports/formList.ts FORM_LIST，欄位定義由 GET /ael/peit/form/metadata 動態取得）。
+ * 13 份申報文件的 formCode（見 reports/formList.ts FORM_LIST，欄位定義由 GET /ael/peit/form/metadata 動態取得）。
  * CIT_COVER 併入步驟 3 公司資料頁；營所稅其餘各表與依期別展開的 401／403 為步驟 4 逐頁核對（見 reports/reportPages.ts）。
  */
 export type SettlementReportId =
@@ -38,7 +38,8 @@ export type SettlementReportId =
   | 'CIT_WH_RECON'
   | 'CIT_PROPERTY'
   | 'CIT_SHAREHOLDERS'
-  | 'CIT_UNAMORTIZED';
+  | 'CIT_UNAMORTIZED'
+  | 'CIT_WH_RETURN';
 
 /** 步驟 4 一個頁面的 key：營所稅為 formCode，401／403 為 `VAT_401:115-3`（見 reports/reportPages.ts） */
 export type ReportKey = string;

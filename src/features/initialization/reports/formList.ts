@@ -4,7 +4,7 @@ import type { OrgType, SettlementReportId } from '../state/initializationReducer
 const ROC_YEAR_OFFSET = 1911;
 
 export interface FormListItem {
-  /** metadata API 的文件編號（1–12） */
+  /** metadata API 的文件編號（1–13） */
   formNo: number;
   formCode: SettlementReportId;
   title: string;
@@ -14,7 +14,7 @@ export interface FormListItem {
   optional?: boolean;
 }
 
-/** 12 份開帳文件，順序即 formNo；封面（formNo 1）併入步驟 3，其餘 11 份為步驟 4 逐頁核對 */
+/** 13 份開帳文件，順序即 formNo；封面（formNo 1）併入步驟 3，其餘為步驟 4 逐頁核對（營所稅各表依 formNo 排，營業稅 401／403 依期別展開） */
 export const FORM_LIST: FormListItem[] = [
   { formNo: 1, formCode: 'CIT_COVER', title: '營利事業所得稅結算申報書封面', taxType: 'cit' },
   { formNo: 2, formCode: 'CIT_INCOME_TAX', title: '損益及稅額計算表', taxType: 'cit' },
@@ -28,6 +28,7 @@ export const FORM_LIST: FormListItem[] = [
   { formNo: 10, formCode: 'CIT_UNAMORTIZED', title: '未攤銷費用明細表', taxType: 'cit', optional: true },
   { formNo: 11, formCode: 'VAT_401', title: '營業人銷售額與稅額申報書(401)', taxType: 'vat' },
   { formNo: 12, formCode: 'VAT_403', title: '營業人銷售額與稅額申報書(403)', taxType: 'vat' },
+  { formNo: 13, formCode: 'CIT_WH_RETURN', title: '各類所得扣繳暨免扣繳憑單申報書', taxType: 'cit' },
 ];
 
 export function getFormItem(formCode: SettlementReportId): FormListItem {

@@ -52,6 +52,39 @@ function buildHeader(columns: ReportTableColumnDef[]): HeaderCell[][] {
   return rows;
 }
 
+/**
+ * 某一組（類別）的小計格：值存在該組的小計列（rowKind=SUBTOTAL）；有值（辨識帶入或使用者輸入）以該值為主，
+ * 沒有值時顯示該組明細列的即時加總（沒有任何數字顯示空白）。使用者輸入時才建立該組的小計列。
+ */
+function GroupSubtotalCell({ table, group, sub }: { table: ReportPaperTableDef; group: RowGroup; sub: ReportFieldDef }) {
+  const store = usePaperStore();
+  const keys = table.groupBy?.fieldCodes ?? [];
+  const source = store.rows[group.indices[0]];
+  const groupKey = source ? rowGroupKey(source, keys) : '';
+  const subIndex = store.rows.findIndex(r => isSubtotalRow(r) && rowGroupKey(r, keys) === groupKey);
+  const stored = subIndex >= 0 ? store.rows[subIndex][sub.key] : undefined;
+
+  // 該組明細列同一欄的加總
+  const detail = table.rowColumns.find(f => f.columnCode === sub.columnCode);
+  const cells = detail ? group.indices.map(i => store.rows[i][detail.key]).filter(c => c && c.value !== '') : [];
+  const autoValue = cells.length > 0 ? cells.reduce((sum, c) => sum + (Number(c.value) || 0), 0) : null;
+
+  const handleChange = (value: string | number) => {
+    if (subIndex >= 0) {
+      store.setRowField(subIndex, sub.key, value);
+      return;
+    }
+    const at = store.rows.length;
+    store.addRow([...table.subtotalColumns, ...table.groupFields]);
+    store.setRowField(at, KIND_MARK, 'SUBTOTAL');
+    for (const f of table.groupFields) store.setRowField(at, f.key, source?.[f.key]?.value ?? '');
+    store.setRowField(at, GROUP_MARK, source?.[GROUP_MARK]?.value ?? '');
+    store.setRowField(at, sub.key, value);
+  };
+
+  return <FieldInput field={sub} data={stored ?? { value: '', aiFilled: false }} autoValue={autoValue} onChange={handleChange} />;
+}
+
 /** 格子：紙本編號放輸入框左側同一行（對帳模式為三值）；欄標題已經有代號時格子不再重複顯示 */
 function Cell({ field, hideCode }: { field: ReportFieldDef; hideCode?: boolean }) {
   const hasCode = !hideCode && (field.officialCode || field.refNo);
@@ -72,17 +105,29 @@ interface RowGroup {
   indices: number[];
 }
 
-/** 把連續且分組欄位值相同的列併成一組；分組欄位全空的列也併成連續一組（填入類別後才會分開） */
 /** 分組標記：只存在畫面狀態（不在 metadata，送出時會被略過），記錄「新增類別」開出來的新組 */
 const GROUP_MARK = '__group';
 
-function buildRowGroups(rows: Record<string, { value: string | number }>[], keys: string[]): RowGroup[] {
+/** 小計列標記：只存在畫面狀態，辨識回傳 rowKind=SUBTOTAL 的列與使用者輸入的組小計都會帶，送出時轉成 rowKind */
+const KIND_MARK = '__kind';
+
+type RowData = Record<string, { value: string | number }>;
+
+const isSubtotalRow = (row: RowData) => String(row[KIND_MARK]?.value ?? '') === 'SUBTOTAL';
+
+/** 一列所屬的分組鍵：分組欄位（類別編號、名稱）都還沒填時，用「新增類別」時記下的群組標記區分，不然新增的類別會和上一個空白類別併成同一組 */
+function rowGroupKey(row: RowData, keys: string[]): string {
+  const empty = keys.every(k => String(row[k]?.value ?? '') === '');
+  return empty ? `\u0001${String(row[GROUP_MARK]?.value ?? '')}` : keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+}
+
+function buildRowGroups(rows: RowData[], keys: string[]): RowGroup[] {
   const groups: RowGroup[] = [];
   let lastKey: string | null = null;
   rows.forEach((row, index) => {
-    // 分組欄位（類別編號、名稱）都還沒填時，用「新增類別」時記下的群組標記區分，不然新增的類別會和上一個空白類別併成同一組
-    const empty = keys.every(k => String(row[k]?.value ?? '') === '');
-    const key = empty ? `\u0001${String(row[GROUP_MARK]?.value ?? '')}` : keys.map(k => String(row[k]?.value ?? '')).join('\u0000');
+    // 小計列不是明細，不參與分組（它的值掛在所屬那一組的小計格）
+    if (isSubtotalRow(row)) return;
+    const key = rowGroupKey(row, keys);
     if (key === lastKey) groups[groups.length - 1].indices.push(index);
     else groups.push({ indices: [index] });
     lastKey = key;
@@ -191,7 +236,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   // 新增一列：有分組時沿用最後一組的分組欄位值（加進同一組）；新增類別則分組欄位留空，自成一組
   const addDataRow = (inheritGroup: boolean) => {
     const at = store.rows.length;
-    const last = store.rows[at - 1];
+    const last = [...store.rows].reverse().find(r => !isSubtotalRow(r));
     store.addRow([...table.rowColumns, ...table.groupFields]);
     if (inheritGroup && last) {
       for (const f of table.groupFields) store.setRowField(at, f.key, last[f.key]?.value ?? '');
@@ -280,24 +325,16 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
                             {i === leadCols - 1 ? table.groupBy!.subtotalLabel : null}
                           </td>
                         ))}
-                        {table.columns.map(c =>
-                          cellOf('SUBTOTAL', c.code) ? (
+                        {table.columns.map(c => {
+                          const sub = table.subtotalColumns.find(f => f.columnCode === c.code);
+                          return sub ? (
                             <td key={c.code} className={cn(border, 'p-1.5 align-middle')}>
-                              {/* 小計欄位在 metadata 裡只有一個，存不下每一組各自的值，所以各組小計只是依該組各列即時算出來的唯讀數字，沒有數字時顯示「—」 */}
-                              {(() => {
-                                const sub = cellOf('SUBTOTAL', c.code) as ReportFieldDef;
-                                const value = computeFieldValue(sub, Object.values(store.page.fieldMap), key => store.get(key).value, group.indices.map(i => store.rows[i]));
-                                return (
-                                  <div className='flex h-10 items-center justify-end rounded-lg border-[1.5px] border-neutral-blue-gray/30 bg-surface-cream px-3 text-sm tabular-nums text-neutral-dark'>
-                                    {value === null ? '—' : value.toLocaleString('en-US')}
-                                  </div>
-                                );
-                              })()}
+                              <GroupSubtotalCell table={table} group={group} sub={sub} />
                             </td>
                           ) : (
                             <td key={c.code} className={cn(border, SLASH_CLASS)} />
-                          )
-                        )}
+                          );
+                        })}
                         <td className={border} />
                       </tr>
                     </Fragment>

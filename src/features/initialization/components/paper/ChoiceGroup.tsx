@@ -65,10 +65,10 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
     );
   }
 
-  // 標題與勾選框同一排：標題在左，寬度等於兩欄輸入格裡一欄的標籤寬（38% × (整列 − 欄距) ÷ 2），勾選框才會和上方輸入框左緣切齊；手機寬度不夠時自動換行
+  // 標題與勾選框同一排：標題在左，寬度等於兩欄輸入格裡一欄的標籤寬（max(12% × (整列 − 欄距) ÷ 2，5.5rem)），勾選框才會和上方輸入框左緣切齊；手機寬度不夠時自動換行
   return (
     <div className='flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2'>
-      <div className='flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:w-[calc((100%_-_1.5rem)_*_0.19)] md:shrink-0'>
+      <div className='flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:w-[var(--label-w,max(calc((100%_-_1.5rem)_*_0.06),5.5rem))] md:shrink-0'>
         {choice.officialCode && <CodeChip official={choice.officialCode} />}
         <span className='text-sm font-medium text-neutral-dark'>{choice.title}</span>
         {choice.note && <span className='text-[13px] text-neutral-mid'>{choice.note}</span>}

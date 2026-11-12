@@ -55,12 +55,46 @@
 
 第一條 `placeAfter` 接在 82（`BONDED`）之後，其餘每條接在前一條後面。
 
-## 5.【401、403】申辦情形建議改成紙本的表格
+## 5.【401、403】申辦情形要改成紙本的表格（必要，非建議）
 
-紙本是表格：欄為「姓名、身分證統一編號、電話、登錄文(字)號」，列為「自行申報、委任申報」，自行申報列的登錄文(字)號是斜線（不要回傳該欄位，前端會畫斜線）。
-目前是兩個勾選（`FILING_SELF`、`FILING_AGENT`）加分開的輸入欄；`FILER_REG_NO`（登錄文(字)號）設了 `visibleWhen: FILING_AGENT checked`，勾選委任申報才出現。
+紙本是一張表格：
 
-若短期不改成表格，至少請依第 3 點排好欄位順序。
+| 申辦情形 | 姓名 | 身分證統一編號 | 電話 | 登錄文(字)號 |
+|----------|------|----------------|------|---------------|
+| 自行申報 | 可填 | 可填 | 可填 | 斜線（不可填） |
+| 委任申報 | 可填 | 可填 | 可填 | 可填 |
+
+目前是兩個勾選（`FILING_SELF`、`FILING_AGENT`）加分開的輸入欄（`FILER_NAME`、`FILER_ID_NO`、`FILER_PHONE`、`FILER_REG_NO`），`FILER_REG_NO` 靠 `visibleWhen: FILING_AGENT checked` 才出現。
+畫面和紙本差很多，**請後端改成表格結構**（前端已支援固定列的紙本表格：左欄列標籤、格子依 `rowNo|columnCode` 對應、沒有欄位的格子畫斜線，不需要前端另外開發）。
+
+### 建議結構（401、403 相同，`tables[]` 新增一張，`sectionCode: DECLARANT`）
+
+- `tableCode: VAT_FILER`、`rowRepeatable: false`、`placeAfter`：接在 `ATTACH` 區塊的申報日期、核收日期之後（紙本順序）。
+- `corner`：欄名「申辦情形」可放在左上角表頭格（`column` 欄名、`row` 列名，沿用其他表格的用法）。
+- `columns[]`：
+
+| `columnCode` | `title` |
+|--------------|---------|
+| `NAME` | 姓名 |
+| `ID_NO` | 身分證統一編號 |
+| `PHONE` | 電話 |
+| `REG_NO` | 登錄文(字)號 |
+
+- `rows[]`：`SELF`（`rowLabel: 自行申報`）、`AGENT`（`rowLabel: 委任申報`）。
+- 格子欄位（`layout: cell`、`tableCode: VAT_FILER`、`rowNo`、`columnCode`）共 7 個：
+
+| 列 | `columnCode` | 建議 `fieldCode` | `dataType` |
+|----|--------------|------------------|-----------|
+| `SELF` | `NAME`、`ID_NO`、`PHONE` | `FILER_SELF_NAME`、`FILER_SELF_ID_NO`、`FILER_SELF_PHONE` | 文字（0） |
+| `AGENT` | `NAME`、`ID_NO`、`PHONE`、`REG_NO` | `FILER_AGENT_NAME`、`FILER_AGENT_ID_NO`、`FILER_AGENT_PHONE`、`FILER_AGENT_REG_NO` | 文字（0） |
+
+- `SELF` 列的 `REG_NO` 是紙本斜線：**不要回傳該欄位**，前端會畫斜線。
+- 原本的 `FILING_SELF`、`FILING_AGENT` 兩個勾選與 `FILER_NAME`、`FILER_ID_NO`、`FILER_PHONE`、`FILER_REG_NO`：
+  申報人是自行還是委任，改由「哪一列有填資料」判斷（辨識也依此回填對應的列），不再需要勾選，請移除，或標 `hidden: true` 保留給後端自用。
+  `choiceGroups` 的 `VAT_FILER` 一併移除。
+- 辨識（identify）、確認（confirm）請改用新欄位代碼回傳與接收。
+
+欄位代碼與 `placeAfter` 是建議，後端可自訂；重點是「畫面要是紙本那張 2 列 × 4 欄、自行申報列的登錄文(字)號為斜線」。
 
 ## 6. 進項區塊下方：每個項目各自一行
 

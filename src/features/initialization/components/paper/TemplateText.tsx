@@ -14,7 +14,7 @@ function RefValue({ field }: { field: ReportFieldDef }) {
   const store = usePaperStore();
   if (!store.renderValue) {
     return (
-      <span className='mx-1 inline-block w-36 align-middle'>
+      <span className='mx-0.5 inline-block w-36 align-middle'>
         <StoreFieldInput field={field} />
       </span>
     );
@@ -50,7 +50,7 @@ export function TemplateText({ template }: { template: string }) {
         if (!isFieldVisible(field, store)) return null;
         // 輸入框嵌在文字中，固定寬度與文字基線對齊
         return (
-          <span key={i} className='mx-1 inline-block w-36 align-middle'>
+          <span key={i} className='mx-0.5 inline-block w-36 align-middle'>
             <StoreFieldInput field={field} />
           </span>
         );
