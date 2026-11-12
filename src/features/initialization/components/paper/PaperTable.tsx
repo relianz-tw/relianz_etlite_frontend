@@ -85,11 +85,19 @@ function GroupSubtotalCell({ table, group, sub }: { table: ReportPaperTableDef; 
   return <FieldInput field={sub} data={stored ?? { value: '', aiFilled: false }} autoValue={autoValue} onChange={handleChange} />;
 }
 
+/** 格子最小寬度：日期要放得下「114/05/10」加日曆圖示、金額要放得下「$ 12,345,678」加閃電圖示，否則數字被輸入框截掉 */
+function cellMinWidthClass(field: ReportFieldDef): string {
+  if (field.type === 'date') return 'min-w-[176px]';
+  if (field.type === 'money') return 'min-w-[176px]';
+  if (field.type === 'percent' || field.type === 'decimal' || field.type === 'integer') return 'min-w-[132px]';
+  return 'min-w-[144px]';
+}
+
 /** 格子：紙本編號放輸入框左側同一行（對帳模式為三值）；欄標題已經有代號時格子不再重複顯示 */
 function Cell({ field, hideCode }: { field: ReportFieldDef; hideCode?: boolean }) {
   const hasCode = !hideCode && (field.officialCode || field.refNo);
   return (
-    <div className='flex min-w-[120px] items-center gap-1.5'>
+    <div className={cn('flex items-center gap-1.5', cellMinWidthClass(field))}>
       {hasCode && <span className='shrink-0 text-[11px] font-bold leading-none text-brand-blue'>{[field.officialCode, field.refNo].filter(Boolean).join(' ')}</span>}
       <div className='min-w-0 flex-1'>
         <StoreFieldInput field={field} />
@@ -220,7 +228,7 @@ export function PaperTable({ table }: { table: ReportPaperTableDef }) {
       {table.columns.map(c => {
         const col = table.rowColumns.find(f => f.columnCode === c.code);
         return (
-          <td key={c.code} className={cn(border, 'min-w-[120px] p-1.5 align-middle')}>
+          <td key={c.code} className={cn(border, col ? cellMinWidthClass(col) : 'min-w-[144px]', 'p-1.5 align-middle')}>
             {col && <FieldInput field={col} data={row[col.key] ?? { value: '', aiFilled: false }} autoValue={computeRowFieldValue(col, table.rowColumns, row)} onChange={value => store.setRowField(index, col.key, value)} />}
           </td>
         );
