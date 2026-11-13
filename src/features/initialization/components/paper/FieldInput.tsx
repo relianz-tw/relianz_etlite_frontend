@@ -8,6 +8,9 @@ import { cn, formatLocalDate } from '@/lib/utils';
 import type { ReportField } from '../../state/initializationReducer';
 import type { ReportFieldDef } from '../../reports/types';
 import { computeFieldValue } from '../../reports/formula';
+import { getFieldWarning } from '../../reports/fieldValidators';
+import { FieldWarning } from './FieldWarning';
+import { useState } from 'react';
 import { usePaperStore, type PaperStore } from './PaperStore';
 
 interface FieldInputProps {
@@ -82,8 +85,31 @@ export function FieldInput({ field, data: stored, onChange, readOnly, autoValue,
     case 'boolean':
       return <Checkbox checked={Number(data.value) === 1} onChange={() => onChange(Number(data.value) === 1 ? 0 : 1)} aria-label={field.label} />;
     default:
-      return <TextInput widthClassName='w-full' placeholder={placeholder} value={typeof data.value === 'string' ? data.value : String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value)} />;
+      return <TextFieldWithWarning field={field} data={data} placeholder={placeholder} onChange={onChange} />;
   }
+}
+
+/**
+ * 文字欄位：統編、身分證等有格式規則的欄位，離開欄位後（或辨識帶入時）在下方顯示提醒，不擋下一頁。
+ * 獨立成元件是因為需要 useState，而 FieldInput 在 readOnly 時會提早 return，不能在它裡面放 hook。
+ */
+function TextFieldWithWarning({ field, data, placeholder, onChange }: { field: ReportFieldDef; data: ReportField; placeholder?: string; onChange: (value: string | number) => void }) {
+  const [touched, setTouched] = useState(false);
+  const warning = touched || data.aiFilled ? getFieldWarning(field.key, data.value) : null;
+  return (
+    <div className='flex w-full min-w-0 flex-col gap-1'>
+      <TextInput
+        widthClassName='w-full'
+        placeholder={placeholder}
+        value={typeof data.value === 'string' ? data.value : String(data.value)}
+        aiFilled={data.aiFilled}
+        aria-invalid={warning ? true : undefined}
+        onBlur={() => setTouched(true)}
+        onChange={e => onChange(e.target.value)}
+      />
+      {warning && <FieldWarning message={warning} />}
+    </div>
+  );
 }
 
 /** 綁定 store 的欄位輸入：對帳模式改畫 renderValue 的結果 */

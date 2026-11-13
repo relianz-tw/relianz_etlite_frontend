@@ -9,8 +9,10 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import SectionCard from '@/components/ui/SectionCard';
 import TextInput from '@/components/ui/TextInput';
 import { fmtCurrency } from '@/lib/utils';
+import { validateNationalId } from '../reports/fieldValidators';
+import { FieldWarning } from './paper/FieldWarning';
 import { Plus, TriangleAlert, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { Partner } from '../state/initializationReducer';
 
 const EMPTY_OWNER: Partner = { title: '負責人', name: '', idNo: '', address: '', capital: 0 };
@@ -67,7 +69,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
               <TextInput value={p.name} onChange={e => update(index, { name: e.target.value })} />
             </Field>
             <Field label='身分證字號'>
-              <TextInput value={p.idNo} onChange={e => update(index, { idNo: e.target.value.toUpperCase() })} />
+              <IdNoInput value={p.idNo} onChange={value => update(index, { idNo: value })} />
             </Field>
             <Field label='戶籍地址'>
               <TextInput value={p.address} onChange={e => update(index, { address: e.target.value })} />
@@ -113,6 +115,18 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
           )}
         </div>
       </SectionCard>
+    </>
+  );
+}
+
+/** 身分證字號輸入：離開欄位後檢查格式與檢查碼，不符只顯示提醒（不擋下一頁） */
+function IdNoInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [touched, setTouched] = useState(false);
+  const warning = touched && value.trim() !== '' ? validateNationalId(value.trim()) : null;
+  return (
+    <>
+      <TextInput value={value} aria-invalid={warning ? true : undefined} onBlur={() => setTouched(true)} onChange={e => onChange(e.target.value.toUpperCase())} />
+      {warning && <FieldWarning message={warning} />}
     </>
   );
 }

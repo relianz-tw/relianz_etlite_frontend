@@ -7,7 +7,9 @@ import { ChevronDown } from 'lucide-react';
 import type { ReportChoiceDef, ReportDateRangeDef, ReportFieldDef, ReportRowDef, ReportSectionDef, ReportSectionItem } from '../../reports/types';
 import { ReportFieldRow } from '../ReportFieldRow';
 import { fieldLabelClass, FIELD_LABEL_BASE, labelWidthFor } from '../fieldLabel';
+import { validateDateRange } from '../../reports/fieldValidators';
 import { ChoiceGroup } from './ChoiceGroup';
+import { FieldWarning } from './FieldWarning';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { PaperStoreProvider, effectiveNumber, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
@@ -128,19 +130,23 @@ function ValueCell({ field, head }: { field: ReportFieldDef; head?: string }) {
 
 /** 起訖日期一排：標籤＋兩個日期框；寬度與兩欄輸入格的一欄相同，標籤與輸入框左緣才對得齊 */
 function DateRangeRow({ range, store, paired }: { range: ReportDateRangeDef; store: PaperStore; paired?: boolean }) {
+  const warning = validateDateRange(store.get(range.start.key).value, store.get(range.end.key).value);
   return (
-    <div className={cn('flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 nav:flex-nowrap', !paired && 'nav:max-w-[calc(50%-0.75rem)]')}>
-      <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
-      {/* 兩個日期框同一排，各佔剩餘寬度的一半；桌機最寬約 11rem、不撐滿整列，手機標籤獨佔一行、兩框各半寬 */}
-      <div className='flex min-w-0 flex-1 items-center gap-2'>
-        <div className='min-w-0 flex-1 nav:max-w-44'>
-          <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
-        </div>
-        <span className='shrink-0 text-sm text-neutral-mid'>至</span>
-        <div className='min-w-0 flex-1 nav:max-w-44'>
-          <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
+    <div className={cn('flex min-w-0 flex-col gap-1', !paired && 'nav:max-w-[calc(50%-0.75rem)]')}>
+      <div className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 nav:flex-nowrap'>
+        <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
+        {/* 兩個日期框同一排，各佔剩餘寬度的一半；桌機最寬約 11rem、不撐滿整列，手機標籤獨佔一行、兩框各半寬 */}
+        <div className='flex min-w-0 flex-1 items-center gap-2'>
+          <div className='min-w-0 flex-1 nav:max-w-44'>
+            <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
+          </div>
+          <span className='shrink-0 text-sm text-neutral-mid'>至</span>
+          <div className='min-w-0 flex-1 nav:max-w-44'>
+            <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
+          </div>
         </div>
       </div>
+      {warning && <FieldWarning message={warning} />}
     </div>
   );
 }
