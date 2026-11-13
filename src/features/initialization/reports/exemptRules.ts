@@ -15,3 +15,12 @@ export const BOLD_CHECK_KEYS = Object.keys(EXEMPT_COLLAPSE);
 
 /** 這些子區塊上方畫分隔線（「一」與「二」兩大塊之間，從「無關係人及關係人交易」勾選開始算二的那一塊） */
 export const DIVIDER_BEFORE_SECTIONS = ['RELATED_NO_PARTY'];
+
+/**
+ * 整份可免填的勾選（如未分配盈餘申報書）：勾起來時，除了勾選所在區塊與表頭，其餘區塊全部收起。
+ * 畫面與 confirm 送出共用，收起來的區塊不送。
+ */
+export const EXEMPT_FLAG_KEYS = ['UE_EXEMPT'];
+
+/** 整份免填時仍保留（畫面與送出）的表頭區塊 */
+export const EXEMPT_KEEP_SECTION = 'HEADER';
