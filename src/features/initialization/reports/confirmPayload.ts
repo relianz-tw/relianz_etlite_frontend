@@ -1,7 +1,8 @@
+import { EXEMPT_COLLAPSE, EXEMPT_FLAG_KEYS, EXEMPT_KEEP_SECTION } from './exemptRules';
 import { loadFormMetadata } from '../hooks/useFormMetadata';
 import { FORM_LIST, getCurrentOpenYear, getDefaultFormYear, isFormApplicable, resolveToday } from './formList';
 import { isPageFilled, resolveReportPage } from './reportPages';
-import type { ConfirmField, ConfirmForm, ConfirmRow, MetadataField, MetadataTable } from '@/api/peit';
+import type { ConfirmField, ConfirmForm, ConfirmRow, MetadataField, MetadataSection, MetadataTable } from '@/api/peit';
 import type { InitializationState, ReportField, SettlementReportId } from '../state/initializationReducer';
 
 /** 欄位值是否已填（空字串與未設定視為空，0 與 false 是有意義的值） */
@@ -36,18 +37,62 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
 }
 
 /**
+ * visibleWhen 的勾選條件（checked／unchecked）是否成立；沒有條件或不是勾選條件（nonZero 只是「有值才顯示」，沒值本來就不送）一律視為顯示。
+ * 與畫面（PaperStore.isFieldVisible）同一規則：勾選欄位的值為 1 才算勾選。
+ */
+function isVisibleByCheckbox(meta: MetadataField, fields: Record<string, ReportField>): boolean {
+  const cond = meta.visibleWhen;
+  if (!cond || cond.op === 'nonZero') return true;
+  const checked = Number(fields[cond.fieldCode]?.value) === 1;
+  return cond.op === 'checked' ? checked : !checked;
+}
+
+/**
  * @param negateDeductions 資產負債表：減項科目（累計折舊、備抵呆帳等，紙本以（）表示負值）一律存負值，
  *   畫面上輸入的是正數，辨識帶入的值也可能是正數，這裡統一轉成負數；其他表的減項（如損益表 02）仍是正數
  */
-function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<string, ReportField>, wantRow: boolean, negateDeductions = false): ConfirmField[] {
+function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<string, ReportField>, wantRow: boolean, negateDeductions = false, skipSections?: Set<string>): ConfirmField[] {
   const result: ConfirmField[] = [];
   for (const [code, field] of Object.entries(fields)) {
     const meta = metaByCode.get(code);
     // 欄位須存在於該年 metadata；可重複列欄位只出現在 rows，不能當純量欄送
     if (!meta || meta.isRow !== wantRow || !isFilled(field)) continue;
+    // 被「免填」勾選收起來的區塊：畫面上看不到，使用者先前填過的舊值也不送
+    if (meta.sectionCode && skipSections?.has(meta.sectionCode)) continue;
+    // 依勾選條件顯示的欄位（visibleWhen）：條件不成立時畫面藏起來，舊值也不送
+    if (!wantRow && !isVisibleByCheckbox(meta, fields)) continue;
     // 帶算式的小計只送有值的（辨識帶入或使用者輸入）；只是畫面試算出來的不存進欄位，沒送的由後端計算
     const confirmField = toConfirmField(meta, negateDeductions && meta.isDeduction && meta.dataType === 1 ? { ...field, value: -Math.abs(Number(field.value) || 0) } : field);
     if (confirmField) result.push(confirmField);
+  }
+  return result;
+}
+
+/**
+ * 免填勾選收起來的區塊（含其子區塊），與畫面（PaperForm）同一套規則：
+ * - EXEMPT_COLLAPSE：勾了免填，指定的區塊收起（表四關係人負債、關係人交易）
+ * - EXEMPT_FLAG_KEYS：整份免填，除了勾選所在區塊與表頭，其餘區塊全部收起（未分配盈餘申報書）
+ */
+function collapsedSections(sections: MetadataSection[], metaByCode: Map<string, MetadataField>, fields: Record<string, ReportField>): Set<string> {
+  const isChecked = (key: string) => Number(fields[key]?.value) === 1;
+  const roots = new Set<string>();
+  for (const [flag, codes] of Object.entries(EXEMPT_COLLAPSE)) if (isChecked(flag)) codes.forEach(c => roots.add(c));
+  const wholeFormFlag = EXEMPT_FLAG_KEYS.find(k => metaByCode.has(k) && isChecked(k));
+  if (wholeFormFlag) {
+    const keep = new Set([metaByCode.get(wholeFormFlag)?.sectionCode, EXEMPT_KEEP_SECTION]);
+    sections.filter(s => !s.parentSectionCode && !keep.has(s.sectionCode)).forEach(s => roots.add(s.sectionCode));
+  }
+  // 收起的區塊底下的子區塊一併收起（可能多層）
+  const result = new Set(roots);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const s of sections) {
+      if (s.parentSectionCode && result.has(s.parentSectionCode) && !result.has(s.sectionCode)) {
+        result.add(s.sectionCode);
+        grew = true;
+      }
+    }
   }
   return result;
 }
@@ -162,7 +207,7 @@ export async function buildConfirmForms(state: InitializationState): Promise<Con
         taxYear: source.taxYear,
         // 營業稅期別 1／3／5…＝所屬起月
         ...(source.periodStartMonth !== undefined && { periodStartMonth: source.periodStartMonth, cmsPhase: source.periodStartMonth }),
-        fields: toConfirmFields(metaByCode, report?.fields ?? {}, false, source.formCode === 'CIT_BALANCE_SHEET'),
+        fields: toConfirmFields(metaByCode, report?.fields ?? {}, false, source.formCode === 'CIT_BALANCE_SHEET', collapsedSections(meta.sections ?? [], metaByCode, report?.fields ?? {})),
         rows,
       };
     })

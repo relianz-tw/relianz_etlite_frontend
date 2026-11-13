@@ -11,7 +11,7 @@ import { ChoiceGroup } from './ChoiceGroup';
 import { CodeChip } from './CodeChip';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { PaperStoreProvider, effectiveNumber, isFieldShown, isFieldVisible, usePaperStore, type PaperStore } from './PaperStore';
-import { BOLD_CHECK_KEYS, DIVIDER_BEFORE_SECTIONS, EXEMPT_COLLAPSE } from './exemptRules';
+import { BOLD_CHECK_KEYS, DIVIDER_BEFORE_SECTIONS, EXEMPT_COLLAPSE, EXEMPT_FLAG_KEYS } from '../../reports/exemptRules';
 import { RECON_DIFF_FIELD, RECON_GROUPS, itemGroupCode, splitItemsByGroup } from './reconGroups';
 import { PaperTable } from './PaperTable';
 import { TemplateText } from './TemplateText';
@@ -352,7 +352,6 @@ interface PaperFormProps {
  * 整份可免填的勾選（如未分配盈餘申報書「符合背面申報須知二免申報情形之一，本年度得免填報本申報表」）：
  * 勾選放最上方，勾起來後下面的表單（含表頭的營利事業名稱、統編、收件編號）全部收起，只留這個勾選。
  */
-const EXEMPT_FLAG_KEYS = ['UE_EXEMPT'];
 
 export function PaperForm({ sections, store }: PaperFormProps) {
   const shown = sections.filter(s => (!s.parentKey || !sections.some(p => p.key === s.parentKey)) && isSectionShown(s, sections, store));
