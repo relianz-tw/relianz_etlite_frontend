@@ -37,6 +37,17 @@ function toConfirmField(meta: MetadataField, field: ReportField): ConfirmField |
 }
 
 /**
+ * visibleWhen 的勾選條件（checked／unchecked）是否成立；沒有條件或不是勾選條件（nonZero 只是「有值才顯示」，沒值本來就不送）一律視為顯示。
+ * 與畫面（PaperStore.isFieldVisible）同一規則：勾選欄位的值為 1 才算勾選。
+ */
+function isVisibleByCheckbox(meta: MetadataField, fields: Record<string, ReportField>): boolean {
+  const cond = meta.visibleWhen;
+  if (!cond || cond.op === 'nonZero') return true;
+  const checked = Number(fields[cond.fieldCode]?.value) === 1;
+  return cond.op === 'checked' ? checked : !checked;
+}
+
+/**
  * @param negateDeductions 資產負債表：減項科目（累計折舊、備抵呆帳等，紙本以（）表示負值）一律存負值，
  *   畫面上輸入的是正數，辨識帶入的值也可能是正數，這裡統一轉成負數；其他表的減項（如損益表 02）仍是正數
  */
@@ -48,6 +59,8 @@ function toConfirmFields(metaByCode: Map<string, MetadataField>, fields: Record<
     if (!meta || meta.isRow !== wantRow || !isFilled(field)) continue;
     // 被「免填」勾選收起來的區塊：畫面上看不到，使用者先前填過的舊值也不送
     if (meta.sectionCode && skipSections?.has(meta.sectionCode)) continue;
+    // 依勾選條件顯示的欄位（visibleWhen）：條件不成立時畫面藏起來，舊值也不送
+    if (!wantRow && !isVisibleByCheckbox(meta, fields)) continue;
     // 帶算式的小計只送有值的（辨識帶入或使用者輸入）；只是畫面試算出來的不存進欄位，沒送的由後端計算
     const confirmField = toConfirmField(meta, negateDeductions && meta.isDeduction && meta.dataType === 1 ? { ...field, value: -Math.abs(Number(field.value) || 0) } : field);
     if (confirmField) result.push(confirmField);
