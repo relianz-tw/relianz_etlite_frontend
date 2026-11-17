@@ -655,6 +655,26 @@ Sticky 表頭（清單夠長、需捲動時適用）：
 單一金額欄範例）、`ReconHistoryCard.tsx` 桌機列與 `ReconHistoryList.tsx` 分組標頭
 （多金額欄＋分層範例）。
 
+### File Slot（檔案格，雲端資料夾）
+
+用途：雲端資料夾以「文件類型」為單位的欄位，每格固定對應一種文件，狀態只有已上傳／未上傳兩種。
+
+```
+格標籤：text-sm font-medium text-neutral-mid，置於檔案格上方，間距 gap-2
+已上傳：列容器沿用 Record Row（rounded-md bg-white px-3 py-2 hover:bg-surface-cream，無 border）
+  左：FileText size={20} text-brand-blue + 檔名（text-sm font-semibold text-neutral-dark truncate）
+      + 上傳時間（text-xs text-neutral-mid，「上傳於 yyyy-MM-dd HH:mm」）
+  右：Button size="sm" variant="outline"，順序：預覽（Eye）、下載（Download）、重新上傳（Upload）
+  手機（< nav）：按鈕列換到第二行，靠左
+未上傳：整格為 <label>，rounded-md border border-dashed border-neutral-blue-gray/40 bg-white
+  py-4 text-center text-sm text-neutral-mid，內含 Upload size={16} + 「尚未上傳，點擊上傳檔案」；
+  hover 轉 border-brand-blue text-brand-blue；focus-within 顯示 ring-2 ring-brand-blue/20
+分組標頭（如營業稅依期別）：沿用 Record Row 分組標頭（15px semibold + 左側 3px 藍豎線，
+  第二組起 border-t pt-4），不加卡片陰影
+```
+
+對應元件：`src/features/cloud-files/components/FileSlot.tsx`。
+
 ### Tab Bar (Underline)
 
 用途：附著於資料表格頂部的檢視切換（如帳簿應收/已收款、應付/已付款）。
