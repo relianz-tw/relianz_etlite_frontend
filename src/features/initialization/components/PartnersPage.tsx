@@ -2,8 +2,6 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
-import type { StepNavProps } from '@/components/initialization/StepPageHeader';
-import type { StepProgressValue } from '@/components/initialization/StepProgress';
 import Label from '@/components/ui/Label';
 import MoneyInput from '@/components/ui/MoneyInput';
 import SectionCard from '@/components/ui/SectionCard';
@@ -19,8 +17,9 @@ const EMPTY_OWNER: Partner = { title: '負責人', name: '', idNo: '', address: 
 const EMPTY_PARTNER: Partner = { title: '合夥人', name: '', idNo: '', address: '', capital: 0 };
 
 /** 負責人（獨資）或負責人及合夥人（合夥）的基本資料與出資額 */
-export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: Omit<StepNavProps, 'nextDisabled'>; progress: StepProgressValue }) {
+export function PartnersPage() {
   const { state, dispatch } = useInitialization();
+  const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel: '下一頁' };
   const isPartnership = state.orgType === 'partnership';
   const partners = state.partners.length > 0 ? state.partners : [EMPTY_OWNER];
 
@@ -53,7 +52,7 @@ export function PartnersPage({ kicker, nav, progress }: { kicker: string; nav: O
 
   return (
     <>
-      <StepPageHeader kicker={kicker} title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch, hint: mismatch ? '出資額合計與資產負債表資本額不符，請調整後再前往下一頁' : undefined }} progress={progress}>
+      <StepPageHeader kicker='負責人資料' title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch, hint: mismatch ? '出資額合計與資產負債表資本額不符，請調整後再前往下一頁' : undefined }}>
         <p className='text-sm text-neutral-mid'>{isPartnership ? '合夥需填負責人及每位合夥人，出資額加總應等於資產負債表資本額 (3110)。' : '請填寫負責人資料與出資額。'}</p>
         {mismatch && (
           <p className='text-xs text-semantic-error'>

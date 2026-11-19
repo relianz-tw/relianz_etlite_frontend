@@ -27,3 +27,17 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
       ];
   }
 }
+
+/**
+ * 開帳精靈上傳頁用的全部文件。上傳頁排在合約後、選組織型態之前，所以不分型態一次全列，
+ * 使用者上傳自己有的即可。
+ */
+export const ALL_REGISTRATION_DOCS: RegistrationDoc[] = [
+  APPROVAL_LETTER,
+  { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表' },
+  { code: 'ARTICLES', title: '最新公司章程' },
+  { code: 'SHAREHOLDER_LIST', title: '股東名簿' },
+  { code: 'BUSINESS_TRANSCRIPT', title: '最新設立或變更商業抄本' },
+  { code: 'PARTNERSHIP_AGREEMENT', title: '最新合夥契約' },
+  INVOICE_PERMIT,
+];

@@ -3,6 +3,7 @@
 import { StepProgress, type StepProgressValue } from './StepProgress';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
+import { DraftSaveStatus } from '@/features/initialization/components/DraftSaveStatus';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
@@ -90,10 +91,11 @@ export function StepPageHeader({ kicker, title, badges, nav, progress, titleActi
 
       {nav && (
         <div ref={barRef} className='fixed inset-x-0 bottom-0 z-40 border-t border-surface-cream bg-white pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3'>
-          {/* 與 InitializationLayout 內容欄同寬；進度在上、按鈕在下，桌機按鈕靠右對齊卡片右緣 */}
-          <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 nav:px-6'>
+          {/* 與 InitializationLayout 內容欄同寬（兩處都讀 --init-content-max-w／--init-content-px，對照面板展開時一起加寬）；進度在上、按鈕在下，桌機按鈕靠右對齊卡片右緣 */}
+          <div className='mx-auto flex w-full max-w-[var(--init-content-max-w,1200px)] flex-col gap-2 px-4 nav:px-[var(--init-content-px,1.5rem)]'>
             {progress && <StepProgress {...progress} />}
             <div className='flex flex-col gap-2 nav:flex-row nav:items-center nav:justify-end nav:gap-4'>
+              <DraftSaveStatus />
               {nav.hint && <p className='text-xs text-semantic-error nav:text-right'>{nav.hint}</p>}
               <div className='flex gap-3'>
                 {nav.onPrev && (

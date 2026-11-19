@@ -13,6 +13,28 @@ import { normalizeDateToIso } from '@/lib/utils';
 /** dataType：0 文字、1 金額元（可負）、2 小數、3 日期、4 布林、5 純整數（年數、份數等，非金額）、6 百分比（顯示值，20＝20%，可負） */
 export type IdentifiedFieldDataType = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
+/** 欄位值在原件上的位置：page 從 1 起，x／y／w／h 為 0–1 的相對座標（左上角為原點），與圖片實際尺寸無關 */
+export interface FieldBBox {
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** 後端回傳的框：對角兩點（左上 x1,y1、右下 x2,y2）；實測為 0–1 的相對座標小數，規格寫 integer，見 toFieldBBox 的相容處理 */
+interface IdentifiedBBox {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** 規格若真的是 0–1000 整數，座標會大於 1；此時以這個刻度換成 0–1 */
+const LEGACY_BBOX_SCALE = 1000;
+/** 框的寬或高小於這個比例視為無效（後端曾回過被多除一次 1000 的座標，畫出來是看不見的一個點） */
+const MIN_BBOX_SIZE = 0.002;
+
 export interface IdentifiedField {
   fieldCode: string;
   fieldName: string;
@@ -23,6 +45,28 @@ export interface IdentifiedField {
   valueText: string | null;
   valueDate: string | null;
   valueBoolean: boolean | null;
+  /** 欄位值所在頁（從 1 起）；表格列（rows[].fields[]）沒有 page 與 bbox */
+  page?: number | null;
+  /** 欄位值的座標框；辨識不到位置時為 null，前端就不畫紅框 */
+  bbox?: IdentifiedBBox | null;
+}
+
+/**
+ * 辨識欄位的座標轉成前端用的 0–1 相對座標。
+ * 實測後端回的已經是 0–1 小數，原樣使用；只有任一值大於 1 才當成 0–1000 整數除以 1000。
+ * 沒有座標、頁碼，或框不合理（右下不在左上之後、寬高小到看不見）回 null，前端就不畫框。
+ */
+export function toFieldBBox(field: IdentifiedField): FieldBBox | null {
+  const { page, bbox } = field;
+  if (!page || page < 1 || !bbox) return null;
+  const scale = Math.max(bbox.x1, bbox.y1, bbox.x2, bbox.y2) > 1 ? LEGACY_BBOX_SCALE : 1;
+  const clamp01 = (n: number) => Math.min(Math.max(n / scale, 0), 1);
+  const x1 = clamp01(bbox.x1);
+  const y1 = clamp01(bbox.y1);
+  const x2 = clamp01(bbox.x2);
+  const y2 = clamp01(bbox.y2);
+  if (x2 - x1 < MIN_BBOX_SIZE || y2 - y1 < MIN_BBOX_SIZE) return null;
+  return { page, x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 }
 
 export interface IdentifiedRow {
@@ -49,6 +93,8 @@ export interface IdentifiedForm {
   /** 僅 401／403 會傳：申報始月、結月 */
   periodStartMonth?: number;
   periodEndMonth?: number;
+  /** 這張表出現過的頁碼（去重升序） */
+  pages?: number[];
   fields: IdentifiedField[];
   rows: IdentifiedRow[];
 }

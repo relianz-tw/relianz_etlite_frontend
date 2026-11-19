@@ -29,37 +29,45 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
       for (const f of choice.fields) if (f.key !== key && isOn(f.key)) store.set(f.key, 0);
     }
     store.set(key, next ? 1 : 0);
+    // 使用者改動任何一項，整組的 AI 標記一起移除：其餘仍帶 aiFilled 的選項用原值重設即可
+    for (const f of choice.fields) if (f.key !== key && store.get(f.key).aiFilled) store.set(f.key, isOn(f.key) ? 1 : 0);
   };
+
+  // 辨識對沒選的項目也會回 false，逐項標記會整排都亮；改成整組只在題目前面放一個閃電
+  const aiMark = choice.fields.some(f => store.get(f.key).aiFilled) ? <Zap aria-hidden='true' size={14} className='shrink-0 fill-semantic-success text-semantic-success' /> : null;
 
   const options = (
     <div
       // 選項一律橫排一行（放不下才換行），不使用 metadata 的 columns 分欄
       className={cn('flex flex-wrap gap-x-8 gap-y-2', yesNo && 'shrink-0 flex-nowrap gap-x-4', inline && 'inline-flex items-center align-middle')}
     >
-      {choice.fields.map(f => {
-        const data = store.get(f.key);
-        return (
-          <label
-            key={f.key}
-            className={cn('flex min-h-8 w-fit cursor-pointer items-center gap-2', data.aiFilled && 'rounded-lg border-[1.5px] border-semantic-success bg-semantic-success/5 px-2')}
-          >
-            {data.aiFilled && <Zap aria-hidden='true' size={14} className='shrink-0 fill-semantic-success text-semantic-success' />}
-            <Checkbox checked={isOn(f.key)} onChange={() => toggle(f.key)} aria-label={f.label} />
-            <span className='text-sm text-neutral-dark'>{f.label}</span>
-          </label>
-        );
-      })}
+      {choice.fields.map(f => (
+        <label key={f.key} className='flex min-h-8 w-fit cursor-pointer items-center gap-2'>
+          <Checkbox checked={isOn(f.key)} onChange={() => toggle(f.key)} aria-label={f.label} />
+          <span className='text-sm text-neutral-dark'>{f.label}</span>
+        </label>
+      ))}
     </div>
   );
 
-  if (inline) return options;
+  if (inline) {
+    return (
+      <span className='inline-flex items-center gap-2 align-middle'>
+        {aiMark}
+        {options}
+      </span>
+    );
+  }
 
   if (yesNo) {
     return (
       <div className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1'>
         {choice.officialCode && <CodeChip official={choice.officialCode} />}
         {options}
-        <span className='min-w-0 text-sm font-medium text-neutral-dark'>{choice.title}</span>
+        <span className='flex min-w-0 items-center gap-1.5 text-sm font-medium text-neutral-dark'>
+          {aiMark}
+          {choice.title}
+        </span>
         {choice.note && <span className='min-w-0 text-[13px] text-neutral-mid'>{choice.note}</span>}
       </div>
     );
@@ -70,6 +78,7 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
     <div className='flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2'>
       <div className='flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 nav:w-[var(--label-w,max(calc((100%_-_1.5rem)_*_0.06),5.5rem))] nav:shrink-0'>
         {choice.officialCode && <CodeChip official={choice.officialCode} />}
+        {aiMark}
         <span className='text-sm font-medium text-neutral-dark'>{choice.title}</span>
         {choice.note && <span className='text-[13px] text-neutral-mid'>{choice.note}</span>}
       </div>

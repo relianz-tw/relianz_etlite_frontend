@@ -16,11 +16,30 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import {
+  deleteDraftFile,
+  downloadDraftFile,
+  DRAFT_CONFLICT_CODE,
+  getDraft,
+  listDraftFiles,
+  saveDraft,
+  uploadDraftFile,
+  type DraftConflictData,
+  type DraftRecord,
+} from '@/api/initializationDraft';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { blobToFile } from '@/lib/blobToFile';
+import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
+import { toast } from 'sonner';
+import { DraftConflictDialog } from '../components/DraftConflictDialog';
+import { toVatPeriodKey } from '../reports/vatPeriodKey';
 
 // storage key 加上 etlite_ 前綴，理由同 onboarding（見 features/onboarding/state/OnboardingContext.tsx）：
 // 瀏覽器 storage 以 origin 為界、不分 basePath，避免與姊妹專案同名 key 互相覆寫
-const SESSION_KEY = 'etlite_initialization_state';
+// 步驟編號改版（登記文件前移）後換版號，舊 session 的 step 數字已對不上
+const SESSION_KEY = 'etlite_initialization_state_v2';
+/** 這個分頁最後一次和雲端草稿同步到的版本；重新整理後用來判斷雲端是不是被別的裝置更新過 */
+const DRAFT_VERSION_KEY = 'etlite_initialization_draft_version';
 
 interface HistoryStepState {
   step: number;
@@ -29,18 +48,29 @@ interface HistoryStepState {
   base?: boolean;
 }
 
-/** 步驟 2–5 正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
-function isFillingStep(step: number): boolean {
-  return step >= 2 && step <= 5;
+/** 自動儲存的檢查間隔：內容有變動才會真的儲存 */
+const AUTOSAVE_INTERVAL_MS = 30_000;
+
+/** 步驟 2–7 正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
+export function isFillingStep(step: number): boolean {
+  return step >= 2 && step <= 7;
 }
 
 interface InitializationContextValue {
   state: InitializationState;
   dispatch: React.Dispatch<InitializationAction>;
   clearSession: () => void;
-  /** 401／403 各期別頁上傳辨識的檔案（key = 期別頁 key），僅存記憶體供預覽 */
+  /** 還原完成（含必要時等雲端草稿）；未完成前頁面先不畫，避免先閃出第一步再跳到上次的進度 */
+  ready: boolean;
+  /** 401／403 各期別頁上傳辨識的原件（key = 期別頁 key）；同時存在後端，重新整理後從後端取回 */
   vatUploads: Record<string, File>;
   setVatUpload: (pageKey: string, file: File) => void;
+  /** 上次儲存草稿的時間（ms，伺服器時間），尚未儲存過為 null */
+  savedAt: number | null;
+  /** 最近一次儲存是否失敗（如網路問題） */
+  saveError: boolean;
+  /** 立即儲存草稿到雲端（儲存按鈕用；每 30 秒也會自動儲存有變動的內容） */
+  saveDraftNow: () => Promise<void>;
 }
 
 const InitializationContext = createContext<InitializationContextValue | null>(null);
@@ -50,29 +80,168 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const [mounted, setMounted] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
-  // File 無法序列化，不放進 reducer／sessionStorage；重新整理後會消失，待後端存檔 API 上線後改從後端取回
+
+  // ===== 401／403 原件：File 無法序列化，不放進 reducer；上傳到後端，重新整理後依期別取回 =====
   const [vatUploads, setVatUploads] = useState<Record<string, File>>({});
+  // 期別頁 key → 後端 fileId；與「已（或正在）上傳的 File」，避免同一個檔重複上傳
+  const vatFileIdsRef = useRef<Record<string, string>>({});
+  const vatSyncedFileRef = useRef<Record<string, File>>({});
   const setVatUpload = useCallback((pageKey: string, file: File) => {
     setVatUploads(prev => ({ ...prev, [pageKey]: file }));
+    if (vatSyncedFileRef.current[pageKey] === file) return;
+    vatSyncedFileRef.current[pageKey] = file;
+    const period = stateRef.current.reportPages.find(p => p.key === pageKey)?.period;
+    if (!period) return;
+    const previousId = vatFileIdsRef.current[pageKey];
+    uploadDraftFile(file, 'VAT_PERIOD', toVatPeriodKey(period))
+      .then(meta => {
+        vatFileIdsRef.current[pageKey] = meta.fileId;
+        // 換檔時把這一期舊的原件從後端刪掉
+        if (previousId && previousId !== meta.fileId) deleteDraftFile(previousId).catch(() => {});
+      })
+      .catch(error => toast.error(`${getFriendlyErrorMessage(error, '原件上傳失敗')}，原件未存到雲端，重新整理後需重新上傳`));
   }, []);
+
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   // 取消離開時用 history.forward() 回到流程，會再觸發一次 popstate，需忽略
   const ignoreNextPopRef = useRef(false);
   // ConfirmDialog 按確認後會接著呼叫 onClose，用這個旗標區分「確認離開」與「取消」
   const leaveConfirmedRef = useRef(false);
 
-  // 首次掛載從 sessionStorage 還原
+  // ===== 草稿：整份 state 存雲端（樂觀鎖 version），換裝置續填 =====
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  /** 版本衝突（另一個裝置更新過雲端草稿）時為伺服器目前的版本，非 null 就跳選擇視窗 */
+  const [conflict, setConflict] = useState<DraftConflictData | null>(null);
+  const conflictRef = useRef<DraftConflictData | null>(null);
+  conflictRef.current = conflict;
+  // 目前與雲端同步到的版本（還沒存過為 0，之後每次儲存都要帶它當 baseVersion）
+  const draftVersionRef = useRef(0);
+  const savingRef = useRef(false);
+  // 上次存進雲端的內容，自動儲存用來判斷「有沒有變動」
+  const lastSavedJsonRef = useRef<string | null>(null);
+
+  const recordVersion = useCallback((version: number) => {
+    draftVersionRef.current = version;
+    try {
+      sessionStorage.setItem(DRAFT_VERSION_KEY, String(version));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const saveDraftNow = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const snapshot = stateRef.current;
+    try {
+      const record = await saveDraft({ step: snapshot.currentStep, reportIndex: snapshot.currentReportIndex, state: snapshot, baseVersion: draftVersionRef.current });
+      recordVersion(record.version);
+      lastSavedJsonRef.current = JSON.stringify(snapshot);
+      setSavedAt(Date.parse(record.savedAt));
+      setSaveError(false);
+    } catch (error) {
+      if (error instanceof ApiError && error.errorCode === DRAFT_CONFLICT_CODE && error.data) setConflict(error.data as DraftConflictData);
+      else setSaveError(true);
+    } finally {
+      savingRef.current = false;
+    }
+  }, [recordVersion]);
+
+  /** 用雲端草稿取代目前畫面：還原表單並跳到存檔時的步驟，瀏覽器歷史的目前這一筆也同步成該步驟 */
+  const applyServerDraft = useCallback(
+    (draft: DraftRecord) => {
+      const restored = draft.state as InitializationState;
+      rawDispatch({ type: 'RESTORE_STATE', payload: restored });
+      history.replaceState({ step: draft.step, reportIndex: draft.reportIndex } satisfies HistoryStepState, '');
+      recordVersion(draft.version);
+      lastSavedJsonRef.current = JSON.stringify(restored);
+      setSavedAt(Date.parse(draft.savedAt));
+    },
+    [recordVersion]
+  );
+
+  // 首次掛載還原：同一分頁的 sessionStorage 優先（可能有尚未儲存的最新修改）；沒有（新分頁、換裝置）就用雲端草稿，
+  // 兩邊都有但雲端版本不是這個分頁同步到的那一版，代表別的裝置更新過，跳視窗讓使用者選
   useEffect(() => {
+    let local: InitializationState | null = null;
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
-      if (saved) {
-        rawDispatch({ type: 'RESTORE_STATE', payload: JSON.parse(saved) as InitializationState });
-      }
+      if (saved) local = JSON.parse(saved) as InitializationState;
     } catch {
-      // 讀取或解析失敗，保持 initialState
+      // 讀取或解析失敗，視為沒有本機狀態
     }
-    setMounted(true);
-  }, []);
+    const knownVersion = Number(sessionStorage.getItem(DRAFT_VERSION_KEY) ?? 0) || 0;
+    if (local) {
+      rawDispatch({ type: 'RESTORE_STATE', payload: local });
+      draftVersionRef.current = knownVersion;
+      setMounted(true);
+    }
+    getDraft()
+      .then(draft => {
+        if (!draft) return;
+        if (!local) applyServerDraft(draft);
+        else if (draft.version !== knownVersion) setConflict({ version: draft.version, savedAt: draft.savedAt });
+        else setSavedAt(Date.parse(draft.savedAt));
+      })
+      // 讀雲端失敗（斷線等）就用本機狀態繼續，之後儲存時會再提示
+      .catch(() => {})
+      .finally(() => setMounted(true));
+  }, [applyServerDraft]);
+
+  // 401／403 原件：狀態還原、期別頁清單有了之後，依期別從後端取回（只做一次）
+  const vatRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!mounted || vatRestoredRef.current) return;
+    const periodPages = state.reportPages.filter(p => p.period);
+    if (periodPages.length === 0) return;
+    vatRestoredRef.current = true;
+    (async () => {
+      const metas = (await listDraftFiles().catch(() => [])).filter(m => m.kind === 'VAT_PERIOD');
+      for (const meta of metas) {
+        const page = periodPages.find(p => toVatPeriodKey(p.period!) === meta.periodKey);
+        if (!page) continue;
+        try {
+          const file = blobToFile(await downloadDraftFile(meta.fileId), meta.fileName);
+          vatFileIdsRef.current[page.key] = meta.fileId;
+          vatSyncedFileRef.current[page.key] = file;
+          // 取回期間使用者若已經上傳新檔，以新檔為準
+          setVatUploads(prev => (prev[page.key] ? prev : { ...prev, [page.key]: file }));
+        } catch {
+          // 取不回來就當這期沒有原件
+        }
+      }
+    })();
+  }, [mounted, state.reportPages]);
+
+  // 自動儲存：只在填寫步驟、內容與上次儲存不同、且沒有衝突視窗開著時才存，避免白白更新時間
+  useEffect(() => {
+    if (!mounted) return;
+    const timer = setInterval(() => {
+      const current = stateRef.current;
+      if (conflictRef.current || !isFillingStep(current.currentStep)) return;
+      if (JSON.stringify(current) !== lastSavedJsonRef.current) saveDraftNow();
+    }, AUTOSAVE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [mounted, saveDraftNow]);
+
+  const handleConflictLoadServer = async () => {
+    try {
+      const draft = await getDraft();
+      if (draft) applyServerDraft(draft);
+      setConflict(null);
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, '載入雲端草稿失敗，請稍後再試'));
+    }
+  };
+
+  const handleConflictOverwrite = async () => {
+    if (!conflict) return;
+    // 以伺服器目前的版本當 baseVersion 重送，本機內容覆蓋雲端
+    recordVersion(conflict.version);
+    setConflict(null);
+    await saveDraftNow();
+  };
 
   // mounted 後才同步，避免將 initialState 覆寫已儲存的狀態
   useEffect(() => {
@@ -149,12 +318,14 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     history.forward();
   };
 
+  // 只清這個分頁的暫存；雲端草稿與原件在開帳完成（complete）時由後端自動刪除、封存，前端不處理
   function clearSession() {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(DRAFT_VERSION_KEY);
   }
 
   return (
-    <InitializationContext.Provider value={{ state, dispatch, clearSession, vatUploads, setVatUpload }}>
+    <InitializationContext.Provider value={{ state, dispatch, clearSession, ready: mounted, vatUploads, setVatUpload, savedAt, saveError, saveDraftNow }}>
       {children}
       <ConfirmDialog
         open={leavePromptOpen}
@@ -164,6 +335,13 @@ export function InitializationProvider({ children }: { children: React.ReactNode
         message='確定要離開開帳設定嗎？目前填寫的內容會保留在這個分頁，回來時可以繼續。'
         confirmLabel='離開'
         cancelLabel='留在這裡'
+      />
+      <DraftConflictDialog
+        open={conflict !== null}
+        serverSavedAt={conflict?.savedAt ?? ''}
+        onLoadServer={handleConflictLoadServer}
+        onOverwrite={handleConflictOverwrite}
+        onClose={() => setConflict(null)}
       />
     </InitializationContext.Provider>
   );

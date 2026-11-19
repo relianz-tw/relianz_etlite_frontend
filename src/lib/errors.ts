@@ -8,12 +8,15 @@ import { ERROR_MESSAGES } from './errorCodes';
 export class ApiError extends Error {
   readonly errorCode: string;
   readonly status: number;
+  /** 失敗信封的 data（如草稿 0409 衝突會帶伺服器目前的 version、savedAt）；多數錯誤沒有 */
+  readonly data?: unknown;
 
-  constructor(errorCode: string, message: string, status: number) {
+  constructor(errorCode: string, message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.errorCode = errorCode;
     this.status = status;
+    this.data = data;
   }
 }
 

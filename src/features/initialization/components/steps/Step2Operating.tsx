@@ -2,7 +2,6 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { FORM_LIST, ORG_TYPE_LABEL, buildReportPages, describePeriods, getOpenYearOptions, isFormApplicable, isSoleOrPartnership, resolveToday, toGregorianYear } from '../../reports';
-import { getRegistrationDocs } from '../../reports/registrationDocs';
 import { StepPageHeader, type StepNavProps } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -117,7 +116,6 @@ export function Step2Operating() {
   const asksEstablishYear = isOverOneYear && state.orgType !== null && !isSoleOrPartnership(state.orgType);
   const establishYearValid = state.establishYear !== null && state.openYear !== null && state.establishYear >= 1 && state.establishYear < state.openYear;
   const ready = hasOrgType && hasBaseDate && (state.operatingStatus === 'under_one_year' || (isOverOneYear && hasYear && (!asksEstablishYear || establishYearValid)));
-  const registrationDocs = getRegistrationDocs(state.orgType);
 
   const hint =
     !hasOrgType
@@ -132,8 +130,7 @@ export function Step2Operating() {
             ? '請選擇開帳基準日。'
             : '';
 
-  // 此頁不提供「上一頁」
-  const nav: StepNavProps = { onNext: handleNext, nextLabel: '下一頁', nextDisabled: !ready };
+  const nav: StepNavProps = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: handleNext, nextLabel: '下一頁', nextDisabled: !ready };
 
   return (
     <>
@@ -376,13 +373,6 @@ export function Step2Operating() {
                   </ul>
                 </li>
               )}
-            </ul>
-            <p className='text-[15px] font-medium text-neutral-dark'>登記資料（逐頁核對的最後會請您上傳）</p>
-            <ul className='grid list-inside list-disc grid-cols-1 gap-x-8 gap-y-1.5 text-[15px] text-neutral-dark nav:grid-cols-2'>
-              {registrationDocs.map(doc => (
-                <li key={doc.code}>{doc.title}</li>
-              ))}
-              {isSoleOrPartnership(state.orgType) && <li>負責人{state.orgType === 'partnership' ? '及合夥人' : ''}基本資料（姓名、身分證字號、戶籍地址、出資額）</li>}
             </ul>
           </div>
         )}

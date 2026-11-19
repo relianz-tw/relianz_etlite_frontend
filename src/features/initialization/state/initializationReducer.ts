@@ -1,10 +1,22 @@
 'use client';
 
-import { buildEmptyRow, buildInitialReportsState } from '../reports';
+import type { FieldBBox } from '@/api/peit';
+import { buildEmptyRow, buildInitialReportsState, isSoleOrPartnership } from '../reports';
 import type { ReportPageSpec, VatFormCode } from '../reports/reportPages';
 import type { ReportFieldDef } from '../reports/types';
 
 // ==================== 類型定義 ====================
+
+/** 辨識帶入的欄位在哪份原件的哪一頁、哪個位置（供對照面板畫紅框）；sourceId 是原件的 fileId */
+export interface FieldLocation extends FieldBBox {
+  sourceId: string;
+}
+
+/** 一張表辨識自哪份原件、出現在原件的哪幾頁（頁碼從 1 起）；對照面板只顯示這幾頁 */
+export interface FormSource {
+  sourceId: string;
+  pages: number[];
+}
 
 /** 組織型態：決定要備哪些文件（公司有股東名簿與未分配盈餘申報書，獨資合夥改填負責人／合夥人資料） */
 export type OrgType = 'share' | 'limited' | 'sole' | 'partnership' | null;
@@ -60,7 +72,7 @@ export interface ReportData {
 
 export interface InitializationState {
   currentStep: number;
-  /** 步驟 4（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
+  /** 步驟 6（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
   currentReportIndex: number;
 
   /**
@@ -90,6 +102,12 @@ export interface InitializationState {
   simulatedDate: string | null;
   /** 使用者改了開帳年度且確認過提示後為 true；按下步驟 2「下一步」時才真的清掉 reportYears（見 APPLY_YEAR_RESET） */
   yearResetPending: boolean;
+  /** 辨識帶入欄位的原件位置：key 為頁面 key，內層 key 為 fieldCode；隨草稿一起存，換裝置也看得到紅框 */
+  fieldLocations: Record<ReportKey, Record<string, FieldLocation>>;
+  /** 每張表辨識自哪份原件、在哪幾頁：key 為頁面 key；對照面板只顯示該表自己的頁，不顯示整份原件 */
+  formSources: Record<ReportKey, FormSource>;
+  /** 每份原件（key = fileId）辨識後帶入了哪些文件，畫面上「已帶入：…」一直顯示用 */
+  sourceLabels: Record<string, string[]>;
 
   // 步驟 3：公司基本資料，供確認頁與送出 API 使用。封面欄位全部依 metadata 存於 reports.CIT_COVER，
   // 按「下一步」時由 Step3Cover 把對應欄位整理進來（見 COVER_TO_COMPANY）
@@ -147,6 +165,9 @@ export const initialState: InitializationState = {
   vatChoices: {},
   reportPages: [],
   yearResetPending: false,
+  fieldLocations: {},
+  formSources: {},
+  sourceLabels: {},
   simulatedDate: null,
 
   company: {
@@ -215,26 +236,42 @@ export type InitializationAction =
         taxYear?: number;
         fields: Record<string, string | number>;
         rows: Record<string, string | number>[];
+        /** 各欄位在原件上的位置（key = fieldCode）；有傳就整批取代這一頁原本的位置 */
+        locations?: Record<string, FieldLocation>;
+        /** 這張表辨識自哪份原件、在哪幾頁（後端回的 pages） */
+        source?: FormSource;
       };
     }
+  /** 丟入新一份原件辨識前，先清掉所有欄位的 AI 閃電標記（值不動），之後只有這次辨識帶入的欄位會重新被標記 */
+  | { type: 'CLEAR_AI_FLAGS' }
+  | { type: 'SET_SOURCE_LABELS'; payload: { sourceId: string; labels: string[] } }
+  /** 原件被刪除：移除它的「已帶入」說明與所有指向它的欄位位置（欄位值不動） */
+  | { type: 'FORGET_SOURCE'; payload: { sourceId: string } }
   | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[]; /** 插在這個位置（不給＝加在最後） */ at?: number } }
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
   | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: ReportKey; index: number; key: string; value: string | number } }
 
-  // 步驟 4 登記資料頁
+  // 登記文件上傳頁、負責人頁
   | { type: 'SET_REGISTRATION_FILE'; payload: { docType: string; fileName: string | null } }
   | { type: 'SET_PARTNERS'; payload: Partner[] }
 
-  // 步驟 6
+  // 完成
   | { type: 'COMPLETE' };
 
 // ==================== 步驟導航邏輯 ====================
-// Stepper 分組（見 Stepper 元件呼叫端）：1=合約　2=營運狀況　3+4=開帳資料（公司資料＋報表核對）　5=確認　6=完成
-// 步驟 2 選「未滿一年」時無結算申報書可核對，3 之後直接跳到 5（確認），略過步驟 4 的報表頁
+// 步驟順序：1=合約　2=登記文件上傳　3=營運狀況　4=負責人／合夥人資料（僅滿一年的獨資、合夥）
+//          5=封面／公司資料　6=逐頁核對報表（僅滿一年）　7=確認　8=完成
+// 登記文件排在合約後，是因為之後後端辨識文件會把公司基本資料帶入後面的頁面；此時還沒選組織型態，故文件不分型態
+// 步驟 2 選「未滿一年」時無結算申報書可核對，5 之後直接跳到 7（確認），略過步驟 6 的報表頁
 
 export interface StepTarget {
   step: number;
   reportIndex: number;
+}
+
+/** 負責人／合夥人資料頁：只有獨資、合夥且滿一年才需要（跟封面一起走結算申報的路線） */
+function needsPartnersPage(state: Pick<InitializationState, 'operatingStatus' | 'orgType'>): boolean {
+  return state.operatingStatus === 'over_one_year' && isSoleOrPartnership(state.orgType);
 }
 
 export function getPrevStep(state: InitializationState): StepTarget {
@@ -244,10 +281,14 @@ export function getPrevStep(state: InitializationState): StepTarget {
     case 3:
       return { step: 2, reportIndex: 0 };
     case 4:
-      if (state.currentReportIndex > 0) return { step: 4, reportIndex: state.currentReportIndex - 1 };
       return { step: 3, reportIndex: 0 };
     case 5:
-      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 3, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 3, reportIndex: 0 };
+    case 6:
+      if (state.currentReportIndex > 0) return { step: 6, reportIndex: state.currentReportIndex - 1 };
+      return { step: 5, reportIndex: 0 };
+    case 7:
+      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 5, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -260,12 +301,16 @@ export function getNextStep(state: InitializationState): StepTarget {
     case 2:
       return { step: 3, reportIndex: 0 };
     case 3:
-      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
     case 4:
-      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 4, reportIndex: state.currentReportIndex + 1 };
       return { step: 5, reportIndex: 0 };
     case 5:
-      return { step: 6, reportIndex: 0 };
+      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: 0 } : { step: 7, reportIndex: 0 };
+    case 6:
+      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 6, reportIndex: state.currentReportIndex + 1 };
+      return { step: 7, reportIndex: 0 };
+    case 7:
+      return { step: 8, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -447,7 +492,7 @@ export function initializationReducer(state: InitializationState, action: Initia
     }
 
     case 'APPLY_IDENTIFIED_FORM': {
-      const { reportId, taxYear, fields, rows } = action.payload;
+      const { reportId, taxYear, fields, rows, locations, source } = action.payload;
       let reports = state.reports;
       for (const [key, value] of Object.entries(fields)) {
         reports = setReportFieldSynced(reports, reportId, key, value, true);
@@ -457,7 +502,41 @@ export function initializationReducer(state: InitializationState, action: Initia
         const newRows: ReportRow[] = rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, { value, aiFilled: true }])));
         reports = setReportRows(reports, reportId, newRows);
       }
-      return { ...state, reports, reportYears: taxYear === undefined ? state.reportYears : { ...state.reportYears, [reportId]: taxYear } };
+      return {
+        ...state,
+        reports,
+        reportYears: taxYear === undefined ? state.reportYears : { ...state.reportYears, [reportId]: taxYear },
+        fieldLocations: locations ? { ...state.fieldLocations, [reportId]: locations } : state.fieldLocations,
+        formSources: source ? { ...state.formSources, [reportId]: source } : state.formSources,
+      };
+    }
+
+    case 'CLEAR_AI_FLAGS': {
+      const clearField = (field: ReportField): ReportField => (field.aiFilled ? { ...field, aiFilled: false } : field);
+      const reports = Object.fromEntries(
+        Object.entries(state.reports).map(([reportId, report]) => [
+          reportId,
+          {
+            ...report,
+            fields: Object.fromEntries(Object.entries(report.fields).map(([key, field]) => [key, clearField(field)])),
+            rows: report.rows.map(row => Object.fromEntries(Object.entries(row).map(([key, field]) => [key, clearField(field)]))),
+          },
+        ])
+      );
+      return { ...state, reports };
+    }
+
+    case 'SET_SOURCE_LABELS':
+      return { ...state, sourceLabels: { ...state.sourceLabels, [action.payload.sourceId]: action.payload.labels } };
+
+    case 'FORGET_SOURCE': {
+      const { sourceId } = action.payload;
+      const { [sourceId]: _removed, ...sourceLabels } = state.sourceLabels;
+      const fieldLocations = Object.fromEntries(
+        Object.entries(state.fieldLocations).map(([reportId, byField]) => [reportId, Object.fromEntries(Object.entries(byField).filter(([, loc]) => loc.sourceId !== sourceId))])
+      );
+      const formSources = Object.fromEntries(Object.entries(state.formSources).filter(([, src]) => src.sourceId !== sourceId));
+      return { ...state, sourceLabels, fieldLocations, formSources };
     }
 
     case 'ADD_REPORT_ROW': {

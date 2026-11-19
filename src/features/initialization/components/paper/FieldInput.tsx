@@ -9,6 +9,7 @@ import type { ReportField } from '../../state/initializationReducer';
 import type { ReportFieldDef } from '../../reports/types';
 import { computeFieldValue } from '../../reports/formula';
 import { getFieldWarning } from '../../reports/fieldValidators';
+import { useReferenceOptional } from '../../reference/ReferenceContext';
 import { FieldWarning } from './FieldWarning';
 import { useState } from 'react';
 import { usePaperStore, type PaperStore } from './PaperStore';
@@ -32,8 +33,22 @@ function sanitizePercent(raw: string): string {
   return negative ? `-${body}` : body;
 }
 
-/** 單一欄位的輸入元件（依 type 選元件），標籤由呼叫端負責 */
-export function FieldInput({ field, data: stored, onChange, readOnly, autoValue, placeholder }: FieldInputProps) {
+/**
+ * 單一欄位的輸入元件（依 type 選元件），標籤由呼叫端負責。
+ * contents 讓外層 div 不產生版面框，只負責接 focus 事件，告訴對照面板目前聚焦哪個欄位（面板據此在原件上框出位置）；
+ * 放在這裡而不是各呼叫端，是因為輸入欄位有好幾條路徑（ReportFieldRow、金額列、表格格子、內嵌文字）都用到 FieldInput。
+ * 對帳頁沒有對照面板，reference 為 null。
+ */
+export function FieldInput(props: FieldInputProps) {
+  const reference = useReferenceOptional();
+  return (
+    <div className='contents' onFocusCapture={() => reference?.setFocusedField(props.field.key)}>
+      <FieldInputBody {...props} />
+    </div>
+  );
+}
+
+function FieldInputBody({ field, data: stored, onChange, readOnly, autoValue, placeholder }: FieldInputProps) {
   // 算式欄位可編輯：有值（辨識帶入或使用者輸入）以該值為主，沒有值才顯示試算結果
   const data = stored.value === '' && autoValue != null ? { ...stored, value: autoValue } : stored;
   if (readOnly) {

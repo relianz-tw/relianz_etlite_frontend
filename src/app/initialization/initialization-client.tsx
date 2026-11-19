@@ -1,6 +1,8 @@
 'use client';
 
 import { useInitialization } from '@/features/initialization/state/InitializationContext';
+import { PartnersPage } from '@/features/initialization/components/PartnersPage';
+import { RegistrationDocsPage } from '@/features/initialization/components/RegistrationDocsPage';
 import { Step1Terms } from '@/features/initialization/components/steps/Step1Terms';
 import { Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -41,7 +43,7 @@ const Step6Done = dynamic(
 );
 
 export function InitializationClient() {
-  const { state, dispatch } = useInitialization();
+  const { state, dispatch, ready } = useInitialization();
   const { currentStep, currentReportIndex } = state;
   const searchParams = useSearchParams();
   const uuid = searchParams.get('uuid');
@@ -59,9 +61,9 @@ export function InitializationClient() {
     if (scroller) scroller.scrollTop = 0;
   }, [currentStep, currentReportIndex]);
 
-  // 步驟 2–5 正在填資料時，關閉分頁或重新整理前讓瀏覽器跳出「確定要離開」確認；
+  // 步驟 2–7 正在填資料時，關閉分頁或重新整理前讓瀏覽器跳出「確定要離開」確認；
   // 合約與完成頁沒有待保存的內容，不攔。瀏覽器只會顯示內建文字，無法自訂
-  const hasUnsavedProgress = currentStep >= 2 && currentStep <= 5;
+  const hasUnsavedProgress = currentStep >= 2 && currentStep <= 7;
   useEffect(() => {
     if (!hasUnsavedProgress) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -72,13 +74,17 @@ export function InitializationClient() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedProgress]);
 
+  // 新分頁／換裝置要先等雲端草稿回來，避免先閃出第一步再跳到上次的進度
+  if (!ready) return <StepLoading />;
   if (currentStep === 1) return <Step1Terms />;
-  if (currentStep === 2) return <Step2Operating />;
+  if (currentStep === 2) return <RegistrationDocsPage />;
+  if (currentStep === 3) return <Step2Operating />;
+  if (currentStep === 4) return <PartnersPage />;
   // 尚未結算申報過沒有申報書，改填固定的公司資料表單；穩定經營一年以上沿用封面頁
-  if (currentStep === 3) return state.operatingStatus === 'over_one_year' ? <Step3Cover /> : <Step3CompanyInfo />;
-  if (currentStep === 4) return <Step4Reports />;
-  if (currentStep === 5) return <Step5Confirm />;
-  if (currentStep === 6) return <Step6Done />;
+  if (currentStep === 5) return state.operatingStatus === 'over_one_year' ? <Step3Cover /> : <Step3CompanyInfo />;
+  if (currentStep === 6) return <Step4Reports />;
+  if (currentStep === 7) return <Step5Confirm />;
+  if (currentStep === 8) return <Step6Done />;
 
   return <Step1Terms />;
 }

@@ -62,7 +62,7 @@ async function fetchEnvelope<E extends ApiEnvelope<unknown>>(path: string, init?
 
   const code = body.errorCode ?? body.errorcode;
   if (!body.success || code !== '0000') {
-    throw new ApiError(code ?? '', body.message ?? '', res.status);
+    throw new ApiError(code ?? '', body.message ?? '', res.status, body.data ?? undefined);
   }
   return body;
 }
