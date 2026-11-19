@@ -17,7 +17,7 @@ import React, {
   useState,
 } from 'react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { clearReferenceImages } from '../reference/referenceImagesStorage';
+import { clearUploadedFiles } from '../reference/referenceStorage';
 
 // storage key 加上 etlite_ 前綴，理由同 onboarding（見 features/onboarding/state/OnboardingContext.tsx）：
 // 瀏覽器 storage 以 origin 為界、不分 basePath，避免與姊妹專案同名 key 互相覆寫
@@ -140,7 +140,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (state.currentStep < 8) return;
     localStorage.removeItem(DRAFT_KEY);
-    clearReferenceImages();
+    clearUploadedFiles();
   }, [state.currentStep]);
 
   // mounted 後才同步，避免將 initialState 覆寫已儲存的狀態
@@ -221,7 +221,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   function clearSession() {
     sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(DRAFT_KEY);
-    clearReferenceImages();
+    clearUploadedFiles();
   }
 
   return (

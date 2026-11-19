@@ -80,7 +80,7 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  */
 export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
-  const { setImages: setReferenceImages } = useReference();
+  const { setImages: setReferenceImages, addSourceFile, setSourceAppliedLabels } = useReference();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
@@ -142,9 +142,12 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
       if (vatPeriod && pageKey) setVatUpload(pageKey, file);
 
+      // 營所稅上傳的檔案留存並列在頁面上（401／403 走 setVatUpload）；辨識失敗檔案也保留
+      const sourceId = vatPeriod ? null : addSourceFile(file);
+
       // 右側對照面板用的原件圖片：PDF 切成每頁一張，圖片直接用；不等它完成，失敗也不影響辨識
       (isPdf ? pdfToImages(file) : Promise.resolve([file]))
-        .then(setReferenceImages)
+        .then(images => setReferenceImages(images, sourceId))
         .catch(() => toast.error('對照圖片產生失敗，不影響辨識'));
 
       // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
@@ -171,8 +174,10 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
         return;
       }
       setStatus('done');
-      // 列出帶入了哪些文件；有部分略過或失敗時另以紅字提醒
-      setAppliedLabels(outcomes.flatMap(o => (o.label ? [o.label] : [])));
+      // 列出帶入了哪些文件；有部分略過或失敗時另以紅字提醒。營所稅記在檔案上（SourceFileList 一直顯示），401／403 留在這個元件
+      const labels = outcomes.flatMap(o => (o.label ? [o.label] : []));
+      if (sourceId) setSourceAppliedLabels(sourceId, labels);
+      else setAppliedLabels(labels);
       setMessage(notes.join('；'));
       toast.success(`辨識完畢，已帶入 ${appliedCount} 份文件`);
     } catch (err) {
@@ -239,7 +244,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
           <span>未辨識到文件資訊，請確認檔案內容，或直接手動輸入</span>
         </p>
       )}
-      {status === 'done' && appliedLabels.length > 0 && (
+      {vatPeriod && status === 'done' && appliedLabels.length > 0 && (
         <p className='flex items-start gap-1.5 text-xs text-semantic-success'>
           <CircleCheck size={14} className='mt-0.5 shrink-0' />
           <span>已帶入：{appliedLabels.join('、')}</span>

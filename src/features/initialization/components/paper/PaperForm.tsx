@@ -17,6 +17,7 @@ import { BOLD_CHECK_KEYS, DIVIDER_BEFORE_SECTIONS, EXEMPT_COLLAPSE, EXEMPT_FLAG_
 import { RECON_DIFF_FIELD, RECON_GROUPS, itemGroupCode, splitItemsByGroup } from './reconGroups';
 import { PaperTable } from './PaperTable';
 import { TemplateText } from './TemplateText';
+import { useReferenceOptional } from '../../reference/ReferenceContext';
 
 /** BOOK／ADJ 成對欄位的欄標題（metadata 只給 column 代碼，沒有標題文字） */
 const COLUMN_HEADS = { BOOK: '帳載結算金額', ADJ: '自行依法調整後金額' } as const;
@@ -156,8 +157,10 @@ const PAIRED_WITH_DATE_RANGE_KEY = 'HDR_RECEIPT_NO';
 
 function InputGrid({ fields }: { fields: ReportFieldDef[] }) {
   const store = usePaperStore();
+  // 對照面板展開時表單區變窄，改成單欄，輸入框才有足夠寬度顯示完整內容；對帳頁沒有對照面板，維持兩欄
+  const singleColumn = !!useReferenceOptional()?.open;
   return (
-    <div className='grid grid-cols-1 gap-4 nav:grid-cols-2 nav:gap-x-6'>
+    <div className={cn('grid grid-cols-1 gap-4', !singleColumn && 'nav:grid-cols-2 nav:gap-x-6')}>
       {fields.filter(f => isFieldShown(f, store)).map(f => (
         <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
       ))}
@@ -251,6 +254,7 @@ function NoteColumnBox({ monthly, unit }: { monthly: ReportFieldDef; unit: Repor
 /** 內容項目；調節說明的加項／減項分組畫標題並可折疊，其餘項目照順序渲染 */
 function SectionItems({ items, store }: { items: ReportSectionItem[]; store: PaperStore }) {
   const [override, setOverride] = useState<Record<string, boolean>>({});
+  const singleColumn = !!useReferenceOptional()?.open;
   const diff = effectiveNumber(RECON_DIFF_FIELD, store);
   const nodes: ReactNode[] = [];
   const noteUnit = items.find((i): i is Extract<ReportSectionItem, { kind: 'choice' }> => i.kind === 'choice' && i.choice.groupCode === NOTE_BOX_UNIT_GROUP)?.choice;
@@ -277,7 +281,7 @@ function SectionItems({ items, store }: { items: ReportSectionItem[]; store: Pap
     if (current !== NOTE && current.kind === 'dateRange' && next && next !== NOTE && next.kind === 'inputs' && next.fields[0]?.key === PAIRED_WITH_DATE_RANGE_KEY) {
       const [receipt, ...rest] = next.fields;
       nodes.push(
-        <div key={`range-${i}`} className='grid grid-cols-1 gap-4 nav:grid-cols-2 nav:gap-x-6'>
+        <div key={`range-${i}`} className={cn('grid grid-cols-1 gap-4', !singleColumn && 'nav:grid-cols-2 nav:gap-x-6')}>
           <DateRangeRow range={current.range} store={store} paired />
           <ReportFieldRow field={receipt} data={store.get(receipt.key)} onChange={value => store.set(receipt.key, value)} />
         </div>

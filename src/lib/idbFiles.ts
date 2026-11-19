@@ -27,16 +27,19 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
   });
 }
 
-/** 以 key 存一組檔案（File 可直接結構化複製進 IndexedDB，檔名與類型都會保留） */
-export async function saveFiles(key: string, files: File[]): Promise<void> {
-  await withStore('readwrite', store => store.put(files, key));
+/**
+ * 以 key 存任何可結構化複製的值（含 File／Blob，檔名與類型都會保留；
+ * 可以是 File[] 或夾帶 File 的物件陣列）。
+ */
+export async function saveValue<T>(key: string, value: T): Promise<void> {
+  await withStore('readwrite', store => store.put(value, key));
 }
 
-/** 取回 key 對應的檔案，沒存過回空陣列 */
-export async function loadFiles(key: string): Promise<File[]> {
-  return (await withStore<File[] | undefined>('readonly', store => store.get(key))) ?? [];
+/** 取回 key 對應的值，沒存過回 undefined */
+export async function loadValue<T>(key: string): Promise<T | undefined> {
+  return withStore<T | undefined>('readonly', store => store.get(key));
 }
 
-export async function deleteFiles(key: string): Promise<void> {
+export async function deleteValue(key: string): Promise<void> {
   await withStore('readwrite', store => store.delete(key));
 }

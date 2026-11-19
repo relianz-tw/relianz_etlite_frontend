@@ -359,6 +359,8 @@ Icon：lucide TriangleAlert size 20、text-semantic-error、shrink-0
   aria-hidden：true（狀態僅為輔助視覺提示，不影響欄位語意）
 Focus 樣式不變：仍套用一般 Focus border／shadow（#005FA2），聚焦後綠框暫時被取代，失焦回復
 移除時機：使用者對該欄位觸發任何 onChange（含清空）即移除，改回一般欄位樣式；不因儲存/送出而移除
+勾選框群組（ChoiceGroup）：辨識對沒選的項目也會回 false，逐項標記會整排都亮，所以選項本身不加框、不加底色，
+  整組只在題目文字前面放一個 Zap（14px，fill + 色 #377456，aria-hidden）；使用者改動群組內任何一項，整組標記一起移除
 ```
 對應元件：`src/components/ui/TextInput.tsx`／`MoneyInput.tsx`／`Select.tsx`／`DatePicker.tsx`／
 `Textarea.tsx` 的 `aiFilled` prop；`SubjectPicker.tsx` 沿用既有 `pickedByAi` 狀態同步套用邊框樣式
@@ -415,11 +417,23 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 - **顯示條件**：僅桌機（`nav:` 以上）；預設收合，頁首標題旁的「對照原件」按鈕（`outline`、`sm`、`PanelRightOpen`／`PanelRightClose`）切換。手機不提供，按鈕與面板一律隱藏。
 - **版面**：表單區與面板並排（`flex items-start gap-5`），表單區 `min-w-0 flex-1`，面板 `w-[40%] shrink-0`。
-- **面板容器**：`sticky top-2`、高 `h-[70svh]`、`overflow-hidden`、`rounded-lg border border-neutral-blue-gray/30 bg-white`，不用陰影。上方一列頁碼切換（`ChevronLeft`／`ChevronRight` ghost 按鈕加「第 N / M 頁」`text-xs text-neutral-mid`），下方為圖片視窗。
-- **圖片視窗**：圖片寬度填滿視窗，以 `transform: translate + scale` 放大並把目標區域置中，`transition-transform duration-200 ease-out`；放大倍率最小 1、最大 3，目標區域約佔視窗 60%；位移夾在圖片邊界內，不露出空白。
-- **紅框**：`border-semantic-error`（開創紅）、`bg-semantic-error/10`、`rounded-sm`，位置以百分比定位在圖片上；邊框實際寬度隨放大倍率反算，視覺固定 2px。
+- **展開時加寬內容欄**：內容欄最寬由 1200px 放寬到 1680px，桌機左右留白由 `1.5rem` 縮到 `1rem`（寫在捲動區的 CSS 變數 `--init-content-max-w`、`--init-content-px`，頁面內容欄與固定操作列同讀這組變數才會對齊；收合或離開該頁還原）。
+- **展開時輸入欄位改單欄**：表單區變窄，原本兩欄並排的輸入欄位（`InputGrid`、起訖日期搭收件編號）改成單欄堆疊，輸入框才有足夠寬度顯示完整內容；收合後恢復兩欄。
+- **面板容器**：`sticky top-2`、高度 = 捲動區可視高度 − 固定操作列高度（`--init-action-bar-h`）− `1rem`（上下各 `0.5rem` 留白），貼齊操作列上緣，最小 `16rem`；`overflow-hidden`、`rounded-lg border border-neutral-blue-gray/30 bg-white`，不用陰影。上方一列頁碼切換（`ChevronLeft`／`ChevronRight` ghost 按鈕加「第 N / M 頁」`text-xs text-neutral-mid`），下方為圖片視窗。
+- **圖片視窗**：`overflow-auto`（細捲軸），圖片寬度預設填滿視窗，整頁可上下捲動看完；放大不用 transform，而是把圖片寬度撐成視窗的 N 倍（視窗可左右上下捲動），再用 `scrollTo` 把目標區域捲到視窗中央。放大倍率最小 1、最大 3，目標區域約佔視窗 60%。沒有目標區域（換頁、清除聚焦）時回到最上方、倍率 1。
+- **紅框**：`border-2 border-semantic-error`（開創紅）、`bg-semantic-error/10`、`rounded-sm`，以百分比定位在圖片上，邊框寬度固定 2px。
 - **座標格式**：`{ page, x, y, w, h }`，`page` 從 1 起，其餘為 0–1 的相對座標（左上角為原點），與圖片尺寸無關。沒有座標的欄位不畫框、圖片維持原位。
 - **空狀態**：尚未上傳檔案時，面板置中顯示 `FileText` 圖示加「上傳申報書檔案後，可在這裡對照原件」（`text-sm text-neutral-mid`）。
+
+### 上傳檔案列（Source File List）
+
+營所稅各頁（含封面）頁首卡片列出使用者上傳過的申報書，實作見 `src/features/initialization/components/SourceFileList.tsx`。營業稅 401／403 仍是每期一份、不在此列。
+
+- **內容**：每份檔案一列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。可上傳多份，依上傳順序由上到下。
+- **範圍**：整份共用（一份 PDF 含多張表），每個營所稅頁列同一組。
+- **帶入說明**：檔案列下方一直顯示「已帶入：…」（`CircleCheck` 14px、`text-xs text-semantic-success`），文字跟著該份檔案，檔案還在就一直顯示；沒有帶入任何文件時不顯示。
+- **刪除**：只有使用者按「刪除」並在 `ConfirmDialog` 確認後才會移除；刪除不會清掉已帶入表單的資料。該檔案轉出的對照圖片一併清掉。
+- **目前儲存位置**：瀏覽器 IndexedDB；後端檔案 API 上線後改存後端（見 `docs/後端需求-草稿儲存與原件座標.md`）。
 
 ### 草稿儲存狀態（Draft Save Status）
 

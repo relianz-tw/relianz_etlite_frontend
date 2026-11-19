@@ -8,6 +8,7 @@ import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
 import { ReferenceLayout, ReferenceToggle } from './ReferencePanel';
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
+import { SourceFileList } from './SourceFileList';
 import { UploadedFilePreview } from './UploadedFilePreview';
 import { BalanceSheetView } from './BalanceSheetView';
 import { PaperForm } from './paper/PaperForm';
@@ -33,6 +34,9 @@ const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
 
 /** 封面「股票發行狀況」勾選群組：只有股份有限公司才有股票發行，其他組織型態整組不顯示 */
 const STOCK_GROUP_CODE = 'STOCK';
+
+/** 損益及稅額計算表的「組織種類」不提供這四個選項（無限、兩合、合作社、有限合夥）：畫面不顯示，欄位值不受影響 */
+const INCOME_TAX_HIDDEN_ORG_KEYS = ['ORG_3_UNLIMITED', 'ORG_4_JOINT', 'ORG_L_COOP', 'ORG_M_LP'];
 
 /** 資產負債表用 T 字帳版面（BalanceSheetView），其餘文件頁用一般欄位卡片 */
 const BALANCE_SHEET_CODE: SettlementReportId = 'CIT_BALANCE_SHEET';
@@ -98,8 +102,9 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const sections = useMemo(() => {
     if (!rawPage) return [];
     const stockKeys = hideStock ? (rawPage.groupMap[STOCK_GROUP_CODE]?.fields ?? []).map(f => f.key) : [];
-    return omitFields(rawPage.sections, [...autoKeyList.split(','), ...stockKeys]);
-  }, [rawPage, autoKeyList, hideStock]);
+    const orgKeys = formCode === 'CIT_INCOME_TAX' ? INCOME_TAX_HIDDEN_ORG_KEYS : [];
+    return omitFields(rawPage.sections, [...autoKeyList.split(','), ...stockKeys, ...orgKeys]);
+  }, [rawPage, autoKeyList, hideStock, formCode]);
   const store = useInitPaperStore(reportKey, rawPage, autoKeys);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
@@ -169,6 +174,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         )}
         {spec.period && <VatPeriodPicker />}
         {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
+        {/* 營所稅的上傳檔案是整份共用（一份 PDF 含多張表），每個營所稅頁都列出同一組，只有手動刪除才移除 */}
+        {!spec.period && <SourceFileList />}
         {/* 封面頁不是可略過的文件，只在步驟 4 的選填頁提示 */}
         {!spec.required && spec.key !== 'CIT_COVER' && (
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>

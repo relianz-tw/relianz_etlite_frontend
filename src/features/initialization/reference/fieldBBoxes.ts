@@ -21,6 +21,13 @@ const MOCK_FIELD_BBOXES: Record<string, FieldBBox> = {
   HDR_INDUSTRY_CODE: { page: 1, x: 0.2, y: 0.34, w: 0.45, h: 0.03 },
 };
 
+/** 假資料：沒有手動配置位置的欄位，依 fieldCode 算出固定的假位置（同一欄位每次都在同一處），讓任何欄位點下去都看得到紅框 */
+function fakeBBox(fieldCode: string): FieldBBox {
+  let hash = 0;
+  for (const ch of fieldCode) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return { page: 1, x: 0.1 + (hash % 50) / 100, y: 0.1 + ((hash >> 4) % 60) / 100, w: 0.3, h: 0.03 };
+}
+
 export function getFieldBBox(fieldCode: string | null): FieldBBox | null {
-  return fieldCode ? (MOCK_FIELD_BBOXES[fieldCode] ?? null) : null;
+  return fieldCode ? (MOCK_FIELD_BBOXES[fieldCode] ?? fakeBBox(fieldCode)) : null;
 }
