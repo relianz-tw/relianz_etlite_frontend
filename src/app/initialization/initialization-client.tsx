@@ -43,7 +43,7 @@ const Step6Done = dynamic(
 );
 
 export function InitializationClient() {
-  const { state, dispatch } = useInitialization();
+  const { state, dispatch, ready } = useInitialization();
   const { currentStep, currentReportIndex } = state;
   const searchParams = useSearchParams();
   const uuid = searchParams.get('uuid');
@@ -74,6 +74,8 @@ export function InitializationClient() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedProgress]);
 
+  // 新分頁／換裝置要先等雲端草稿回來，避免先閃出第一步再跳到上次的進度
+  if (!ready) return <StepLoading />;
   if (currentStep === 1) return <Step1Terms />;
   if (currentStep === 2) return <RegistrationDocsPage />;
   if (currentStep === 3) return <Step2Operating />;

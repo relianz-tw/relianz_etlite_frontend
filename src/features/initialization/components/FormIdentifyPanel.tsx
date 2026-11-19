@@ -2,14 +2,15 @@
 
 import { useReference } from '../reference/ReferenceContext';
 import { useInitialization } from '../state/InitializationContext';
+import type { FieldLocation } from '../state/initializationReducer';
 import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
-import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
+import { identifyCit, pickIdentifiedValue, toFieldBBox, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { toJpegFile } from '@/lib/imageToJpeg';
-import { pdfToImages } from '@/lib/pdfToImages';
 import { CircleCheck, Loader2, TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { OverwriteConfirmDialog, type OverwriteConflict } from './OverwriteConfirmDialog';
 import { toast } from 'sonner';
 
 const MAX_SIZE_MB = 5;
@@ -65,6 +66,33 @@ export function toRowValues(rows: IdentifiedRow[]): Record<string, string | numb
   return result;
 }
 
+function hasValue(value: string | number | undefined): value is string | number {
+  return value !== undefined && value !== '';
+}
+
+/** 值是否相同：文字比對去頭尾空白，兩邊都是數字時以數值比（"1000" 與 1000 視為相同） */
+function sameValue(a: string | number, b: string | number): boolean {
+  const x = String(a).trim();
+  const y = String(b).trim();
+  if (x === y) return true;
+  const nx = Number(x);
+  const ny = Number(y);
+  return x !== '' && y !== '' && !Number.isNaN(nx) && !Number.isNaN(ny) && nx === ny;
+}
+
+/** 401／403 的原件另外存在各期別頁（vatUploads），欄位位置的 sourceId 用這個固定值，對照面板會改用該期自己的檔案 */
+const VAT_SOURCE_ID = 'vat-upload';
+
+/** 辨識欄位的座標轉成各欄位在原件上的位置；沒有座標的欄位不收（表格列規格上也沒有座標） */
+function toLocations(fields: IdentifiedField[], sourceId: string): Record<string, FieldLocation> {
+  const result: Record<string, FieldLocation> = {};
+  for (const field of fields) {
+    const box = toFieldBBox(field);
+    if (box) result[field.fieldCode] = { ...box, sourceId };
+  }
+  return result;
+}
+
 function toValueMap(fields: IdentifiedField[]): Record<string, string | number> {
   const result: Record<string, string | number> = {};
   for (const field of fields) {
@@ -80,7 +108,7 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  */
 export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
-  const { setImages: setReferenceImages, addSourceFile, setSourceAppliedLabels } = useReference();
+  const { addSourceFile } = useReference();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
@@ -88,31 +116,77 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
   const [fileName, setFileName] = useState('');
   // 這次辨識實際帶入的文件名稱，成功後列給使用者看
   const [appliedLabels, setAppliedLabels] = useState<string[]>([]);
+  // 辨識結果會蓋到已有資料時，等使用者選覆蓋或保留；resolve 把選擇交回 handleFile
+  const [overwriteAsk, setOverwriteAsk] = useState<{ conflicts: OverwriteConflict[]; resolve: (overwrite: boolean) => void } | null>(null);
+  const askOverwrite = (conflicts: OverwriteConflict[]) => new Promise<boolean>(resolve => setOverwriteAsk({ conflicts, resolve }));
+  const answerOverwrite = (overwrite: boolean) => {
+    overwriteAsk?.resolve(overwrite);
+    setOverwriteAsk(null);
+  };
+
+  /** 這張辨識結果對應的資料 key：營所稅是 formCode，401／403 要對到需要的期別頁；對不到回 null */
+  const findVatPage = (form: IdentifiedForm) => state.reportPages.find(p => p.period?.rocYear === form.taxYear && p.period.phase === form.periodStartMonth);
+  const reportIdOf = (form: IdentifiedForm): string | null => {
+    if (form.formCode !== 'VAT_401' && form.formCode !== 'VAT_403') return form.formCode;
+    const page = findVatPage(form);
+    return page ? getVatReportKey(form.formCode, page.period!) : null;
+  };
+
+  /** 找出辨識結果會蓋掉「已有資料、且值不同」的欄位（現有為空白或值相同的不算）；表格列整批取代，有資料且不同算一筆 */
+  const findConflicts = (forms: IdentifiedForm[]): OverwriteConflict[] =>
+    forms.flatMap(form => {
+      const reportId = reportIdOf(form);
+      if (!reportId) return [];
+      const current = state.reports[reportId];
+      const values = toValueMap(form.fields);
+      const conflicts: OverwriteConflict[] = form.fields.flatMap(f => {
+        const next = values[f.fieldCode];
+        const existing = current?.fields[f.fieldCode]?.value;
+        return next !== undefined && hasValue(existing) && !sameValue(existing, next) ? [{ fieldName: f.fieldName, current: existing, next }] : [];
+      });
+      const newRows = toRowValues(form.rows);
+      const oldRows = current?.rows ?? [];
+      const oldRowsHaveData = oldRows.some(row => Object.values(row).some(field => hasValue(field.value)));
+      const rowsDiffer = oldRows.length !== newRows.length || newRows.some((row, i) => Object.entries(row).some(([key, value]) => key !== '__kind' && !sameValue(oldRows[i]?.[key]?.value ?? '', value)));
+      if (newRows.length > 0 && oldRowsHaveData && rowsDiffer) conflicts.push({ fieldName: `${form.formName}的表格明細`, current: `${oldRows.length} 列`, next: `${newRows.length} 列` });
+      return conflicts;
+    });
 
   /**
    * 套用一張辨識結果。營所稅各表以 formCode 為 key；401／403 要依「民國年＋期別起始月」對到這次需要的期別頁，
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
    * file 為實際送出辨識的檔案（圖片已轉 JPG），401／403 套用成功時一併記到該期別頁供預覽。
    */
-  const applyForm = (form: IdentifiedForm, file: File): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
-    const values = toValueMap(form.fields);
-    const rows = toRowValues(form.rows);
+  const applyForm = (form: IdentifiedForm, file: File, sourceId: string, overwrite: boolean): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
+    let values = toValueMap(form.fields);
+    let rows = toRowValues(form.rows);
+    let locations = toLocations(form.fields, sourceId);
+    // 使用者選「保留現有資料」：只填目前空白（或值相同）的欄位；已有資料的表格列不動。沒填入的欄位也不記原件位置，免得紅框指到不是這份檔案來的值
+    const targetId = reportIdOf(form);
+    if (!overwrite && targetId) {
+      const current = state.reports[targetId];
+      values = Object.fromEntries(Object.entries(values).filter(([key, next]) => !hasValue(current?.fields[key]?.value) || sameValue(current!.fields[key].value, next)));
+      if ((current?.rows ?? []).some(row => Object.values(row).some(field => hasValue(field.value)))) rows = [];
+      locations = Object.fromEntries(Object.entries(locations).filter(([key]) => key in values));
+    }
+    // 後端回這張表出現在原件的哪幾頁；沒回就不記，面板退回顯示整份原件
+    const source = form.pages && form.pages.length > 0 ? { sourceId, pages: form.pages } : undefined;
 
     if (form.formCode === 'VAT_401' || form.formCode === 'VAT_403') {
       const code = form.formCode === 'VAT_401' ? '401' : '403';
-      const page = state.reportPages.find(p => p.period?.rocYear === form.taxYear && p.period.phase === form.periodStartMonth);
+      const page = findVatPage(form);
       if (!page) {
         const label = form.periodStartMonth ? formatPeriodLabel(form.taxYear, form.periodStartMonth) : `民國 ${form.taxYear} 年（無法判斷期別）`;
         return { applied: false, skipped: `辨識到 ${label} 的 ${code}，不在這次需要的期別內，未帶入` };
       }
       dispatch({ type: 'SET_VAT_CHOICE', payload: { pageKey: page.key, formCode: form.formCode } });
-      dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows } });
+      dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows, locations, source } });
       // 辨識到的是別期時，該期頁面也留一份供預覽
       setVatUpload(page.key, file);
       return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}`, vatPageIndex: state.reportPages.indexOf(page) };
     }
 
-    dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: form.formCode, taxYear: form.taxYear, fields: values, rows } });
+    dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: form.formCode, taxYear: form.taxYear, fields: values, rows, locations, source } });
     return { applied: true, label: FORM_LIST.find(f => f.formCode === form.formCode)?.title ?? form.formName };
   };
 
@@ -142,13 +216,8 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
       if (vatPeriod && pageKey) setVatUpload(pageKey, file);
 
-      // 營所稅上傳的檔案留存並列在頁面上（401／403 走 setVatUpload）；辨識失敗檔案也保留
-      const sourceId = vatPeriod ? null : addSourceFile(file);
-
-      // 右側對照面板用的原件圖片：PDF 切成每頁一張，圖片直接用；不等它完成，失敗也不影響辨識
-      (isPdf ? pdfToImages(file) : Promise.resolve([file]))
-        .then(images => setReferenceImages(images, sourceId))
-        .catch(() => toast.error('對照圖片產生失敗，不影響辨識'));
+      // 營所稅上傳的原件存到後端並列在頁面上（401／403 走 setVatUpload），與辨識同時進行；辨識失敗檔案也保留
+      const sourcePromise = vatPeriod ? null : addSourceFile(file);
 
       // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
       const openingYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
@@ -157,7 +226,15 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       const presentForms = result.forms.filter(f => f.present && !f.errorCode && knownCodes.has(f.formCode));
       const failedForms = result.forms.filter(f => f.errorCode && knownCodes.has(f.formCode));
 
-      const outcomes = presentForms.map(form => applyForm(form, file));
+      // 欄位位置要記下它屬於哪份原件（fileId），所以等上傳也完成再套用
+      const source = sourcePromise ? await sourcePromise : null;
+      if (source?.error) toast.error(`${getFriendlyErrorMessage(source.error, '原件上傳失敗')}，原件未存到雲端，重新整理後需重新上傳`);
+      // 辨識結果會蓋到已有資料的欄位時，先問使用者要覆蓋還是保留（不直接覆蓋）
+      const conflicts = findConflicts(presentForms);
+      const overwrite = conflicts.length > 0 ? await askOverwrite(conflicts) : true;
+      // 新一份原件：先清掉所有欄位的 AI 閃電標記，下面套用時只標記這次有辨識到、有帶入的欄位
+      dispatch({ type: 'CLEAR_AI_FLAGS' });
+      const outcomes = presentForms.map(form => applyForm(form, file, source?.id ?? VAT_SOURCE_ID, overwrite));
       const appliedCount = outcomes.filter(o => o.applied).length;
       // 401／403 實際帶入的是別一期時，跳到那一期，申報書種類（401／403）與帶入的資料才會顯示出來
       const targetIndex = outcomes.find(o => o.vatPageIndex !== undefined && o.vatPageIndex >= 0)?.vatPageIndex;
@@ -176,7 +253,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       setStatus('done');
       // 列出帶入了哪些文件；有部分略過或失敗時另以紅字提醒。營所稅記在檔案上（SourceFileList 一直顯示），401／403 留在這個元件
       const labels = outcomes.flatMap(o => (o.label ? [o.label] : []));
-      if (sourceId) setSourceAppliedLabels(sourceId, labels);
+      if (source) dispatch({ type: 'SET_SOURCE_LABELS', payload: { sourceId: source.id, labels } });
       else setAppliedLabels(labels);
       setMessage(notes.join('；'));
       toast.success(`辨識完畢，已帶入 ${appliedCount} 份文件`);
@@ -256,6 +333,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
           <span>{message}</span>
         </p>
       )}
+      <OverwriteConfirmDialog open={overwriteAsk !== null} conflicts={overwriteAsk?.conflicts ?? []} onOverwrite={() => answerOverwrite(true)} onKeep={() => answerOverwrite(false)} />
     </div>
   );
 }

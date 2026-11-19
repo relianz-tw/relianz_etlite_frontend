@@ -7,6 +7,8 @@ import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheet
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
 import { ReferenceLayout, ReferenceToggle } from './ReferencePanel';
+import { useReference } from '../reference/ReferenceContext';
+import { formatPageRange } from '../reference/pageRange';
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
 import { SourceFileList } from './SourceFileList';
 import { UploadedFilePreview } from './UploadedFilePreview';
@@ -61,6 +63,7 @@ interface ReportPageViewProps {
  */
 export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, nextLabel, onNext }: ReportPageViewProps) {
   const { state, dispatch, vatUploads } = useInitialization();
+  const { sourceFiles } = useReference();
   // 營業稅期別頁依使用者選的 401 或 403（預設 401）決定表單與資料 key，營所稅頁固定
   const { formCode, reportKey } = resolveReportPage(spec, state.vatChoices);
   const { formNo, title: fallbackTitle } = getFormItem(formCode);
@@ -130,6 +133,11 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死
   const blocked = spec.required && !error && !isPageFilled(state.reports, reportKey);
 
+  // 底部進度列右側的小字：這一頁表單辨識自哪個檔案、在原件的第幾頁（還沒辨識過的頁面不顯示）
+  const formSource = state.formSources[reportKey];
+  const sourceFile = spec.period ? vatUploads[spec.key] : sourceFiles.find(s => s.id === formSource?.sourceId)?.file;
+  const sourceNote = formSource && sourceFile ? `${sourceFile.name}・原件${formatPageRange(formSource.pages)}` : undefined;
+
   const nav = {
     onPrev: () => dispatch({ type: 'PREV_STEP' }),
     onNext,
@@ -146,7 +154,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         title={title}
         badges={badges}
         nav={nav}
-        progress={progress}
+        progress={progress && { ...progress, note: sourceNote }}
         titleAction={
           <>
             <FormPaperPreview formCode={formCode} />
@@ -202,7 +210,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
       )}
 
       {rawPage && store && (
-        <ReferenceLayout>
+        // 401／403 的對照原件是該期自己上傳的檔案；營所稅頁用上傳列表（依欄位位置選檔）
+        <ReferenceLayout reportKey={reportKey} file={spec.period ? vatUploads[spec.key] : undefined}>
           {formCode === BALANCE_SHEET_CODE ? (
             <BalanceSheetView page={rawPage} sections={sections} />
           ) : (
