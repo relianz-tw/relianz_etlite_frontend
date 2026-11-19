@@ -160,14 +160,14 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
   const applyForm = (form: IdentifiedForm, file: File, sourceId: string, overwrite: boolean): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
     let values = toValueMap(form.fields);
     let rows = toRowValues(form.rows);
-    let locations = toLocations(form.fields, sourceId);
-    // 使用者選「保留現有資料」：只填目前空白（或值相同）的欄位；已有資料的表格列不動。沒填入的欄位也不記原件位置，免得紅框指到不是這份檔案來的值
+    const locations = toLocations(form.fields, sourceId);
+    // 使用者選「保留現有資料」：只填目前空白（或值相同）的欄位；已有資料的表格列不動。
+    // 原件位置照記不過濾：使用者正是要對照原件上的值和現有資料有什麼不同，沒填入的欄位也要能框出來
     const targetId = reportIdOf(form);
     if (!overwrite && targetId) {
       const current = state.reports[targetId];
       values = Object.fromEntries(Object.entries(values).filter(([key, next]) => !hasValue(current?.fields[key]?.value) || sameValue(current!.fields[key].value, next)));
       if ((current?.rows ?? []).some(row => Object.values(row).some(field => hasValue(field.value)))) rows = [];
-      locations = Object.fromEntries(Object.entries(locations).filter(([key]) => key in values));
     }
     // 後端回這張表出現在原件的哪幾頁；沒回就不記，面板退回顯示整份原件
     const source = form.pages && form.pages.length > 0 ? { sourceId, pages: form.pages } : undefined;
