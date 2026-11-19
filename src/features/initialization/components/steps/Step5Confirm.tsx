@@ -3,7 +3,6 @@
 import { useInitialization } from '../../state/InitializationContext';
 import { useFormMetadata } from '../../hooks/useFormMetadata';
 import { ORG_TYPE_LABEL, getCurrentOpenYear, getDefaultFormYear, getFormItem, getPageLabel, isPageFilled, resolveReportPage, resolveToday } from '../../reports';
-import { getRegistrationDocs } from '../../reports/registrationDocs';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
@@ -32,13 +31,9 @@ export function Step5Confirm() {
 
   // 尚未填寫的頁面：只提醒不阻擋，點了可跳回該頁補填（補完用「下一頁」走回確認頁）
   const missingPages = hasReports
-    ? state.reportPages.flatMap((spec, index) => {
-        let filled: boolean;
-        if (spec.kind === 'registration') filled = getRegistrationDocs(state.orgType).every(doc => state.registrationFiles[doc.code]);
-        else if (spec.kind === 'partners') filled = state.partners.length > 0;
-        else filled = isPageFilled(state.reports, resolveReportPage(spec, state.vatChoices).reportKey);
-        return filled ? [] : [{ index, label: getPageLabel(spec, state.vatChoices) }];
-      })
+    ? state.reportPages.flatMap((spec, index) =>
+        isPageFilled(state.reports, resolveReportPage(spec, state.vatChoices).reportKey) ? [] : [{ index, label: getPageLabel(spec, state.vatChoices) }]
+      )
     : [];
 
   // 組織型態由步驟 2 決定
@@ -117,7 +112,7 @@ export function Step5Confirm() {
                   <li key={page.index}>
                     <button
                       type='button'
-                      onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 4, reportIndex: page.index } })}
+                      onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 6, reportIndex: page.index } })}
                       className='font-medium text-brand-blue underline-offset-2 hover:underline'
                     >
                       {page.label}

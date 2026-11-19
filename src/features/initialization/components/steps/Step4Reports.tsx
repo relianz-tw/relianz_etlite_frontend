@@ -2,8 +2,6 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { buildReportPages, formatPeriodLabel, getCurrentOpenYear, resolveToday } from '../../reports';
-import { PartnersPage } from '../PartnersPage';
-import { RegistrationDocsPage } from '../RegistrationDocsPage';
 import { ReportPageView } from '../ReportPageView';
 import { useEffect } from 'react';
 
@@ -22,21 +20,17 @@ export function Step4Reports() {
 
   if (!spec) return null;
 
-  // kicker 標出目前所在段落（營所稅／營業稅／登記資料），營所稅頁排在最前，索引即第幾份；整體進度由進度條呈現
-  const citTotal = state.reportPages.filter(p => !p.period && !p.kind).length;
+  // kicker 標出目前所在段落（營所稅／營業稅），營所稅頁排在最前，索引即第幾份；整體進度由進度條呈現
+  const citTotal = state.reportPages.filter(p => !p.period).length;
   const vatPages = state.reportPages.filter(p => p.period);
   const vatNo = vatPages.findIndex(p => p.key === spec.key) + 1;
-  const kicker = spec.kind
-    ? '登記資料'
-    : spec.period
-      ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}・第 ${vatNo} / ${vatPages.length} 期`
-      : `營所稅結算申報・第 ${state.currentReportIndex + 1} / ${citTotal} 份`;
+  const kicker = spec.period
+    ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}・第 ${vatNo} / ${vatPages.length} 期`
+    : `營所稅結算申報・第 ${state.currentReportIndex + 1} / ${citTotal} 份`;
   const nextLabel = state.currentReportIndex >= total - 1 ? '下一頁：確認開帳' : '下一頁';
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel };
   // 封面算第 1 份，所以這裡各頁要再 +1
   const progress = { value: state.currentReportIndex + 2, max: total + 1 };
-  if (spec.kind === 'registration') return <RegistrationDocsPage kicker={kicker} nav={nav} progress={progress} />;
-  if (spec.kind === 'partners') return <PartnersPage kicker={kicker} nav={nav} progress={progress} />;
 
   // 營所稅：已辨識過的表用辨識回傳的年度，否則用預設年度；401／403：年度由期別決定
   const taxYear = spec.period ? spec.taxYear : (state.reportYears[spec.key] ?? spec.taxYear);

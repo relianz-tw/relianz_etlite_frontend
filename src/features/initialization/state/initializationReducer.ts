@@ -1,6 +1,6 @@
 'use client';
 
-import { buildEmptyRow, buildInitialReportsState } from '../reports';
+import { buildEmptyRow, buildInitialReportsState, isSoleOrPartnership } from '../reports';
 import type { ReportPageSpec, VatFormCode } from '../reports/reportPages';
 import type { ReportFieldDef } from '../reports/types';
 
@@ -60,7 +60,7 @@ export interface ReportData {
 
 export interface InitializationState {
   currentStep: number;
-  /** 步驟 4（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
+  /** 步驟 6（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
   currentReportIndex: number;
 
   /**
@@ -221,20 +221,27 @@ export type InitializationAction =
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
   | { type: 'SET_REPORT_ROW_FIELD'; payload: { reportId: ReportKey; index: number; key: string; value: string | number } }
 
-  // 步驟 4 登記資料頁
+  // 登記文件上傳頁、負責人頁
   | { type: 'SET_REGISTRATION_FILE'; payload: { docType: string; fileName: string | null } }
   | { type: 'SET_PARTNERS'; payload: Partner[] }
 
-  // 步驟 6
+  // 完成
   | { type: 'COMPLETE' };
 
 // ==================== 步驟導航邏輯 ====================
-// Stepper 分組（見 Stepper 元件呼叫端）：1=合約　2=營運狀況　3+4=開帳資料（公司資料＋報表核對）　5=確認　6=完成
-// 步驟 2 選「未滿一年」時無結算申報書可核對，3 之後直接跳到 5（確認），略過步驟 4 的報表頁
+// 步驟順序：1=合約　2=登記文件上傳　3=營運狀況　4=負責人／合夥人資料（僅滿一年的獨資、合夥）
+//          5=封面／公司資料　6=逐頁核對報表（僅滿一年）　7=確認　8=完成
+// 登記文件排在合約後，是因為之後後端辨識文件會把公司基本資料帶入後面的頁面；此時還沒選組織型態，故文件不分型態
+// 步驟 2 選「未滿一年」時無結算申報書可核對，5 之後直接跳到 7（確認），略過步驟 6 的報表頁
 
 export interface StepTarget {
   step: number;
   reportIndex: number;
+}
+
+/** 負責人／合夥人資料頁：只有獨資、合夥且滿一年才需要（跟封面一起走結算申報的路線） */
+function needsPartnersPage(state: Pick<InitializationState, 'operatingStatus' | 'orgType'>): boolean {
+  return state.operatingStatus === 'over_one_year' && isSoleOrPartnership(state.orgType);
 }
 
 export function getPrevStep(state: InitializationState): StepTarget {
@@ -244,10 +251,14 @@ export function getPrevStep(state: InitializationState): StepTarget {
     case 3:
       return { step: 2, reportIndex: 0 };
     case 4:
-      if (state.currentReportIndex > 0) return { step: 4, reportIndex: state.currentReportIndex - 1 };
       return { step: 3, reportIndex: 0 };
     case 5:
-      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 3, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 3, reportIndex: 0 };
+    case 6:
+      if (state.currentReportIndex > 0) return { step: 6, reportIndex: state.currentReportIndex - 1 };
+      return { step: 5, reportIndex: 0 };
+    case 7:
+      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 5, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -260,12 +271,16 @@ export function getNextStep(state: InitializationState): StepTarget {
     case 2:
       return { step: 3, reportIndex: 0 };
     case 3:
-      return state.operatingStatus === 'over_one_year' ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
     case 4:
-      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 4, reportIndex: state.currentReportIndex + 1 };
       return { step: 5, reportIndex: 0 };
     case 5:
-      return { step: 6, reportIndex: 0 };
+      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: 0 } : { step: 7, reportIndex: 0 };
+    case 6:
+      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 6, reportIndex: state.currentReportIndex + 1 };
+      return { step: 7, reportIndex: 0 };
+    case 7:
+      return { step: 8, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }

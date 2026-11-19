@@ -3,6 +3,7 @@
 import { StepProgress, type StepProgressValue } from './StepProgress';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
+import { DraftSaveStatus } from '@/features/initialization/components/DraftSaveStatus';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
@@ -94,6 +95,7 @@ export function StepPageHeader({ kicker, title, badges, nav, progress, titleActi
           <div className='mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 nav:px-6'>
             {progress && <StepProgress {...progress} />}
             <div className='flex flex-col gap-2 nav:flex-row nav:items-center nav:justify-end nav:gap-4'>
+              <DraftSaveStatus />
               {nav.hint && <p className='text-xs text-semantic-error nav:text-right'>{nav.hint}</p>}
               <div className='flex gap-3'>
                 {nav.onPrev && (

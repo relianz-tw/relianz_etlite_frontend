@@ -9,6 +9,7 @@ import type { ReportField } from '../../state/initializationReducer';
 import type { ReportFieldDef } from '../../reports/types';
 import { computeFieldValue } from '../../reports/formula';
 import { getFieldWarning } from '../../reports/fieldValidators';
+import { useReferenceOptional } from '../../reference/ReferenceContext';
 import { FieldWarning } from './FieldWarning';
 import { useState } from 'react';
 import { usePaperStore, type PaperStore } from './PaperStore';
@@ -119,7 +120,13 @@ export function StoreFieldInput({ field }: { field: ReportFieldDef }) {
 }
 
 function StoreFieldInputWith({ field, store }: { field: ReportFieldDef; store: PaperStore }) {
+  const reference = useReferenceOptional();
   if (store.renderValue) return <>{store.renderValue(field)}</>;
   const autoValue = field.formulaExpr ? computeFieldValue(field, Object.values(store.page.fieldMap), key => store.get(key).value, store.rows) : null;
-  return <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} readOnly={store.readOnlyKeys?.includes(field.key)} onChange={value => store.set(field.key, value)} />;
+  // contents 讓外層 div 不產生版面框，只負責接 focus 事件（對照面板依聚焦欄位定位原件）；對帳頁沒有對照面板，reference 為 null
+  return (
+    <div className='contents' onFocusCapture={() => reference?.setFocusedField(field.key)}>
+      <FieldInput field={field} data={store.get(field.key)} autoValue={autoValue} readOnly={store.readOnlyKeys?.includes(field.key)} onChange={value => store.set(field.key, value)} />
+    </div>
+  );
 }

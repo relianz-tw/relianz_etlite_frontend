@@ -1,4 +1,4 @@
-import { CIT_PAGE_ORDER, getDefaultFormYear, getFormItem, isFormApplicable, isSoleOrPartnership } from './formList';
+import { CIT_PAGE_ORDER, getDefaultFormYear, getFormItem, isFormApplicable } from './formList';
 import type { OrgType, ReportData, SettlementReportId } from '../state/initializationReducer';
 
 /** 西元年換算民國年的差值 */
@@ -22,8 +22,6 @@ export interface ReportPageSpec {
   /** 僅營業稅期別頁有 */
   period?: { rocYear: number; phase: number };
   required: boolean;
-  /** 非申報書的特殊頁：登記文件上傳、負責人／合夥人資料（formCode 僅為占位） */
-  kind?: 'registration' | 'partners';
 }
 
 export interface VatPeriod {
@@ -51,8 +49,6 @@ export function resolveReportPage(spec: ReportPageSpec, vatChoices: Record<strin
 
 /** 頁面的顯示名稱（確認頁未填清單用）：營所稅為文件名稱，營業稅為「401・民國…期別」 */
 export function getPageLabel(spec: ReportPageSpec, vatChoices: Record<string, VatFormCode>): string {
-  if (spec.kind === 'registration') return '登記文件';
-  if (spec.kind === 'partners') return '負責人及合夥人資料';
   const { formCode } = resolveReportPage(spec, vatChoices);
   if (spec.period) return `${formCode === 'VAT_403' ? '403' : '401'}・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}`;
   return getFormItem(formCode).title;
@@ -107,11 +103,7 @@ export function buildReportPages({ openYear, baseDate, today, orgType = null, es
     required: p.required,
   }));
 
-  // 登記資料頁排在最後：所有組織型態都要上傳登記文件，獨資／合夥再填負責人及合夥人資料
-  const registration: ReportPageSpec[] = [{ key: 'REGISTRATION', formCode: 'CIT_COVER', taxYear: openYear, required: false, kind: 'registration' }];
-  if (isSoleOrPartnership(orgType)) registration.push({ key: 'PARTNERS', formCode: 'CIT_COVER', taxYear: openYear, required: false, kind: 'partners' });
-
-  return [...cit, ...vat, ...registration];
+  return [...cit, ...vat];
 }
 
 /** 依年度分組描述期別，如「民國 114 年 1–2、3–4 月；民國 115 年 1–2 月」 */

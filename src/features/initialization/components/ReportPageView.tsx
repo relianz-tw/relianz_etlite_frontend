@@ -6,6 +6,7 @@ import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportP
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
+import { ReferenceLayout, ReferenceToggle } from './ReferencePanel';
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
 import { UploadedFilePreview } from './UploadedFilePreview';
 import { BalanceSheetView } from './BalanceSheetView';
@@ -141,7 +142,12 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         badges={badges}
         nav={nav}
         progress={progress}
-        titleAction={<FormPaperPreview formCode={formCode} />}
+        titleAction={
+          <>
+            <FormPaperPreview formCode={formCode} />
+            <ReferenceToggle />
+          </>
+        }
         aside={showIdentify && <FormIdentifyPanel required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
       >
         {spec.period && (
@@ -189,7 +195,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
       )}
 
       {rawPage && store && (
-        <>
+        <ReferenceLayout>
           {formCode === BALANCE_SHEET_CODE ? (
             <BalanceSheetView page={rawPage} sections={sections} />
           ) : (
@@ -205,7 +211,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
               )}
             </>
           )}
-        </>
+        </ReferenceLayout>
       )}
     </>
   );

@@ -409,6 +409,28 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 `dateRanges[]` 的起、迄兩個日期並排為一組，標題用 `groupName`，中間以「至」相連；迄早於起時顯示後端回傳的錯誤訊息。
 
+### 對照面板（Reference Panel）
+
+開帳精靈申報書頁（`ReportPageView`）的原件對照：使用者上傳的申報書轉成每頁一張圖，放在表單右側；點選（focus）表單欄位時，面板把該欄位在原件上的位置放大並框起來。實作見 `src/features/initialization/components/ReferencePanel.tsx`。
+
+- **顯示條件**：僅桌機（`nav:` 以上）；預設收合，頁首標題旁的「對照原件」按鈕（`outline`、`sm`、`PanelRightOpen`／`PanelRightClose`）切換。手機不提供，按鈕與面板一律隱藏。
+- **版面**：表單區與面板並排（`flex items-start gap-5`），表單區 `min-w-0 flex-1`，面板 `w-[40%] shrink-0`。
+- **面板容器**：`sticky top-2`、高 `h-[70svh]`、`overflow-hidden`、`rounded-lg border border-neutral-blue-gray/30 bg-white`，不用陰影。上方一列頁碼切換（`ChevronLeft`／`ChevronRight` ghost 按鈕加「第 N / M 頁」`text-xs text-neutral-mid`），下方為圖片視窗。
+- **圖片視窗**：圖片寬度填滿視窗，以 `transform: translate + scale` 放大並把目標區域置中，`transition-transform duration-200 ease-out`；放大倍率最小 1、最大 3，目標區域約佔視窗 60%；位移夾在圖片邊界內，不露出空白。
+- **紅框**：`border-semantic-error`（開創紅）、`bg-semantic-error/10`、`rounded-sm`，位置以百分比定位在圖片上；邊框實際寬度隨放大倍率反算，視覺固定 2px。
+- **座標格式**：`{ page, x, y, w, h }`，`page` 從 1 起，其餘為 0–1 的相對座標（左上角為原點），與圖片尺寸無關。沒有座標的欄位不畫框、圖片維持原位。
+- **空狀態**：尚未上傳檔案時，面板置中顯示 `FileText` 圖示加「上傳申報書檔案後，可在這裡對照原件」（`text-sm text-neutral-mid`）。
+
+### 草稿儲存狀態（Draft Save Status）
+
+開帳精靈填寫步驟（步驟 2–7）的草稿儲存提示，放在固定底部操作列的按鈕列：桌機靠左（`nav:mr-auto`），手機在按鈕上方獨立一行。實作見 `src/features/initialization/components/DraftSaveStatus.tsx`。
+
+- **狀態文字**：`text-xs text-neutral-mid`，「上次儲存 14:32」（24 小時制、時：分）；尚未儲存過不顯示文字；儲存失敗改 `text-semantic-error`「儲存失敗，請重試」。
+- **儲存按鈕**：`ghost`、`sm`、`Save` 圖示、文字「儲存」，點擊立即儲存並更新時間。
+- **自動儲存**：每 30 秒檢查一次，內容有變動才儲存；沒有變動不更新時間。
+- **範圍**：只在填寫步驟（2–7）顯示與儲存；合約與完成頁不顯示。
+- **目前儲存位置**：瀏覽器本機（表單資料 `localStorage`、原件圖片 IndexedDB），只能在同一台裝置同一個瀏覽器續填；後端草稿 API 上線後改為存後端，才能換裝置續填。
+
 ### Navigation — Sidebar（側邊欄導覽）
 
 全站主導覽為**左側可開關的側邊欄**（取代舊版頂部固定列），對應元件 `src/components/sideBar.tsx` +

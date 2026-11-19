@@ -1,11 +1,13 @@
 'use client';
 
+import { useReference } from '../reference/ReferenceContext';
 import { useInitialization } from '../state/InitializationContext';
 import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
 import { identifyCit, pickIdentifiedValue, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { toJpegFile } from '@/lib/imageToJpeg';
+import { pdfToImages } from '@/lib/pdfToImages';
 import { CircleCheck, Loader2, TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -78,6 +80,7 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
  */
 export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
+  const { setImages: setReferenceImages } = useReference();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<PanelStatus>('idle');
@@ -138,6 +141,11 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       // 不論辨識結果如何，檔案都掛在使用者上傳的這一頁，讓使用者自己確認（防辨識失誤），之後也要存後端
       // TODO：後端存檔 API 上線後，在這裡把 file 上傳保存
       if (vatPeriod && pageKey) setVatUpload(pageKey, file);
+
+      // 右側對照面板用的原件圖片：PDF 切成每頁一張，圖片直接用；不等它完成，失敗也不影響辨識
+      (isPdf ? pdfToImages(file) : Promise.resolve([file]))
+        .then(setReferenceImages)
+        .catch(() => toast.error('對照圖片產生失敗，不影響辨識'));
 
       // 辨識需帶開帳民國年（未選時退回依日期推算的當期年度）
       const openingYear = state.openYear ?? getCurrentOpenYear(resolveToday(state.simulatedDate));
