@@ -154,7 +154,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         title={title}
         badges={badges}
         nav={nav}
-        progress={progress && { ...progress, note: sourceNote }}
+        progress={progress && { ...progress, title, note: sourceNote }}
         titleAction={
           <>
             <FormPaperPreview formCode={formCode} />
