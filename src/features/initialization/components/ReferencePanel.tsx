@@ -14,17 +14,6 @@ const SCROLL_CONTAINER_ID = 'initialization-scroll';
 const EXPANDED_CONTENT_MAX_W = '1680px';
 const EXPANDED_CONTENT_PX = '1rem';
 
-/** 紅框比辨識座標各邊多留的空間（頁面寬高的比例）：辨識框常貼著文字邊緣，外擴一點才框得完整、看得舒服 */
-const BOX_PAD_X = 0.01;
-const BOX_PAD_Y = 0.006;
-
-/** 把辨識座標外擴固定的邊距，並夾在頁面範圍內（0–1）；放大倍率與紅框都用外擴後的框 */
-function padBBox(box: FieldBBox): FieldBBox {
-  const x = Math.max(0, box.x - BOX_PAD_X);
-  const y = Math.max(0, box.y - BOX_PAD_Y);
-  return { page: box.page, x, y, w: Math.min(1, box.x + box.w + BOX_PAD_X) - x, h: Math.min(1, box.y + box.h + BOX_PAD_Y) - y };
-}
-
 /** 放大後目標區域約佔視窗的比例 */
 const FILL_RATIO = 0.6;
 const MAX_ZOOM = 3;
@@ -180,7 +169,7 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
   const [ratio, setRatio] = useState(0);
 
   // 放大靠把圖片撐寬（視窗本身可捲動），不是 CSS transform；這樣沒有座標時也能上下捲動看完整頁
-  const activeBox = bbox && bbox.page === page && viewport.w > 0 && ratio > 0 ? padBBox(bbox) : null;
+  const activeBox = bbox && bbox.page === page && viewport.w > 0 && ratio > 0 ? bbox : null;
   let scale = 1;
   if (activeBox) {
     const boxW = activeBox.w * viewport.w;
@@ -251,7 +240,7 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
               {activeBox && (
                 <div
                   aria-hidden='true'
-                  className='absolute rounded-sm border-2 border-semantic-error bg-semantic-error/10'
+                  className='absolute rounded-sm border-2 border-semantic-error/50 bg-semantic-error/10'
                   style={{ left: `${activeBox.x * 100}%`, top: `${activeBox.y * 100}%`, width: `${activeBox.w * 100}%`, height: `${activeBox.h * 100}%` }}
                 />
               )}
