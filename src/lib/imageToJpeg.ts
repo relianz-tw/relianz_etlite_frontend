@@ -1,6 +1,8 @@
 import { loadImage } from '@/lib/imageCrop';
 
-const JPEG_QUALITY = 0.92;
+// 用無損品質：表格的細線被 JPEG 雜訊破壞後，後端的線偵測會失準
+// （實測同一張照片 quality 0.92 只定位到 150 欄，quality 1.0 有 221 欄）
+const JPEG_QUALITY = 1;
 
 function getExtension(name: string): string {
   return name.split('.').pop()?.toLowerCase() ?? '';
