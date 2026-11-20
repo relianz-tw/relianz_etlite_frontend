@@ -26,7 +26,8 @@ interface PocField extends IdentifiedField {
 interface PocResult {
   formCode: string;
   page: number;
-  image: { width: number; height: number; dataUrl: string };
+  /** 校正後的頁面圖片；框的座標都是相對這張圖，不能用使用者上傳的原檔顯示 */
+  image: { width: number; height: number; url: string };
   method: string;
   /** 對頁面做了什麼校正：none 原圖是正的；rotate 單純旋轉；perspective 透視校正（手機翻拍的梯形變形）。顯示與框都是校正後的圖 */
   correction: 'none' | 'rotate' | 'perspective';
@@ -56,9 +57,11 @@ function formatValue(field: IdentifiedField): string {
   return value === undefined ? '' : String(value);
 }
 
-/** 把 Go PoC 的頁面圖片（data URL）轉成 File，交給 SourceViewer 顯示；框的座標是相對這張圖的 */
-async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
-  const blob = await (await fetch(dataUrl)).blob();
+/** 下載 Go PoC 回傳的頁面圖片轉成 File，交給 SourceViewer 顯示；框的座標是相對這張圖的 */
+async function fetchPageFile(url: string, name: string): Promise<File> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`取頁面圖片失敗（${response.status}）`);
+  const blob = await response.blob();
   return new File([blob], name, { type: blob.type });
 }
 
@@ -111,7 +114,7 @@ export function ReferenceTestClient() {
       const data = (await response.json()) as PocResult & { message?: string };
       if (!response.ok) throw new Error(data.message ?? `Go PoC 回應 ${response.status}`);
       setPoc(data);
-      setPocImage(await dataUrlToFile(data.image.dataUrl, `page-${data.page}.png`));
+      setPocImage(await fetchPageFile(data.image.url, `page-${data.page}.png`));
       setViewSource('processed');
       setFieldCode(null);
     } catch (e) {
