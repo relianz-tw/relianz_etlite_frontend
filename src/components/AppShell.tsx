@@ -17,6 +17,7 @@ const SHELL_FREE_PATH_PREFIXES = [
   "/withholding/labor/sign", // 勞報單對外免登入簽署頁
   "/onboarding", // 客戶開通引導流程：全螢幕嚮導版型，含 /onboarding/payment/*
   "/initialization", // 開帳精靈：全螢幕嚮導版型，付款完成後、進系統前的公司資料與期初設定
+  "/test", // 開發用測試頁（如原件座標測試），不需要側欄
 ];
 
 // 側邊欄殼層：桌機固定展開（不可收合，寬度可拖曳），手機採 Overlay（浮層，由頂部列選單鈕開合）
