@@ -40,6 +40,8 @@ import { toVatPeriodKey } from '../reports/vatPeriodKey';
 const SESSION_KEY = 'etlite_initialization_state_v2';
 /** 這個分頁最後一次和雲端草稿同步到的版本；重新整理後用來判斷雲端是不是被別的裝置更新過 */
 const DRAFT_VERSION_KEY = 'etlite_initialization_draft_version';
+/** 最後一次成功存上雲端的狀態。跟 SESSION_KEY 比對即可知道這個分頁有沒有未存檔的修改 */
+const DRAFT_SAVED_KEY = 'etlite_initialization_saved_state';
 
 interface HistoryStepState {
   step: number;
@@ -153,6 +155,11 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       }
       recordVersion(record.version);
       lastSavedJsonRef.current = JSON.stringify(snapshot);
+      try {
+        sessionStorage.setItem(DRAFT_SAVED_KEY, lastSavedJsonRef.current);
+      } catch {
+        // 存不進去只會讓下次還原時保守地跳衝突視窗，不影響資料
+      }
       setSavedAt(Date.parse(record.savedAt));
       setSaveError(false);
     } catch (error) {
@@ -187,6 +194,15 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       // 讀取或解析失敗，視為沒有本機狀態
     }
     const knownVersion = Number(sessionStorage.getItem(DRAFT_VERSION_KEY) ?? 0) || 0;
+    // 這個分頁有沒有「改了但還沒存上雲端」的內容：拿本機狀態跟最後一次成功存檔的內容比。
+    // 讀不到最後存檔內容時保守當成有，寧可多問一次也不要默默蓋掉使用者的修改。
+    let hasUnsavedEdits = true;
+    try {
+      const savedJson = sessionStorage.getItem(DRAFT_SAVED_KEY);
+      hasUnsavedEdits = savedJson === null || savedJson !== sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      // 讀不到就維持保守判斷
+    }
     if (local) {
       rawDispatch({ type: 'RESTORE_STATE', payload: local });
       draftVersionRef.current = knownVersion;
@@ -196,7 +212,11 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       .then(draft => {
         if (!draft) return;
         if (!local) applyServerDraft(draft);
-        else if (draft.version !== knownVersion) setConflict({ version: draft.version, savedAt: draft.savedAt });
+        // 雲端比這個分頁記得的新：本機沒有未存檔的修改就直接採用雲端，有才讓使用者選要留哪一邊
+        else if (draft.version !== knownVersion) {
+          if (hasUnsavedEdits) setConflict({ version: draft.version, savedAt: draft.savedAt });
+          else applyServerDraft(draft);
+        }
         else setSavedAt(Date.parse(draft.savedAt));
       })
       // 讀雲端失敗（斷線等）就用本機狀態繼續，之後儲存時會再提示
@@ -337,6 +357,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   function clearSession() {
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(DRAFT_VERSION_KEY);
+    sessionStorage.removeItem(DRAFT_SAVED_KEY);
   }
 
   return (
