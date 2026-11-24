@@ -21,7 +21,10 @@ interface ReferenceContextValue {
   removeSourceFile: (id: string) => Promise<void>;
   /** 對照面板是否展開 */
   open: boolean;
-  setOpen: (open: boolean) => void;
+  /** 使用者按按鈕展開／收合；按過之後自動展開就不再覆寫他的選擇 */
+  toggleOpen: (open: boolean) => void;
+  /** 進入有辨識文件的頁面時自動展開；使用者手動操作過就不動 */
+  autoOpen: (should: boolean) => void;
   /** 目前聚焦的欄位 fieldCode，面板依它查座標 */
   focusedField: string | null;
   setFocusedField: (fieldCode: string | null) => void;
@@ -36,7 +39,18 @@ function newTempId(): string {
 export function ReferenceProvider({ children }: { children: ReactNode }) {
   const [sourceFiles, setSourceFiles] = useState<SourceFile[]>([]);
   const [open, setOpen] = useState(false);
+  // 使用者手動展開／收合過沒有：有的話自動展開就不再插手，免得他收起來後換頁又被打開
+  const userToggledRef = useRef(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const toggleOpen = useCallback((next: boolean) => {
+    userToggledRef.current = true;
+    setOpen(next);
+  }, []);
+
+  const autoOpen = useCallback((should: boolean) => {
+    if (!userToggledRef.current) setOpen(should);
+  }, []);
+
   // 連續操作時 state 還沒更新，用 ref 拿最新列表
   const sourceFilesRef = useRef<SourceFile[]>([]);
 
@@ -96,8 +110,8 @@ export function ReferenceProvider({ children }: { children: ReactNode }) {
   }, [commit]);
 
   const value = useMemo(
-    () => ({ sourceFiles, addSourceFile, removeSourceFile, open, setOpen, focusedField, setFocusedField }),
-    [sourceFiles, addSourceFile, removeSourceFile, open, focusedField]
+    () => ({ sourceFiles, addSourceFile, removeSourceFile, open, toggleOpen, autoOpen, focusedField, setFocusedField }),
+    [sourceFiles, addSourceFile, removeSourceFile, open, toggleOpen, autoOpen, focusedField]
   );
   return <ReferenceContext.Provider value={value}>{children}</ReferenceContext.Provider>;
 }

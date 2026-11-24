@@ -6,7 +6,7 @@ import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportP
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
-import { ReferenceLayout, ReferenceToggle } from './ReferencePanel';
+import { ReferenceLayout } from './ReferencePanel';
 import { useReference } from '../reference/ReferenceContext';
 import { formatPageRange } from '../reference/pageRange';
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
@@ -137,6 +137,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const formSource = state.formSources[reportKey];
   const sourceFile = spec.period ? vatUploads[spec.key] : sourceFiles.find(s => s.id === formSource?.sourceId)?.file;
   const sourceNote = formSource && sourceFile ? `${sourceFile.name}・原件${formatPageRange(formSource.pages)}` : undefined;
+  // 這一頁有沒有辨識過的原件可以對照：營業稅看該期上傳的檔案，營所稅看辨識後記下的來源
+  const hasReference = spec.period ? !!vatUploads[spec.key] : !!formSource;
 
   const nav = {
     onPrev: () => dispatch({ type: 'PREV_STEP' }),
@@ -158,7 +160,6 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         titleAction={
           <>
             <FormPaperPreview formCode={formCode} />
-            <ReferenceToggle />
           </>
         }
         aside={showIdentify && <FormIdentifyPanel required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
@@ -211,7 +212,7 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
 
       {rawPage && store && (
         // 401／403 的對照原件是該期自己上傳的檔案；營所稅頁用上傳列表（依欄位位置選檔）
-        <ReferenceLayout reportKey={reportKey} file={spec.period ? vatUploads[spec.key] : undefined}>
+        <ReferenceLayout reportKey={reportKey} hasReference={hasReference} file={spec.period ? vatUploads[spec.key] : undefined}>
           {formCode === BALANCE_SHEET_CODE ? (
             <BalanceSheetView page={rawPage} sections={sections} />
           ) : (

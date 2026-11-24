@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import { ChevronLeft, ChevronRight, FileText, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { FieldBBox } from '@/api/peit';
 import { pdfToImages } from '@/lib/pdfToImages';
 
@@ -82,6 +82,8 @@ interface SourceViewerProps {
   pages?: number[];
   /** 要框出的位置；座標的頁在顯示範圍內時會自動跳到該頁並放大 */
   bbox: FieldBBox | null;
+  /** 工具列右側的額外按鈕（目前是收合對照面板） */
+  action?: ReactNode;
   /** 使用者手動翻頁時通知（呼叫端可清掉聚焦欄位，避免又被座標拉回去） */
   onPageNavigate?: () => void;
   /** 沒有檔案時的提示文字 */
@@ -89,7 +91,7 @@ interface SourceViewerProps {
 }
 
 /** 原件圖片檢視器：翻頁、依座標放大並捲到目標、疊上紅框。對照面板與座標測試頁共用 */
-export function SourceViewer({ file, pages, bbox, onPageNavigate, emptyText = '上傳申報書檔案後，可在這裡對照原件' }: SourceViewerProps) {
+export function SourceViewer({ file, pages, bbox, onPageNavigate, action, emptyText = '上傳申報書檔案後，可在這裡對照原件' }: SourceViewerProps) {
   const { images, status } = useSourceImages(file);
   // 要顯示的頁（原件的頁碼，從 1 起）；後端沒回頁碼、或頁碼都超出實際頁數時退回整份原件
   const validPages = (pages ?? []).filter(n => n >= 1 && n <= images.length);
@@ -197,12 +199,15 @@ export function SourceViewer({ file, pages, bbox, onPageNavigate, emptyText = '�
 
   if (pageCount === 0) {
     return (
-      <div className='flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center'>
-        <FileText size={24} className='text-neutral-mid' />
-        <p className='text-sm text-neutral-mid'>
-          {status === 'loading' ? '對照圖片載入中…' : status === 'error' ? '對照圖片產生失敗，請重新上傳檔案' : emptyText}
-        </p>
-      </div>
+      <>
+        {action && <div className='flex items-center justify-end border-b border-neutral-blue-gray/30 px-3 py-2'>{action}</div>}
+        <div className='flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center'>
+          <FileText size={24} className='text-neutral-mid' />
+          <p className='text-sm text-neutral-mid'>
+            {status === 'loading' ? '對照圖片載入中…' : status === 'error' ? '對照圖片產生失敗，請重新上傳檔案' : emptyText}
+          </p>
+        </div>
+      </>
     );
   }
 
@@ -216,11 +221,14 @@ export function SourceViewer({ file, pages, bbox, onPageNavigate, emptyText = '�
           </span>
           <Button variant='ghost' size='sm' icon={ChevronRight} aria-label='下一頁' disabled={index >= pageCount - 1} onClick={() => goToIndex(index + 1)} />
         </div>
-        <div className='flex items-center gap-1' title='Ctrl／⌘ ＋ 滾輪也可以縮放'>
-          <Button variant='ghost' size='sm' icon={ZoomOut} aria-label='縮小' disabled={scale <= MIN_MANUAL_ZOOM + 0.001} onClick={() => zoomTo(scale / ZOOM_STEP)} />
-          <span className='w-12 text-center text-xs tabular-nums text-neutral-mid'>{Math.round(scale * 100)}%</span>
-          <Button variant='ghost' size='sm' icon={ZoomIn} aria-label='放大' disabled={scale >= MAX_MANUAL_ZOOM - 0.001} onClick={() => zoomTo(scale * ZOOM_STEP)} />
-          <Button variant='ghost' size='sm' icon={RotateCcw} aria-label='重設縮放' disabled={manualScale === null} onClick={() => setManual(null)} />
+        <div className='flex items-center gap-1'>
+          <div className='flex items-center gap-1' title='Ctrl／⌘ ＋ 滾輪也可以縮放'>
+            <Button variant='ghost' size='sm' icon={ZoomOut} aria-label='縮小' disabled={scale <= MIN_MANUAL_ZOOM + 0.001} onClick={() => zoomTo(scale / ZOOM_STEP)} />
+            <span className='w-12 text-center text-xs tabular-nums text-neutral-mid'>{Math.round(scale * 100)}%</span>
+            <Button variant='ghost' size='sm' icon={ZoomIn} aria-label='放大' disabled={scale >= MAX_MANUAL_ZOOM - 0.001} onClick={() => zoomTo(scale * ZOOM_STEP)} />
+            <Button variant='ghost' size='sm' icon={RotateCcw} aria-label='重設縮放' disabled={manualScale === null} onClick={() => setManual(null)} />
+          </div>
+          {action}
         </div>
       </div>
       <div ref={viewportRef} className='min-h-0 flex-1 overflow-auto bg-surface-off-white [scrollbar-width:thin]'>

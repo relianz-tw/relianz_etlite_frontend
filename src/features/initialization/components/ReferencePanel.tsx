@@ -32,37 +32,38 @@ function useScrollerHeight(): number {
   return height;
 }
 
-/** 頁首的展開／收合按鈕，只在桌機出現（手機不提供對照面板） */
-export function ReferenceToggle() {
-  const { open, setOpen } = useReference();
-  return (
-    <Button variant='outline' size='sm' icon={open ? PanelRightClose : PanelRightOpen} className='hidden shrink-0 self-start nav:inline-flex' onClick={() => setOpen(!open)}>
-      {open ? '收合對照' : '對照原件'}
-    </Button>
-  );
-}
-
-/** 表單區與對照面板並排；每頁表單各掛一份，離開該頁時清掉聚焦欄位，避免下一頁沿用上一頁的紅框 */
-export function ReferenceLayout({ reportKey, file, children }: { reportKey: string; file?: File; children: ReactNode }) {
-  const { open, setFocusedField } = useReference();
+/**
+ * 表單區與對照面板並排；每頁表單各掛一份，離開該頁時清掉聚焦欄位，避免下一頁沿用上一頁的紅框。
+ * hasReference：這一頁有沒有辨識過的原件。沒有就完全不出現對照（連展開按鈕都不給），有就自動展開。
+ */
+export function ReferenceLayout({ reportKey, file, hasReference, children }: { reportKey: string; file?: File; hasReference: boolean; children: ReactNode }) {
+  const { open, toggleOpen, autoOpen, setFocusedField } = useReference();
   useEffect(() => () => setFocusedField(null), [setFocusedField]);
+  useEffect(() => autoOpen(hasReference), [autoOpen, hasReference]);
+  const expanded = hasReference && open;
 
   // 展開時把內容欄加寬、左右留白縮小（寫在捲動區上，InitializationLayout 與固定操作列都讀同一組變數，才會對齊）；收合或離開此頁時還原
   useEffect(() => {
     const scroller = document.getElementById(SCROLL_CONTAINER_ID);
-    if (!open || !scroller) return;
+    if (!expanded || !scroller) return;
     scroller.style.setProperty('--init-content-max-w', EXPANDED_CONTENT_MAX_W);
     scroller.style.setProperty('--init-content-px', EXPANDED_CONTENT_PX);
     return () => {
       scroller.style.removeProperty('--init-content-max-w');
       scroller.style.removeProperty('--init-content-px');
     };
-  }, [open]);
+  }, [expanded]);
 
   return (
     <div className='flex items-start gap-4 nav:gap-5'>
       <div className='flex min-w-0 flex-1 flex-col gap-4 nav:gap-5'>{children}</div>
-      {open && <ReferencePanel reportKey={reportKey} file={file} />}
+      {/* 收合後在表單右側留一顆展開按鈕，跟著捲動；手機不提供對照面板 */}
+      {hasReference && !open && (
+        <Button variant='outline' size='sm' icon={PanelRightOpen} className='sticky top-2 hidden shrink-0 nav:inline-flex' onClick={() => toggleOpen(true)}>
+          對照原件
+        </Button>
+      )}
+      {expanded && <ReferencePanel reportKey={reportKey} file={file} />}
     </div>
   );
 }
@@ -98,7 +99,7 @@ function useBackendPageImage(url: string | undefined): File | undefined {
 }
 
 function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File }) {
-  const { sourceFiles, focusedField, setFocusedField } = useReference();
+  const { sourceFiles, focusedField, setFocusedField, toggleOpen } = useReference();
   const { state } = useInitialization();
   // 聚焦欄位的原件位置（辨識時存進 state）；沒有座標的欄位不畫框
   const location = focusedField ? (state.fieldLocations[reportKey]?.[focusedField] ?? null) : null;
@@ -120,7 +121,13 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
       className='sticky top-2 hidden min-h-64 w-[40%] shrink-0 flex-col overflow-hidden rounded-lg border border-neutral-blue-gray/30 bg-white nav:flex'
     >
       {/* 後端的圖已經是該表那一頁，不需要再依 pages 篩頁 */}
-      <SourceViewer file={sourceFile} pages={backendImage ? undefined : formSource?.pages} bbox={bbox} onPageNavigate={() => setFocusedField(null)} />
+      <SourceViewer
+        file={sourceFile}
+        pages={backendImage ? undefined : formSource?.pages}
+        bbox={bbox}
+        onPageNavigate={() => setFocusedField(null)}
+        action={<Button variant='ghost' size='sm' icon={PanelRightClose} aria-label='收合對照' onClick={() => toggleOpen(false)} />}
+      />
     </aside>
   );
 }
