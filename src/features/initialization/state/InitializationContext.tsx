@@ -75,6 +75,12 @@ interface InitializationContextValue {
 
 const InitializationContext = createContext<InitializationContextValue | null>(null);
 
+/** 衝突回應代表「伺服器上沒有草稿」：目前版本是 0 且從未儲存過 */
+function isMissingDraft(data: unknown): boolean {
+  const conflict = data as DraftConflictData | undefined;
+  return conflict?.version === 0 && !conflict.savedAt;
+}
+
 export function InitializationProvider({ children }: { children: React.ReactNode }) {
   const [state, rawDispatch] = useReducer(initializationReducer, initialState);
   const [mounted, setMounted] = useState(false);
@@ -134,8 +140,17 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     if (savingRef.current) return;
     savingRef.current = true;
     const snapshot = stateRef.current;
+    const save = (baseVersion: number) => saveDraft({ step: snapshot.currentStep, reportIndex: snapshot.currentReportIndex, state: snapshot, baseVersion });
     try {
-      const record = await saveDraft({ step: snapshot.currentStep, reportIndex: snapshot.currentReportIndex, state: snapshot, baseVersion: draftVersionRef.current });
+      let record;
+      try {
+        record = await save(draftVersionRef.current);
+      } catch (error) {
+        // 伺服器回衝突、但它目前是第 0 版又沒存過，代表草稿已被刪除（環境重置、DELETE 過），不是真的有另一裝置在改。
+        // 這時本機留著的版本號已經失效，直接以 0 重送即可，不必跳對話框打擾使用者。
+        if (!(error instanceof ApiError && error.errorCode === DRAFT_CONFLICT_CODE && isMissingDraft(error.data))) throw error;
+        record = await save(0);
+      }
       recordVersion(record.version);
       lastSavedJsonRef.current = JSON.stringify(snapshot);
       setSavedAt(Date.parse(record.savedAt));
