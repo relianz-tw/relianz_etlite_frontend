@@ -83,12 +83,17 @@ function sameValue(a: string | number, b: string | number): boolean {
 /** 401／403 的原件另外存在各期別頁（vatUploads），欄位位置的 sourceId 用這個固定值，對照面板會改用該期自己的檔案 */
 const VAT_SOURCE_ID = 'vat-upload';
 
-/** 辨識欄位的座標轉成各欄位在原件上的位置；沒有座標的欄位不收（表格列規格上也沒有座標） */
-function toLocations(fields: IdentifiedField[], sourceId: string): Record<string, FieldLocation> {
+/**
+ * 辨識欄位的座標轉成各欄位在原件上的位置；沒有座標的欄位不收（表格列規格上也沒有座標）。
+ *
+ * pageOverride：改用後端回的頁面圖時，那張圖就是這張表唯一的一頁，欄位的 page 不該再參與比對。
+ * 後端各表回的 page 不一致（損益表回 1，基本稅額表回原件頁次 3），照收會讓對不到 1 的表全部畫不出框。
+ */
+function toLocations(fields: IdentifiedField[], sourceId: string, pageOverride?: number): Record<string, FieldLocation> {
   const result: Record<string, FieldLocation> = {};
   for (const field of fields) {
     const box = toFieldBBox(field);
-    if (box) result[field.fieldCode] = { ...box, sourceId };
+    if (box) result[field.fieldCode] = { ...box, page: pageOverride ?? box.page, sourceId };
   }
   return result;
 }
@@ -160,7 +165,9 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
   const applyForm = (form: IdentifiedForm, file: File, sourceId: string, overwrite: boolean): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
     let values = toValueMap(form.fields);
     let rows = toRowValues(form.rows);
-    const locations = toLocations(form.fields, sourceId);
+    // 後端有回該表的頁面圖時，對照面板顯示的就是那張圖，欄位位置統一歸到第 1 頁
+    const imageUrl = identifiedImageUrl(form.image);
+    const locations = toLocations(form.fields, sourceId, imageUrl ? 1 : undefined);
     // 使用者選「保留現有資料」：只填目前空白（或值相同）的欄位；已有資料的表格列不動。
     // 原件位置照記不過濾：使用者正是要對照原件上的值和現有資料有什麼不同，沒填入的欄位也要能框出來
     const targetId = reportIdOf(form);
@@ -170,7 +177,6 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       if ((current?.rows ?? []).some(row => Object.values(row).some(field => hasValue(field.value)))) rows = [];
     }
     // 後端回這張表出現在原件的哪幾頁；沒回就不記，面板退回顯示整份原件
-    const imageUrl = identifiedImageUrl(form.image);
     const source = form.pages && form.pages.length > 0 ? { sourceId, pages: form.pages, imageUrl } : undefined;
 
     if (form.formCode === 'VAT_401' || form.formCode === 'VAT_403') {
