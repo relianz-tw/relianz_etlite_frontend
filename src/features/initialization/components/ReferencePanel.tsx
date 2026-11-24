@@ -56,13 +56,17 @@ export function ReferenceLayout({ reportKey, file, hasReference, children }: { r
 
   return (
     <div className='flex items-start gap-4 nav:gap-5'>
-      <div className='flex min-w-0 flex-1 flex-col gap-4 nav:gap-5'>{children}</div>
-      {/* 收合後在表單右側留一顆展開按鈕，跟著捲動；手機不提供對照面板 */}
-      {hasReference && !open && (
-        <Button variant='outline' size='sm' icon={PanelRightOpen} className='sticky top-2 hidden shrink-0 nav:inline-flex' onClick={() => toggleOpen(true)}>
-          對照原件
-        </Button>
-      )}
+      <div className='flex min-w-0 flex-1 flex-col gap-4 nav:gap-5'>
+        {/* 收合後把展開按鈕放回表單最上方靠右，不要浮在版面外側；手機不提供對照面板 */}
+        {hasReference && !open && (
+          <div className='hidden justify-end nav:flex'>
+            <Button variant='outline' size='sm' icon={PanelRightOpen} onClick={() => toggleOpen(true)}>
+              對照原件
+            </Button>
+          </div>
+        )}
+        {children}
+      </div>
       {expanded && <ReferencePanel reportKey={reportKey} file={file} />}
     </div>
   );
