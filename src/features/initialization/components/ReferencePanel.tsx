@@ -67,6 +67,36 @@ export function ReferenceLayout({ reportKey, file, children }: { reportKey: stri
   );
 }
 
+/**
+ * 下載後端辨識用的頁面圖片。後端做過轉正／透視校正時，框的座標是相對這張圖，
+ * 用使用者上傳的原檔顯示會偏掉。下載失敗就回 undefined，呼叫端退回用原檔。
+ */
+function useBackendPageImage(url: string | undefined): File | undefined {
+  const [image, setImage] = useState<File>();
+  useEffect(() => {
+    if (!url) {
+      setImage(undefined);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(String(response.status));
+        const blob = await response.blob();
+        if (!cancelled) setImage(new File([blob], url.split('/').pop() ?? 'page.png', { type: blob.type }));
+      } catch {
+        // 取不到就讓畫面退回顯示原件，不打斷使用者
+        if (!cancelled) setImage(undefined);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return image;
+}
+
 function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File }) {
   const { sourceFiles, focusedField, setFocusedField } = useReference();
   const { state } = useInitialization();
@@ -76,7 +106,10 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
   // 這張表辨識自哪份原件、在哪幾頁（後端回的 pages）：面板只顯示這幾頁，不顯示整份原件
   const formSource = state.formSources[reportKey];
   // 顯示哪份原件：401／403 用該期自己的檔案；營所稅用這張表辨識自的那份，再來是欄位位置指向的那份，都沒有用最新上傳的
-  const sourceFile = file ?? sourceFiles.find(s => s.id === (formSource?.sourceId ?? location?.sourceId))?.file ?? sourceFiles[sourceFiles.length - 1]?.file;
+  const uploadedFile = file ?? sourceFiles.find(s => s.id === (formSource?.sourceId ?? location?.sourceId))?.file ?? sourceFiles[sourceFiles.length - 1]?.file;
+  // 後端辨識時用的頁面圖片：bbox 是相對它算的，有就優先顯示，沒有才退回自己把原件轉圖
+  const backendImage = useBackendPageImage(formSource?.imageUrl);
+  const sourceFile = backendImage ?? uploadedFile;
   const scrollerHeight = useScrollerHeight();
 
   return (
@@ -86,7 +119,8 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
       style={{ height: scrollerHeight > 0 ? `calc(${scrollerHeight}px - var(--init-action-bar-h, 0px) - 1rem)` : '70svh' }}
       className='sticky top-2 hidden min-h-64 w-[40%] shrink-0 flex-col overflow-hidden rounded-lg border border-neutral-blue-gray/30 bg-white nav:flex'
     >
-      <SourceViewer file={sourceFile} pages={formSource?.pages} bbox={bbox} onPageNavigate={() => setFocusedField(null)} />
+      {/* 後端的圖已經是該表那一頁，不需要再依 pages 篩頁 */}
+      <SourceViewer file={sourceFile} pages={backendImage ? undefined : formSource?.pages} bbox={bbox} onPageNavigate={() => setFocusedField(null)} />
     </aside>
   );
 }

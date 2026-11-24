@@ -16,6 +16,11 @@ export interface FieldLocation extends FieldBBox {
 export interface FormSource {
   sourceId: string;
   pages: number[];
+  /**
+   * 後端辨識時實際使用的頁面圖片（完整網址）。bbox 是相對這張圖，
+   * 後端若有轉正或透視校正，一定要顯示它而不是使用者上傳的原檔，否則框會偏。
+   */
+  imageUrl?: string;
 }
 
 /** 組織型態：決定要備哪些文件（公司有股東名簿與未分配盈餘申報書，獨資合夥改填負責人／合夥人資料） */

@@ -4,7 +4,7 @@ import { useReference } from '../reference/ReferenceContext';
 import { useInitialization } from '../state/InitializationContext';
 import type { FieldLocation } from '../state/initializationReducer';
 import { FORM_LIST, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
-import { identifyCit, pickIdentifiedValue, toFieldBBox, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
+import { identifiedImageUrl, identifyCit, pickIdentifiedValue, toFieldBBox, type IdentifiedField, type IdentifiedForm, type IdentifiedRow } from '@/api/peit';
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { toJpegFile } from '@/lib/imageToJpeg';
@@ -170,7 +170,8 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       if ((current?.rows ?? []).some(row => Object.values(row).some(field => hasValue(field.value)))) rows = [];
     }
     // 後端回這張表出現在原件的哪幾頁；沒回就不記，面板退回顯示整份原件
-    const source = form.pages && form.pages.length > 0 ? { sourceId, pages: form.pages } : undefined;
+    const imageUrl = identifiedImageUrl(form.image);
+    const source = form.pages && form.pages.length > 0 ? { sourceId, pages: form.pages, imageUrl } : undefined;
 
     if (form.formCode === 'VAT_401' || form.formCode === 'VAT_403') {
       const code = form.formCode === 'VAT_401' ? '401' : '403';
