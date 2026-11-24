@@ -15,6 +15,7 @@ import { CodeChip } from './paper/CodeChip';
 import { TemplateText } from './paper/TemplateText';
 import { useInitPaperStore } from './paper/useInitPaperStore';
 import { ReportFieldRow } from './ReportFieldRow';
+import { useReferenceOptional } from '../reference/ReferenceContext';
 import MoneyInput from '@/components/ui/MoneyInput';
 import { cn, fmtCurrency } from '@/lib/utils';
 import { CircleCheck, Clock, TriangleAlert } from 'lucide-react';
@@ -42,6 +43,8 @@ interface BalanceSheetViewProps {
  */
 export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   const { state, dispatch } = useInitialization();
+  // 科目列直接用 MoneyInput，不走 FieldInput，所以要自己告訴對照面板聚焦的是哪個欄位
+  const reference = useReferenceOptional();
   const store = useInitPaperStore(REPORT_ID, page);
   const data = state.reports[REPORT_ID].fields;
 
@@ -74,7 +77,11 @@ export function BalanceSheetView({ page, sections }: BalanceSheetViewProps) {
   // 紙本填在「合計」欄的科目（後端 isTotalColumn：小計、資本公積、減：庫藏股票等）標題粗體
   const renderRow = (field: ReportFieldDef, emphasized = false) => (
     // 標籤內嵌輸入框（如「包括商譽金額 ＿ 元」）的列，手機標籤整列、金額欄在下，內嵌輸入框才放得下、不蓋到金額欄
-    <div key={field.key} className={cn(ROW_GRID, field.labelTemplate && '!grid-cols-1 nav:!grid-cols-[minmax(0,1fr)_210px]', emphasized && 'font-bold')}>
+    <div
+      key={field.key}
+      onFocusCapture={() => reference?.setFocusedField(field.key)}
+      className={cn(ROW_GRID, field.labelTemplate && '!grid-cols-1 nav:!grid-cols-[minmax(0,1fr)_210px]', emphasized && 'font-bold')}
+    >
       <span style={{ paddingLeft: depthOf(field) * 16 }} className='flex min-w-0 items-center gap-2'>
         {/* 紙本科目編號（如 1111）；沒有編號的科目留空不佔位 */}
         <CodeChip official={field.officialCode} refNo={field.refNo} />
