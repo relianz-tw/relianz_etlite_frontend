@@ -79,6 +79,17 @@ export interface IdentifiedRow {
   fields: IdentifiedField[];
 }
 
+/**
+ * 後端辨識時實際使用的頁面圖片。bbox 的座標都是相對這張圖，
+ * 若 correction 不是 none（有轉正或透視校正），前端必須顯示這張圖而不是使用者上傳的原檔，否則框會偏。
+ */
+export interface IdentifiedImage {
+  width: number;
+  height: number;
+  /** GCS 上的相對路徑，要接 NEXT_PUBLIC_IMG_URL 才是完整網址，用 identifiedImageUrl() 取得 */
+  url: string;
+}
+
 export interface IdentifiedForm {
   formCode: string;
   officialFormCode: string | null;
@@ -87,6 +98,8 @@ export interface IdentifiedForm {
   present: boolean;
   /** 該表自己的民國年，之後依此年度撈 metadata */
   taxYear: number;
+  /** 該表 Gemini 辨識耗時（毫秒）；僅供觀察效能，畫面不使用 */
+  geminiMs?: number;
   /** 單路失敗碼（0019／0025／0029）；成功為 null */
   errorCode: string | null;
   errorMessage: string;
@@ -95,6 +108,14 @@ export interface IdentifiedForm {
   periodEndMonth?: number;
   /** 這張表出現過的頁碼（去重升序） */
   pages?: number[];
+  /** 辨識用的頁面圖片；僅 present 的表會有 */
+  image?: IdentifiedImage;
+  /** 定位方式：grid＝表格線＋OCR、template＝官方版面投影、software＝申報軟體版面座標 */
+  method?: string;
+  /** 對頁面做了什麼校正：none 原圖是正的、rotate 單純旋轉、perspective 透視校正 */
+  correction?: 'none' | 'rotate' | 'perspective';
+  /** rotate 時轉正前的傾斜角度（順時針為正） */
+  skewDegrees?: number;
   fields: IdentifiedField[];
   rows: IdentifiedRow[];
 }
@@ -263,17 +284,31 @@ export function pickIdentifiedValue(field: IdentifiedField): string | number | u
   }
 }
 
+/**
+ * 把辨識回傳的圖片路徑接成完整網址（後端給的是 GCS 相對路徑）。
+ * 沒有圖片時回 undefined，呼叫端退回自己把原檔轉圖顯示。
+ */
+export function identifiedImageUrl(image?: IdentifiedImage): string | undefined {
+  if (!image?.url) return undefined;
+  const base = process.env.NEXT_PUBLIC_IMG_URL ?? '';
+  return `${base.replace(/\/$/, '')}/${image.url.replace(/^\//, '')}`;
+}
+
 /** 依文件編號（1–12）與民國年取得該表欄位 metadata */
 export function getFormMetadata(formNo: number, taxYear: number): Promise<FormMetadata> {
   return apiFetch<FormMetadata>(`/ael/peit/form/metadata${buildQuery({ formNo, taxYear })}`);
 }
 
-/** 辨識營所稅結算申報書（可含多頁）或 401／403 PDF，不寫庫，僅回辨識結果供前端回填欄位；openingYear 為開帳民國年 */
-export function identifyCit(file: File, openingYear: number): Promise<CitIdentifyResult> {
+/**
+ * 辨識營所稅結算申報書（可含多頁）或 401／403 PDF，不寫庫，僅回辨識結果供前端回填欄位。
+ * openingYear 為開帳民國年；page 選填，指定 PDF 頁碼（從 1 起），不給時後端自己判斷在第幾頁。
+ */
+export function identifyCit(file: File, openingYear: number, page?: number): Promise<CitIdentifyResult> {
   const formData = new FormData();
   formData.append('companyUuid', COMPANY_UUID);
   formData.append('openingYear', String(openingYear));
   formData.append('file', file);
+  if (page !== undefined) formData.append('page', String(page));
   return apiFetch<CitIdentifyResult>('/ael/peit/cit/identify', {
     method: 'POST',
     body: formData,
