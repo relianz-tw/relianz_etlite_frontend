@@ -218,7 +218,7 @@ nav:hidden（≥ nav 1000px 不掛載）
 
 **z-index 分層**（由低到高，新增 Bottom Sheet／Sticky Action Bar 後的完整順序）：
 ```
-z-30  Sticky Action Bar（行動版底部固定操作條）
+z-30  Sticky Action Bar（行動版底部固定操作條）、邊緣浮動按鈕（如對照面板的「對照原件」標籤）
 z-40  AppShell 手機固定頂部列
 z-50  Sidebar 行動版 Overlay 抽屜
 z-[55] Bottom Sheet 遮罩
@@ -344,6 +344,22 @@ Icon：lucide TriangleAlert size 20、text-semantic-error、shrink-0
 ```
 對應元件：`src/features/ledger/transaction/TransactionFormView.tsx`（新增銷項無銀行帳戶）。
 
+### 送出失敗警示框（Submit Error Alert）
+
+用途：送出／儲存被後端擋下，使用者要先去改資料再回來重送（如確認開帳時後端回跨表不符）。
+容器樣式同 Blocking Alert，但**送出按鈕維持可按**（改完回來要能重試），且不自動消失，重新送出時才清掉。
+```
+容器：role='alert'、flex flex-col gap-3 nav:flex-row nav:items-center、rounded-md、
+      border border-semantic-error、bg-semantic-error/10、p-4
+Icon：lucide TriangleAlert size 20、text-semantic-error、shrink-0
+標題：text-sm font-bold text-semantic-error（如「開帳資料儲存失敗」）
+說明：text-[13px] leading-relaxed text-neutral-dark，直接顯示後端訊息原文
+動作：primary、sm「回去修正「<文件名>」」，置右（nav:ml-auto）；對不到是哪一份時不顯示
+```
+對應元件：`src/features/initialization/components/steps/Step5Confirm.tsx`（`POST /ael/peit/cit/confirm` 失敗，
+或回傳有 `skipped` 的表）。訊息對應回哪一份文件的規則見 `src/features/initialization/reports/confirmErrors.ts`：
+跨表訊息同時提到兩份時取最先被提到的那份（要改的是它，後面那份是比對基準）。
+
 ### AI 填入欄位提示（AI-filled Field Indicator）
 
 用途：欄位由 AI／自動辨識（如憑證照片辨識）帶入值、使用者尚未手動修改前，需與一般手動輸入的欄位
@@ -379,6 +395,7 @@ POST /ael/invoice/identification/one 自動帶入的表單欄位。
 - **標籤附註**：`note` 為標籤後 `text-[13px] text-neutral-mid` 小字括號；`formula.text` 以括號接在標籤後，欄位唯讀（`isSubtotal`，後端計算，前端不加總）。
 - **成對欄位**：`column` 為 `BOOK`／`ADJ` 的欄位依 `rowCode` 合成一列，桌機並排 170px 兩欄，上方 `text-xs font-bold text-neutral-mid` 欄標題；手機改為單欄堆疊並在框上顯示欄名。
 - **行內／段落空格**：`labelTemplate` 與 `textBlocks[].template` 的 `{{field:}}` 畫成嵌在文字中的小輸入框（沿用輸入元件高度，寬 `w-36`），`{{ref:}}` 為唯讀值，`{{group:}}` 為行內勾選框。沒有 `{{field:}}`、`{{group:}}` 的純說明段落，以及表格的 `note` 說明文字，一律不顯示；只有要輸入文字或勾選的說明才出現。
+- **行內輸入框的行距**：內嵌輸入框（40px）比正文行高還高，模板含 `{{field:}}` 或 `{{group:}}` 的段落與標籤一律用 `leading-[3.25rem]`（52px，上下各留 6px），折行時相鄰兩排的輸入框才不會黏在一起；純文字的段落與標籤維持原行高（`leading-9`／`leading-7`），不讓整張表變鬆。
 - **百分比**（`dataType: 6`）：輸入框尾端固定顯示 `%`，可輸入負號；數值為顯示值（20 代表 20%）。
 - **金額負值**：金額欄一律開放正負切換（`MoneyInput allowSign`）。
 - `groupCode` 只是分組代碼（metadata 沒有標題文字），不畫小標。
@@ -415,13 +432,15 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 開帳精靈申報書頁（`ReportPageView`）的原件對照：使用者上傳的申報書轉成每頁一張圖，放在表單右側；點選（focus）表單欄位時，面板把該欄位在原件上的位置放大並框起來。實作見 `src/features/initialization/components/ReferencePanel.tsx`。
 
-- **顯示條件**：僅桌機（`nav:` 以上）；預設收合，頁首標題旁的「對照原件」按鈕（`outline`、`sm`、`PanelRightOpen`／`PanelRightClose`）切換。手機不提供，按鈕與面板一律隱藏。
+- **顯示條件**：僅桌機（`nav:` 以上）；這一頁有辨識過的原件才出現（連展開按鈕都不給），有就自動展開，使用者手動收合後不再自動展開。手機不提供，按鈕與面板一律隱藏。
+- **收合時的展開按鈕**：浮在畫面右緣的直立標籤（`fixed right-0 top-1/2 -translate-y-1/2 z-30`），長表單捲到哪都點得到。樣式 `rounded-l-lg border border-r-0 border-neutral-blue-gray/30 bg-white shadow-level1`（浮動元素，符合陰影例外規則），內容為 `PanelRightOpen` 16px 加直書文字「對照原件」（`[writing-mode:vertical-rl]`），寬度至少 44px 符合觸控熱區。展開後的收合鈕（`ghost`、`sm`、`PanelRightClose`）在面板工具列右側。
 - **版面**：表單區與面板並排（`flex items-start gap-5`），表單區 `min-w-0 flex-1`，面板 `w-[40%] shrink-0`。
 - **展開時加寬內容欄**：內容欄最寬由 1200px 放寬到 1680px，桌機左右留白由 `1.5rem` 縮到 `1rem`（寫在捲動區的 CSS 變數 `--init-content-max-w`、`--init-content-px`，頁面內容欄與固定操作列同讀這組變數才會對齊；收合或離開該頁還原）。
 - **展開時輸入欄位改單欄**：表單區變窄，原本兩欄並排的輸入欄位（`InputGrid`、起訖日期搭收件編號）改成單欄堆疊，輸入框才有足夠寬度顯示完整內容；收合後恢復兩欄。
 - **面板容器**：`sticky top-2`、高度 = 捲動區可視高度 − 固定操作列高度（`--init-action-bar-h`）− `1rem`（上下各 `0.5rem` 留白），貼齊操作列上緣，最小 `16rem`；`overflow-hidden`、`rounded-lg border border-neutral-blue-gray/30 bg-white`，不用陰影。上方一列頁碼切換（`ChevronLeft`／`ChevronRight` ghost 按鈕加「第 N / M 頁」`text-xs text-neutral-mid`），下方為圖片視窗。
-- **圖片視窗**：`overflow-auto`（細捲軸），圖片寬度預設填滿視窗，整頁可上下捲動看完；放大不用 transform，而是把圖片寬度撐成視窗的 N 倍（視窗可左右上下捲動），再用 `scrollTo` 把目標區域捲到視窗中央。放大倍率最小 1、最大 3，目標區域約佔視窗 60%。沒有目標區域（換頁、清除聚焦）時回到最上方、倍率 1。
-- **紅框**：`border-2 border-semantic-error`（開創紅）、`bg-semantic-error/10`、`rounded-sm`，以百分比定位在圖片上，邊框寬度固定 2px。框比辨識座標各邊外擴一點固定邊距（左右各頁寬的 1%、上下各頁高的 0.6%，不超出頁面），放大倍率也以外擴後的框計算。
+- **圖片視窗**：`overflow-auto`（細捲軸），圖片寬度預設填滿視窗，整頁可上下捲動看完；放大不用 transform，而是把圖片寬度撐成視窗的 N 倍（視窗可左右上下捲動），再用 `scrollTo` 把目標區域捲到視窗中央。放大倍率最小 1、最大 3，目標區域約佔視窗 60%。沒有目標區域（換頁、清除聚焦）時回到最上方、倍率 1。使用者另可用工具列的放大／縮小鈕或 `Ctrl`／`⌘` 加滾輪手動調整（0.5–6 倍），換欄位或換頁即失效。
+- **退出放大**：點紅框以外的圖片區域即清除聚焦欄位與手動倍率，回到倍率 1、捲回最上方；有紅框時圖片游標為 `cursor-zoom-out` 提示可點。紅框本身疊在圖片上，點框不會觸發。
+- **紅框**：`border-2 border-semantic-error/50`（開創紅半透明，不遮住框內的字）、`bg-semantic-error/10`、`rounded-sm`，以百分比定位在圖片上，邊框寬度固定 2px。框即辨識座標本身，不額外外擴。
 - **座標來源與格式**：來自辨識 API（`/ael/peit/cit/identify`）每個欄位的 `page`、`bbox`（對角兩點 `x1,y1,x2,y2`，實測為 0–1 小數，若大於 1 則當作 0–1000 整數換算），前端換成 `{ page, x, y, w, h }`（`page` 從 1 起，其餘 0–1 相對座標、左上角為原點）並連同來源原件 id 存進草稿 state，所以換裝置也看得到紅框。表格列沒有座標。沒有座標的欄位不畫框、圖片維持原位。
 - **只顯示該表的頁**：辨識 API 回每張表出現在原件的哪幾頁（`forms[].pages`），面板只列這幾頁，頁碼切換與「第 N / M 頁」都以這個範圍計算；後端沒回頁碼時退回顯示整份原件。
 - **文件標題**：固定底部操作列的進度文字接上這一頁的文件標題（如「第 3 / 14 份・損益及稅額計算表」），沒辨識過的頁面也顯示。
@@ -429,15 +448,32 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 - **顯示哪份原件**：營所稅頁用這張表辨識自的那份上傳檔案，其次是欄位座標指向的那份，都沒有時用最新上傳的；401／403 用該期自己上傳的申報書。PDF 在需要時才切頁（同一份只切一次）。
 - **空狀態**：尚未上傳檔案時，面板置中顯示 `FileText` 圖示加「上傳申報書檔案後，可在這裡對照原件」（`text-sm text-neutral-mid`）；切頁中顯示「對照圖片載入中…」，失敗顯示「對照圖片產生失敗，請重新上傳檔案」。
 
-### 上傳檔案列（Source File List）
+### 申報書上傳區（Source Upload Section）
 
-營所稅各頁（含封面）頁首卡片列出使用者上傳過的申報書，實作見 `src/features/initialization/components/SourceFileList.tsx`。營業稅 401／403 仍是每期一份、不在此列。
+開帳精靈申報書頁的上傳與已上傳檔案是同一塊，放在頁首卡片下半部整行（標題右上不再另放上傳框），實作見 `src/features/initialization/components/SourceUploadSection.tsx`。
 
-- **內容**：每份檔案一列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。可上傳多份，依上傳順序由上到下。
-- **範圍**：整份共用（一份 PDF 含多張表），每個營所稅頁列同一組。
-- **帶入說明**：檔案列下方一直顯示「已帶入：…」（`CircleCheck` 14px、`text-xs text-semantic-success`），文字跟著該份檔案，檔案還在就一直顯示；沒有帶入任何文件時不顯示。
-- **刪除**：只有使用者按「刪除」並在 `ConfirmDialog` 確認後才會移除（後端刪除成功才從列表拿掉，失敗以 toast 提示）；刪除不會清掉已帶入表單的資料，但這份檔案的欄位座標與「已帶入」說明一併清掉。
-- **儲存位置**：後端原件 API（`/ael/initialization/draft/files`，單檔 ≤5MB、PDF ≤50 頁）；上傳失敗時檔案仍留在列表（只在記憶體）並以 toast 提示重新整理後需重傳。「已帶入」說明存在草稿 state，跟著草稿換裝置。
+- **沒有檔案**：整行的虛線上傳框（`rounded-lg border-[1.5px] border-dashed border-neutral-blue-gray bg-surface-off-white px-3 py-2`），左側 `Upload` 20px 城信藍，中間主文「上傳申報書快速帶入（選填）」與格式小字「PDF、JPG、PNG、HEIC，5MB 以內」，右側 `outline`、`sm`「選擇檔案」。拖放進框時邊框與底色轉 `brand-blue`／`brand-blue/5`；辨識中左側圖示換 `Loader2` 旋轉、主文改「辨識中…檔名」。
+- **有檔案**：主角是檔案列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、`outline` `sm`「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。營所稅可多份，依上傳順序由上到下，列表下方靠右一顆 `outline`、`sm`、`Plus`「新增檔案」；401／403 每期只收一份，該顆按鈕文字改「重新上傳」。
+- **範圍**：營所稅的上傳檔案整份共用（一份 PDF 含多張表），每個營所稅頁列同一組；401／403 的檔案掛在各期別頁自己身上。
+- **辨識結果訊息**：接在這塊下方，`text-xs`——未辨識到內容用 `TriangleAlert` 加 `text-semantic-warm-dark`，略過或失敗用 `TriangleAlert` 加 `text-semantic-error`。成功帶入哪幾份不寫成一行文字，改看下方的文件備齊清單。
+- **刪除**：只有使用者按「刪除」並在 `ConfirmDialog` 確認後才會移除（後端刪除成功才從列表拿掉，失敗以 toast 提示）；刪除不會清掉已帶入表單的資料，但這份檔案的欄位座標與來源記錄一併清掉。
+- **儲存位置**：後端原件 API（`/ael/initialization/draft/files`，單檔 ≤5MB、PDF ≤50 頁）；上傳失敗時檔案仍留在列表（只在記憶體）並以 toast 提示重新整理後需重傳。
+
+### 文件備齊清單（Required Docs Checklist）
+
+申報書上傳區底部的可展開清單，列出這間公司這條開帳路徑需要的每一份文件及其狀態，取代舊的「已帶入：…」一行文字。實作見 `src/features/initialization/components/RequiredDocsChecklist.tsx`。
+
+- **收合列**：`ChevronDown` 14px（展開時 `rotate-180`）加「已備齊 N / M 份文件」，`text-[13px] font-medium text-brand-blue`，熱區 `min-h-11 nav:min-h-0`。
+- **清單內容**：封面加上步驟 4 的逐頁清單（營所稅各表與 401／403 各期），份數與順序依組織型態、設立年度、開帳基準日動態算出，不寫死。每項一列 `text-[13px]`，左側狀態圖示 14px。
+- **三種狀態**：
+
+| 狀態 | 判斷 | 圖示 | 文字 |
+|---|---|---|---|
+| 已帶入 | 這份表有辨識來源 | `CircleCheck`／`text-semantic-success` | `text-neutral-dark`，右側以 `text-xs text-neutral-mid` 顯示來源檔名 |
+| 已手填 | 沒有辨識來源但已有資料 | `PencilLine`／`text-brand-blue` | `text-neutral-dark` |
+| 未填 | 兩者皆否 | `Circle`／`text-neutral-blue-gray` | `text-neutral-mid` |
+
+- **資料來源**：狀態由草稿 state 推導（辨識來源 `formSources`、資料 `isPageFilled`），不另存一份「已帶入」名單，避免兩個真相。
 
 ### 辨識結果覆蓋確認（Overwrite Confirm）
 
@@ -1073,7 +1109,7 @@ Dialog 內左滑面板（桌機，於 Modal 對話框內使用）：
 | Level | Treatment | Use |
 |-------|-----------|-----|
 | Flat (0) | No shadow | All surfaces — default |
-| Subtle (1) | `0 1px 4px rgba(58,56,48,0.08)` | Floating menus, dropdowns only |
+| Subtle (1) | `0 1px 4px rgba(58,56,48,0.08)` | Floating menus, dropdowns, and edge-anchored floating buttons only |
 | Focus | `0 0 0 3px rgba(0,95,162,0.25)` | Keyboard focus ring |
 
 **Shadow Philosophy**: Follow Revolut's flat-first principle. Depth comes from section color contrast (white ↔ 城信藍 ↔ 清爽白) and generous whitespace. Avoid decorative shadows.
