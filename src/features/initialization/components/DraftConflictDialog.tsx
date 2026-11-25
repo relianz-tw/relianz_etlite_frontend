@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import { formatDraftTime } from './draftTime';
+import { formatDraftDateTime } from './draftTime';
 
 interface DraftConflictDialogProps {
   open: boolean;
@@ -19,15 +19,16 @@ interface DraftConflictDialogProps {
 /** 草稿版本衝突：另一個裝置（或另一個分頁）已更新雲端草稿，讓使用者選用哪一邊（見 DESIGN.md「草稿儲存狀態」） */
 export function DraftConflictDialog({ open, serverSavedAt, onLoadServer, onOverwrite, onClose }: DraftConflictDialogProps) {
   return (
-    <Modal open={open} onClose={onClose} title='草稿有更新版本' widthClassName='max-w-[480px]'>
+    <Modal open={open} onClose={onClose} title='資料同步' widthClassName='max-w-[480px]'>
       <p className='text-sm leading-relaxed text-neutral-dark'>
-        另一個裝置在 {formatDraftTime(serverSavedAt)} 更新了雲端草稿，和這裡的內容不同。請選擇要使用哪一份：載入雲端最新版會放棄這裡尚未儲存的修改，保留這裡的內容則會覆蓋雲端草稿。
+        另一部裝置在 {formatDraftDateTime(serverSavedAt)} 有更新過草稿，請選擇要使用哪一份。
       </p>
       <div className='mt-6 flex flex-col-reverse gap-3 nav:flex-row nav:justify-end'>
-        <Button variant='outline' onClick={onLoadServer}>
-          載入雲端最新版
+        <Button variant='outline' onClick={onOverwrite}>
+          保留目前版本
         </Button>
-        <Button onClick={onOverwrite}>保留這裡並覆蓋</Button>
+        {/* 預設選項：以雲端最新版為準，不會留下兩份互相覆蓋的草稿 */}
+        <Button onClick={onLoadServer}>使用最新版本</Button>
       </div>
     </Modal>
   );
