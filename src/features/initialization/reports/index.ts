@@ -6,6 +6,7 @@ export type { ReportFieldDef, ReportPageDef, ReportSectionDef, ReportTableDef, R
 export { buildReportPage, omitFields, isAmountType } from './paperLayout';
 export * from './reportPages';
 export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getOpenYearOptions, resolveToday, toGregorianYear, getFormItem, isFormApplicable, isSoleOrPartnership, ORG_TYPE_LABEL } from './formList';
+export { findFormInMessage, formTitleOf } from './confirmErrors';
 
 /** InitializationState.reports 初始值：只種營所稅各表（含封面）的空容器；401／403 各期別頁的 key 在使用時才建立 */
 export function buildInitialReportsState(): Record<string, ReportData> {

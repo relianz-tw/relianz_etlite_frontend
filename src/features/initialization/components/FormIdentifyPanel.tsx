@@ -8,7 +8,7 @@ import { identifiedImageUrl, identifyCit, pickIdentifiedValue, toFieldBBox, type
 import Button from '@/components/ui/Button';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { toJpegFile } from '@/lib/imageToJpeg';
-import { CircleCheck, Loader2, TriangleAlert, Upload } from 'lucide-react';
+import { Loader2, Plus, TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { OverwriteConfirmDialog, type OverwriteConflict } from './OverwriteConfirmDialog';
 import { toast } from 'sonner';
@@ -26,6 +26,8 @@ interface FormIdentifyPanelProps {
   vatPeriod?: boolean;
   /** 目前頁面的 key；401／403 上傳的檔案一律掛在這一頁供預覽 */
   pageKey?: string;
+  /** 還沒有檔案時畫整行虛線上傳框；已經有檔案時只畫一顆「新增檔案」按鈕（檔案本身由 SourceUploadSection 呈現） */
+  variant?: 'dropzone' | 'button';
 }
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
@@ -108,10 +110,10 @@ function toValueMap(fields: IdentifiedField[]): Record<string, string | number> 
 }
 
 /**
- * 逐頁表單的「上傳辨識」區（選填），放在固定底部操作列左側：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
+ * 逐頁表單的「上傳辨識」入口（選填），由 SourceUploadSection 擺在頁首卡片下方：上傳一份 PDF 或圖片（JPG／PNG／HEIC，PNG、HEIC 先轉成 JPG）後呼叫 cit/identify，
  * 回傳中所有 present 的表都會一併套用（含其他頁），使用者也可略過直接手動輸入。
  */
-export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey }: FormIdentifyPanelProps) {
+export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey, variant = 'dropzone' }: FormIdentifyPanelProps) {
   const { state, dispatch, setVatUpload } = useInitialization();
   const { addSourceFile } = useReference();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,8 +121,6 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
   const [status, setStatus] = useState<PanelStatus>('idle');
   const [message, setMessage] = useState('');
   const [fileName, setFileName] = useState('');
-  // 這次辨識實際帶入的文件名稱，成功後列給使用者看
-  const [appliedLabels, setAppliedLabels] = useState<string[]>([]);
   // 辨識結果會蓋到已有資料時，等使用者選覆蓋或保留；resolve 把選擇交回 handleFile
   const [overwriteAsk, setOverwriteAsk] = useState<{ conflicts: OverwriteConflict[]; resolve: (overwrite: boolean) => void } | null>(null);
   const askOverwrite = (conflicts: OverwriteConflict[]) => new Promise<boolean>(resolve => setOverwriteAsk({ conflicts, resolve }));
@@ -162,7 +162,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
    * 並把該期的申報書選擇切到辨識到的那一種；對不到（不在需上傳範圍）就略過。回傳是否有套用，以及略過時給使用者看的原因。
    * file 為實際送出辨識的檔案（圖片已轉 JPG），401／403 套用成功時一併記到該期別頁供預覽。
    */
-  const applyForm = (form: IdentifiedForm, file: File, sourceId: string, overwrite: boolean): { applied: boolean; label?: string; skipped?: string; vatPageIndex?: number } => {
+  const applyForm = (form: IdentifiedForm, file: File, sourceId: string, overwrite: boolean): { applied: boolean; skipped?: string; vatPageIndex?: number } => {
     let values = toValueMap(form.fields);
     let rows = toRowValues(form.rows);
     // 後端有回該表的頁面圖時，對照面板顯示的就是那張圖，欄位位置統一歸到第 1 頁
@@ -190,11 +190,11 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: getVatReportKey(form.formCode, page.period!), fields: values, rows, locations, source } });
       // 辨識到的是別期時，該期頁面也留一份供預覽
       setVatUpload(page.key, file);
-      return { applied: true, label: `${code}・${formatPeriodLabel(form.taxYear, form.periodStartMonth!)}`, vatPageIndex: state.reportPages.indexOf(page) };
+      return { applied: true, vatPageIndex: state.reportPages.indexOf(page) };
     }
 
     dispatch({ type: 'APPLY_IDENTIFIED_FORM', payload: { reportId: form.formCode, taxYear: form.taxYear, fields: values, rows, locations, source } });
-    return { applied: true, label: FORM_LIST.find(f => f.formCode === form.formCode)?.title ?? form.formName };
+    return { applied: true };
   };
 
   const handleFile = async (originalFile: File) => {
@@ -209,7 +209,6 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
     setFileName(originalFile.name);
     setStatus('recognizing');
     setMessage('');
-    setAppliedLabels([]);
     try {
       // PNG、HEIC 先轉成 JPG 再送；大小上限檢查轉檔後實際上傳的檔案
       const file = isImage ? await toJpegFile(originalFile) : originalFile;
@@ -258,10 +257,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
         return;
       }
       setStatus('done');
-      // 列出帶入了哪些文件；有部分略過或失敗時另以紅字提醒。營所稅記在檔案上（SourceFileList 一直顯示），401／403 留在這個元件
-      const labels = outcomes.flatMap(o => (o.label ? [o.label] : []));
-      if (source) dispatch({ type: 'SET_SOURCE_LABELS', payload: { sourceId: source.id, labels } });
-      else setAppliedLabels(labels);
+      // 帶入了哪幾份由下方的文件備齊清單（RequiredDocsChecklist）呈現，這裡只留部分略過或失敗的紅字提醒
       setMessage(notes.join('；'));
       toast.success(`辨識完畢，已帶入 ${appliedCount} 份文件`);
     } catch (err) {
@@ -274,41 +270,55 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
 
   return (
     <div className='flex min-w-0 flex-col gap-1'>
-      <div
-        onDragOver={e => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={e => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files[0];
-          if (file && !recognizing) handleFile(file);
-        }}
-        className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-[1.5px] border-dashed px-3 py-2 transition-colors ${
-          dragging ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray bg-surface-off-white'
-        }`}
-      >
-        {recognizing ? (
-          <Loader2 size={20} className='shrink-0 animate-spin text-brand-blue' />
+      {variant === 'button' ? (
+        // 已經有檔案：檔案本身是主角，這裡只留一顆再上傳的按鈕（辨識中改顯示進度，按鈕暫時收起）
+        recognizing ? (
+          <span className='flex items-center justify-end gap-2 text-sm text-neutral-mid'>
+            <Loader2 size={16} className='shrink-0 animate-spin text-brand-blue' />
+            <span className='truncate'>辨識中…{fileName}</span>
+          </span>
         ) : (
-          <Upload size={20} strokeWidth={1.75} className='shrink-0 text-brand-blue' />
-        )}
-        <div className='flex min-w-0 flex-1 basis-40 flex-col'>
-          {/* 手機文字可換行（辨識中的檔名、「上傳申報書快速帶入（選填）」要看得到全文），桌機單行截斷 */}
-          <span className='break-words text-sm font-medium text-neutral-dark nav:truncate'>
-            {recognizing ? `辨識中…${fileName}` : vatPeriod ? `上傳申報書檔案${required ? '' : '（選填）'}` : `上傳申報書快速帶入${required ? '' : '（選填）'}`}
-          </span>
-          {/* 營業稅申報書的檔案會留存於系統，說明手機也要看得到；其餘文件的格式提示只在桌機顯示 */}
-          <span className={`text-xs text-neutral-mid ${vatPeriod ? '' : 'hidden nav:block'}`}>
-            {vatPeriod ? `上傳後會記錄在系統中・PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內` : `PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內`}
-          </span>
+          <Button variant='outline' size='sm' icon={Plus} onClick={() => inputRef.current?.click()} className='min-h-11 self-end nav:min-h-0'>
+            {vatPeriod ? '重新上傳' : '新增檔案'}
+          </Button>
+        )
+      ) : (
+        <div
+          onDragOver={e => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => {
+            e.preventDefault();
+            setDragging(false);
+            const file = e.dataTransfer.files[0];
+            if (file && !recognizing) handleFile(file);
+          }}
+          className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-[1.5px] border-dashed px-3 py-2 transition-colors ${
+            dragging ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-blue-gray bg-surface-off-white'
+          }`}
+        >
+          {recognizing ? (
+            <Loader2 size={20} className='shrink-0 animate-spin text-brand-blue' />
+          ) : (
+            <Upload size={20} strokeWidth={1.75} className='shrink-0 text-brand-blue' />
+          )}
+          <div className='flex min-w-0 flex-1 basis-40 flex-col'>
+            {/* 手機文字可換行（辨識中的檔名、「上傳申報書快速帶入（選填）」要看得到全文），桌機單行截斷 */}
+            <span className='break-words text-sm font-medium text-neutral-dark nav:truncate'>
+              {recognizing ? `辨識中…${fileName}` : vatPeriod ? `上傳申報書檔案${required ? '' : '（選填）'}` : `上傳申報書快速帶入${required ? '' : '（選填）'}`}
+            </span>
+            {/* 營業稅申報書的檔案會留存於系統，說明手機也要看得到；其餘文件的格式提示只在桌機顯示 */}
+            <span className={`text-xs text-neutral-mid ${vatPeriod ? '' : 'hidden nav:block'}`}>
+              {vatPeriod ? `上傳後會記錄在系統中・PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內` : `PDF、JPG、PNG、HEIC，${MAX_SIZE_MB}MB 以內`}
+            </span>
+          </div>
+          <Button variant='outline' size='sm' disabled={recognizing} onClick={() => inputRef.current?.click()} className='min-h-11 w-full shrink-0 nav:min-h-0 nav:w-auto'>
+            {vatPeriod ? '上傳檔案' : '選擇檔案'}
+          </Button>
         </div>
-        <Button variant='outline' size='sm' disabled={recognizing} onClick={() => inputRef.current?.click()} className='min-h-11 w-full shrink-0 nav:min-h-0 nav:w-auto'>
-          {vatPeriod ? '上傳檔案' : '選擇檔案'}
-        </Button>
-      </div>
+      )}
       <input
         ref={inputRef}
         type='file'
@@ -326,12 +336,6 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
         <p className='flex items-start gap-1.5 text-xs text-semantic-warm-dark'>
           <TriangleAlert size={14} className='mt-0.5 shrink-0' />
           <span>未辨識到文件資訊，請確認檔案內容，或直接手動輸入</span>
-        </p>
-      )}
-      {vatPeriod && status === 'done' && appliedLabels.length > 0 && (
-        <p className='flex items-start gap-1.5 text-xs text-semantic-success'>
-          <CircleCheck size={14} className='mt-0.5 shrink-0' />
-          <span>已帶入：{appliedLabels.join('、')}</span>
         </p>
       )}
       {(status === 'error' || (status === 'done' && message)) && (

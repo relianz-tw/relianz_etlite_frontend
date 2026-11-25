@@ -111,8 +111,6 @@ export interface InitializationState {
   fieldLocations: Record<ReportKey, Record<string, FieldLocation>>;
   /** 每張表辨識自哪份原件、在哪幾頁：key 為頁面 key；對照面板只顯示該表自己的頁，不顯示整份原件 */
   formSources: Record<ReportKey, FormSource>;
-  /** 每份原件（key = fileId）辨識後帶入了哪些文件，畫面上「已帶入：…」一直顯示用 */
-  sourceLabels: Record<string, string[]>;
 
   // 步驟 3：公司基本資料，供確認頁與送出 API 使用。封面欄位全部依 metadata 存於 reports.CIT_COVER，
   // 按「下一步」時由 Step3Cover 把對應欄位整理進來（見 COVER_TO_COMPANY）
@@ -172,7 +170,6 @@ export const initialState: InitializationState = {
   yearResetPending: false,
   fieldLocations: {},
   formSources: {},
-  sourceLabels: {},
   simulatedDate: null,
 
   company: {
@@ -249,8 +246,7 @@ export type InitializationAction =
     }
   /** 丟入新一份原件辨識前，先清掉所有欄位的 AI 閃電標記（值不動），之後只有這次辨識帶入的欄位會重新被標記 */
   | { type: 'CLEAR_AI_FLAGS' }
-  | { type: 'SET_SOURCE_LABELS'; payload: { sourceId: string; labels: string[] } }
-  /** 原件被刪除：移除它的「已帶入」說明與所有指向它的欄位位置（欄位值不動） */
+  /** 原件被刪除：移除它的來源記錄與所有指向它的欄位位置（欄位值不動） */
   | { type: 'FORGET_SOURCE'; payload: { sourceId: string } }
   | { type: 'ADD_REPORT_ROW'; payload: { reportId: ReportKey; columns: ReportFieldDef[]; /** 插在這個位置（不給＝加在最後） */ at?: number } }
   | { type: 'REMOVE_REPORT_ROW'; payload: { reportId: ReportKey; index: number } }
@@ -531,17 +527,13 @@ export function initializationReducer(state: InitializationState, action: Initia
       return { ...state, reports };
     }
 
-    case 'SET_SOURCE_LABELS':
-      return { ...state, sourceLabels: { ...state.sourceLabels, [action.payload.sourceId]: action.payload.labels } };
-
     case 'FORGET_SOURCE': {
       const { sourceId } = action.payload;
-      const { [sourceId]: _removed, ...sourceLabels } = state.sourceLabels;
       const fieldLocations = Object.fromEntries(
         Object.entries(state.fieldLocations).map(([reportId, byField]) => [reportId, Object.fromEntries(Object.entries(byField).filter(([, loc]) => loc.sourceId !== sourceId))])
       );
       const formSources = Object.fromEntries(Object.entries(state.formSources).filter(([, src]) => src.sourceId !== sourceId));
-      return { ...state, sourceLabels, fieldLocations, formSources };
+      return { ...state, fieldLocations, formSources };
     }
 
     case 'ADD_REPORT_ROW': {

@@ -28,6 +28,16 @@ const COMPARE_KINDS: ReportSectionItem['kind'][] = ['amountRows', 'table'];
 /** 段落模板內有 {{field:}}（輸入框）或 {{group:}}（勾選框）才算有要填的內容 */
 const HAS_INPUT_TOKEN = /\{\{(field|group):/;
 
+/**
+ * 內嵌輸入框實高 40px，比正文行高還高，模板折成多行時上下兩排會黏在一起，
+ * 所以含輸入框／勾選框的段落與標籤改用 52px 行高（上下各留 6px）；純文字維持原行高，不讓整張表變鬆。
+ */
+const INLINE_INPUT_LEADING = 'leading-[3.25rem]';
+
+function templateLeading(template: string | undefined, base: string): string {
+  return template && HAS_INPUT_TOKEN.test(template) ? INLINE_INPUT_LEADING : base;
+}
+
 function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
   if (store.renderValue && !COMPARE_KINDS.includes(item.kind)) return false;
   switch (item.kind) {
@@ -93,7 +103,7 @@ function AmountRows({ rows }: { rows: ReportRowDef[] }) {
           >
             <div className='flex min-w-0 items-center gap-2'>
               {hasChip && <CodeChip official={main.officialCode} refNo={main.refNo} placeholder />}
-              <div className='min-w-0 break-words text-sm font-medium leading-7 text-neutral-dark'>
+              <div className={cn('min-w-0 break-words text-sm font-medium text-neutral-dark', templateLeading(main.labelTemplate, 'leading-7'))}>
                 {/* 減項標籤本身沒有「減：」時（紙本縮排在「減：」那列底下的子項），前面補「減：」 */}
                 {main.isDeduction && !main.label.startsWith('減') && '減：'}
                 {main.labelTemplate ? <TemplateText template={main.labelTemplate} /> : main.label}
@@ -180,7 +190,7 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
           {item.fields.filter(f => isFieldShown(f, store)).map(f =>
             // 勾選項文字內嵌輸入框（如「…利息支出合計數 ___ 元」）：勾選框後接模板文字
             f.labelTemplate ? (
-              <label key={f.key} className='flex w-full items-center gap-2 text-sm leading-9 text-neutral-dark'>
+              <label key={f.key} className={cn('flex w-full items-center gap-2 text-sm text-neutral-dark', templateLeading(f.labelTemplate, 'leading-9'))}>
                 <CodeChip official={f.officialCode} refNo={f.refNo} />
                 <Checkbox checked={Number(store.get(f.key).value) === 1} onChange={() => store.set(f.key, Number(store.get(f.key).value) === 1 ? 0 : 1)} aria-label={f.label} />
                 <span className='min-w-0'>
@@ -208,7 +218,7 @@ function renderItem(item: ReportSectionItem, index: number, store: PaperStore): 
     case 'text':
       return (
         // 一般行內排版（不用 flex），長文字接著輸入框才會同一行折行，不會把輸入框擠到下一排
-        <p key={index} className='text-sm leading-9 text-neutral-dark'>
+        <p key={index} className={cn('text-sm text-neutral-dark', templateLeading(item.block.template, 'leading-9'))}>
           {item.block.officialCode && <CodeChip official={item.block.officialCode} className='mr-1 align-middle' />}
           <TemplateText template={item.block.template} />
         </p>

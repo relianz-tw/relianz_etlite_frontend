@@ -2,12 +2,13 @@
 
 import { useInitialization } from '../../state/InitializationContext';
 import { useFormMetadata } from '../../hooks/useFormMetadata';
-import { ORG_TYPE_LABEL, getCurrentOpenYear, getDefaultFormYear, getFormItem, getPageLabel, isPageFilled, resolveReportPage, resolveToday } from '../../reports';
+import { ORG_TYPE_LABEL, findFormInMessage, formTitleOf, getCurrentOpenYear, getDefaultFormYear, getFormItem, getPageLabel, isPageFilled, resolveReportPage, resolveToday } from '../../reports';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
 import { confirmCit, saveOpeningDate } from '@/api/peit';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
+import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { fmtCurrency, formatYyyymmddRoc, toRocYyyMmDd } from '@/lib/utils';
@@ -15,9 +16,16 @@ import { TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+/** 確認開帳失敗時要顯示的內容；formCode 對得到時附「回去修正」直接跳到該份文件 */
+interface ConfirmError {
+  message: string;
+  formCode?: string;
+}
+
 export function Step5Confirm() {
   const { state, dispatch } = useInitialization();
   const [submitting, setSubmitting] = useState(false);
+  const [confirmError, setConfirmError] = useState<ConfirmError | null>(null);
   const balanceSheetFields = state.reports.CIT_BALANCE_SHEET.fields;
   const totalAssets = Number(balanceSheetFields.BS_1000?.value) || 0; // 資產總計
   const totalLiabilitiesAndEquity = Number(balanceSheetFields.BS_9000?.value) || 0; // 負債及權益總計
@@ -36,17 +44,36 @@ export function Step5Confirm() {
       )
     : [];
 
+  // 儲存失敗的那份文件在逐頁清單的位置（營所稅頁的 key 就是 formCode）；對不到就不給跳轉按鈕
+  const errorPageIndex = confirmError?.formCode ? state.reportPages.findIndex(p => p.key === confirmError.formCode) : -1;
+
   // 組織型態由步驟 2 決定
   const orgTypeLabel = state.orgType ? ORG_TYPE_LABEL[state.orgType] : '';
 
   const handleConfirm = async () => {
     // 逐頁核對的資料先寫入後端；失敗就擋在這一步，避免使用者以為已存但實際沒存
     setSubmitting(true);
+    setConfirmError(null);
     try {
       const forms = await buildConfirmForms(state);
-      if (forms.length > 0) await confirmCit(forms);
+      if (forms.length > 0) {
+        const result = await confirmCit(forms);
+        // 前端只送有資料的表、present 一律 true，後端還是略過代表那份資料真的有問題（缺年、缺期），不默默帶過
+        const skipped = result.forms.filter(f => f.skipped);
+        if (skipped.length > 0) {
+          setConfirmError({
+            message: `以下 ${skipped.length} 份文件沒有寫入：${skipped.map(f => `${formTitleOf(f.formCode)}（${f.skipReason ?? '原因不明'}）`).join('、')}`,
+            formCode: skipped[0].formCode,
+          });
+          setSubmitting(false);
+          return;
+        }
+        toast.success(`已儲存 ${result.writtenFormCount} 份文件`);
+      }
     } catch (error) {
-      toast.error(getFriendlyErrorMessage(error, '開帳資料儲存失敗，請稍後再試'));
+      // 後端把驗證與跨表不符的原文放在 message，可直接給使用者看（如「財產目錄未折減餘額總計與資產負債表 1400 欄不符」）
+      const message = getFriendlyErrorMessage(error, '開帳資料儲存失敗，請稍後再試');
+      setConfirmError({ message, formCode: findFormInMessage(message) ?? undefined });
       setSubmitting(false);
       return;
     }
@@ -101,6 +128,25 @@ export function Step5Confirm() {
       </StepPageHeader>
 
       <>
+        {confirmError && (
+          <div role='alert' className='flex flex-col gap-3 rounded-md border border-semantic-error bg-semantic-error/10 p-4 nav:flex-row nav:items-center'>
+            <TriangleAlert size={20} className='shrink-0 text-semantic-error' />
+            <div className='flex min-w-0 flex-col gap-1'>
+              <span className='text-sm font-bold text-semantic-error'>開帳資料儲存失敗</span>
+              <span className='text-[13px] leading-relaxed text-neutral-dark'>{confirmError.message}</span>
+            </div>
+            {errorPageIndex >= 0 && (
+              <Button
+                size='sm'
+                className='shrink-0 nav:ml-auto'
+                onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 6, reportIndex: errorPageIndex } })}
+              >
+                回去修正「{formTitleOf(confirmError.formCode!)}」
+              </Button>
+            )}
+          </div>
+        )}
+
         {missingPages.length > 0 && (
           <div className='flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3 text-semantic-warm-dark'>
             <TriangleAlert size={16} className='mt-0.5 shrink-0' />

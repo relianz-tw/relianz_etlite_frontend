@@ -56,18 +56,19 @@ export function ReferenceLayout({ reportKey, file, hasReference, children }: { r
 
   return (
     <div className='flex items-start gap-4 nav:gap-5'>
-      <div className='flex min-w-0 flex-1 flex-col gap-4 nav:gap-5'>
-        {/* 收合後把展開按鈕放回表單最上方靠右，不要浮在版面外側；手機不提供對照面板 */}
-        {hasReference && !open && (
-          <div className='hidden justify-end nav:flex'>
-            <Button variant='outline' size='sm' icon={PanelRightOpen} onClick={() => toggleOpen(true)}>
-              對照原件
-            </Button>
-          </div>
-        )}
-        {children}
-      </div>
+      <div className='flex min-w-0 flex-1 flex-col gap-4 nav:gap-5'>{children}</div>
       {expanded && <ReferencePanel reportKey={reportKey} file={file} />}
+      {/* 收合時的展開鈕浮在畫面右緣、垂直置中，長表單捲到哪都點得到；手機不提供對照面板 */}
+      {hasReference && !open && (
+        <button
+          type='button'
+          onClick={() => toggleOpen(true)}
+          className='fixed right-0 top-1/2 z-30 hidden w-11 -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-neutral-blue-gray/30 bg-white py-4 text-sm font-medium text-brand-blue shadow-level1 transition-colors hover:bg-brand-blue/5 nav:flex'
+        >
+          <PanelRightOpen size={16} />
+          <span className='[writing-mode:vertical-rl]'>對照原件</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -129,7 +130,7 @@ function ReferencePanel({ reportKey, file }: { reportKey: string; file?: File })
         file={sourceFile}
         pages={backendImage ? undefined : formSource?.pages}
         bbox={bbox}
-        onPageNavigate={() => setFocusedField(null)}
+        onLeaveFocus={() => setFocusedField(null)}
         action={<Button variant='ghost' size='sm' icon={PanelRightClose} aria-label='收合對照' onClick={() => toggleOpen(false)} />}
       />
     </aside>

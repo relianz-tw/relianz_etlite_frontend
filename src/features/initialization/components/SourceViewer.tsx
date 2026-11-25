@@ -84,14 +84,14 @@ interface SourceViewerProps {
   bbox: FieldBBox | null;
   /** 工具列右側的額外按鈕（目前是收合對照面板） */
   action?: ReactNode;
-  /** 使用者手動翻頁時通知（呼叫端可清掉聚焦欄位，避免又被座標拉回去） */
-  onPageNavigate?: () => void;
+  /** 使用者主動離開目前聚焦的欄位時通知（手動翻頁、點紅框以外的圖片區域），呼叫端可清掉聚焦欄位，避免又被座標拉回去 */
+  onLeaveFocus?: () => void;
   /** 沒有檔案時的提示文字 */
   emptyText?: string;
 }
 
 /** 原件圖片檢視器：翻頁、依座標放大並捲到目標、疊上紅框。對照面板與座標測試頁共用 */
-export function SourceViewer({ file, pages, bbox, onPageNavigate, action, emptyText = '上傳申報書檔案後，可在這裡對照原件' }: SourceViewerProps) {
+export function SourceViewer({ file, pages, bbox, onLeaveFocus, action, emptyText = '上傳申報書檔案後，可在這裡對照原件' }: SourceViewerProps) {
   const { images, status } = useSourceImages(file);
   // 要顯示的頁（原件的頁碼，從 1 起）；後端沒回頁碼、或頁碼都超出實際頁數時退回整份原件
   const validPages = (pages ?? []).filter(n => n >= 1 && n <= images.length);
@@ -193,8 +193,16 @@ export function SourceViewer({ file, pages, bbox, onPageNavigate, action, emptyT
 
   const goToIndex = (next: number) => {
     // 手動翻頁後不再鎖定在欄位座標的頁
-    onPageNavigate?.();
+    onLeaveFocus?.();
     setManualIndex(clamp(next, 0, pageCount - 1));
+  };
+
+  // 點紅框以外的圖片區域：清掉聚焦欄位與手動倍率，圖片回到原比例、捲回最上方
+  // （紅框疊在圖片上且是它的兄弟節點，點框本身不會進到這裡）
+  const leaveFocus = () => {
+    if (!activeBox && manualScale === null) return;
+    setManual(null);
+    onLeaveFocus?.();
   };
 
   if (pageCount === 0) {
@@ -238,8 +246,9 @@ export function SourceViewer({ file, pages, bbox, onPageNavigate, action, emptyT
             <img
               src={urls[page - 1]}
               alt={`原件第 ${page} 頁`}
-              className='block h-auto w-full select-none'
+              className={`block h-auto w-full select-none ${activeBox ? 'cursor-zoom-out' : ''}`}
               draggable={false}
+              onClick={leaveFocus}
               onLoad={e => setRatio(e.currentTarget.naturalHeight / e.currentTarget.naturalWidth)}
             />
           )}

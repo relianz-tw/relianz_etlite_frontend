@@ -28,8 +28,6 @@ interface StepPageHeaderProps {
   progress?: StepProgressValue;
   /** 緊貼標題右側的動作（如查看範例文件） */
   titleAction?: ReactNode;
-  /** 與標題同一排、靠右的內容（如上傳辨識）；手機堆在標題下方 */
-  aside?: ReactNode;
   /** 卡片下半部內容（上傳辨識區等），與標題同屬一塊 */
   children?: ReactNode;
 }
@@ -61,12 +59,12 @@ function useActionBarHeight(active: boolean) {
   return ref;
 }
 
-export function StepPageHeader({ kicker, title, badges, nav, progress, titleAction, aside, children }: StepPageHeaderProps) {
+export function StepPageHeader({ kicker, title, badges, nav, progress, titleAction, children }: StepPageHeaderProps) {
   const barRef = useActionBarHeight(Boolean(nav));
   return (
     <>
       <SectionCard className='gap-5 nav:p-6'>
-        <div className='flex flex-col gap-3 nav:flex-row nav:items-start nav:justify-between nav:gap-4'>
+        <div className='flex flex-col gap-3'>
           <div className='flex min-w-0 flex-col gap-1.5'>
             {kicker && <span className='text-xs font-semibold text-brand-blue'>{kicker}</span>}
             {/* 報表名稱含頓號等標點，用序體排版可能出現字重/標點對不齊的問題，改用正文黑體 */}
@@ -84,7 +82,6 @@ export function StepPageHeader({ kicker, title, badges, nav, progress, titleActi
               </div>
             )}
           </div>
-          {aside}
         </div>
         {children}
       </SectionCard>

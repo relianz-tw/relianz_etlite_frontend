@@ -4,14 +4,12 @@ import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
 import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
-import { FormIdentifyPanel } from './FormIdentifyPanel';
 import { FormPaperPreview } from './FormPaperPreview';
 import { ReferenceLayout } from './ReferencePanel';
 import { useReference } from '../reference/ReferenceContext';
 import { formatPageRange } from '../reference/pageRange';
 import { PAPER_PREVIEWS } from '../reports/paperPreviews';
-import { SourceFileList } from './SourceFileList';
-import { UploadedFilePreview } from './UploadedFilePreview';
+import { SourceUploadSection } from './SourceUploadSection';
 import { BalanceSheetView } from './BalanceSheetView';
 import { PaperForm } from './paper/PaperForm';
 import { PaperStoreProvider } from './paper/PaperStore';
@@ -162,7 +160,6 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
             <FormPaperPreview formCode={formCode} />
           </>
         }
-        aside={showIdentify && <FormIdentifyPanel required={spec.required} vatPeriod={!!spec.period} pageKey={spec.key} />}
       >
         {spec.period && (
           // 申報書種類二選一：預設 401，該期有免稅銷售額改用 403（上傳辨識到另一種也會自動切換）
@@ -182,9 +179,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
           </div>
         )}
         {spec.period && <VatPeriodPicker />}
-        {spec.period && vatUploads[spec.key] && <UploadedFilePreview file={vatUploads[spec.key]} />}
-        {/* 營所稅的上傳檔案是整份共用（一份 PDF 含多張表），每個營所稅頁都列出同一組，只有手動刪除才移除 */}
-        {!spec.period && <SourceFileList />}
+        {/* 上傳區與已上傳檔案是同一塊：沒檔案畫虛線上傳框，有檔案改以檔案列為主、旁邊留「新增檔案」，底下接文件備齊清單 */}
+        {showIdentify && <SourceUploadSection pageKey={spec.key} required={spec.required} vatPeriod={!!spec.period} />}
         {/* 封面頁不是可略過的文件，只在步驟 4 的選填頁提示 */}
         {!spec.required && spec.key !== 'CIT_COVER' && (
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
