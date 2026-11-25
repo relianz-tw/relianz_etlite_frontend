@@ -185,6 +185,10 @@ export function Step2Operating() {
             <StepBadge n={1} done={hasOrgType} />
             <h2 className='text-lg font-bold text-neutral-dark'>請選擇組織型態</h2>
           </div>
+          {/* 預選過的要提醒使用者確認：這裡選錯會靜默改掉後面的報表計畫，而且預選讓這一題看起來已經完成 */}
+          {state.orgTypeAuto && hasOrgType && (
+            <p className='text-[13px] text-neutral-mid'>已依公司名稱與上傳的文件預選，請確認是否正確；獨資或合夥無法從名稱判斷，請自行選擇。</p>
+          )}
           <div role='radiogroup' aria-label='組織型態' className='grid grid-cols-1 gap-3 nav:grid-cols-2'>
             {ORG_OPTIONS.map(option => {
               const selected = state.orgType === option.value;

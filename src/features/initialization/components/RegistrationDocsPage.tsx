@@ -3,24 +3,35 @@
 import { useRef, type ReactNode } from 'react';
 import { useInitialization } from '../state/InitializationContext';
 import { useRegistrationIdentify } from '../hooks/useRegistrationIdentify';
-import { ALL_REGISTRATION_DOCS } from '../reports/registrationDocs';
+import { PARTNERSHIP_AGREEMENT_CODE, classifyEntity, inferOrgType, registrationDocsFor } from '../reports/registrationDocs';
 import { COMPANY_REGISTRATION_KEY, IDENTIFY_MAX_SIZE_MB, hasRegistrationData } from '../reports';
+import { RegistrationMismatchDialog } from './RegistrationMismatchDialog';
 import { RegistrationSummaryCard } from './RegistrationSummaryCard';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
-import { CircleCheck, FileText, Loader2, TriangleAlert, Upload, X } from 'lucide-react';
+import { CircleCheck, FileText, Loader2, Trash2, TriangleAlert, Upload } from 'lucide-react';
 
 /** 與辨識 API 的上限一致（IDENTIFY_MAX_SIZE_MB），登記事項表才不會傳得進來卻辨識不了 */
 const MAX_SIZE_MB = IDENTIFY_MAX_SIZE_MB;
 
-/** 登記文件上傳頁（合約後第一步）：每項可上傳 PDF 或圖片。TODO：後端上傳 API 上線後改為實際上傳，目前只記錄檔名 */
+const KIND_LABEL = { company: '公司', business: '商號' } as const;
+
+/** 登記文件上傳頁（付款資料的下一步）：每項可上傳 PDF 或圖片。TODO：後端上傳 API 上線後改為實際上傳，目前只記錄檔名 */
 export function RegistrationDocsPage() {
   const { state, dispatch } = useInitialization();
   const identify = useRegistrationIdentify();
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel: '下一頁' };
   const recognizing = identify.status === 'recognizing';
+
+  // 公司或商號由付款資料的公司名稱判斷；判斷不出來就列全部
+  const kind = classifyEntity(state.payment.companyName);
+  const docs = registrationDocsFor(kind, state.registrationFiles);
   const showSummary = !!state.registrationFiles.REGISTRATION_ITEMS && hasRegistrationData(state.reports);
+
+  /** 合夥契約有沒有上傳會改變商號的組織型態預選（公司名稱判得出公司時，推論結果與它無關） */
+  const inferFromFiles = (hasPartnershipAgreement: boolean) =>
+    dispatch({ type: 'INFER_ORG_TYPE', payload: inferOrgType(state.payment.companyName, hasPartnershipAgreement) });
 
   return (
     <>
@@ -29,10 +40,15 @@ export function RegistrationDocsPage() {
           請上傳您有的最新登記文件，供事務所核對公司（行號）資料。檔案格式 PDF 或圖片，{MAX_SIZE_MB}MB 以內。
           其中「最新設立或變更登記事項表」上傳後會自動辨識，公司資料與董監事名單會帶入後面的頁面。
         </p>
+        {kind && (
+          <p className='text-xs text-neutral-mid'>
+            目前依「{state.payment.companyName}」列出{KIND_LABEL[kind]}需要的文件；公司資料有誤請回上一頁修改。
+          </p>
+        )}
       </StepPageHeader>
       <SectionCard>
         <div className='flex flex-col divide-y divide-neutral-blue-gray/30'>
-          {ALL_REGISTRATION_DOCS.map(doc => (
+          {docs.map(doc => (
             <DocRow
               key={doc.code}
               title={doc.title}
@@ -41,11 +57,13 @@ export function RegistrationDocsPage() {
               onPick={file => {
                 dispatch({ type: 'SET_REGISTRATION_FILE', payload: { docType: doc.code, fileName: file.name } });
                 if (doc.identifiable) identify.run(file);
+                if (doc.code === PARTNERSHIP_AGREEMENT_CODE) inferFromFiles(true);
               }}
               onClear={() => {
                 dispatch({ type: 'SET_REGISTRATION_FILE', payload: { docType: doc.code, fileName: null } });
                 // 連同辨識結果一併丟棄，卡片才不會留著一份沒有來源的資料；已帶到後面頁面的值不回收
                 if (doc.identifiable) dispatch({ type: 'CLEAR_REPORT', payload: { reportId: COMPANY_REGISTRATION_KEY } });
+                if (doc.code === PARTNERSHIP_AGREEMENT_CODE) inferFromFiles(false);
               }}
               extra={
                 doc.identifiable && (
@@ -64,6 +82,8 @@ export function RegistrationDocsPage() {
           ))}
         </div>
       </SectionCard>
+
+      <RegistrationMismatchDialog mismatch={identify.mismatch} onResolve={identify.resolveMismatch} />
     </>
   );
 }
@@ -99,8 +119,8 @@ function DocRow({ title, fileName, recognizing, onPick, onClear, extra }: DocRow
         </div>
         <div className='flex shrink-0 gap-2'>
           {fileName && (
-            <Button variant='ghost' size='sm' icon={X} disabled={recognizing} onClick={onClear} className='min-h-11 nav:min-h-0'>
-              移除
+            <Button variant='ghost' size='sm' icon={Trash2} disabled={recognizing} onClick={onClear} className='min-h-11 nav:min-h-0'>
+              刪除
             </Button>
           )}
           <Button variant='outline' size='sm' icon={Upload} disabled={recognizing} onClick={() => inputRef.current?.click()} className='min-h-11 nav:min-h-0'>

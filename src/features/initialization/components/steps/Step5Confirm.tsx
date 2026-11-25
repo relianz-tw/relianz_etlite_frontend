@@ -1,6 +1,7 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
+import { STEP } from '../../state/initializationReducer';
 import { useFormMetadata } from '../../hooks/useFormMetadata';
 import { ORG_TYPE_LABEL, findFormInMessage, formTitleOf, getCurrentOpenYear, getDefaultFormYear, getFormItem, getPageLabel, isPageFilled, resolveReportPage, resolveToday } from '../../reports';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
@@ -139,7 +140,7 @@ export function Step5Confirm() {
               <Button
                 size='sm'
                 className='shrink-0 nav:ml-auto'
-                onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 6, reportIndex: errorPageIndex } })}
+                onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: STEP.REPORTS, reportIndex: errorPageIndex } })}
               >
                 回去修正「{formTitleOf(confirmError.formCode!)}」
               </Button>
@@ -158,7 +159,7 @@ export function Step5Confirm() {
                   <li key={page.index}>
                     <button
                       type='button'
-                      onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 6, reportIndex: page.index } })}
+                      onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: STEP.REPORTS, reportIndex: page.index } })}
                       className='font-medium text-brand-blue underline-offset-2 hover:underline'
                     >
                       {page.label}

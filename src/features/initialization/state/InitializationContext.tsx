@@ -1,9 +1,12 @@
 'use client';
 
 import {
+  FLOW_VERSION,
   getNextStep,
   initialState,
   initializationReducer,
+  isStaleFlow,
+  restoredStep,
   type InitializationAction,
   type InitializationState,
 } from './initializationReducer';
@@ -20,6 +23,7 @@ import {
   deleteDraftFile,
   downloadDraftFile,
   DRAFT_CONFLICT_CODE,
+  isOverwriteAsk,
   getDraft,
   listDraftFiles,
   saveDraft,
@@ -32,11 +36,13 @@ import { blobToFile } from '@/lib/blobToFile';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { toast } from 'sonner';
 import { DraftConflictDialog } from '../components/DraftConflictDialog';
+import { formatDraftDateTime } from '../components/draftTime';
 import { toVatPeriodKey } from '../reports/vatPeriodKey';
 
 // storage key 加上 etlite_ 前綴，理由同 onboarding（見 features/onboarding/state/OnboardingContext.tsx）：
 // 瀏覽器 storage 以 origin 為界、不分 basePath，避免與姊妹專案同名 key 互相覆寫
-// 步驟編號改版（登記文件前移）後換版號，舊 session 的 step 數字已對不上
+// 步驟編號改版不再換版號：換 key 等於連本機還沒存上雲端的修改一起丟掉，而雲端草稿本來就擋不到。
+// 改由 state.flowVersion 處理（見 reducer 的 isStaleFlow）——資料全留，只有步驟位置退回重走
 const SESSION_KEY = 'etlite_initialization_state_v2';
 /** 這個分頁最後一次和雲端草稿同步到的版本；重新整理後用來判斷雲端是不是被別的裝置更新過 */
 const DRAFT_VERSION_KEY = 'etlite_initialization_draft_version';
@@ -48,14 +54,16 @@ interface HistoryStepState {
   reportIndex: number;
   /** 流程最底下的守門 entry：瀏覽器返回退到這裡代表使用者要離開開帳頁（見下方 popstate 處理） */
   base?: boolean;
+  /** 寫入當下的 FLOW_VERSION；對不上代表是改版前留下的 entry，步驟號不可信（見 popstate） */
+  v?: number;
 }
 
 /** 自動儲存的檢查間隔：內容有變動才會真的儲存 */
 const AUTOSAVE_INTERVAL_MS = 30_000;
 
-/** 步驟 2–7 正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
+/** 步驟 2–8 正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
 export function isFillingStep(step: number): boolean {
-  return step >= 2 && step <= 7;
+  return step >= 2 && step <= 8;
 }
 
 interface InitializationContextValue {
@@ -123,6 +131,10 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const [conflict, setConflict] = useState<DraftConflictData | null>(null);
   const conflictRef = useRef<DraftConflictData | null>(null);
   conflictRef.current = conflict;
+  // 後端的覆蓋確認：問過之後整個分頁都帶 overwrite；使用者按取消就先不再自動問，等他自己按「儲存」
+  const [overwriteAsk, setOverwriteAsk] = useState<DraftConflictData | null>(null);
+  const overwriteOkRef = useRef(false);
+  const overwriteAskedRef = useRef(false);
   // 目前與雲端同步到的版本（還沒存過為 0，之後每次儲存都要帶它當 baseVersion）
   const draftVersionRef = useRef(0);
   const savingRef = useRef(false);
@@ -142,7 +154,9 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     if (savingRef.current) return;
     savingRef.current = true;
     const snapshot = stateRef.current;
-    const save = (baseVersion: number) => saveDraft({ step: snapshot.currentStep, reportIndex: snapshot.currentReportIndex, state: snapshot, baseVersion });
+    // overwrite：這間公司已有草稿時後端預設不覆寫，會回 0003 問一次；使用者按過「覆蓋」之後整個分頁都帶 true，不再重複打擾
+    const save = (baseVersion: number) =>
+      saveDraft({ step: snapshot.currentStep, reportIndex: snapshot.currentReportIndex, state: snapshot, baseVersion, overwrite: overwriteOkRef.current });
     try {
       let record;
       try {
@@ -164,18 +178,38 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       setSaveError(false);
     } catch (error) {
       if (error instanceof ApiError && error.errorCode === DRAFT_CONFLICT_CODE && error.data) setConflict(error.data as DraftConflictData);
-      else setSaveError(true);
+      // 後端要求確認覆蓋：這不是失敗，是一個問題。使用者拒絕過就不再自動問，但畫面要顯示沒存成功
+      else if (error instanceof ApiError && isOverwriteAsk(error.errorCode, error.data) && !overwriteAskedRef.current) {
+        overwriteAskedRef.current = true;
+        setOverwriteAsk(error.data);
+      } else setSaveError(true);
     } finally {
       savingRef.current = false;
     }
   }, [recordVersion]);
+
+  /** 使用者同意覆蓋雲端那份草稿：之後的儲存都帶 overwrite，並立刻把剛才沒存成功的內容重送一次 */
+  const handleOverwriteConfirm = () => {
+    overwriteOkRef.current = true;
+    setOverwriteAsk(null);
+    saveDraftNow();
+  };
+
+  /** 不覆蓋：這次就是沒存成功，照實顯示；之後按「儲存」會再問一次 */
+  const handleOverwriteCancel = () => {
+    setOverwriteAsk(null);
+    overwriteAskedRef.current = false;
+    setSaveError(true);
+  };
 
   /** 用雲端草稿取代目前畫面：還原表單並跳到存檔時的步驟，瀏覽器歷史的目前這一筆也同步成該步驟 */
   const applyServerDraft = useCallback(
     (draft: DraftRecord) => {
       const restored = draft.state as InitializationState;
       rawDispatch({ type: 'RESTORE_STATE', payload: restored });
-      history.replaceState({ step: draft.step, reportIndex: draft.reportIndex } satisfies HistoryStepState, '');
+      // 改版前的草稿會被 RESTORE_STATE 退回流程起點，歷史要同步寫那一步，否則按返回又被丟回過期的步驟
+      const step = isStaleFlow(restored) ? restoredStep(restored) : draft.step;
+      history.replaceState({ step, reportIndex: isStaleFlow(restored) ? 0 : draft.reportIndex, v: FLOW_VERSION } satisfies HistoryStepState, '');
       recordVersion(draft.version);
       lastSavedJsonRef.current = JSON.stringify(restored);
       setSavedAt(Date.parse(draft.savedAt));
@@ -295,8 +329,8 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     historyInitialized.current = true;
     // 先把目前 entry 標為 base，再推入一個同步驟的 entry 作為實際操作位置：
     // 這樣從第一個步驟按瀏覽器返回時，會先落在我們自己的 base entry，才有機會攔下並詢問
-    history.replaceState({ step: state.currentStep, reportIndex: state.currentReportIndex, base: true } satisfies HistoryStepState, '');
-    history.pushState({ step: state.currentStep, reportIndex: state.currentReportIndex } satisfies HistoryStepState, '');
+    history.replaceState({ step: state.currentStep, reportIndex: state.currentReportIndex, base: true, v: FLOW_VERSION } satisfies HistoryStepState, '');
+    history.pushState({ step: state.currentStep, reportIndex: state.currentReportIndex, v: FLOW_VERSION } satisfies HistoryStepState, '');
   }, [mounted, state.currentStep, state.currentReportIndex]);
 
   // 監聽瀏覽器上一頁：用 GO_TO_STEP 跳回 history 記錄的步驟
@@ -312,7 +346,8 @@ export function InitializationProvider({ children }: { children: React.ReactNode
         else history.back(); // 沒有待保存內容，直接再退一步離開，不多按一次
         return;
       }
-      if (s && typeof s.step === 'number') {
+      // 改版前推進的 entry：那時的步驟號對應的是別的畫面，寧可留在原地也不要亂跳
+      if (s && typeof s.step === 'number' && s.v === FLOW_VERSION) {
         rawDispatch({ type: 'GO_TO_STEP', payload: { step: s.step, reportIndex: s.reportIndex ?? 0 } });
       }
     };
@@ -327,9 +362,9 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     let nextStep: HistoryStepState | null = null;
 
     if (action.type === 'NEXT_STEP') {
-      nextStep = getNextStep(stateRef.current);
+      nextStep = { ...getNextStep(stateRef.current), v: FLOW_VERSION };
     } else if (action.type === 'GO_TO_STEP') {
-      nextStep = { step: action.payload.step, reportIndex: action.payload.reportIndex ?? 0 };
+      nextStep = { step: action.payload.step, reportIndex: action.payload.reportIndex ?? 0, v: FLOW_VERSION };
     }
 
     if (nextStep) {
@@ -378,6 +413,15 @@ export function InitializationProvider({ children }: { children: React.ReactNode
         onLoadServer={handleConflictLoadServer}
         onOverwrite={handleConflictOverwrite}
         onClose={() => setConflict(null)}
+      />
+      <ConfirmDialog
+        open={overwriteAsk !== null}
+        onClose={handleOverwriteCancel}
+        onConfirm={handleOverwriteConfirm}
+        title='覆蓋雲端草稿'
+        message={`雲端已經有一份草稿（上次儲存 ${overwriteAsk ? formatDraftDateTime(overwriteAsk.savedAt) : ''}）。繼續儲存會以這個分頁的內容覆蓋它，雲端那份的內容不會保留。`}
+        confirmLabel='覆蓋'
+        cancelLabel='先不要'
       />
     </InitializationContext.Provider>
   );

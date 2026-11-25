@@ -19,7 +19,10 @@ import {
   withoutSharedFields,
 } from '../reports';
 import { toRowValues, toValueMap } from '../reports/identifiedValues';
+import { classifyEntity, inferOrgType } from '../reports/registrationDocs';
+import type { RegistrationMismatch } from '../components/RegistrationMismatchDialog';
 import { loadFormMetadata } from './useFormMetadata';
+import { toast } from 'sonner';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
 
@@ -35,6 +38,15 @@ export interface RegistrationIdentify {
   message: string;
   /** 辨識一份登記事項表並把結果帶進後面的頁面；非 PDF／圖片直接略過 */
   run: (file: File) => Promise<void>;
+  /** 辨識到的公司與付款資料不一致時的對照內容，沒有就是 null */
+  mismatch: RegistrationMismatch | null;
+  /** 使用者的選擇：改用文件上的資料，或保留目前的 */
+  resolveMismatch: (useDocument: boolean) => void;
+}
+
+/** 比對用：去掉所有空白再比，排版差異不算不吻合 */
+function squash(value: string | number | undefined): string {
+  return String(value ?? '').replace(/\s/g, '');
 }
 
 /**
@@ -46,6 +58,7 @@ export function useRegistrationIdentify(): RegistrationIdentify {
   const { state, dispatch } = useInitialization();
   const [status, setStatus] = useState<IdentifyStatus>('idle');
   const [message, setMessage] = useState('');
+  const [mismatch, setMismatch] = useState<RegistrationMismatch | null>(null);
 
   const run = async (originalFile: File) => {
     const isPdf = originalFile.type === 'application/pdf';
@@ -95,9 +108,18 @@ export function useRegistrationIdentify(): RegistrationIdentify {
         payload: { reportId: COMPANY_REGISTRATION_KEY, fields: withoutSharedFields(values), rows: officers },
       });
 
+      // 這三個都只補空白，不會蓋掉付款資料，所以不必等使用者決定、先帶入沒關係
       applyToCover(values, state, dispatch);
       applyToCompany(values, state, dispatch);
       applyToInvestors(officers, state, dispatch);
+
+      // 文件上的公司和系統登記的不是同一間時事後詢問；付款資料那一欄是空的就沒有基準，不比
+      const document = { taxId: String(values.HDR_TAX_ID ?? ''), companyName: String(values.NAME_ZH ?? '') };
+      const system = { taxId: state.payment.taxId, companyName: state.payment.companyName };
+      const differs =
+        (!!system.taxId && !!document.taxId && squash(system.taxId) !== squash(document.taxId)) ||
+        (!!system.companyName && !!document.companyName && squash(system.companyName) !== squash(document.companyName));
+      setMismatch(differs ? { system, document } : null);
 
       setStatus('idle');
       setMessage('');
@@ -107,7 +129,24 @@ export function useRegistrationIdentify(): RegistrationIdentify {
     }
   };
 
-  return { status, message, run };
+  /** 改用文件上的資料：付款資料與封面都以文件為準改寫（這裡是刻意覆蓋，不是只補空白） */
+  const resolveMismatch = (useDocument: boolean) => {
+    const current = mismatch;
+    setMismatch(null);
+    if (!useDocument || !current) return;
+    const { taxId, companyName } = current.document;
+    dispatch({ type: 'SET_PAYMENT_INFO', payload: { ...(taxId ? { taxId } : {}), ...(companyName ? { companyName } : {}) } });
+    if (taxId) dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: 'CIT_COVER', key: 'HDR_VAT_NO', value: taxId } });
+    if (companyName) dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: 'CIT_COVER', key: 'HDR_COMPANY_NAME', value: companyName } });
+    dispatch({ type: 'SET_COMPANY', payload: { ...(taxId ? { taxId } : {}), ...(companyName ? { name: companyName } : {}) } });
+    // 公司／商號的分類若跟著翻面，下方的文件清單會整組換掉，不講一聲使用者會以為畫面壞了
+    if (companyName && classifyEntity(companyName) !== classifyEntity(current.system.companyName)) {
+      dispatch({ type: 'INFER_ORG_TYPE', payload: inferOrgType(companyName, !!state.registrationFiles.PARTNERSHIP_AGREEMENT) });
+      toast('已依文件上的公司名稱調整需要上傳的文件清單');
+    }
+  };
+
+  return { status, message, run, mismatch, resolveMismatch };
 }
 
 type Dispatch = ReturnType<typeof useInitialization>['dispatch'];

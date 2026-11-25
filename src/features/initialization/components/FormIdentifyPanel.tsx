@@ -2,6 +2,7 @@
 
 import { useReference } from '../reference/ReferenceContext';
 import { useInitialization } from '../state/InitializationContext';
+import { STEP } from '../state/initializationReducer';
 import { FORM_LIST, buildRequiredDocs, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
 import { hasValue, sameValue, toLocations, toRowValues, toValueMap } from '../reports/identifiedValues';
 import { identifiedImageUrl, identifyCit, type IdentifiedForm } from '@/api/peit';
@@ -188,7 +189,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       const appliedCount = outcomes.filter(o => o.applied).length;
       // 401／403 實際帶入的是別一期時，跳到那一期，申報書種類（401／403）與帶入的資料才會顯示出來
       const targetIndex = outcomes.find(o => o.vatPageIndex !== undefined && o.vatPageIndex >= 0)?.vatPageIndex;
-      if (targetIndex !== undefined && targetIndex !== state.currentReportIndex) dispatch({ type: 'GO_TO_STEP', payload: { step: 4, reportIndex: targetIndex } });
+      if (targetIndex !== undefined && targetIndex !== state.currentReportIndex) dispatch({ type: 'GO_TO_STEP', payload: { step: STEP.REPORTS, reportIndex: targetIndex } });
       const notes = [
         ...outcomes.flatMap(o => (o.skipped ? [o.skipped] : [])),
         ...(failedForms.length > 0 ? [`${failedForms.length} 份文件辨識失敗，請手動輸入`] : []),
