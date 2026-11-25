@@ -21,6 +21,8 @@ export interface FormSource {
    * 後端若有轉正或透視校正，一定要顯示它而不是使用者上傳的原檔，否則框會偏。
    */
   imageUrl?: string;
+  /** 這份表是什麼時候辨識帶入的（ISO 8601），供匯入覆蓋確認視窗顯示「已有資料」的時間 */
+  importedAt?: string;
 }
 
 /** 組織型態：決定要備哪些文件（公司有股東名簿與未分配盈餘申報書，獨資合夥改填負責人／合夥人資料） */
@@ -254,6 +256,8 @@ export type InitializationAction =
 
   // 登記文件上傳頁、負責人頁
   | { type: 'SET_REGISTRATION_FILE'; payload: { docType: string; fileName: string | null } }
+  /** 整份文件的欄位與列全部清掉（如移除登記事項表檔案時一併丟棄它的辨識結果） */
+  | { type: 'CLEAR_REPORT'; payload: { reportId: ReportKey } }
   | { type: 'SET_PARTNERS'; payload: Partner[] }
 
   // 完成
@@ -347,7 +351,7 @@ function setReportField(
  * 各份文件都會出現的公司識別欄位（統編、公司名稱、負責人、地址、電話、稅籍編號）。
  * 刻意不含申報年度、期別等每份文件各自不同的 HDR_ 欄位。
  */
-const SHARED_FIELD_KEYS = new Set(['HDR_VAT_NO', 'HDR_COMPANY_NAME', 'HDR_OWNER_NAME', 'HDR_ADDRESS', 'HDR_PHONE', 'HDR_TAX_REG_NO']);
+export const SHARED_FIELD_KEYS = new Set(['HDR_VAT_NO', 'HDR_COMPANY_NAME', 'HDR_OWNER_NAME', 'HDR_ADDRESS', 'HDR_PHONE', 'HDR_TAX_REG_NO']);
 
 /**
  * 寫入欄位值；若是共用的公司識別欄位，同步帶入其他文件。
@@ -430,6 +434,12 @@ export function initializationReducer(state: InitializationState, action: Initia
     case 'SET_REGISTRATION_FILE': {
       const { [action.payload.docType]: _removed, ...rest } = state.registrationFiles;
       return { ...state, registrationFiles: action.payload.fileName ? { ...rest, [action.payload.docType]: action.payload.fileName } : rest };
+    }
+
+    case 'CLEAR_REPORT': {
+      // 已經同步到其他文件（共用的公司識別欄位）或 state.company 的值不回收，使用者可能已經改過
+      const { [action.payload.reportId]: _cleared, ...reports } = state.reports;
+      return { ...state, reports };
     }
 
     case 'SET_PARTNERS':

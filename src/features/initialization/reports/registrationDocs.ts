@@ -4,9 +4,12 @@ export interface RegistrationDoc {
   /** 文件類型代碼（後端上傳 API 上線後作為 docType） */
   code: string;
   title: string;
+  /** 上傳後會跑欄位辨識並把資料帶往後面的頁面；目前只有登記事項表（formNo 14）有 */
+  identifiable?: boolean;
 }
 
 const APPROVAL_LETTER: RegistrationDoc = { code: 'APPROVAL_LETTER', title: '最新設立或變更核准函' };
+const REGISTRATION_ITEMS: RegistrationDoc = { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表', identifiable: true };
 const INVOICE_PERMIT: RegistrationDoc = { code: 'INVOICE_PERMIT', title: '最新統一發票購票證或國稅局核准公文' };
 
 /** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表、章程與股東名簿；行號看商業抄本，合夥另加合夥契約） */
@@ -19,7 +22,7 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
     default:
       return [
         APPROVAL_LETTER,
-        { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表' },
+        REGISTRATION_ITEMS,
         { code: 'ARTICLES', title: '最新公司章程' },
         INVOICE_PERMIT,
         // 股東名簿不逐頁核對，公司（不論營運是否滿一年）一律上傳檔案
@@ -34,7 +37,7 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
  */
 export const ALL_REGISTRATION_DOCS: RegistrationDoc[] = [
   APPROVAL_LETTER,
-  { code: 'REGISTRATION_ITEMS', title: '最新設立或變更登記事項表' },
+  REGISTRATION_ITEMS,
   { code: 'ARTICLES', title: '最新公司章程' },
   { code: 'SHAREHOLDER_LIST', title: '股東名簿' },
   { code: 'BUSINESS_TRANSCRIPT', title: '最新設立或變更商業抄本' },
