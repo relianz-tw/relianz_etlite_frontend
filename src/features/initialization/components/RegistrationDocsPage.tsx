@@ -45,6 +45,10 @@ export function RegistrationDocsPage() {
             目前依「{state.payment.companyName}」列出{KIND_LABEL[kind]}需要的文件；公司資料有誤請回上一頁修改。
           </p>
         )}
+        {/* 獨資與合夥的名稱分不出來，唯一的判準就是這份契約，而後面已經沒有別的地方可以改組織型態了 */}
+        {kind === 'business' && (
+          <p className='text-xs text-semantic-warm-dark'>合夥請務必上傳「最新合夥契約」，系統依此判定為合夥商號；沒有上傳一律視為獨資商號。</p>
+        )}
       </StepPageHeader>
       <SectionCard>
         <div className='flex flex-col divide-y divide-neutral-blue-gray/30'>
