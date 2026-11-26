@@ -1,6 +1,7 @@
 'use client';
 
 import { useInitialization } from '../state/InitializationContext';
+import { STEP } from '../state/initializationReducer';
 import { isPageFilled, resolveReportPage } from '../reports';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
@@ -26,7 +27,7 @@ export function VatPeriodPicker() {
             key={spec.key}
             type='button'
             aria-pressed={active}
-            onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 4, reportIndex: index } })}
+            onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: STEP.REPORTS, reportIndex: index } })}
             className={cn(
               'flex min-h-[72px] flex-col items-start gap-1 rounded-lg border-2 bg-white px-3 py-2 text-left nav:min-h-[88px] nav:gap-1.5 nav:py-3 transition-colors nav:px-4',
               active ? 'border-brand-primary' : 'border-neutral-blue-gray/30 hover:border-neutral-blue-gray'

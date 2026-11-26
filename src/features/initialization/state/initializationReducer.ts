@@ -77,9 +77,30 @@ export interface ReportData {
   rows: ReportRow[];
 }
 
+/**
+ * 畫面流程的版本號。步驟編號是存進草稿的，流程一改舊草稿的數字就對不上畫面，
+ * 所以每次調整步驟順序都要加一，RESTORE_STATE 會據此把對不上的草稿退回第一步（資料保留）。
+ */
+export const FLOW_VERSION = 3;
+
+/**
+ * 這份草稿是不是改版前存的（沒有這個欄位的舊草稿也算）。步驟編號對不上現在的畫面，位置不能信。
+ * 還原時要退到哪一步見 RESTORE_STATE；寫瀏覽器歷史的地方也要問一次，否則按返回會跳回過期的步驟。
+ */
+export function isStaleFlow(state: Pick<InitializationState, 'flowVersion'>): boolean {
+  return state.flowVersion !== FLOW_VERSION;
+}
+
+/** 改版前的草稿還原後要落在哪一步 */
+export function restoredStep(state: Pick<InitializationState, 'termsAgreed'>): number {
+  return state.termsAgreed ? STEP.PAYMENT : STEP.TERMS;
+}
+
 export interface InitializationState {
+  /** 這份草稿是用哪一版流程存的，見 FLOW_VERSION */
+  flowVersion: number;
   currentStep: number;
-  /** 步驟 6（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
+  /** 步驟 7（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
   currentReportIndex: number;
 
   /**
@@ -91,9 +112,24 @@ export interface InitializationState {
   // 步驟 1
   termsAgreed: boolean;
 
-  // 步驟 2
+  /**
+   * 步驟 2：正式流程中由付款環節帶進來的公司資料，目前由測試用的付款資料頁手動輸入。
+   * 這是「系統登記資料」的定本：辨識流程不會覆寫它，登記事項表比對不吻合時以它為一方。
+   */
+  payment: {
+    taxId: string;
+    companyName: string;
+    representative: string;
+    address: string;
+    email: string;
+    phone: string;
+  };
+
+  // 步驟 4
   /** 組織型態，於開帳設定選擇，並同步寫入損益表 ORG_KIND */
   orgType: OrgType;
+  /** orgType 目前還是系統依公司名稱與合夥契約推論的；使用者在開帳設定自己選過就轉為 false，之後不再被推論覆蓋 */
+  orgTypeAuto: boolean;
   operatingStatus: OperatingStatus;
   /** 開帳年度（民國年），預設值見 reports/formList.ts getCurrentOpenYear；尚未進入步驟 2 前為 null */
   openYear: number | null;
@@ -155,6 +191,7 @@ export interface InitializationState {
 // ==================== 初始狀態 ====================
 
 export const initialState: InitializationState = {
+  flowVersion: FLOW_VERSION,
   currentStep: 1,
   currentReportIndex: 0,
 
@@ -162,7 +199,17 @@ export const initialState: InitializationState = {
 
   termsAgreed: false,
 
+  payment: {
+    taxId: '',
+    companyName: '',
+    representative: '',
+    address: '',
+    email: '',
+    phone: '',
+  },
+
   orgType: null,
+  orgTypeAuto: true,
   operatingStatus: null,
   openYear: null,
   establishYear: null,
@@ -215,6 +262,9 @@ export type InitializationAction =
   | { type: 'AGREE_TERMS' }
 
   // 步驟 2
+  | { type: 'SET_PAYMENT_INFO'; payload: Partial<InitializationState['payment']> }
+  /** 系統依公司名稱與合夥契約推論出的組織型態；使用者自己選過（SET_ORG_TYPE）之後就不再套用 */
+  | { type: 'INFER_ORG_TYPE'; payload: OrgType }
   | { type: 'SET_ORG_TYPE'; payload: OrgType }
   | { type: 'SET_OPERATING_STATUS'; payload: OperatingStatus }
   | { type: 'SET_OPEN_YEAR'; payload: number | null }
@@ -264,10 +314,30 @@ export type InitializationAction =
   | { type: 'COMPLETE' };
 
 // ==================== 步驟導航邏輯 ====================
-// 步驟順序：1=合約　2=登記文件上傳　3=營運狀況　4=負責人／合夥人資料（僅滿一年的獨資、合夥）
-//          5=封面／公司資料　6=逐頁核對報表（僅滿一年）　7=確認　8=完成
-// 登記文件排在合約後，是因為之後後端辨識文件會把公司基本資料帶入後面的頁面；此時還沒選組織型態，故文件不分型態
-// 步驟 2 選「未滿一年」時無結算申報書可核對，5 之後直接跳到 7（確認），略過步驟 6 的報表頁
+// 步驟順序：1=合約　2=付款資料（測試用，代替尚未串接的付款環節）　3=登記文件上傳　4=營運狀況
+//          5=負責人／合夥人資料（僅滿一年的獨資、合夥）　6=封面／公司資料　7=逐頁核對報表（僅滿一年）
+//          8=確認　9=完成
+// 付款資料排最前面，是因為那裡的統一編號決定了要上傳哪一組登記文件（公司或商號）；
+// 登記文件接在後面，是因為後端辨識登記事項表會把公司基本資料帶入更後面的頁面
+// 步驟 4 選「未滿一年」時無結算申報書可核對，6 之後直接跳到 8（確認），略過步驟 7 的報表頁
+// 改動這個順序時記得同步 FLOW_VERSION、utils/stepper.ts 與 app/initialization/initialization-client.tsx
+
+/**
+ * 各畫面的步驟編號。**跳轉一律用這組常數，不要寫死數字**：
+ * 前兩次改號都有呼叫端被漏掉（營業稅期別方塊跳去負責人頁、完成頁的按鈕跳去登記文件頁），
+ * 而且因為型別都是 number，編譯器完全抓不到。
+ */
+export const STEP = {
+  TERMS: 1,
+  PAYMENT: 2,
+  REGISTRATION_DOCS: 3,
+  OPERATING: 4,
+  PARTNERS: 5,
+  COMPANY: 6,
+  REPORTS: 7,
+  CONFIRM: 8,
+  DONE: 9,
+} as const;
 
 export interface StepTarget {
   step: number;
@@ -288,12 +358,14 @@ export function getPrevStep(state: InitializationState): StepTarget {
     case 4:
       return { step: 3, reportIndex: 0 };
     case 5:
-      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 3, reportIndex: 0 };
+      return { step: 4, reportIndex: 0 };
     case 6:
-      if (state.currentReportIndex > 0) return { step: 6, reportIndex: state.currentReportIndex - 1 };
-      return { step: 5, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 5, reportIndex: 0 } : { step: 4, reportIndex: 0 };
     case 7:
-      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 5, reportIndex: 0 };
+      if (state.currentReportIndex > 0) return { step: 7, reportIndex: state.currentReportIndex - 1 };
+      return { step: 6, reportIndex: 0 };
+    case 8:
+      return state.operatingStatus === 'over_one_year' ? { step: 7, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 6, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -306,16 +378,18 @@ export function getNextStep(state: InitializationState): StepTarget {
     case 2:
       return { step: 3, reportIndex: 0 };
     case 3:
-      return needsPartnersPage(state) ? { step: 4, reportIndex: 0 } : { step: 5, reportIndex: 0 };
+      return { step: 4, reportIndex: 0 };
     case 4:
-      return { step: 5, reportIndex: 0 };
+      return needsPartnersPage(state) ? { step: 5, reportIndex: 0 } : { step: 6, reportIndex: 0 };
     case 5:
-      return state.operatingStatus === 'over_one_year' ? { step: 6, reportIndex: 0 } : { step: 7, reportIndex: 0 };
+      return { step: 6, reportIndex: 0 };
     case 6:
-      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 6, reportIndex: state.currentReportIndex + 1 };
-      return { step: 7, reportIndex: 0 };
+      return state.operatingStatus === 'over_one_year' ? { step: 7, reportIndex: 0 } : { step: 8, reportIndex: 0 };
     case 7:
+      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 7, reportIndex: state.currentReportIndex + 1 };
       return { step: 8, reportIndex: 0 };
+    case 8:
+      return { step: 9, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -380,6 +454,18 @@ function setReportRows(reports: InitializationState['reports'], reportId: Report
   return { ...reports, [reportId]: { ...getReport(reports, reportId), rows } };
 }
 
+/**
+ * 寫入組織型態並同步損益表「組織種類」勾選。
+ * 組織型態只由開帳設定頁與登記文件頁的推論決定，損益表那邊不回寫，因為逐頁核對的頁面清單已依此凍結。
+ */
+function applyOrgType(state: InitializationState, orgType: OrgType): Pick<InitializationState, 'orgType' | 'reports'> {
+  let reports = state.reports;
+  for (const [type, fieldCode] of Object.entries(ORG_TYPE_FIELD)) {
+    reports = setReportField(reports, 'CIT_INCOME_TAX', fieldCode, type === orgType ? 1 : 0, false);
+  }
+  return { orgType, reports };
+}
+
 /** 組織型態 → 損益表 ORG_KIND 組的欄位代碼 */
 const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
   share: 'ORG_1_SHARE',
@@ -390,18 +476,26 @@ const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
 
 export function initializationReducer(state: InitializationState, action: InitializationAction): InitializationState {
   switch (action.type) {
-    case 'RESTORE_STATE':
+    case 'RESTORE_STATE': {
+      // 流程改版後舊草稿的步驟號對不上現在的畫面（雲端草稿換 session key 也擋不住），
+      // 資料全部留著，只把進度退回第一步讓使用者重走一次
+      const staleFlow = isStaleFlow(action.payload);
       // reports 的 key（formCode）可能因改版增減，用 initialState.reports 補齊舊 sessionStorage 缺少的 key，
       // 避免 reports[reportId] 因改版後缺 key 變成 undefined
       return {
         ...initialState,
         ...action.payload,
+        flowVersion: FLOW_VERSION,
+        currentStep: staleFlow ? restoredStep(action.payload) : action.payload.currentStep,
+        currentReportIndex: staleFlow ? 0 : action.payload.currentReportIndex,
         reports: { ...initialState.reports, ...action.payload.reports },
         // company 欄位也可能因改版增減（如新增 phone／taxRegNo），同樣用初始值補齊
         company: { ...initialState.company, ...action.payload.company },
+        payment: { ...initialState.payment, ...action.payload.payment },
         reportYears: { ...initialState.reportYears, ...action.payload.reportYears },
         vatChoices: { ...initialState.vatChoices, ...action.payload.vatChoices },
       };
+    }
 
     case 'NEXT_STEP': {
       const next = getNextStep(state);
@@ -414,7 +508,12 @@ export function initializationReducer(state: InitializationState, action: Initia
     }
 
     case 'GO_TO_STEP':
-      return { ...state, currentStep: action.payload.step, currentReportIndex: action.payload.reportIndex ?? 0 };
+      return {
+        ...state,
+        // 夾回有效範圍：越界的步驟會讓畫面 fallback 成合約頁、但 getNextStep 的 default 原地打轉，按下一頁沒反應
+        currentStep: Math.min(Math.max(action.payload.step, STEP.TERMS), STEP.DONE),
+        currentReportIndex: action.payload.reportIndex ?? 0,
+      };
 
     case 'SET_USER_UUID':
       return { ...state, userUuid: action.payload };
@@ -422,14 +521,17 @@ export function initializationReducer(state: InitializationState, action: Initia
     case 'AGREE_TERMS':
       return { ...state, termsAgreed: true };
 
-    case 'SET_ORG_TYPE': {
-      // 同步損益表「組織種類」勾選；組織型態只由這裡（步驟 2）決定，損益表那邊不回寫，因為步驟 4 的頁面清單已依此凍結
-      let reports = state.reports;
-      for (const [type, fieldCode] of Object.entries(ORG_TYPE_FIELD)) {
-        reports = setReportField(reports, 'CIT_INCOME_TAX', fieldCode, type === action.payload ? 1 : 0, false);
-      }
-      return { ...state, orgType: action.payload, reports };
-    }
+    case 'INFER_ORG_TYPE':
+      // 使用者已經自己選過組織型態，或推不出東西，就不動
+      if (!state.orgTypeAuto || action.payload === null || action.payload === state.orgType) return state;
+      return { ...state, ...applyOrgType(state, action.payload) };
+
+    case 'SET_ORG_TYPE':
+      // 使用者自己選的，之後登記文件頁的推論不再覆蓋
+      return { ...state, ...applyOrgType(state, action.payload), orgTypeAuto: false };
+
+    case 'SET_PAYMENT_INFO':
+      return { ...state, payment: { ...state.payment, ...action.payload } };
 
     case 'SET_REGISTRATION_FILE': {
       const { [action.payload.docType]: _removed, ...rest } = state.registrationFiles;

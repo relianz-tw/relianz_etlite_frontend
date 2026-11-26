@@ -1,6 +1,7 @@
 'use client';
 
 import { useInitialization } from '../../state/InitializationContext';
+import { STEP } from '../../state/initializationReducer';
 import { listBankAccounts } from '@/api/bankAccounts';
 import { completeInitialization } from '@/api/initialization';
 import Button from '@/components/ui/Button';
@@ -92,7 +93,7 @@ export function Step6Done() {
 
       <div className='mt-2 flex flex-col gap-3 sm:flex-row'>
         {isUnderOneYear && (
-          <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: 2 } })}>
+          <Button variant='outline' onClick={() => dispatch({ type: 'GO_TO_STEP', payload: { step: STEP.OPERATING } })}>
             前往上傳結算申報書
           </Button>
         )}

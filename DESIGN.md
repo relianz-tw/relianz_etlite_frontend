@@ -333,6 +333,18 @@ Icon：lucide TriangleAlert size 16、mt-0.5 shrink-0
 對應元件：`src/features/initialization/components/FormIdentifyPanel.tsx`（未辨識到文件）、
 `src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目）。
 
+### Context Summary（情境摘要區塊）
+
+用途：把「系統依前面的輸入替使用者判定了什麼」講清楚，並就近提供修正入口。不是提醒也不是錯誤，
+語氣中性，所以不用 Notice 的暖色框。用在一整段說明文字裡，某一兩個值才是使用者真正要確認的時候
+（如登記文件頁：依公司名稱判定為公司或商號，據此決定要列哪幾份文件）。
+```
+容器：flex flex-col gap-3、rounded-md、bg-surface-cream、p-3
+說明：text-[13px]、#797C80（neutral-mid）；句中的關鍵值用 font-bold + #3A3830（neutral-dark）抬起來
+修正入口：放在同一塊裡（如 SegmentedControl），與說明之間 gap-3，不要散成並排的獨立段落
+```
+對應元件：`src/features/initialization/components/RegistrationDocsPage.tsx`。
+
 ### Blocking Alert（阻擋型警示框）
 
 用途：缺少前置設定導致無法繼續的情境（如尚未新增銀行帳戶），**須搭配停用對應送出按鈕**。
@@ -448,11 +460,25 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 - **顯示哪份原件**：營所稅頁用這張表辨識自的那份上傳檔案，其次是欄位座標指向的那份，都沒有時用最新上傳的；401／403 用該期自己上傳的申報書。PDF 在需要時才切頁（同一份只切一次）。
 - **空狀態**：尚未上傳檔案時，面板置中顯示 `FileText` 圖示加「上傳申報書檔案後，可在這裡對照原件」（`text-sm text-neutral-mid`）；切頁中顯示「對照圖片載入中…」，失敗顯示「對照圖片產生失敗，請重新上傳檔案」。
 
+### 付款資料頁（Payment Info Page）
+
+開帳精靈步驟 2（合約之後、上傳登記文件之前）。正式流程中這些資料會從付款環節帶進來，該環節尚未串接，所以先做成一頁讓人手動輸入，實作見 `src/features/initialization/components/steps/PaymentInfoPage.tsx`。頁首 `badges={['測試用']}`，表單整塊包在虛線卡裡（`rounded-lg border border-dashed border-neutral-blue-gray bg-white p-4`，同「測試用：模擬今天日期」的處理），明示它不是正式介面。
+
+- **統一編號**：`TextInput inputMode='numeric' maxLength={8}`，右側 `outline`、`sm`「查詢」，未滿 8 碼時 disabled、查詢中文字改「查詢中…」。查詢走 `GET /ael/onboarding/company-lookup`（client 已存在：`src/api/onboarding/companyLookup.ts`）。
+- **查詢結果**：成功就覆蓋公司名稱、代表人、公司地址三欄（使用者仍可手改）；後端查得到但某些欄位缺席時該欄留白，不視為錯誤；失敗以 `text-sm text-semantic-error` 顯示後端訊息（檢查碼由後端驗，前端不再自寫一份）。
+- **其餘欄位**：公司名稱、代表人姓名、公司地址、Email、手機號碼皆必填，版面與 `Step3CompanyInfo` 一致（頁內自帶 `Field` ＋ `grid-cols-1 nav:grid-cols-2`）。必填未齊或 Email／手機格式錯誤時「下一頁」disabled。
+- **往後帶**：按「下一頁」時寫入 `state.company`（統編、名稱、代表人、地址、聯絡信箱、聯絡電話），並把共用的公司識別欄位補進封面空白欄位。這一頁自己的值另存在 `state.payment`，辨識流程不會覆寫它，作為「系統登記資料」的定本。
+- **決定下一頁的文件清單**：公司名稱含「有限公司」視為公司，否則視為商號，見下一節。
+
 ### 登記文件上傳頁（Registration Docs Page）
 
-開帳精靈步驟 2（合約後第一步，選組織型態之前）給客戶上傳登記文件的頁面，實作見 `src/features/initialization/components/RegistrationDocsPage.tsx`。文件不分組織型態一次全列（此時還沒選型態），使用者上傳自己有的即可。
+開帳精靈步驟 3（付款資料之後、選組織型態之前）給客戶上傳登記文件的頁面，實作見 `src/features/initialization/components/RegistrationDocsPage.tsx`。
 
-- **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）與檔名或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`X`「移除」。列與列之間 `divide-y divide-neutral-blue-gray/30`。
+- **列哪幾份**：依步驟 2 的公司名稱判斷。公司（名稱含「有限公司」）列五份：核准函、登記事項表、公司章程、統一發票購票證、股東名簿；商號列四份：核准函、商業抄本、合夥契約（如為合夥）、統一發票購票證。還沒有公司名稱（跳過查詢）時退回不分型態的七份全集，不擋使用者。
+- **判定結果**：說明文字下方接一塊「情境摘要區塊」，寫出依哪個公司名稱判成公司或商號（兩個值以 `font-bold text-neutral-dark` 抬起來），並說明名稱有誤可回上一頁改。不要讓這句跟一般說明一樣平鋪成灰字，使用者要確認的就是這兩個值。
+- **組織型態由這裡決定**（營運狀況頁不再問）：名稱含「股份有限公司」→ 股份有限公司；否則含「有限公司」→ 有限公司；都不是 → 獨資商號，且使用者一旦上傳「最新合夥契約」就改為合夥商號、刪除則退回獨資。
+- **獨資或合夥**：不讓使用者直接選，唯一的判準是有沒有上傳「最新合夥契約」。那一列排在商號清單的**最後**，標題帶「（如為合夥）」並附 `hint` 說明獨資不需要、上傳後會改為合夥商號；情境摘要區塊同時寫出目前被視為哪一種。
+- **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）、選用的補充說明（`text-xs text-neutral-mid`，只有需要交代「什麼情況才要傳」的文件才給），以及檔名（`text-xs text-neutral-dark`）或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`Trash2`「刪除」（與已上傳檔案列同一套用詞與圖示）。列與列之間 `divide-y divide-neutral-blue-gray/30`。
 - **限制**：PDF 或圖片，5MB 以內（與申報書上傳區相同；辨識 API 的上限就是 5MB，放寬會讓登記事項表傳得進來卻辨識不了）。
 - **辨識**：七份文件中**只有「最新設立或變更登記事項表」會辨識**（`formNo 14`／`COMPANY_REGISTRATION`），其餘純上傳。辨識中該列圖示換 `Loader2` 旋轉、檔名位置改「辨識中…檔名」、按鈕 disabled。辨識完成後在該列下方接「登記事項表摘要卡」。
 - **辨識失敗不擋**：檔案裡沒有登記事項表時以 Notice（非阻擋提醒框）顯示「這份檔案沒有辨識到登記事項表的資料，可直接進行下一步」；後端回錯誤碼則原樣顯示後端訊息。兩種情況都不影響「下一頁」。
@@ -471,7 +497,16 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 - **董事監察人名單**：5 欄表格（職稱／姓名或名稱／身分證號或統編／持有股份／住所），欄位標籤同樣取自 `fieldMap`；沒有名單時整塊不出現。登記表 metadata 的 `tables[]` 是空的，這張表由前端依 `sectionCode` 自行分組，**不使用** `buildReportPage` 的 `page.table`（它的 fallback 會把四組明細列擠成一張表）。
 - **底部提示**（`text-xs text-neutral-mid`，兩行）：「這些資料會自動帶入後面的公司資料與投資人明細表，之後仍可修改。」「名單僅含董監事，其餘股東請於投資人明細表補齊。」
 - **帶到後面**：公司名稱／統編／所在地／負責人／電話只補目前空白的欄位，不覆蓋使用者已輸入的值；董監事名單只在投資人明細表還沒有任何資料時帶入，並標為 AI 帶入。
-- **移除檔案**：連同辨識資料一起清掉（卡片消失）；已經帶到公司資料與投資人明細表的值不回收，使用者可能已經改過。
+- **刪除檔案**：連同辨識資料一起清掉（卡片消失）；已經帶到公司資料與投資人明細表的值不回收，使用者可能已經改過。
+
+#### 資料不吻合提示（Registration Mismatch Dialog）
+
+辨識出來的統一編號或公司名稱與步驟 2 的付款資料不同時，先問使用者留哪一份再帶入，實作見 `src/features/initialization/components/RegistrationMismatchDialog.tsx`。
+
+- **觸發**：統編去頭尾空白後字串比、公司名稱去掉所有空白後比，任一不同即跳窗；付款資料該欄為空時不比（沒有基準）。
+- **視窗**（`Modal`，`max-w-[520px]`，標題「資料不吻合」）：一句說明，下方 `bg-surface-cream` 兩欄對照，各列統一編號與公司名稱，左為「目前系統登記資料」、右為「這份文件辨識結果」。
+- **按鈕**：`outline`「保留目前資料」（付款資料與封面都不動，辨識結果仍留在摘要卡供使用者自行修正）與主要按鈕「改用文件上的資料」（更新付款資料後照常帶入）；手機上下堆疊、主要按鈕在上。關閉視窗等同保留目前資料。
+- **改用文件資料後若公司／商號分類改變**，文件清單會跟著重算，並以 toast 告知。
 
 ### 申報書上傳區（Source Upload Section）
 
@@ -489,7 +524,7 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 申報書上傳區底部的可展開清單，列出這間公司這條開帳路徑需要的每一份文件及其狀態，取代舊的「已帶入：…」一行文字。實作見 `src/features/initialization/components/RequiredDocsChecklist.tsx`。
 
 - **收合列**：`ChevronDown` 14px（展開時 `rotate-180`）加「已備齊 N / M 份文件」，`text-[13px] font-medium text-brand-blue`，熱區 `min-h-11 nav:min-h-0`。
-- **清單內容**：封面加上步驟 4 的逐頁清單（營所稅各表與 401／403 各期），份數與順序依組織型態、設立年度、開帳基準日動態算出，不寫死。每項一列 `text-[13px]`，左側狀態圖示 14px。
+- **清單內容**：封面加上步驟 7 的逐頁清單（營所稅各表與 401／403 各期），份數與順序依組織型態、設立年度、開帳基準日動態算出，不寫死。每項一列 `text-[13px]`，左側狀態圖示 14px。
 - **三種狀態**：
 
 | 狀態 | 判斷 | 圖示 | 文字 |
@@ -513,14 +548,15 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 ### 草稿儲存狀態（Draft Save Status）
 
-開帳精靈填寫步驟（步驟 2–7）的草稿儲存提示，放在固定底部操作列的按鈕列：桌機靠左（`nav:mr-auto`），手機在按鈕上方獨立一行。實作見 `src/features/initialization/components/DraftSaveStatus.tsx`。
+開帳精靈填寫步驟（步驟 2–8）的草稿儲存提示，放在固定底部操作列的按鈕列：桌機靠左（`nav:mr-auto`），手機在按鈕上方獨立一行。實作見 `src/features/initialization/components/DraftSaveStatus.tsx`。
 
 - **狀態文字**：`text-xs text-neutral-mid`，「上次儲存 14:32」（24 小時制、時：分，取自雲端回傳的儲存時間）；尚未儲存過不顯示文字；儲存失敗改 `text-semantic-error`「儲存失敗，請重試」。
 - **儲存按鈕**：`ghost`、`sm`、`Save` 圖示、文字「儲存」，點擊立即儲存並更新時間。
 - **自動儲存**：每 30 秒檢查一次，內容有變動才儲存；沒有變動不更新時間。
-- **範圍**：只在填寫步驟（2–7）顯示與儲存；合約與完成頁不顯示。
+- **範圍**：只在填寫步驟（2–8）顯示與儲存；合約與完成頁不顯示。
 - **儲存位置**：雲端草稿 API（`/ael/initialization/draft`），整份表單狀態（含辨識欄位座標、各原件的「已帶入」說明）存成一段 JSON，換裝置、換瀏覽器都能續填；同一分頁另有 `sessionStorage` 即時備份，重新整理不會丟尚未儲存的修改。
 - **版本衝突**：草稿有版本號（樂觀鎖）。載入時雲端版本不是這個分頁同步到的那一版，或儲存時後端回 `0409`，都跳「資料同步」視窗（`Modal`，`max-w-[480px]`）：內文「另一部裝置在 2026-11-25 10:43 有更新過草稿，請選擇要使用哪一份。」（完整日期時間 `yyyy-MM-dd HH:mm`，與底部操作列只寫時分的「上次儲存」不同）；兩顆按鈕，`outline`「保留目前版本」（以雲端目前版本為基準重送，覆蓋雲端草稿）與主要按鈕「使用最新版本」（預設選項，放棄這裡尚未儲存的修改），手機上下堆疊、主要按鈕在上。關掉視窗不選，下次儲存仍衝突會再跳出；視窗開著時暫停自動儲存。
+- **覆蓋確認**：這間公司雲端已有草稿時，後端不會直接覆寫，而是回 `0003`（data 帶 `version` 與 `savedAt`）要求確認。前端跳 `ConfirmDialog`「覆蓋雲端草稿」，內文寫出雲端那份的上次儲存時間並說明會被取代，按鈕為「先不要」與 `danger`「覆蓋」。按「覆蓋」之後這個分頁後續的儲存都帶 `overwrite`，不再重複詢問；按「先不要」當作這次沒存成功（顯示「儲存失敗，請重試」），自動儲存不再追問，下次使用者自己按「儲存」才會再問一次。`0003` 在這個後端也是通用驗證錯誤碼，所以要同時看 data 是不是草稿版本資訊才當成覆蓋確認。
 - **完成後**：開帳完成時後端自動刪除草稿並封存原件，前端不呼叫刪除。
 
 ### Navigation — Sidebar（側邊欄導覽）
