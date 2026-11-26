@@ -4,6 +4,8 @@ export interface RegistrationDoc {
   /** 文件類型代碼（後端上傳 API 上線後作為 docType） */
   code: string;
   title: string;
+  /** 標題下方的補充說明，只有需要交代「什麼情況才要傳」的文件才給 */
+  hint?: string;
   /** 上傳後會跑欄位辨識並把資料帶往後面的頁面；目前只有登記事項表（formNo 14）有 */
   identifiable?: boolean;
 }
@@ -40,14 +42,18 @@ export const COMPANY_REGISTRATION_DOCS: RegistrationDoc[] = [
 
 /**
  * 商號（獨資、合夥）要備的四份。上傳頁只知道是不是商號、分不出獨資或合夥，
- * 所以合夥契約一律列出並在標題標明「如為合夥」，由使用者自行判斷。
+ * 所以合夥契約排在最後、標題標明「如為合夥」並附說明，有沒有上傳就是判定合夥的唯一依據。
  * 第五項「負責人及合夥人基本資料」是表單不是檔案，走獨立的負責人頁。
  */
 export const BUSINESS_REGISTRATION_DOCS: RegistrationDoc[] = [
   APPROVAL_LETTER,
   BUSINESS_TRANSCRIPT,
-  { code: PARTNERSHIP_AGREEMENT_CODE, title: '最新合夥契約（如為合夥）' },
   INVOICE_PERMIT,
+  {
+    code: PARTNERSHIP_AGREEMENT_CODE,
+    title: '最新合夥契約（如為合夥）',
+    hint: '獨資不需要這份。上傳後系統會把組織型態改為合夥商號，負責人頁才會出現合夥人欄位。',
+  },
 ];
 
 /** 還不知道是公司還是商號時（跳過統編查詢）列出的全部文件，使用者上傳自己有的即可 */
@@ -82,12 +88,9 @@ export function classifyEntity(companyName: string): EntityKind | null {
 export function registrationDocsFor(kind: EntityKind | null, uploaded: Record<string, string> = {}): RegistrationDoc[] {
   const picked = kind === 'company' ? COMPANY_REGISTRATION_DOCS : kind === 'business' ? BUSINESS_REGISTRATION_DOCS : ALL_REGISTRATION_DOCS;
   if (picked === ALL_REGISTRATION_DOCS) return picked;
-  // 順序沿用全集，標題以這一類的為準（商號的合夥契約帶「如為合夥」字樣）
-  return ALL_REGISTRATION_DOCS.flatMap(doc => {
-    const inPicked = picked.find(p => p.code === doc.code);
-    if (inPicked) return [inPicked];
-    return uploaded[doc.code] ? [doc] : [];
-  });
+  // 這一類的清單照它自己的順序（商號的合夥契約要留在最後）；另一類已經傳過檔案的補在後面
+  const codes = new Set(picked.map(doc => doc.code));
+  return [...picked, ...ALL_REGISTRATION_DOCS.filter(doc => !codes.has(doc.code) && uploaded[doc.code])];
 }
 
 /**

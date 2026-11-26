@@ -10,7 +10,6 @@ import { RegistrationSummaryCard } from './RegistrationSummaryCard';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
-import SegmentedControl from '@/components/ui/SegmentedControl';
 import { CircleCheck, FileText, Loader2, Trash2, TriangleAlert, Upload } from 'lucide-react';
 
 /** 與辨識 API 的上限一致（IDENTIFY_MAX_SIZE_MB），登記事項表才不會傳得進來卻辨識不了 */
@@ -36,31 +35,25 @@ export function RegistrationDocsPage() {
 
   return (
     <>
-      <StepPageHeader kicker='登記資料' title='上傳登記文件' badges={['給客戶上傳']} nav={nav}>
+      <StepPageHeader kicker='登記資料' title='上傳登記文件' badges={['客戶提供']} nav={nav}>
         <p className='text-sm text-neutral-mid'>
           請上傳您有的最新登記文件，供事務所核對公司（行號）資料。檔案格式 PDF 或圖片，{MAX_SIZE_MB}MB 以內。
           其中「最新設立或變更登記事項表」上傳後會自動辨識，公司資料與董監事名單會帶入後面的頁面。
         </p>
+        {/* 依公司名稱判定公司或商號，決定下面列哪幾份文件；判定結果與修正入口收在同一塊，見 DESIGN.md「情境摘要區塊」 */}
         {kind && (
-          <p className='text-xs text-neutral-mid'>
-            目前依「{state.payment.companyName}」列出{KIND_LABEL[kind]}需要的文件；公司資料有誤請回上一頁修改。
-          </p>
-        )}
-        {/* 獨資與合夥從名稱分不出來，上傳合夥契約只是推論，這裡給一個明確的入口；營運狀況頁已不再問組織型態 */}
-        {kind === 'business' && (
-          <div className='flex flex-col gap-1.5'>
-            <span className='text-xs text-neutral-mid'>這個商號是獨資還是合夥？上傳合夥契約會自動改為合夥，也可以直接在這裡選。</span>
-            <SegmentedControl
-              size='sm'
-              fit
-              className='self-start'
-              options={[
-                { value: 'sole', label: ORG_TYPE_LABEL.sole },
-                { value: 'partnership', label: ORG_TYPE_LABEL.partnership },
-              ]}
-              value={state.orgType === 'partnership' ? 'partnership' : 'sole'}
-              onChange={value => dispatch({ type: 'SET_ORG_TYPE', payload: value })}
-            />
+          <div className='flex flex-col gap-3 rounded-md bg-surface-cream p-3'>
+            <p className='text-[13px] text-neutral-mid'>
+              依公司名稱<span className='font-bold text-neutral-dark'>「{state.payment.companyName}」</span>
+              列出<span className='font-bold text-neutral-dark'>{KIND_LABEL[kind]}</span>需要的文件。名稱有誤請回上一頁修改。
+            </p>
+            {/* 獨資與合夥從名稱分不出來，唯一的判準是最下面那份合夥契約 */}
+            {kind === 'business' && (
+              <p className='text-[13px] text-neutral-mid'>
+                目前視為<span className='font-bold text-neutral-dark'>{ORG_TYPE_LABEL[state.orgType === 'partnership' ? 'partnership' : 'sole']}</span>
+                。合夥請上傳最下方的「最新合夥契約」，上傳後會改為合夥商號。
+              </p>
+            )}
           </div>
         )}
       </StepPageHeader>
@@ -70,6 +63,7 @@ export function RegistrationDocsPage() {
             <DocRow
               key={doc.code}
               title={doc.title}
+              hint={doc.hint}
               fileName={state.registrationFiles[doc.code]}
               recognizing={doc.identifiable && recognizing}
               onPick={file => {
@@ -108,6 +102,8 @@ export function RegistrationDocsPage() {
 
 interface DocRowProps {
   title: string;
+  /** 標題下方的補充說明（如合夥契約只有合夥才要傳） */
+  hint?: string;
   fileName?: string;
   /** 辨識中：檔名位置改顯示進度，按鈕暫時停用 */
   recognizing?: boolean;
@@ -117,7 +113,7 @@ interface DocRowProps {
   extra?: ReactNode;
 }
 
-function DocRow({ title, fileName, recognizing, onPick, onClear, extra }: DocRowProps) {
+function DocRow({ title, hint, fileName, recognizing, onPick, onClear, extra }: DocRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className='flex flex-col gap-3 py-4 first:pt-0 last:pb-0'>
@@ -132,7 +128,10 @@ function DocRow({ title, fileName, recognizing, onPick, onClear, extra }: DocRow
           )}
           <div className='flex min-w-0 flex-col'>
             <span className='text-sm font-medium text-neutral-dark'>{title}</span>
-            <span className='truncate text-xs text-neutral-mid'>{recognizing ? `辨識中…${fileName ?? ''}` : fileName ?? '尚未上傳'}</span>
+            {hint && <span className='text-xs text-neutral-mid'>{hint}</span>}
+            <span className={`truncate text-xs ${fileName ? 'text-neutral-dark' : 'text-neutral-mid'}`}>
+              {recognizing ? `辨識中…${fileName ?? ''}` : fileName ?? '尚未上傳'}
+            </span>
           </div>
         </div>
         <div className='flex shrink-0 gap-2'>

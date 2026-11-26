@@ -52,7 +52,7 @@ export function PartnersPage() {
 
   return (
     <>
-      <StepPageHeader kicker='負責人資料' title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['給客戶填寫']} nav={{ ...nav, nextDisabled: mismatch, hint: mismatch ? '出資額合計與資產負債表資本額不符，請調整後再前往下一頁' : undefined }}>
+      <StepPageHeader kicker='負責人資料' title={isPartnership ? '負責人及合夥人基本資料' : '負責人基本資料'} badges={['客戶填寫']} nav={{ ...nav, nextDisabled: mismatch, hint: mismatch ? '出資額合計與資產負債表資本額不符，請調整後再前往下一頁' : undefined }}>
         <p className='text-sm text-neutral-mid'>{isPartnership ? '合夥需填負責人及每位合夥人，出資額加總應等於資產負債表資本額 (3110)。' : '請填寫負責人資料與出資額。'}</p>
         {mismatch && (
           <p className='text-xs text-semantic-error'>

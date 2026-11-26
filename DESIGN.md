@@ -333,6 +333,18 @@ Icon：lucide TriangleAlert size 16、mt-0.5 shrink-0
 對應元件：`src/features/initialization/components/FormIdentifyPanel.tsx`（未辨識到文件）、
 `src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目）。
 
+### Context Summary（情境摘要區塊）
+
+用途：把「系統依前面的輸入替使用者判定了什麼」講清楚，並就近提供修正入口。不是提醒也不是錯誤，
+語氣中性，所以不用 Notice 的暖色框。用在一整段說明文字裡，某一兩個值才是使用者真正要確認的時候
+（如登記文件頁：依公司名稱判定為公司或商號，據此決定要列哪幾份文件）。
+```
+容器：flex flex-col gap-3、rounded-md、bg-surface-cream、p-3
+說明：text-[13px]、#797C80（neutral-mid）；句中的關鍵值用 font-bold + #3A3830（neutral-dark）抬起來
+修正入口：放在同一塊裡（如 SegmentedControl），與說明之間 gap-3，不要散成並排的獨立段落
+```
+對應元件：`src/features/initialization/components/RegistrationDocsPage.tsx`。
+
 ### Blocking Alert（阻擋型警示框）
 
 用途：缺少前置設定導致無法繼續的情境（如尚未新增銀行帳戶），**須搭配停用對應送出按鈕**。
@@ -462,10 +474,11 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 開帳精靈步驟 3（付款資料之後、選組織型態之前）給客戶上傳登記文件的頁面，實作見 `src/features/initialization/components/RegistrationDocsPage.tsx`。
 
-- **列哪幾份**：依步驟 2 的公司名稱判斷。公司（名稱含「有限公司」）列五份：核准函、登記事項表、公司章程、統一發票購票證、股東名簿；商號列四份：核准函、商業抄本、合夥契約（如為合夥）、統一發票購票證。還沒有公司名稱（跳過查詢）時退回不分型態的七份全集，不擋使用者。標題下方以 `text-xs text-neutral-mid` 說明目前依哪一類列出、資料不對可回上一頁改。
+- **列哪幾份**：依步驟 2 的公司名稱判斷。公司（名稱含「有限公司」）列五份：核准函、登記事項表、公司章程、統一發票購票證、股東名簿；商號列四份：核准函、商業抄本、合夥契約（如為合夥）、統一發票購票證。還沒有公司名稱（跳過查詢）時退回不分型態的七份全集，不擋使用者。
+- **判定結果**：說明文字下方接一塊「情境摘要區塊」，寫出依哪個公司名稱判成公司或商號（兩個值以 `font-bold text-neutral-dark` 抬起來），並說明名稱有誤可回上一頁改。不要讓這句跟一般說明一樣平鋪成灰字，使用者要確認的就是這兩個值。
 - **組織型態由這裡決定**（營運狀況頁不再問）：名稱含「股份有限公司」→ 股份有限公司；否則含「有限公司」→ 有限公司；都不是 → 獨資商號，且使用者一旦上傳「最新合夥契約」就改為合夥商號、刪除則退回獨資。
-- **獨資／合夥切換**：商號那一組在文件清單上方多一個 `SegmentedControl`（`sm`、`fit`、`self-start`）讓使用者直接選獨資或合夥，上方以 `text-xs text-neutral-mid` 說明上傳合夥契約也會自動改。名稱分不出獨資與合夥，光靠合夥契約推論會讓沒帶契約的合夥商號無處可改，所以要有這個明確入口；使用者在這裡選過之後，上傳或刪除合夥契約都不再覆蓋他的選擇。公司那一組不顯示（名稱已經判得出來）。
-- **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）與檔名或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`Trash2`「刪除」（與已上傳檔案列同一套用詞與圖示）。列與列之間 `divide-y divide-neutral-blue-gray/30`。
+- **獨資或合夥**：不讓使用者直接選，唯一的判準是有沒有上傳「最新合夥契約」。那一列排在商號清單的**最後**，標題帶「（如為合夥）」並附 `hint` 說明獨資不需要、上傳後會改為合夥商號；情境摘要區塊同時寫出目前被視為哪一種。
+- **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）、選用的補充說明（`text-xs text-neutral-mid`，只有需要交代「什麼情況才要傳」的文件才給），以及檔名（`text-xs text-neutral-dark`）或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`Trash2`「刪除」（與已上傳檔案列同一套用詞與圖示）。列與列之間 `divide-y divide-neutral-blue-gray/30`。
 - **限制**：PDF 或圖片，5MB 以內（與申報書上傳區相同；辨識 API 的上限就是 5MB，放寬會讓登記事項表傳得進來卻辨識不了）。
 - **辨識**：七份文件中**只有「最新設立或變更登記事項表」會辨識**（`formNo 14`／`COMPANY_REGISTRATION`），其餘純上傳。辨識中該列圖示換 `Loader2` 旋轉、檔名位置改「辨識中…檔名」、按鈕 disabled。辨識完成後在該列下方接「登記事項表摘要卡」。
 - **辨識失敗不擋**：檔案裡沒有登記事項表時以 Notice（非阻擋提醒框）顯示「這份檔案沒有辨識到登記事項表的資料，可直接進行下一步」；後端回錯誤碼則原樣顯示後端訊息。兩種情況都不影響「下一頁」。
