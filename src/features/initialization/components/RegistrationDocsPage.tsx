@@ -4,12 +4,13 @@ import { useRef, type ReactNode } from 'react';
 import { useInitialization } from '../state/InitializationContext';
 import { useRegistrationIdentify } from '../hooks/useRegistrationIdentify';
 import { PARTNERSHIP_AGREEMENT_CODE, classifyEntity, inferOrgType, registrationDocsFor } from '../reports/registrationDocs';
-import { COMPANY_REGISTRATION_KEY, IDENTIFY_MAX_SIZE_MB, hasRegistrationData } from '../reports';
+import { COMPANY_REGISTRATION_KEY, IDENTIFY_MAX_SIZE_MB, ORG_TYPE_LABEL, hasRegistrationData } from '../reports';
 import { RegistrationMismatchDialog } from './RegistrationMismatchDialog';
 import { RegistrationSummaryCard } from './RegistrationSummaryCard';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { CircleCheck, FileText, Loader2, Trash2, TriangleAlert, Upload } from 'lucide-react';
 
 /** 與辨識 API 的上限一致（IDENTIFY_MAX_SIZE_MB），登記事項表才不會傳得進來卻辨識不了 */
@@ -45,9 +46,22 @@ export function RegistrationDocsPage() {
             目前依「{state.payment.companyName}」列出{KIND_LABEL[kind]}需要的文件；公司資料有誤請回上一頁修改。
           </p>
         )}
-        {/* 獨資與合夥的名稱分不出來，唯一的判準就是這份契約，而後面已經沒有別的地方可以改組織型態了 */}
+        {/* 獨資與合夥從名稱分不出來，上傳合夥契約只是推論，這裡給一個明確的入口；營運狀況頁已不再問組織型態 */}
         {kind === 'business' && (
-          <p className='text-xs text-semantic-warm-dark'>合夥請務必上傳「最新合夥契約」，系統依此判定為合夥商號；沒有上傳一律視為獨資商號。</p>
+          <div className='flex flex-col gap-1.5'>
+            <span className='text-xs text-neutral-mid'>這個商號是獨資還是合夥？上傳合夥契約會自動改為合夥，也可以直接在這裡選。</span>
+            <SegmentedControl
+              size='sm'
+              fit
+              className='self-start'
+              options={[
+                { value: 'sole', label: ORG_TYPE_LABEL.sole },
+                { value: 'partnership', label: ORG_TYPE_LABEL.partnership },
+              ]}
+              value={state.orgType === 'partnership' ? 'partnership' : 'sole'}
+              onChange={value => dispatch({ type: 'SET_ORG_TYPE', payload: value })}
+            />
+          </div>
         )}
       </StepPageHeader>
       <SectionCard>
