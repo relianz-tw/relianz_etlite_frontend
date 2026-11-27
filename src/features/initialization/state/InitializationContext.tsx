@@ -31,6 +31,7 @@ import {
   type DraftConflictData,
   type DraftRecord,
 } from '@/api/initializationDraft';
+import type { IdentifiedForm } from '@/api/peit';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { blobToFile } from '@/lib/blobToFile';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
@@ -75,12 +76,37 @@ interface InitializationContextValue {
   /** 401／403 各期別頁上傳辨識的原件（key = 期別頁 key）；同時存在後端，重新整理後從後端取回 */
   vatUploads: Record<string, File>;
   setVatUpload: (pageKey: string, file: File) => void;
+  /**
+   * 這一期能不能用「沒有原件」擋使用者前進。原件是重新整理後才從後端撈回來的，
+   * 還沒撈完或撈失敗時回 false：寧可放行，也不要讓使用者看到「明明傳過卻說沒傳」。
+   */
+  isVatFileRequired: (pageKey: string) => boolean;
+  /**
+   * 辨識出來的期別與上傳當下所在的期別不同時，資料先不帶入，暫存在這裡（key = 該期別頁 key），
+   * 等使用者自己切到那一期再套用。File 無法序列化，不進草稿，重新整理後需重新上傳。
+   */
+  pendingVatForms: Record<string, PendingVatForm>;
+  setPendingVatForm: (pageKey: string, pending: PendingVatForm) => void;
+  clearPendingVatForm: (pageKey: string) => void;
   /** 上次儲存草稿的時間（ms，伺服器時間），尚未儲存過為 null */
   savedAt: number | null;
   /** 最近一次儲存是否失敗（如網路問題） */
   saveError: boolean;
   /** 立即儲存草稿到雲端（儲存按鈕用；每 30 秒也會自動儲存有變動的內容） */
   saveDraftNow: () => Promise<void>;
+  /**
+   * 目前內容與最後一次存進雲端的是否不同（判斷方式與自動儲存同一套）。
+   * 給 beforeunload 用，要在事件當下才讀最新值，所以是函式不是值。
+   */
+  hasUnsavedChanges: () => boolean;
+}
+
+/** 暫存一份「期別對不上目前頁面」的辨識結果，等使用者切到該期別頁再帶入 */
+export interface PendingVatForm {
+  file: File;
+  form: IdentifiedForm;
+  /** 欄位位置要記得屬於哪份原件；401／403 用固定值（見 FormIdentifyPanel） */
+  sourceId: string;
 }
 
 const InitializationContext = createContext<InitializationContextValue | null>(null);
@@ -118,6 +144,27 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       .catch(error => toast.error(`${getFriendlyErrorMessage(error, '原件上傳失敗')}，原件未存到雲端，重新整理後需重新上傳`));
   }, []);
 
+  // 原件還原的結果：還沒撈完（listed=false 的初始值）或撈失敗時，不能用「沒有原件」去擋使用者
+  const [vatRestore, setVatRestore] = useState<{ listed: boolean; failedKeys: string[] }>({ listed: false, failedKeys: [] });
+  const isVatFileRequired = useCallback(
+    (pageKey: string) => vatRestore.listed && !vatRestore.failedKeys.includes(pageKey),
+    [vatRestore],
+  );
+
+  // 期別對不上而暫存的辨識結果：使用者切到該期別頁時由 FormIdentifyPanel 取出帶入
+  const [pendingVatForms, setPendingVatForms] = useState<Record<string, PendingVatForm>>({});
+  const setPendingVatForm = useCallback((pageKey: string, pending: PendingVatForm) => {
+    setPendingVatForms(prev => ({ ...prev, [pageKey]: pending }));
+  }, []);
+  const clearPendingVatForm = useCallback((pageKey: string) => {
+    setPendingVatForms(prev => {
+      if (!(pageKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[pageKey];
+      return next;
+    });
+  }, []);
+
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   // 取消離開時用 history.forward() 回到流程，會再觸發一次 popstate，需忽略
   const ignoreNextPopRef = useRef(false);
@@ -140,6 +187,9 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const savingRef = useRef(false);
   // 上次存進雲端的內容，自動儲存用來判斷「有沒有變動」
   const lastSavedJsonRef = useRef<string | null>(null);
+
+  // 還沒存過（null）一律當成有未儲存內容
+  const hasUnsavedChanges = useCallback(() => lastSavedJsonRef.current === null || JSON.stringify(stateRef.current) !== lastSavedJsonRef.current, []);
 
   const recordVersion = useCallback((version: number) => {
     draftVersionRef.current = version;
@@ -266,7 +316,14 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     if (periodPages.length === 0) return;
     vatRestoredRef.current = true;
     (async () => {
-      const metas = (await listDraftFiles().catch(() => [])).filter(m => m.kind === 'VAT_PERIOD');
+      let listed = true;
+      const metas = (
+        await listDraftFiles().catch(() => {
+          listed = false;
+          return [];
+        })
+      ).filter(m => m.kind === 'VAT_PERIOD');
+      const failed: string[] = [];
       for (const meta of metas) {
         const page = periodPages.find(p => toVatPeriodKey(p.period!) === meta.periodKey);
         if (!page) continue;
@@ -277,9 +334,11 @@ export function InitializationProvider({ children }: { children: React.ReactNode
           // 取回期間使用者若已經上傳新檔，以新檔為準
           setVatUploads(prev => (prev[page.key] ? prev : { ...prev, [page.key]: file }));
         } catch {
-          // 取不回來就當這期沒有原件
+          // 取不回來：不能當成「這期沒有原件」，否則使用者明明傳過卻被擋住又無從補救
+          failed.push(page.key);
         }
       }
+      setVatRestore({ listed, failedKeys: failed });
     })();
   }, [mounted, state.reportPages]);
 
@@ -396,7 +455,24 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   }
 
   return (
-    <InitializationContext.Provider value={{ state, dispatch, clearSession, ready: mounted, vatUploads, setVatUpload, savedAt, saveError, saveDraftNow }}>
+    <InitializationContext.Provider
+      value={{
+        state,
+        dispatch,
+        clearSession,
+        ready: mounted,
+        vatUploads,
+        setVatUpload,
+        isVatFileRequired,
+        pendingVatForms,
+        setPendingVatForm,
+        clearPendingVatForm,
+        savedAt,
+        saveError,
+        saveDraftNow,
+        hasUnsavedChanges,
+      }}
+    >
       {children}
       <ConfirmDialog
         open={leavePromptOpen}

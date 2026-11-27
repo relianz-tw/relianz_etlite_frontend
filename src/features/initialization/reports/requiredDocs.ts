@@ -37,7 +37,7 @@ interface DocsSources {
  */
 export function buildRequiredDocs(state: DocsState, { vatUploads, sourceFiles }: DocsSources): RequiredDoc[] {
   const base = [
-    // 營所稅的必填／選填看 FORM_LIST 的 optional（財產目錄、未攤銷費用明細表為「如有」）；
+    // 營所稅的必填／選填看 FORM_LIST 的 optional（財產目錄、未攤銷費用明細表、兩份扣繳相關文件為「如有」）；
     // 營業稅看期別本身是否落在開帳年度（ReportPageSpec.required），營所稅各頁的 required 一律是 false，不能拿來判斷
     { key: COVER_CODE, label: getFormItem(COVER_CODE).title, reportKey: COVER_CODE, required: !getFormItem(COVER_CODE).optional, sourceName: undefined as string | undefined },
     ...state.reportPages.map(spec => {

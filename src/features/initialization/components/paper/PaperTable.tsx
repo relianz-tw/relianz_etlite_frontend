@@ -1,13 +1,34 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, Plus, X } from 'lucide-react';
+import { ChevronDown, MoveHorizontal, Plus, X } from 'lucide-react';
 import type { ReportFieldDef, ReportPaperTableDef, ReportTableColumnDef } from '../../reports/types';
 import { RowCards } from '../ReportTable';
 import { computeFieldValue, computeRowFieldValue } from '../../reports/formula';
 import { FieldInput, StoreFieldInput } from './FieldInput';
 import { isFieldShown, usePaperStore } from './PaperStore';
+
+/**
+ * 這個捲動容器有沒有被內容撐到要左右捲動。
+ * 欄位多的表（如投資人明細）金額欄會被切在畫面外，不講的話使用者不會知道右邊還有東西。
+ */
+function useHorizontalOverflow() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // 容器與表格都要觀察：視窗變寬變窄、表格增減列都會改變是否溢出
+    const update = () => setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, overflowing };
+}
 
 /** 紙本斜線（不可填的格子、左上角斜線格）：對角線用既有 neutral-blue-gray token */
 /** 左上角表頭格的斜線：由左上到右下（欄名在右上、列名在左下），與不可填格子的「／」方向相反 */
@@ -168,6 +189,7 @@ function GroupHeader({ template, fields, group }: { template: string; fields: Re
 export function PaperTable({ table }: { table: ReportPaperTableDef }) {
   const store = usePaperStore();
   const [open, setOpen] = useState(false);
+  const { ref: scrollRef, overflowing } = useHorizontalOverflow();
 
   // 可重複列的表格一進來預設有一列空白列（只在進頁時補，之後使用者可以刪光）；對帳頁不補、列欄位對不上表頭改用卡片的也不補
   useEffect(() => {
@@ -270,14 +292,20 @@ const border = 'border border-neutral-blue-gray/30';
   return (
     <div className='flex min-w-0 flex-col gap-2'>
       {/* 表格的說明文字（table.note）是純說明，不顯示 */}
-      {table.title && (
-        <div className='flex flex-wrap items-baseline gap-x-3'>
-          <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>
+      {(table.title || (showGrid && overflowing)) && (
+        <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1'>
+          {table.title && <h3 className='text-base font-bold text-neutral-dark'>{table.title}</h3>}
+          {showGrid && overflowing && (
+            <span className='flex items-center gap-1 text-xs text-neutral-mid'>
+              <MoveHorizontal size={14} aria-hidden='true' className='shrink-0' />
+              表格較寬，可左右捲動看其餘欄位
+            </span>
+          )}
         </div>
       )}
 
       {showGrid && (
-        <div className='overflow-x-auto rounded-lg border border-neutral-blue-gray/30'>
+        <div ref={scrollRef} className='overflow-x-auto rounded-lg border border-neutral-blue-gray/30'>
           <table className='w-full border-collapse text-sm'>
             <thead className='bg-surface-cream text-xs font-bold text-neutral-dark'>
               {header.map((cells, level) => (

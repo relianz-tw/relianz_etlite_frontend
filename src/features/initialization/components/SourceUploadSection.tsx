@@ -28,10 +28,18 @@ export function SourceUploadSection({ pageKey, required, vatPeriod }: SourceUplo
   const vatFile = vatPeriod ? vatUploads[pageKey] : undefined;
   const hasFile = vatPeriod ? !!vatFile : sourceFiles.length > 0;
 
+  const identifyPanel = <FormIdentifyPanel required={required} vatPeriod={vatPeriod} pageKey={pageKey} variant={hasFile ? 'button' : 'dropzone'} />;
+
+  // 401／403 已經有檔案時，「重新上傳」接在檔案列的「預覽」右側，文件備齊清單收在同一張卡片裡，
+  // 不再各自佔一行（營所稅是多份檔案的列表，沒有「哪一張卡片」可以收，維持堆疊）
+  if (vatPeriod && vatFile) {
+    return <UploadedFilePreview file={vatFile} actions={identifyPanel} footer={<RequiredDocsChecklist />} />;
+  }
+
   return (
     <div className='flex flex-col gap-3'>
-      {vatPeriod ? vatFile && <UploadedFilePreview file={vatFile} /> : <SourceFileList />}
-      <FormIdentifyPanel required={required} vatPeriod={vatPeriod} pageKey={pageKey} variant={hasFile ? 'button' : 'dropzone'} />
+      {vatPeriod ? null : <SourceFileList />}
+      {identifyPanel}
       <RequiredDocsChecklist />
     </div>
   );

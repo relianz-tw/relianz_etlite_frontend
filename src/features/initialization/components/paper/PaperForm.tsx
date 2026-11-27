@@ -28,6 +28,24 @@ const COMPARE_KINDS: ReportSectionItem['kind'][] = ['amountRows', 'table'];
 /** 段落模板內有 {{field:}}（輸入框）或 {{group:}}（勾選框）才算有要填的內容 */
 const HAS_INPUT_TOKEN = /\{\{(field|group):/;
 
+/** 同上，取出 token 的種類與欄位代碼 */
+const INPUT_TOKEN = /\{\{(field|group):([^}]+)\}\}/g;
+
+/**
+ * 段落當下是否還有東西可填：模板嵌的欄位被 visibleWhen 隱藏時（例如投資人明細表勾了
+ * 「符合填寫須知二」，增資緩課核備資料整組不必填），TemplateText 不會畫輸入框，
+ * 只看模板字串就會留下沒有欄位的標籤文字，所以整段一起不顯示。
+ */
+function hasVisibleTemplateInput(template: string, store: PaperStore): boolean {
+  for (const [, kind, code] of Array.from(template.matchAll(INPUT_TOKEN))) {
+    // 勾選組維持原行為（TemplateText 不判斷 visibleWhen），一律視為可填
+    if (kind === 'group') return true;
+    const field = store.page.fieldMap[code];
+    if (field && isFieldShown(field, store)) return true;
+  }
+  return false;
+}
+
 /**
  * 內嵌輸入框實高 40px，比正文行高還高，模板折成多行時上下兩排會黏在一起，
  * 所以含輸入框／勾選框的段落與標籤改用 52px 行高（上下各留 6px）；純文字維持原行高，不讓整張表變鬆。
@@ -46,11 +64,16 @@ function isItemShown(item: ReportSectionItem, store: PaperStore): boolean {
     case 'inputs':
     case 'checks':
       return item.fields.some(f => isFieldShown(f, store));
-    case 'table':
-      return store.renderValue ? Object.values(item.table.cells).some(f => isFieldShown(f, store)) : true;
+    case 'table': {
+      const cells = Object.values(item.table.cells);
+      // 對帳模式：沒有數字的表不畫。開帳模式：格子全被 visibleWhen 藏起來時（如投資人明細表勾了
+      // 「無須填報以下資料」）整張表也不該留著，否則同區塊其他欄位都收起來了只剩一張空表格
+      if (store.renderValue) return cells.some(f => isFieldShown(f, store));
+      return cells.length === 0 || cells.some(f => isFieldShown(f, store));
+    }
     case 'text':
       // 純說明文字（沒有要輸入的欄位或勾選）不顯示，只有內嵌輸入框／勾選框的段落才畫
-      return HAS_INPUT_TOKEN.test(item.block.template);
+      return hasVisibleTemplateInput(item.block.template, store);
     default:
       return true;
   }
@@ -147,12 +170,13 @@ function DateRangeRow({ range, store, paired }: { range: ReportDateRangeDef; sto
       <div className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 nav:flex-nowrap'>
         <span className={cn(FIELD_LABEL_BASE, fieldLabelClass(range.title))}>{range.title}</span>
         {/* 兩個日期框同一排，各佔剩餘寬度的一半；桌機最寬約 11rem、不撐滿整列，手機標籤獨佔一行、兩框各半寬 */}
+        {/* 日期框最窄也要放得下「114/01/01」加日曆圖示，否則會被壓成「114/01/」看不出是哪一天 */}
         <div className='flex min-w-0 flex-1 items-center gap-2'>
-          <div className='min-w-0 flex-1 nav:max-w-44'>
+          <div className='min-w-[8rem] flex-1 nav:max-w-44'>
             <FieldInput field={range.start} data={store.get(range.start.key)} onChange={value => store.set(range.start.key, value)} />
           </div>
           <span className='shrink-0 text-sm text-neutral-mid'>至</span>
-          <div className='min-w-0 flex-1 nav:max-w-44'>
+          <div className='min-w-[8rem] flex-1 nav:max-w-44'>
             <FieldInput field={range.end} data={store.get(range.end.key)} onChange={value => store.set(range.end.key, value)} />
           </div>
         </div>
@@ -172,7 +196,7 @@ function InputGrid({ fields }: { fields: ReportFieldDef[] }) {
   return (
     <div className={cn('grid grid-cols-1 gap-4', !singleColumn && 'nav:grid-cols-2 nav:gap-x-6')}>
       {fields.filter(f => isFieldShown(f, store)).map(f => (
-        <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} onChange={value => store.set(f.key, value)} />
+        <ReportFieldRow key={f.key} field={f} data={store.get(f.key)} readOnly={store.readOnlyKeys?.includes(f.key)} onChange={value => store.set(f.key, value)} />
       ))}
     </div>
   );

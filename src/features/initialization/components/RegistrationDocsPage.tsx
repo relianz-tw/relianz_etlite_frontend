@@ -8,6 +8,7 @@ import { COMPANY_REGISTRATION_KEY, IDENTIFY_MAX_SIZE_MB, ORG_TYPE_LABEL, hasRegi
 import { RegistrationMismatchDialog } from './RegistrationMismatchDialog';
 import { RegistrationSummaryCard } from './RegistrationSummaryCard';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
+import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import SectionCard from '@/components/ui/SectionCard';
 import { CircleCheck, FileText, Loader2, Trash2, TriangleAlert, Upload } from 'lucide-react';
@@ -28,6 +29,19 @@ export function RegistrationDocsPage() {
   const kind = classifyEntity(state.payment.companyName);
   const docs = registrationDocsFor(kind, state.registrationFiles);
   const showSummary = !!state.registrationFiles.REGISTRATION_ITEMS && hasRegistrationData(state.reports);
+
+  // 還判斷不出公司或商號時列的是兩類文件的聯集，標必填會誤導（公司不需要商業抄本），所以只有判定出來才標
+  const showMarks = !!kind;
+  const requiredDocs = docs.filter(doc => !doc.optional);
+  const requiredReady = requiredDocs.filter(doc => state.registrationFiles[doc.code]).length;
+  const optionalPending = docs.filter(doc => doc.optional && !state.registrationFiles[doc.code]).length;
+  // 必填與選填分開數，與步驟 4 的文件備齊清單同一套講法
+  const countText =
+    requiredReady === requiredDocs.length && optionalPending === 0
+      ? '文件已全部備齊'
+      : optionalPending > 0
+        ? `必填 ${requiredReady} / ${requiredDocs.length} 份已上傳・另有 ${optionalPending} 份選填未傳`
+        : `必填 ${requiredReady} / ${requiredDocs.length} 份已上傳`;
 
   /** 合夥契約有沒有上傳會改變商號的組織型態預選（公司名稱判得出公司時，推論結果與它無關） */
   const inferFromFiles = (hasPartnershipAgreement: boolean) =>
@@ -56,6 +70,7 @@ export function RegistrationDocsPage() {
             )}
           </div>
         )}
+        {showMarks && <p className='text-[13px] font-medium text-neutral-dark'>{countText}</p>}
       </StepPageHeader>
       <SectionCard>
         <div className='flex flex-col divide-y divide-neutral-blue-gray/30'>
@@ -63,7 +78,8 @@ export function RegistrationDocsPage() {
             <DocRow
               key={doc.code}
               title={doc.title}
-              hint={doc.hint}
+              hint={doc.hint ?? (showMarks && doc.optional ? '沒有這份文件可以不傳。' : undefined)}
+              required={showMarks ? !doc.optional : undefined}
               fileName={state.registrationFiles[doc.code]}
               recognizing={doc.identifiable && recognizing}
               onPick={file => {
@@ -104,6 +120,8 @@ interface DocRowProps {
   title: string;
   /** 標題下方的補充說明（如合夥契約只有合夥才要傳） */
   hint?: string;
+  /** 必填／選填徽章；還判斷不出公司或商號時不給，不顯示徽章 */
+  required?: boolean;
   fileName?: string;
   /** 辨識中：檔名位置改顯示進度，按鈕暫時停用 */
   recognizing?: boolean;
@@ -113,7 +131,7 @@ interface DocRowProps {
   extra?: ReactNode;
 }
 
-function DocRow({ title, hint, fileName, recognizing, onPick, onClear, extra }: DocRowProps) {
+function DocRow({ title, hint, required, fileName, recognizing, onPick, onClear, extra }: DocRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className='flex flex-col gap-3 py-4 first:pt-0 last:pb-0'>
@@ -127,7 +145,11 @@ function DocRow({ title, hint, fileName, recognizing, onPick, onClear, extra }: 
             <FileText size={20} className='shrink-0 text-neutral-mid' />
           )}
           <div className='flex min-w-0 flex-col'>
-            <span className='text-sm font-medium text-neutral-dark'>{title}</span>
+            {/* 必填／選填徽章與期別卡片同一套（Badge tone info／neutral） */}
+            <span className='flex flex-wrap items-center gap-2'>
+              <span className='text-sm font-medium text-neutral-dark'>{title}</span>
+              {required !== undefined && <Badge tone={required ? 'info' : 'neutral'}>{required ? '必填' : '選填'}</Badge>}
+            </span>
             {hint && <span className='text-xs text-neutral-mid'>{hint}</span>}
             <span className={`truncate text-xs ${fileName ? 'text-neutral-dark' : 'text-neutral-mid'}`}>
               {recognizing ? `辨識中…${fileName ?? ''}` : fileName ?? '尚未上傳'}

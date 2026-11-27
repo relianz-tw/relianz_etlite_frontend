@@ -1,13 +1,12 @@
-import { SHARED_FIELD_KEYS, type InitializationState } from '../state/initializationReducer';
+import { COMPANY_REGISTRATION_KEY, SHARED_FIELD_KEYS, type InitializationState } from '../state/initializationReducer';
+
+export { COMPANY_REGISTRATION_KEY, isMaskedValue, lockedCoverValues, REGISTRATION_LOCKED_COVER_FIELDS } from '../state/initializationReducer';
 
 /**
  * 「最新設立或變更登記事項表」（registrationDocs.ts 的 docType）是七份登記文件中唯一會辨識的一份。
  * 它含有後面好幾頁都要重打的資料（公司基本資料、股本、董監事名單），辨識一次直接往後帶。
  */
 export const REGISTRATION_ITEMS_CODE = 'REGISTRATION_ITEMS';
-
-/** 辨識結果在 state.reports 的 key，也是辨識 API 回傳的 formCode。刻意不加進 FORM_LIST：它不是逐頁核對的結算表 */
-export const COMPANY_REGISTRATION_KEY = 'COMPANY_REGISTRATION';
 
 export const REGISTRATION_FORM_NO = 14;
 
@@ -49,6 +48,24 @@ export const REGISTRATION_TO_COVER: Record<string, string> = {
   ADDR: 'HDR_ADDRESS',
   HDR_PHONE: 'HDR_PHONE',
 };
+
+/**
+ * 負責人的身分證字號與住居所不在登記表的固定欄位裡，而在董監事名單中「代表公司負責人」那一列
+ * （姓名與 `REPRESENTATIVE` 相同）。封面這兩格原件常是遮蔽的（`F12617****`、`台北市*****`），
+ * 登記表這一列才是完整資料。
+ */
+export const REGISTRATION_OFFICER_TO_COVER: Record<string, string> = {
+  ROW_ID_NO: 'HDR_OWNER_ID',
+  ROW_ADDRESS: 'HDR_OWNER_ADDRESS',
+};
+
+/** 登記表裡代表公司負責人那一列；找不到回 undefined */
+export function representativeRow(report: InitializationState['reports'][string] | undefined): Record<string, { value: string | number }> | undefined {
+  if (!report) return undefined;
+  const name = String(report.fields.REPRESENTATIVE?.value ?? '').trim();
+  if (!name) return undefined;
+  return report.rows.find(row => String(row.ROW_NAME?.value ?? '').trim() === name);
+}
 
 /**
  * 把共用的公司識別欄位（這張表只有 HDR_PHONE）從辨識結果裡挑掉。

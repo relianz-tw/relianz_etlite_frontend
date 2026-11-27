@@ -102,6 +102,12 @@ export interface InitializationState {
   currentStep: number;
   /** 步驟 7（報表核對）目前顯示第幾份，對應 reportPages 的索引 */
   currentReportIndex: number;
+  /**
+   * 走到過的最遠位置。步驟列只開放點到這裡：這些畫面的「下一頁」資料交接
+   * （見 utils/stepper.ts 的 getStepEntry）都已經跑過，跳回去不會產生對不起來的資料；
+   * 還沒走到的頁一律要一頁頁按「下一頁」過去。
+   */
+  maxVisited: { step: number; reportIndex: number };
 
   /**
    * 串接身分用的使用者識別碼，沿用 onboarding Step6Plan 產生的 userUuid（見 Step8Checkout）。
@@ -149,6 +155,11 @@ export interface InitializationState {
   fieldLocations: Record<ReportKey, Record<string, FieldLocation>>;
   /** 每張表辨識自哪份原件、在哪幾頁：key 為頁面 key；對照面板只顯示該表自己的頁，不顯示整份原件 */
   formSources: Record<ReportKey, FormSource>;
+  /**
+   * 申報書辨識出來的公司識別欄位與登記事項表對不上的紀錄（key 為封面欄位代碼）。
+   * 值一律以登記事項表為準，這裡只留下來給畫面提醒使用者「資料不一致」。
+   */
+  registrationConflicts: Record<string, { registered: string; identified: string }>;
 
   // 步驟 3：公司基本資料，供確認頁與送出 API 使用。封面欄位全部依 metadata 存於 reports.CIT_COVER，
   // 按「下一步」時由 Step3Cover 把對應欄位整理進來（見 COVER_TO_COMPANY）
@@ -194,6 +205,7 @@ export const initialState: InitializationState = {
   flowVersion: FLOW_VERSION,
   currentStep: 1,
   currentReportIndex: 0,
+  maxVisited: { step: 1, reportIndex: 0 },
 
   userUuid: '',
 
@@ -219,6 +231,7 @@ export const initialState: InitializationState = {
   yearResetPending: false,
   fieldLocations: {},
   formSources: {},
+  registrationConflicts: {},
   simulatedDate: null,
 
   company: {
@@ -344,6 +357,11 @@ export interface StepTarget {
   reportIndex: number;
 }
 
+/** 畫面位置的先後順序，供 maxVisited 比較；步驟 7 有好幾份報表，光比步驟號分不出走到第幾份 */
+export function stepRank(target: StepTarget): number {
+  return target.step * 1000 + (target.step === STEP.REPORTS ? target.reportIndex : 0);
+}
+
 /** 負責人／合夥人資料頁：只有獨資、合夥且滿一年才需要（跟封面一起走結算申報的路線） */
 function needsPartnersPage(state: Pick<InitializationState, 'operatingStatus' | 'orgType'>): boolean {
   return state.operatingStatus === 'over_one_year' && isSoleOrPartnership(state.orgType);
@@ -427,6 +445,70 @@ function setReportField(
  */
 export const SHARED_FIELD_KEYS = new Set(['HDR_VAT_NO', 'HDR_COMPANY_NAME', 'HDR_OWNER_NAME', 'HDR_ADDRESS', 'HDR_PHONE', 'HDR_TAX_REG_NO']);
 
+/** 登記事項表的辨識結果存在 reports 的這個 key；放這裡是因為 reducer 要用，reports/registrationForm.ts 由此 re-export */
+export const COMPANY_REGISTRATION_KEY = 'COMPANY_REGISTRATION';
+
+/**
+ * 登記事項表辨識過之後，這些封面欄位就以它為準：畫面鎖住不給改，
+ * 後面各份申報書辨識出不同的值也不覆蓋，只記進 registrationConflicts 提醒使用者。
+ * 來源對應表（登記表欄位 → 這些封面欄位）在 reports/registrationForm.ts。
+ */
+export const REGISTRATION_LOCKED_COVER_FIELDS = new Set([
+  'HDR_VAT_NO',
+  'HDR_COMPANY_NAME',
+  'HDR_OWNER_NAME',
+  'HDR_ADDRESS',
+  'HDR_PHONE',
+  'HDR_OWNER_ID',
+  'HDR_OWNER_ADDRESS',
+]);
+
+/** 值被遮蔽（含 `*`，如 `F12617****`）時兩邊對不上是正常的，不算資料不一致 */
+export function isMaskedValue(value: string | number): boolean {
+  return String(value).includes('*');
+}
+
+/**
+ * 受保護欄位的來源：登記事項表的哪一個欄位。負責人身分證字號與住居所不是固定欄位，
+ * 在董監事名單中「姓名與 REPRESENTATIVE 相同」那一列（對應表見 reports/registrationForm.ts）。
+ */
+const REGISTRATION_SOURCE_OF_COVER: Record<string, string> = {
+  HDR_VAT_NO: 'HDR_TAX_ID',
+  HDR_COMPANY_NAME: 'NAME_ZH',
+  HDR_OWNER_NAME: 'REPRESENTATIVE',
+  HDR_ADDRESS: 'ADDR',
+  HDR_PHONE: 'HDR_PHONE',
+};
+
+/**
+ * 登記事項表辨識過時，回傳它對應到封面各受保護欄位的值；沒辨識過、或那一格登記表自己也沒值，
+ * 就不在結果裡（代表不鎖、也不比對），免得使用者被鎖住一個改不掉的空白或錯值。
+ */
+export function lockedCoverValues(reports: InitializationState['reports']): Record<string, string | number> | null {
+  const registration = reports[COMPANY_REGISTRATION_KEY];
+  if (!registration) return null;
+  const fields = registration.fields;
+
+  const values: Record<string, string | number> = {};
+  for (const [coverKey, sourceKey] of Object.entries(REGISTRATION_SOURCE_OF_COVER)) {
+    const value = fields[sourceKey]?.value;
+    if (value !== undefined && value !== '') values[coverKey] = value;
+  }
+
+  const representative = String(fields.REPRESENTATIVE?.value ?? '').trim();
+  const ownerRow = representative ? registration.rows.find(row => String(row.ROW_NAME?.value ?? '').trim() === representative) : undefined;
+  for (const [rowKey, coverKey] of [
+    ['ROW_ID_NO', 'HDR_OWNER_ID'],
+    ['ROW_ADDRESS', 'HDR_OWNER_ADDRESS'],
+  ] as const) {
+    const value = ownerRow?.[rowKey]?.value;
+    // 登記表自己也是遮蔽的就不鎖，使用者還是得自己補
+    if (value !== undefined && value !== '' && !isMaskedValue(value)) values[coverKey] = value;
+  }
+
+  return Object.keys(values).length > 0 ? values : null;
+}
+
 /**
  * 寫入欄位值；若是共用的公司識別欄位，同步帶入其他文件。
  * 只帶入「還是空白」或「仍與來源修改前相同」的文件，已被使用者在別份文件獨立改過的值不會被蓋掉。
@@ -474,20 +556,40 @@ const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
   partnership: 'ORG_5_PARTNERSHIP',
 };
 
+/** 移動到某個畫面，順手把 maxVisited 推到更遠的位置（往回走不會把它拉回來） */
+function visit(state: InitializationState, target: StepTarget): InitializationState {
+  const advanced = stepRank(target) > stepRank(state.maxVisited);
+  return {
+    ...state,
+    currentStep: target.step,
+    currentReportIndex: target.reportIndex,
+    maxVisited: advanced ? target : state.maxVisited,
+  };
+}
+
 export function initializationReducer(state: InitializationState, action: InitializationAction): InitializationState {
   switch (action.type) {
     case 'RESTORE_STATE': {
       // 流程改版後舊草稿的步驟號對不上現在的畫面（雲端草稿換 session key 也擋不住），
       // 資料全部留著，只把進度退回第一步讓使用者重走一次
       const staleFlow = isStaleFlow(action.payload);
+      const restored: StepTarget = {
+        step: staleFlow ? restoredStep(action.payload) : action.payload.currentStep,
+        reportIndex: staleFlow ? 0 : action.payload.currentReportIndex,
+      };
+      // 舊草稿沒存過 maxVisited，用它停在哪一步回推；改版退回第一步的草稿則一併收回去，
+      // 因為交接要重走一次才會對（見 utils/stepper.ts 的 getStepEntry）
+      const restoredMax =
+        !staleFlow && action.payload.maxVisited && stepRank(action.payload.maxVisited) > stepRank(restored) ? action.payload.maxVisited : restored;
       // reports 的 key（formCode）可能因改版增減，用 initialState.reports 補齊舊 sessionStorage 缺少的 key，
       // 避免 reports[reportId] 因改版後缺 key 變成 undefined
       return {
         ...initialState,
         ...action.payload,
         flowVersion: FLOW_VERSION,
-        currentStep: staleFlow ? restoredStep(action.payload) : action.payload.currentStep,
-        currentReportIndex: staleFlow ? 0 : action.payload.currentReportIndex,
+        currentStep: restored.step,
+        currentReportIndex: restored.reportIndex,
+        maxVisited: restoredMax,
         reports: { ...initialState.reports, ...action.payload.reports },
         // company 欄位也可能因改版增減（如新增 phone／taxRegNo），同樣用初始值補齊
         company: { ...initialState.company, ...action.payload.company },
@@ -497,23 +599,18 @@ export function initializationReducer(state: InitializationState, action: Initia
       };
     }
 
-    case 'NEXT_STEP': {
-      const next = getNextStep(state);
-      return { ...state, currentStep: next.step, currentReportIndex: next.reportIndex };
-    }
+    case 'NEXT_STEP':
+      return visit(state, getNextStep(state));
 
-    case 'PREV_STEP': {
-      const prev = getPrevStep(state);
-      return { ...state, currentStep: prev.step, currentReportIndex: prev.reportIndex };
-    }
+    case 'PREV_STEP':
+      return visit(state, getPrevStep(state));
 
     case 'GO_TO_STEP':
-      return {
-        ...state,
+      return visit(state, {
         // 夾回有效範圍：越界的步驟會讓畫面 fallback 成合約頁、但 getNextStep 的 default 原地打轉，按下一頁沒反應
-        currentStep: Math.min(Math.max(action.payload.step, STEP.TERMS), STEP.DONE),
-        currentReportIndex: action.payload.reportIndex ?? 0,
-      };
+        step: Math.min(Math.max(action.payload.step, STEP.TERMS), STEP.DONE),
+        reportIndex: action.payload.reportIndex ?? 0,
+      });
 
     case 'SET_USER_UUID':
       return { ...state, userUuid: action.payload };
@@ -589,6 +686,17 @@ export function initializationReducer(state: InitializationState, action: Initia
       const { reportId } = action.payload;
       let reports = state.reports;
       let changed = false;
+
+      // 登記事項表辨識過的話，受保護欄位一律對齊它。進每一頁時校正，舊草稿裡被別份文件蓋掉的值也會回正——
+      // 否則畫面把一個錯值鎖起來，使用者改不掉
+      const locked = reportId === COMPANY_REGISTRATION_KEY ? null : lockedCoverValues(reports);
+      for (const [key, value] of Object.entries(locked ?? {})) {
+        if (!(key in getReport(reports, reportId).fields)) continue;
+        if (getReport(reports, reportId).fields[key]?.value === value) continue;
+        reports = setReportField(reports, reportId, key, value, false);
+        changed = true;
+      }
+
       for (const key of SHARED_FIELD_KEYS) {
         const own = getReport(reports, reportId).fields[key]?.value;
         if (own !== undefined && own !== '') continue;
@@ -607,7 +715,18 @@ export function initializationReducer(state: InitializationState, action: Initia
     case 'APPLY_IDENTIFIED_FORM': {
       const { reportId, taxYear, fields, rows, locations, source } = action.payload;
       let reports = state.reports;
+      // 登記事項表辨識過之後，公司識別欄位以它為準：其餘申報書辨識出不同的值不覆蓋，只記下來提醒使用者
+      const locked = reportId === COMPANY_REGISTRATION_KEY ? null : lockedCoverValues(state.reports);
+      const conflicts = { ...state.registrationConflicts };
       for (const [key, value] of Object.entries(fields)) {
+        const registered = locked?.[key];
+        if (registered !== undefined) {
+          // 遮蔽過的值（F12617****）本來就對不上完整值，不算不一致
+          if (String(value) !== String(registered) && !isMaskedValue(value) && !isMaskedValue(registered)) {
+            conflicts[key] = { registered: String(registered), identified: String(value) };
+          }
+          continue;
+        }
         reports = setReportFieldSynced(reports, reportId, key, value, true);
       }
       // 列資料以辨識結果整批取代（同一份文件重新辨識不應累加重複列）；辨識無列時保留使用者既有的列
@@ -618,6 +737,7 @@ export function initializationReducer(state: InitializationState, action: Initia
       return {
         ...state,
         reports,
+        registrationConflicts: conflicts,
         reportYears: taxYear === undefined ? state.reportYears : { ...state.reportYears, [reportId]: taxYear },
         fieldLocations: locations ? { ...state.fieldLocations, [reportId]: locations } : state.fieldLocations,
         formSources: source ? { ...state.formSources, [reportId]: source } : state.formSources,

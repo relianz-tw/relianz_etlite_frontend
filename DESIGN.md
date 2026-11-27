@@ -331,7 +331,8 @@ Icon：lucide TriangleAlert size 16、mt-0.5 shrink-0
 標題：text-sm font-bold（可省略）；說明：text-[13px] leading-relaxed
 ```
 對應元件：`src/features/initialization/components/FormIdentifyPanel.tsx`（未辨識到文件）、
-`src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目）。
+`src/features/initialization/components/steps/Step5Confirm.tsx`（尚未填寫項目；組織型態與公司名稱對不上——
+組織型態是依名稱判定的，兩邊不一致多半是名稱打錯，所以只提醒並指回「付款資料」，不阻擋確認開帳）。
 
 ### Context Summary（情境摘要區塊）
 
@@ -478,6 +479,7 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 - **判定結果**：說明文字下方接一塊「情境摘要區塊」，寫出依哪個公司名稱判成公司或商號（兩個值以 `font-bold text-neutral-dark` 抬起來），並說明名稱有誤可回上一頁改。不要讓這句跟一般說明一樣平鋪成灰字，使用者要確認的就是這兩個值。
 - **組織型態由這裡決定**（營運狀況頁不再問）：名稱含「股份有限公司」→ 股份有限公司；否則含「有限公司」→ 有限公司；都不是 → 獨資商號，且使用者一旦上傳「最新合夥契約」就改為合夥商號、刪除則退回獨資。
 - **獨資或合夥**：不讓使用者直接選，唯一的判準是有沒有上傳「最新合夥契約」。那一列排在商號清單的**最後**，標題帶「（如為合夥）」並附 `hint` 說明獨資不需要、上傳後會改為合夥商號；情境摘要區塊同時寫出目前被視為哪一種。
+- **必填／選填標示**：判定出公司或商號之後，每一列名稱右側接 `Badge`（必填 `tone='info'`、選填 `tone='neutral'`，與營業稅期別卡片同一套），並在「判定結果」區塊下方加一行 `text-[13px] font-medium text-neutral-dark` 的計數：「文件已全部備齊」／「必填 N / M 份已上傳」／「必填 N / M 份已上傳・另有 K 份選填未傳」（講法與步驟 4 的文件備齊清單一致）。**只有合夥契約是選填**（`RegistrationDoc.optional`，與 `FORM_LIST.optional` 同一種標法），其餘一律必填；選填那一列沒有自己的 `hint` 時補「沒有這份文件可以不傳。」。還判斷不出公司或商號時（列七份全集）不標徽章也不顯示計數——那份清單是兩類文件的聯集，標必填會誤導。目前必填未齊**不擋「下一頁」**。
 - **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）、選用的補充說明（`text-xs text-neutral-mid`，只有需要交代「什麼情況才要傳」的文件才給），以及檔名（`text-xs text-neutral-dark`）或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`Trash2`「刪除」（與已上傳檔案列同一套用詞與圖示）。列與列之間 `divide-y divide-neutral-blue-gray/30`。
 - **限制**：PDF 或圖片，5MB 以內（與申報書上傳區相同；辨識 API 的上限就是 5MB，放寬會讓登記事項表傳得進來卻辨識不了）。
 - **辨識**：七份文件中**只有「最新設立或變更登記事項表」會辨識**（`formNo 14`／`COMPANY_REGISTRATION`），其餘純上傳。辨識中該列圖示換 `Loader2` 旋轉、檔名位置改「辨識中…檔名」、按鈕 disabled。辨識完成後在該列下方接「登記事項表摘要卡」。
@@ -512,8 +514,8 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 開帳精靈申報書頁的上傳與已上傳檔案是同一塊，放在頁首卡片下半部整行（標題右上不再另放上傳框），實作見 `src/features/initialization/components/SourceUploadSection.tsx`。
 
-- **沒有檔案**：整行的虛線上傳框（`rounded-lg border-[1.5px] border-dashed border-neutral-blue-gray bg-surface-off-white px-3 py-2`），左側 `Upload` 20px 城信藍，中間主文「上傳申報書快速帶入（選填）」與格式小字「PDF、JPG、PNG、HEIC，5MB 以內」，右側 `outline`、`sm`「選擇檔案」。拖放進框時邊框與底色轉 `brand-blue`／`brand-blue/5`；辨識中左側圖示換 `Loader2` 旋轉、主文改「辨識中…檔名」。
-- **有檔案**：主角是檔案列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、`outline` `sm`「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。營所稅可多份，依上傳順序由上到下，列表下方靠右一顆 `outline`、`sm`、`Plus`「新增檔案」；401／403 每期只收一份，該顆按鈕文字改「重新上傳」。
+- **沒有檔案**：整行的虛線上傳框（`rounded-lg border-[1.5px] border-dashed border-neutral-blue-gray bg-surface-off-white px-3 py-2`），左側 `Upload` 20px 城信藍，中間主文「上傳申報書快速帶入（選填）」與格式小字「PDF、JPG、PNG、HEIC，5MB 以內」，右側 `outline`、`sm`「選擇檔案」。拖放進框時邊框與底色轉 `brand-blue`／`brand-blue/5`；辨識中左側圖示換 `Loader2` 旋轉、主文改「辨識中…檔名」，格式小字同時換成等待提示「約需 20–60 秒，請先別關閉頁面」（辨識時間長，只有轉圈會讓使用者以為當掉；這行在手機也要顯示）。
+- **有檔案**：主角是檔案列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、`outline` `sm`「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。營所稅可多份，依上傳順序由上到下，列表下方靠右一顆 `outline`、`sm`、`Plus`「新增檔案」；401／403 每期只收一份，該顆按鈕文字改「重新上傳」。辨識中按鈕收起，改顯示靠右兩行：`Loader2` 旋轉加「辨識中…檔名」，下方 `text-xs text-neutral-mid` 的等待提示（同上）。
 - **範圍**：營所稅的上傳檔案整份共用（一份 PDF 含多張表），每個營所稅頁列同一組；401／403 的檔案掛在各期別頁自己身上。
 - **辨識結果訊息**：接在這塊下方，`text-xs`——未辨識到內容用 `TriangleAlert` 加 `text-semantic-warm-dark`，略過或失敗用 `TriangleAlert` 加 `text-semantic-error`。成功帶入哪幾份不寫成一行文字，改看下方的文件備齊清單。
 - **刪除**：只有使用者按「刪除」並在 `ConfirmDialog` 確認後才會移除（後端刪除成功才從列表拿掉，失敗以 toast 提示）；刪除不會清掉已帶入表單的資料，但這份檔案的欄位座標與來源記錄一併清掉。
@@ -541,7 +543,7 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 
 - **觸發條件**：辨識值與某個欄位的現有值不同（文字比對去頭尾空白，兩邊都是數字時以數值比）；現有為空白或值相同不算。表格列整批取代，現有列有資料且與辨識結果不同也算。完全不會蓋到既有資料就直接帶入，不跳視窗。
 - **視窗**（`Modal`，`max-w-[560px]`，標題「覆蓋原先資料」）：開頭一句「此次匯入資料內容有包含：〈文件名稱、…〉，如有重新匯入會被系統覆蓋。」，下方是文件清單。
-- **文件清單**：列出這條開帳路徑（組織型態、設立年度、開帳基準日算出）需要的**所有**文件，與文件備齊清單同一份來源，依步驟情境調整；分「必填」「選填」兩區，各有 `text-xs font-medium text-neutral-mid` 小標。必填判定：營所稅看 `FORM_LIST.optional`（財產目錄、未攤銷費用明細表為選填），營業稅看期別是否落在開帳年度。清單高度上限 `max-h-[320px]` 可捲動。
+- **文件清單**：列出這條開帳路徑（組織型態、設立年度、開帳基準日算出）需要的**所有**文件，與文件備齊清單同一份來源，依步驟情境調整；分「必填」「選填」兩區，各有 `text-xs font-medium text-neutral-mid` 小標。必填判定：營所稅看 `FORM_LIST.optional`（財產目錄、未攤銷費用明細表、各類給付扣繳調節表、各類所得扣繳憑單申報書為選填），營業稅看期別是否落在開帳年度。清單高度上限 `max-h-[320px]` 可捲動。
 - **每一列**：左側 `Checkbox shape='circle'` 決定這份要不要匯入（這次檔案裡有辨識到的預設勾選；沒辨識到的 `disabled`，文字 `text-neutral-mid`）；右側若該份已有資料，顯示 `CircleCheck` 14px `text-semantic-success` 加匯入時間（`yyyy-MM-dd HH:mm`，取自 `formSources[].importedAt`），手動填的沒有時間，只寫「已有資料」。
 - **按鈕**：`ghost`「取消」（不改任何資料）、`outline`「只匯入勾選項目」（沒勾任何一項時 disabled）、主要按鈕「全部匯入」；手機上下堆疊、主要按鈕在上。關閉視窗（Esc、點遮罩）等同取消。
 - **匯入行為**：被勾選的文件整份覆蓋（欄位與表格列都以辨識結果為準）；沒勾的完全不動。沒被勾選的文件仍會記下原件位置，點欄位照樣框得出原件上的位置，方便對照；AI 閃電標記照常先清掉，只標這次實際填入的欄位。
@@ -903,12 +905,22 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
 步驟文字：Noto Sans TC 13px，圓點下方 8px（gap-2）
   已完成／當前：#3A3830（neutral-dark）
   未達：#9AA7B9（neutral-blue-gray）
+
+可點擊（由流程自己決定，見 canGoTo）：圓點與文字包成一顆 button，cursor-pointer，
+  title 往回「回到「〈步驟名〉」」、往前「前往「〈步驟名〉」」，滑過時圓點 bg 轉 brand-blue/80、文字加底線，
+  鍵盤焦點 outline 2px brand-blue（offset 2px）。不可點的步驟維持原樣，不加任何互動提示。
 ```
 
 **行動版（< nav 1000px）**：不顯示橫向步驟列，改用單行文字「第 2 / 6 步．公司資料」置於頁首，
 字級 13px、色 #797C80（neutral-mid），不佔額外版面高度。
 
 對應元件：`src/components/ui/Stepper.tsx`。
+
+**開帳精靈的可點範圍**：只開放**走到過的位置**（`state.maxVisited`，見 `utils/stepper.ts` 的 `canGoToStepGroup`）。
+往回一定可以點，往前只能回到自己走過的地方；還沒走到的步驟一律要一頁頁按「下一頁」過去——
+步驟 2（付款資料）、4（營運狀況）、6（封面）的「下一頁」還帶著資料交接（填封面與 `state.company`、
+凍結 `reportPages`），跳過去會產生對不起來的資料。另外：目前所在的那一組不可點；
+未滿一年沒有營業稅頁，那一格也不可點（它的進入點會落在營所稅的第一份）；完成頁之後整個流程結束，全部不可點。
 
 ### Segmented Progress（分段進度條）
 

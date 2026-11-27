@@ -8,6 +8,8 @@ export interface RegistrationDoc {
   hint?: string;
   /** 上傳後會跑欄位辨識並把資料帶往後面的頁面；目前只有登記事項表（formNo 14）有 */
   identifiable?: boolean;
+  /** 沒有這份文件可以不傳；只有合夥契約是選填（與 FORM_LIST.optional 同一種標法） */
+  optional?: boolean;
 }
 
 const APPROVAL_LETTER: RegistrationDoc = { code: 'APPROVAL_LETTER', title: '最新設立或變更核准函' };
@@ -17,6 +19,8 @@ const BUSINESS_TRANSCRIPT: RegistrationDoc = { code: 'BUSINESS_TRANSCRIPT', titl
 const ARTICLES: RegistrationDoc = { code: 'ARTICLES', title: '最新公司章程' };
 const SHAREHOLDER_LIST: RegistrationDoc = { code: 'SHAREHOLDER_LIST', title: '股東名簿' };
 export const PARTNERSHIP_AGREEMENT_CODE = 'PARTNERSHIP_AGREEMENT';
+/** 唯一的選填文件：清單上分不出獨資或合夥，有沒有這份就是判準，獨資本來就不會有 */
+const PARTNERSHIP_AGREEMENT: RegistrationDoc = { code: PARTNERSHIP_AGREEMENT_CODE, title: '最新合夥契約', optional: true };
 
 /** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表、章程與股東名簿；行號看商業抄本，合夥另加合夥契約） */
 export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
@@ -24,7 +28,7 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
     case 'sole':
       return [APPROVAL_LETTER, BUSINESS_TRANSCRIPT, INVOICE_PERMIT];
     case 'partnership':
-      return [APPROVAL_LETTER, BUSINESS_TRANSCRIPT, { code: PARTNERSHIP_AGREEMENT_CODE, title: '最新合夥契約' }, INVOICE_PERMIT];
+      return [APPROVAL_LETTER, BUSINESS_TRANSCRIPT, PARTNERSHIP_AGREEMENT, INVOICE_PERMIT];
     default:
       return COMPANY_REGISTRATION_DOCS;
   }
@@ -50,7 +54,7 @@ export const BUSINESS_REGISTRATION_DOCS: RegistrationDoc[] = [
   BUSINESS_TRANSCRIPT,
   INVOICE_PERMIT,
   {
-    code: PARTNERSHIP_AGREEMENT_CODE,
+    ...PARTNERSHIP_AGREEMENT,
     title: '最新合夥契約（如為合夥）',
     hint: '獨資不需要這份。上傳後系統會把組織型態改為合夥商號，負責人頁才會出現合夥人欄位。',
   },
@@ -63,7 +67,7 @@ export const ALL_REGISTRATION_DOCS: RegistrationDoc[] = [
   ARTICLES,
   SHAREHOLDER_LIST,
   BUSINESS_TRANSCRIPT,
-  { code: PARTNERSHIP_AGREEMENT_CODE, title: '最新合夥契約' },
+  PARTNERSHIP_AGREEMENT,
   INVOICE_PERMIT,
 ];
 
@@ -97,6 +101,18 @@ export function registrationDocsFor(kind: EntityKind | null, uploaded: Record<st
  * 由公司名稱與有沒有上傳合夥契約推出組織型態，供開帳設定頁預選。
  * 商號的名稱看不出獨資或合夥，所以預設獨資，傳了合夥契約才改成合夥。
  */
+/**
+ * 組織型態與公司名稱是否對得上（確認頁用來提醒，不阻擋）。
+ * 獨資與合夥從名稱分不出來，所以商號名稱配上其中任一種都算吻合；
+ * 資料還不齊（沒有組織型態或沒有名稱）時不提醒，避免半路就跳警告。
+ */
+export function orgTypeMatchesName(orgType: OrgType, companyName: string): boolean {
+  const kind = classifyEntity(companyName);
+  if (!orgType || kind === null) return true;
+  if (kind === 'business') return orgType === 'sole' || orgType === 'partnership';
+  return companyName.includes('股份有限公司') ? orgType === 'share' : orgType === 'limited';
+}
+
 export function inferOrgType(companyName: string, hasPartnershipAgreement: boolean): OrgType {
   const kind = classifyEntity(companyName);
   if (kind === null) return null;

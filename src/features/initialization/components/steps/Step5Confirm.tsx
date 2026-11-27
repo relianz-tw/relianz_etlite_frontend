@@ -4,6 +4,7 @@ import { useInitialization } from '../../state/InitializationContext';
 import { STEP } from '../../state/initializationReducer';
 import { useFormMetadata } from '../../hooks/useFormMetadata';
 import { ORG_TYPE_LABEL, findFormInMessage, formTitleOf, getCurrentOpenYear, getDefaultFormYear, getFormItem, getPageLabel, isPageFilled, resolveReportPage, resolveToday } from '../../reports';
+import { orgTypeMatchesName } from '../../reports/registrationDocs';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
@@ -50,6 +51,8 @@ export function Step5Confirm() {
 
   // 組織型態由步驟 2 決定
   const orgTypeLabel = state.orgType ? ORG_TYPE_LABEL[state.orgType] : '';
+  // 組織型態是依公司名稱判定的，兩邊對不上多半是名稱打錯；只提醒不阻擋
+  const orgTypeMismatch = !orgTypeMatchesName(state.orgType, state.company.name);
 
   const handleConfirm = async () => {
     // 逐頁核對的資料先寫入後端；失敗就擋在這一步，避免使用者以為已存但實際沒存
@@ -145,6 +148,19 @@ export function Step5Confirm() {
                 回去修正「{formTitleOf(confirmError.formCode!)}」
               </Button>
             )}
+          </div>
+        )}
+
+        {orgTypeMismatch && (
+          <div className='flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3 text-semantic-warm-dark'>
+            <TriangleAlert size={16} className='mt-0.5 shrink-0' />
+            <div className='flex flex-col gap-1.5'>
+              <span className='text-sm font-bold'>組織型態和公司名稱對不上</span>
+              <span className='text-[13px] leading-relaxed'>
+                這裡顯示的是「{orgTypeLabel}」，但公司名稱是「{state.company.name}」。
+                組織型態是依公司名稱判定的，請確認是不是名稱打錯了；要更正請回到「付款資料」修改公司名稱。
+              </span>
+            </div>
           </div>
         )}
 
