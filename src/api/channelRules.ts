@@ -17,6 +17,24 @@ export function createChannelRule(body: Omit<CreateChannelRuleBody, 'companyUuid
   });
 }
 
+/**
+ * 建立系統預設的「其他」銷售管道，用來歸類沒有特別指定管道的銷售款項。
+ * 各公司的 uuid 不同、名稱固定為「其他」，後端之後只允許更新 receivingAccountUuid。
+ * 入帳規則給「每週固定星期一」（settlementStyle 1 = SETTLEMENT_STYLE.WEEKLY）當合理預設，
+ * 常數定義在 features/settings/data.ts，api 層不能反向 import，故此處用字面值。
+ */
+export function createDefaultOtherChannel(receivingAccountUuid: string): Promise<ChannelRuleDto> {
+  return createChannelRule({
+    channelName: '其他',
+    settlementStyle: 1,
+    settlementAmount: 1,
+    receivingAccountUuid,
+    remark: '',
+    isActive: true,
+    initDefaultOther: true,
+  });
+}
+
 export function updateChannelRule(body: Omit<UpdateChannelRuleBody, 'companyUuid'>): Promise<ChannelRuleDto> {
   return apiFetch<ChannelRuleDto>('/ael/payment/channelRules', {
     method: 'PATCH',

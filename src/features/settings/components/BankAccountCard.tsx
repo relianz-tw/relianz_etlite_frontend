@@ -38,7 +38,8 @@ export default function BankAccountCard({
   onSetDefaultReceiving,
 }: BankAccountCardProps) {
   return (
-    <div className="rounded-md border border-neutral-blue-gray/30 p-4">
+    // 自帶白底：設定頁本來就包在白卡片裡看不出差別，但開帳精靈的銀行帳戶頁直接鋪在米色底上，沒底色會整張糊掉
+    <div className="rounded-md border border-neutral-blue-gray/30 bg-white p-4">
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 nav:grid-cols-2">
           <div>

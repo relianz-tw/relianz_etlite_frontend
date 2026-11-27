@@ -1,7 +1,7 @@
 import type { StepperItem } from '@/components/ui/Stepper';
 import { STEP, stepRank, type InitializationState } from '../state/initializationReducer';
 
-/** 開帳精靈 Stepper 分組：內部有 1~9 共 9 個畫面（步驟 7 是逐頁報表），對外壓縮成 8 組顯示 */
+/** 開帳精靈 Stepper 分組：內部有 1~10 共 10 個畫面（步驟 7 是逐頁報表），對外壓縮成 9 組顯示 */
 export const INITIALIZATION_STEPPER_ITEMS: StepperItem[] = [
   { label: '合約' },
   { label: '付款資料' },
@@ -9,6 +9,7 @@ export const INITIALIZATION_STEPPER_ITEMS: StepperItem[] = [
   { label: '營運狀況' },
   { label: '營所稅' },
   { label: '營業稅' },
+  { label: '銀行帳戶' },
   { label: '確認' },
   { label: '完成' },
 ];
@@ -21,14 +22,15 @@ export const INITIALIZATION_STEPPER_ITEMS: StepperItem[] = [
  */
 export function getStepperIndex(state: Pick<InitializationState, 'currentStep' | 'currentReportIndex' | 'reportPages'>): number {
   const { currentStep, currentReportIndex, reportPages } = state;
-  if (currentStep <= 1) return 0;
-  if (currentStep === 2) return 1;
-  if (currentStep === 3) return 2;
-  if (currentStep <= 5) return 3;
-  if (currentStep === 6) return 4;
-  if (currentStep === 7) return reportPages[currentReportIndex]?.period ? 5 : 4;
-  if (currentStep === 8) return 6;
-  return 7;
+  if (currentStep <= STEP.TERMS) return 0;
+  if (currentStep === STEP.PAYMENT) return 1;
+  if (currentStep === STEP.REGISTRATION_DOCS) return 2;
+  if (currentStep <= STEP.PARTNERS) return 3;
+  if (currentStep === STEP.COMPANY) return 4;
+  if (currentStep === STEP.REPORTS) return reportPages[currentReportIndex]?.period ? 5 : 4;
+  if (currentStep === STEP.BANK_ACCOUNTS) return 6;
+  if (currentStep === STEP.CONFIRM) return 7;
+  return 8;
 }
 
 /**
@@ -58,6 +60,8 @@ export function getStepEntry(
     case 5:
       return { step: STEP.REPORTS, reportIndex: Math.max(0, reportPages.findIndex(p => p.period)) };
     case 6:
+      return { step: STEP.BANK_ACCOUNTS, reportIndex: 0 };
+    case 7:
       return { step: STEP.CONFIRM, reportIndex: 0 };
     default:
       return { step: STEP.DONE, reportIndex: 0 };

@@ -35,6 +35,10 @@ const Step4Reports = dynamic(
   () => import('@/features/initialization/components/steps/Step4Reports').then(m => ({ default: m.Step4Reports })),
   { loading: StepLoading }
 );
+const BankAccountsPage = dynamic(
+  () => import('@/features/initialization/components/BankAccountsPage').then(m => ({ default: m.BankAccountsPage })),
+  { loading: StepLoading }
+);
 const Step5Confirm = dynamic(
   () => import('@/features/initialization/components/steps/Step5Confirm').then(m => ({ default: m.Step5Confirm })),
   { loading: StepLoading }
@@ -89,6 +93,7 @@ export function InitializationClient() {
   // 尚未結算申報過沒有申報書，改填固定的公司資料表單；穩定經營一年以上沿用封面頁
   if (currentStep === STEP.COMPANY) return state.operatingStatus === 'over_one_year' ? <Step3Cover /> : <Step3CompanyInfo />;
   if (currentStep === STEP.REPORTS) return <Step4Reports />;
+  if (currentStep === STEP.BANK_ACCOUNTS) return <BankAccountsPage />;
   if (currentStep === STEP.CONFIRM) return <Step5Confirm />;
   if (currentStep === STEP.DONE) return <Step6Done />;
 

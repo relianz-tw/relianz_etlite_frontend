@@ -548,6 +548,29 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 - **按鈕**：`ghost`「取消」（不改任何資料）、`outline`「只匯入勾選項目」（沒勾任何一項時 disabled）、主要按鈕「全部匯入」；手機上下堆疊、主要按鈕在上。關閉視窗（Esc、點遮罩）等同取消。
 - **匯入行為**：被勾選的文件整份覆蓋（欄位與表格列都以辨識結果為準）；沒勾的完全不動。沒被勾選的文件仍會記下原件位置，點欄位照樣框得出原件上的位置，方便對照；AI 閃電標記照常先清掉，只標這次實際填入的欄位。
 
+### 開帳銀行帳戶頁（Initialization Bank Accounts Page）
+
+開帳精靈「確認開帳」前的一步，讓客戶確認／建立／修改公司銀行帳戶的**期初餘額**，並選定日後「其他」
+銷售管道的收款帳戶，實作見 `src/features/initialization/components/BankAccountsPage.tsx`。
+頁首 kicker「銀行帳戶」、title「確認銀行帳戶期初餘額」、`badges={['客戶填寫']}`。
+
+- **期初餘額說明**：用「Notice（非阻擋提醒框）」寫明這些金額是開帳基準日的期初餘額、不是目前銀行實際
+  餘額。客戶最容易把它填成「我現在戶頭裡有多少錢」，所以這句話一定要在清單**上方**先出現，
+  不能只放在欄位下方的小字。資產負債表沒有銀行存款金額時，同一個框改寫成請客戶自行輸入。
+- **帳戶清單與新增表單**：直接重用設定頁的 `BankAccountCard` 與 `BankAccountCreateForm`，不另畫一套。
+  還沒有任何帳戶時，新增表單的「存款餘額」預填資產負債表的銀行存款金額（`aiFilled` 不套用——
+  這是前端依既有欄位推算的帶入，不是辨識結果），欄位下方小字改寫成該年度的期初餘額。
+- **勾稽摘要列**：沿用「負責人出資額 vs 資產負債表資本額」那一列的版面（`SectionCard` 內
+  `flex flex-wrap items-center justify-between gap-2 text-sm`，相符為 `font-bold text-semantic-success`、
+  不符為 `font-bold text-semantic-error` 加 `TriangleAlert` 16px），不另創樣式。
+  **只計啟用中的帳戶**，停用的帳戶不進合計。
+- **擋下一頁**：沒有啟用中帳戶、合計與資產負債表銀行存款不符、或還沒選收款帳戶時，`nextDisabled`
+  並以 `hint` 說明原因（同 `PartnersPage`）。資產負債表銀行存款為 0（未滿一年路線或客戶沒填）時
+  **不勾稽**，只要求至少一個帳戶；帳戶清單載入失敗時**不擋**，只顯示錯誤文字。
+- **收款管道選擇**：`SectionCard` + `Label required` + `Select`（只列啟用中帳戶，選項文字同
+  `InitOtherChannelDialog` 的「暱名（銀行 帳號）」），下方 `text-[13px] text-neutral-mid` 說明確認開帳後
+  會用這個帳戶建立名為「其他」的預設銷售管道、日後可於設定／收款設定調整。
+
 ### 草稿儲存狀態（Draft Save Status）
 
 開帳精靈填寫步驟（步驟 2–8）的草稿儲存提示，放在固定底部操作列的按鈕列：桌機靠左（`nav:mr-auto`），手機在按鈕上方獨立一行。實作見 `src/features/initialization/components/DraftSaveStatus.tsx`。
