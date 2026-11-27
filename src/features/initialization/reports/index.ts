@@ -5,7 +5,7 @@ import type { ReportData, ReportField } from '../state/initializationReducer';
 export type { ReportFieldDef, ReportPageDef, ReportSectionDef, ReportTableDef, ReportFieldType, ReportChoiceDef } from './types';
 export { buildReportPage, omitFields, isAmountType } from './paperLayout';
 export * from './reportPages';
-export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getOpenYearOptions, resolveToday, toGregorianYear, getFormItem, isFormApplicable, isSoleOrPartnership, ORG_TYPE_LABEL } from './formList';
+export { FORM_LIST, CIT_PAGE_ORDER, getDefaultFormYear, getCurrentOpenYear, getOpenYearOptions, resolveToday, toGregorianYear, getFormItem, isFormApplicable, isSoleOrPartnership, ORG_TYPE_FIELD, ORG_TYPE_LABEL } from './formList';
 export { findFormInMessage, formTitleOf } from './confirmErrors';
 export { buildRequiredDocs, COVER_CODE } from './requiredDocs';
 export type { RequiredDoc, RequiredDocStatus } from './requiredDocs';

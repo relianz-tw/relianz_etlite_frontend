@@ -122,11 +122,21 @@ export function describePeriods(specs: ReportPageSpec[]): string {
 /**
  * 某份資料是否「有資料」：除了自動帶入或跨文件同步的 HDR_ 識別欄位外，有任何非空且非 0 的欄位值，或有明細列。
  * 必填頁用它判斷能不能前進（上傳辨識成功或手填皆算）；reportKey 為實際存放資料的 key（見 resolveReportPage）。
+ *
+ * options 用來放寬判準，兩個都不給時行為與原本完全相同：
+ * - ignoreFieldKeys：額外不列入計算的欄位（如開帳流程自動勾選的組織種類）
+ * - ignoreAiFilled：連 aiFilled 的欄位與明細列也不算（文件備齊清單用，見 requiredDocs 的 hasOwnData）
  */
-export function isPageFilled(reports: Record<string, ReportData>, reportKey: string): boolean {
+export function isPageFilled(
+  reports: Record<string, ReportData>,
+  reportKey: string,
+  options: { ignoreFieldKeys?: string[]; ignoreAiFilled?: boolean } = {},
+): boolean {
   const report = reports[reportKey];
   if (!report) return false;
+  const { ignoreFieldKeys = [], ignoreAiFilled = false } = options;
+  const counts = (field: ReportData['fields'][string]) => field.value !== '' && field.value !== 0 && !(ignoreAiFilled && field.aiFilled);
   // 表格預設會有一列空白列，整列都沒填不算有資料
-  if (report.rows.some(row => Object.entries(row).some(([key, field]) => !key.startsWith('__') && field.value !== '' && field.value !== 0))) return true;
-  return Object.entries(report.fields).some(([key, field]) => !key.startsWith('HDR_') && field.value !== '' && field.value !== 0);
+  if (report.rows.some(row => Object.entries(row).some(([key, field]) => !key.startsWith('__') && counts(field)))) return true;
+  return Object.entries(report.fields).some(([key, field]) => !key.startsWith('HDR_') && !ignoreFieldKeys.includes(key) && counts(field));
 }

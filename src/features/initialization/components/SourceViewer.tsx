@@ -197,12 +197,16 @@ export function SourceViewer({ file, pages, bbox, onLeaveFocus, action, emptyTex
     setManualIndex(clamp(next, 0, pageCount - 1));
   };
 
-  // 點紅框以外的圖片區域：清掉聚焦欄位與手動倍率，圖片回到原比例、捲回最上方
-  // （紅框疊在圖片上且是它的兄弟節點，點框本身不會進到這裡）
-  const leaveFocus = () => {
-    if (!activeBox && manualScale === null) return;
-    setManual(null);
-    onLeaveFocus?.();
+  // 滑鼠拖曳移動畫面：放大後只能拉捲軸很難看，按住直接拖比較直覺。
+  // 內容沒有超出檢視區時不給拖（游標也維持一般樣式），觸控交給瀏覽器原生捲動，不攔
+  const canPan = scale > 1.001 || viewport.w * scale * ratio > viewport.h + 1;
+  const dragRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
   if (pageCount === 0) {
@@ -239,16 +243,32 @@ export function SourceViewer({ file, pages, bbox, onLeaveFocus, action, emptyTex
           {action}
         </div>
       </div>
-      <div ref={viewportRef} className='min-h-0 flex-1 overflow-auto bg-surface-off-white [scrollbar-width:thin]'>
+      <div
+        ref={viewportRef}
+        className={`min-h-0 flex-1 overflow-auto bg-surface-off-white [scrollbar-width:thin] ${canPan ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+        onPointerDown={e => {
+          if (!canPan || e.pointerType !== 'mouse' || e.button !== 0) return;
+          dragRef.current = { x: e.clientX, y: e.clientY, left: e.currentTarget.scrollLeft, top: e.currentTarget.scrollTop };
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setDragging(true);
+        }}
+        onPointerMove={e => {
+          const start = dragRef.current;
+          if (!start) return;
+          e.currentTarget.scrollLeft = start.left - (e.clientX - start.x);
+          e.currentTarget.scrollTop = start.top - (e.clientY - start.y);
+        }}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
         <div className='relative mx-auto' style={{ width: `${scale * 100}%` }}>
           {urls[page - 1] && (
             // eslint-disable-next-line @next/next/no-img-element -- 來源是本地 object URL，next/image 無法最佳化
             <img
               src={urls[page - 1]}
               alt={`原件第 ${page} 頁`}
-              className={`block h-auto w-full select-none ${activeBox ? 'cursor-zoom-out' : ''}`}
+              className='block h-auto w-full select-none'
               draggable={false}
-              onClick={leaveFocus}
               onLoad={e => setRatio(e.currentTarget.naturalHeight / e.currentTarget.naturalWidth)}
             />
           )}

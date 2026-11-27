@@ -85,6 +85,18 @@ export const ORG_TYPE_LABEL: Record<Exclude<OrgType, null>, string> = {
   partnership: '合夥商號',
 };
 
+/**
+ * 組織型態 → 損益表 ORG_KIND 組的欄位代碼。
+ * 這幾格是開帳流程依公司名稱推出組織型態後自動勾的，不是使用者在損益表上填的，
+ * 判斷「這份文件有沒有資料」時要排除（見 requiredDocs 的 hasOwnData）。
+ */
+export const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
+  share: 'ORG_1_SHARE',
+  limited: 'ORG_2_LIMITED',
+  sole: 'ORG_6_SOLE',
+  partnership: 'ORG_5_PARTNERSHIP',
+};
+
 /** 獨資或合夥（無股東名簿與未分配盈餘申報書，改填負責人／合夥人資料） */
 export function isSoleOrPartnership(orgType: OrgType): boolean {
   return orgType === 'sole' || orgType === 'partnership';

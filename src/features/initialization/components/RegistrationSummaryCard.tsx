@@ -11,7 +11,7 @@ import { PaperStoreProvider } from './paper/PaperStore';
 import { useInitPaperStore } from './paper/useInitPaperStore';
 
 /**
- * 登記事項表的辨識結果摘要（見 DESIGN.md「登記事項表摘要卡」）。
+ * 登記事項表的辨識結果摘要。
  * 這張表約 100 個欄位，開帳只用得到十幾個，所以不畫完整紙本頁、也不給對照面板；
  * 欄位標籤與型別一律取自 metadata，沒有辨識到值的欄位不顯示。
  */

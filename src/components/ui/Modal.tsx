@@ -10,6 +10,8 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   widthClassName?: string;
+  /** 一定要在彈窗裡做出選擇時設 false：不給關閉鈕、Escape 與點遮罩都不關（如覆蓋雲端草稿） */
+  dismissible?: boolean;
   children: ReactNode;
 }
 
@@ -24,7 +26,7 @@ interface ModalSurface {
 /** 讓 Modal 內部元件（如 SubjectPicker 的 inDialog 模式）取得卡片掛載點與覆蓋層開關狀態 */
 export const ModalSurfaceContext = createContext<ModalSurface | null>(null);
 
-export default function Modal({ open, onClose, title, widthClassName = 'max-w-[480px]', children }: ModalProps) {
+export default function Modal({ open, onClose, title, widthClassName = 'max-w-[480px]', dismissible = true, children }: ModalProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const surface = useMemo(() => ({ cardRef, overlayOpen, setOverlayOpen }), [overlayOpen]);
@@ -32,7 +34,7 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && dismissible) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     // 鎖住背景捲動：手機上內容較短的彈窗（overlay 本身無可捲空間）touchmove 會直接捲動背景頁面，
@@ -43,7 +45,7 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   // 關閉後歸零覆蓋層狀態，避免下次開啟殘留卡片長高／遮罩不可關閉的狀態
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
       <div
         className="flex min-h-full items-center justify-center p-4"
         onMouseDown={e => {
-          if (overlayOpen) return;
+          if (overlayOpen || !dismissible) return;
           if (e.target === e.currentTarget) onClose();
         }}
       >
@@ -74,14 +76,16 @@ export default function Modal({ open, onClose, title, widthClassName = 'max-w-[4
             <h2 id="modal-title" className="font-notoSerif text-lg font-semibold text-neutral-dark">
               {title}
             </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="關閉"
-              className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center text-neutral-mid hover:text-neutral-dark"
-            >
-              <X size={18} />
-            </button>
+            {dismissible && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="關閉"
+                className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center text-neutral-mid hover:text-neutral-dark"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
           <ModalSurfaceContext.Provider value={surface}>{children}</ModalSurfaceContext.Provider>
         </div>

@@ -2,7 +2,7 @@
 
 import { useReference } from '../reference/ReferenceContext';
 import { useInitialization } from '../state/InitializationContext';
-import { FORM_LIST, buildRequiredDocs, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, resolveToday } from '../reports';
+import { FORM_LIST, buildRequiredDocs, formatPeriodLabel, getCurrentOpenYear, getVatReportKey, isMaskedValue, lockedCoverValues, resolveToday } from '../reports';
 import { hasValue, sameValue, toLocations, toRowValues, toValueMap } from '../reports/identifiedValues';
 import { identifiedImageUrl, identifyCit, type IdentifiedForm } from '@/api/peit';
 import Button from '@/components/ui/Button';
@@ -62,8 +62,10 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
     setImportAsk(null);
   };
 
-  /** 這張辨識結果對應的資料 key：營所稅是 formCode，401／403 要對到需要的期別頁；對不到回 null */
+  /** 這張辨識結果對應的期別頁：401／403 要依「民國年＋期別起始月」對到這次需要的那一期 */
   const findVatPage = (form: IdentifiedForm) => state.reportPages.find(p => p.period?.rocYear === form.taxYear && p.period.phase === form.periodStartMonth);
+
+  /** 這張辨識結果對應的資料 key：營所稅是 formCode，401／403 要對到需要的期別頁；對不到回 null */
   const reportIdOf = (form: IdentifiedForm): string | null => {
     if (form.formCode !== 'VAT_401' && form.formCode !== 'VAT_403') return form.formCode;
     const page = findVatPage(form);
@@ -76,14 +78,21 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
     return findVatPage(form)?.key ?? null;
   };
 
-  /** 這次辨識會不會蓋掉「已有資料、且值不同」的欄位（現有為空白或值相同的不算）；表格列整批取代，現有列有資料且不同也算 */
-  const willOverwrite = (forms: IdentifiedForm[]): boolean =>
-    forms.some(form => {
+  /**
+   * 這次辨識會不會蓋掉「已經帶入過或手填過、而且值不同」的資料（現有為空白或值相同的不算）；
+   * 表格列整批取代，現有列有資料且與辨識結果不同也算。只有這種情況才問使用者要不要覆蓋。
+   * 公司基本資料欄位不列入判斷：那幾格由登記事項表鎖定、辨識值本來就不會蓋進去（見 reducer 的
+   * APPLY_IDENTIFIED_FORM），拿它去問等於每次上傳都跳視窗，而且問的是一件不會發生的事。
+   */
+  const willOverwrite = (forms: IdentifiedForm[]): boolean => {
+    const locked = lockedCoverValues(state.reports);
+    return forms.some(form => {
       const reportId = reportIdOf(form);
       if (!reportId) return false;
       const current = state.reports[reportId];
       const values = toValueMap(form.fields);
       const fieldConflict = form.fields.some(f => {
+        if (locked && f.fieldCode in locked) return false;
         const next = values[f.fieldCode];
         const existing = current?.fields[f.fieldCode]?.value;
         return next !== undefined && hasValue(existing) && !sameValue(existing, next);
@@ -95,6 +104,24 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       const rowsDiffer = oldRows.length !== newRows.length || newRows.some((row, i) => Object.entries(row).some(([key, value]) => key !== '__kind' && !sameValue(oldRows[i]?.[key]?.value ?? '', value)));
       return newRows.length > 0 && oldRowsHaveData && rowsDiffer;
     });
+  };
+
+  /**
+   * 這次辨識有沒有和登記事項表對不上的公司基本資料。
+   * 這些欄位以登記事項表為準、辨識值不會覆蓋（見 reducer 的 APPLY_IDENTIFIED_FORM），
+   * 但使用者不會自己去比對，匯入完要當場講一聲，細節在該頁上方的提醒框。
+   */
+  const findCompanyMismatch = (forms: IdentifiedForm[]): boolean => {
+    const locked = lockedCoverValues(state.reports);
+    if (!locked) return false;
+    return forms.some(form =>
+      Object.entries(toValueMap(form.fields)).some(([key, value]) => {
+        const registered = locked[key];
+        // 遮蔽過的值（F12617****）本來就對不上完整值，不算不一致
+        return registered !== undefined && String(value) !== String(registered) && !isMaskedValue(value) && !isMaskedValue(registered);
+      })
+    );
+  };
 
   /**
    * 套用一張辨識結果。營所稅各表以 formCode 為 key；401／403 要依「民國年＋期別起始月」對到這次需要的期別頁，
@@ -188,7 +215,9 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       // 欄位位置要記下它屬於哪份原件（fileId），所以等上傳也完成再套用
       const source = sourcePromise ? await sourcePromise : null;
       if (source?.error) toast.error(`${getFriendlyErrorMessage(source.error, '原件上傳失敗')}，原件未存到雲端，重新整理後需重新上傳`);
-      // 辨識結果會蓋到已有資料時，先讓使用者逐份勾選要匯入哪些；不會蓋到任何東西就全部帶入，不打擾
+      // 統編等公司基本資料對不上不擋匯入：資料照帶，帶完再提醒（見下方 toast 與該頁上方的提醒框）
+      const companyMismatch = findCompanyMismatch(presentForms);
+      // 只有會蓋掉「已帶入過或手填過」的資料時，才讓使用者逐份勾選要匯入哪些
       const importingKeys = presentForms.flatMap(f => {
         const key = docKeyOf(f);
         return key ? [key] : [];
@@ -228,6 +257,7 @@ export function FormIdentifyPanel({ required = false, vatPeriod = false, pageKey
       // 帶入了哪幾份由下方的文件備齊清單（RequiredDocsChecklist）呈現，這裡只留部分略過或失敗的紅字提醒
       setMessage(notes.join('；'));
       toast.success(`辨識完畢，已帶入 ${appliedCount} 份文件`);
+      if (companyMismatch) toast.warning('這份文件的公司基本資料和登記事項表不一致，已保留登記事項表的內容，詳情見該頁上方提醒');
     } catch (err) {
       // 辨識失敗時檔案照樣留在這一頁，使用者可以對著它手動輸入
       if (vatPeriod && pageKey && uploaded) setVatUpload(pageKey, uploaded);

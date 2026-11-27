@@ -378,7 +378,7 @@ export default function ReconciliationView({ initialSide = 'receivable' }: Recon
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
   // 不視為錯誤擋下，UI 面板翻面呈現（見 ReconPoolPanel），這裡同步算出翻轉後的方向供驗證與送出管道使用。
   // 匯總沖帳的對帳單金額欄位不允許輸入負值，加總為負一定是減項（銀行手續費／電商平台扣款／額外金額）
-  // 吃掉本金的輸入錯誤，不套用反向沖帳翻面（見 DESIGN.md「Reversed Settlement Panel」），直接擋下送出
+  // 吃掉本金的輸入錯誤，不套用反向沖帳翻面（見 ReconPoolPanel 的 isReversed），直接擋下送出
   const summaryNegativeTotal = mode === 'summary' && depositAmount < 0;
   const isReversed = mode !== 'summary' && depositAmount < 0;
   const effectiveSide: ReconSide = isReversed ? (side === 'payable' ? 'receivable' : 'payable') : side;

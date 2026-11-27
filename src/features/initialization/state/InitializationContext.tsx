@@ -38,7 +38,6 @@ import { blobToFile } from '@/lib/blobToFile';
 import { ApiError, getFriendlyErrorMessage } from '@/lib/errors';
 import { toast } from 'sonner';
 import { DraftConflictDialog } from '../components/DraftConflictDialog';
-import { formatDraftDateTime } from '../components/draftTime';
 import { toVatPeriodKey } from '../reports/vatPeriodKey';
 
 // storage key 加上 etlite_ 前綴，理由同 onboarding（見 features/onboarding/state/OnboardingContext.tsx）：
@@ -118,6 +117,15 @@ function isMissingDraft(data: unknown): boolean {
   return conflict?.version === 0 && !conflict.savedAt;
 }
 
+/**
+ * 雲端那份草稿還是全空的——進畫面自動建的那一份就長這樣（停在合約頁、還沒按同意，
+ * 後面什麼都不可能填過）。覆蓋它不會丟掉任何東西，所以不必為了它跳「資料同步」問使用者。
+ */
+function isBlankDraft(state: InitializationState | undefined): boolean {
+  if (!state) return true;
+  return !state.termsAgreed && state.currentStep <= STEP.TERMS;
+}
+
 export function InitializationProvider({ children }: { children: React.ReactNode }) {
   const [state, rawDispatch] = useReducer(initializationReducer, initialState);
   const [mounted, setMounted] = useState(false);
@@ -179,7 +187,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const [conflict, setConflict] = useState<DraftConflictData | null>(null);
   const conflictRef = useRef<DraftConflictData | null>(null);
   conflictRef.current = conflict;
-  // 後端的覆蓋確認：問過之後整個分頁都帶 overwrite；使用者按取消就先不再自動問，等他自己按「儲存」
+  // 後端的覆蓋確認：問過之後整個分頁都帶 overwrite，不再重複打擾（同一分頁只問一次）
   const [overwriteAsk, setOverwriteAsk] = useState<DraftConflictData | null>(null);
   const overwriteOkRef = useRef(false);
   const overwriteAskedRef = useRef(false);
@@ -188,6 +196,8 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const savingRef = useRef(false);
   // 上次存進雲端的內容，自動儲存用來判斷「有沒有變動」
   const lastSavedJsonRef = useRef<string | null>(null);
+  // 進場時發現雲端沒有草稿而補建的那一次，只做一次
+  const initialDraftCreatedRef = useRef(false);
 
   // 還沒存過（null）一律當成有未儲存內容
   const hasUnsavedChanges = useCallback(() => lastSavedJsonRef.current === null || JSON.stringify(stateRef.current) !== lastSavedJsonRef.current, []);
@@ -239,18 +249,11 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     }
   }, [recordVersion]);
 
-  /** 使用者同意覆蓋雲端那份草稿：之後的儲存都帶 overwrite，並立刻把剛才沒存成功的內容重送一次 */
+  /** 保留目前版本：覆蓋雲端那份草稿，之後的儲存都帶 overwrite，並立刻把剛才沒存成功的內容重送一次 */
   const handleOverwriteConfirm = () => {
     overwriteOkRef.current = true;
     setOverwriteAsk(null);
     saveDraftNow();
-  };
-
-  /** 不覆蓋：這次就是沒存成功，照實顯示；之後按「儲存」會再問一次 */
-  const handleOverwriteCancel = () => {
-    setOverwriteAsk(null);
-    overwriteAskedRef.current = false;
-    setSaveError(true);
   };
 
   /** 用雲端草稿取代目前畫面：還原表單並跳到存檔時的步驟，瀏覽器歷史的目前這一筆也同步成該步驟 */
@@ -295,7 +298,20 @@ export function InitializationProvider({ children }: { children: React.ReactNode
     }
     getDraft()
       .then(draft => {
-        if (!draft) return;
+        // 雲端還沒有草稿就當場建一份（內容是空的也照存）：草稿從進場就存在、版本號一開始就對得上，
+        // 不必等 30 秒後第一次自動儲存才建立，使用者中途關掉分頁也不會整份不見
+        if (!draft) {
+          // 開發模式的 StrictMode 會把這個 effect 跑兩次，用旗標確保只建一份
+          if (!initialDraftCreatedRef.current) {
+            initialDraftCreatedRef.current = true;
+            // 雲端那份是這個分頁自己建的，後面要存就直接蓋，不必反過來問使用者要不要覆蓋
+            overwriteOkRef.current = true;
+            saveDraftNow();
+          }
+          return;
+        }
+        // 雲端那份還是全空的（多半是上次進畫面自動建的）：之後直接覆蓋，不拿它去打擾使用者
+        if (isBlankDraft(draft.state as InitializationState)) overwriteOkRef.current = true;
         if (!local) applyServerDraft(draft);
         // 雲端比這個分頁記得的新：本機沒有未存檔的修改就直接採用雲端，有才讓使用者選要留哪一邊
         else if (draft.version !== knownVersion) {
@@ -307,7 +323,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
       // 讀雲端失敗（斷線等）就用本機狀態繼續，之後儲存時會再提示
       .catch(() => {})
       .finally(() => setMounted(true));
-  }, [applyServerDraft]);
+  }, [applyServerDraft, saveDraftNow]);
 
   // 401／403 原件：狀態還原、期別頁清單有了之後，依期別從後端取回（只做一次）
   const vatRestoredRef = useRef(false);
@@ -346,13 +362,35 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   // 自動儲存：只在填寫步驟、內容與上次儲存不同、且沒有衝突視窗開著時才存，避免白白更新時間
   useEffect(() => {
     if (!mounted) return;
-    const timer = setInterval(() => {
+    const saveIfChanged = () => {
+      // 使用者不在這個分頁（切到別的分頁、最小化）時不存：背景分頁的內容不會再變動，
+      // 存了只是白白更新雲端時間，還可能和使用者正在操作的另一台裝置互相覆蓋
+      if (document.hidden) return;
       const current = stateRef.current;
       if (conflictRef.current || !isFillingStep(current.currentStep)) return;
       if (JSON.stringify(current) !== lastSavedJsonRef.current) saveDraftNow();
-    }, AUTOSAVE_INTERVAL_MS);
-    return () => clearInterval(timer);
+    };
+    const timer = setInterval(saveIfChanged, AUTOSAVE_INTERVAL_MS);
+    // 切回這個分頁時立刻補一次：離開期間跳過的那幾次在這裡一次補完，不必再等滿 30 秒
+    document.addEventListener('visibilitychange', saveIfChanged);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', saveIfChanged);
+    };
   }, [mounted, saveDraftNow]);
+
+  /** 使用最新版本：放棄這個分頁尚未儲存的修改，改用雲端那份；使用者已經選過了，之後的儲存不再問 */
+  const handleOverwriteLoadServer = async () => {
+    try {
+      const draft = await getDraft();
+      if (draft) applyServerDraft(draft);
+      overwriteOkRef.current = true;
+      setOverwriteAsk(null);
+      setSaveError(false);
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, '載入雲端草稿失敗，請稍後再試'));
+    }
+  };
 
   const handleConflictLoadServer = async () => {
     try {
@@ -489,16 +527,14 @@ export function InitializationProvider({ children }: { children: React.ReactNode
         serverSavedAt={conflict?.savedAt ?? ''}
         onLoadServer={handleConflictLoadServer}
         onOverwrite={handleConflictOverwrite}
-        onClose={() => setConflict(null)}
       />
-      <ConfirmDialog
+      {/* 後端說雲端已有草稿（0003）：和版本衝突是同一件事的兩個入口，用同一個視窗問，
+          但這裡沒有「先關掉不選」——關掉等於沒存成功而使用者不會知道，所以不給 onClose */}
+      <DraftConflictDialog
         open={overwriteAsk !== null}
-        onClose={handleOverwriteCancel}
-        onConfirm={handleOverwriteConfirm}
-        title='覆蓋雲端草稿'
-        message={`雲端已經有一份草稿（上次儲存 ${overwriteAsk ? formatDraftDateTime(overwriteAsk.savedAt) : ''}）。繼續儲存會以這個分頁的內容覆蓋它，雲端那份的內容不會保留。`}
-        confirmLabel='覆蓋'
-        cancelLabel='先不要'
+        serverSavedAt={overwriteAsk?.savedAt ?? ''}
+        onLoadServer={handleOverwriteLoadServer}
+        onOverwrite={handleOverwriteConfirm}
       />
     </InitializationContext.Provider>
   );

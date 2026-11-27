@@ -61,6 +61,11 @@ export function getBalanceSheetDateLabel(taxYear: number, incomePeriodEnd: strin
   return `民國 ${gregorianYear - 1911} 年 ${month} 月 ${day} 日`;
 }
 
+/** 基準日所屬的民國年（頁面標題用，與上面的標籤同一個來源） */
+export function getBalanceSheetDateYear(taxYear: number, incomePeriodEnd: string | number | undefined): number {
+  return getBalanceSheetEndDate(taxYear, incomePeriodEnd).gregorianYear - 1911;
+}
+
 /** 寫入 HDR_BS_DATE 的值（YYYY-MM-DD，與其他日期欄位格式一致） */
 export function getBalanceSheetDateValue(taxYear: number, incomePeriodEnd: string | number | undefined): string {
   const { gregorianYear, month, day } = getBalanceSheetEndDate(taxYear, incomePeriodEnd);

@@ -89,14 +89,14 @@ interface ReconPoolPanelProps {
   /** 放進 BottomSheet 時，Sheet 本身已有標題，面板內不需要再顯示一次標題列，省略時預設顯示 */
   hideHeader?: boolean;
   /** 排列方式：'narrow'（預設，約 340px 窄欄，欄位上下堆疊，逐筆沖帳右欄／行動版 Bottom Sheet 使用）／
-   *  'wide'（全寬多欄網格，匯總沖帳步驟 2 全寬卡使用，見 DESIGN.md「Recon Pool Panel — Wide Layout」） */
+   *  'wide'（全寬多欄網格，匯總沖帳步驟 2 全寬卡使用） */
   layout?: 'narrow' | 'wide';
 }
 
 /**
  * 沖帳金額面板：逐筆沖帳固定於右欄（約 340px 窄欄，layout="narrow"），與左側交易清單同時在首屏出現，
  * 操作順序由左至右——先在清單勾選交易，再到本面板確認/輸入金額；匯總沖帳改置於全寬步驟卡內
- * （layout="wide"，見 ReconciliationView 版面說明與 DESIGN.md「Recon Pool Panel — Wide Layout」）。
+ * （layout="wide"，見 ReconciliationView 版面說明）。
  * 逐筆沖帳／匯總沖帳共用同一份 UI 與驗證邏輯，差異僅在標頭是否顯示已選筆數（逐筆沖帳才顯示）與排列方式。
  * 金額欄位一律為「總金額」；銀行手續費與每筆額外金額預設為減項但可用 MoneyInput 的正負切換鈕改列為加項，
  * 電商平台扣款（僅應收）則固定鎖在負值（lockedSign，切換鈕整組淡化不可點）。三者與沖帳金額加總即為
@@ -156,7 +156,7 @@ export default function ReconPoolPanel({
   const otherDeductionsTotal = otherDeductions.reduce((sum, r) => sum + r.amount, 0);
   const depositAmount = computeActualAmount(statementAmount, feeAmount + platformFeeAmount + otherDeductionsTotal);
   // 反向沖帳：實際存入/付出金額為負，代表方向反了（如逐筆沖帳勾到退款/折讓性質的負值交易）——
-  // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值），見 DESIGN.md「Reversed Settlement Panel」。
+  // 不視為錯誤擋下，整個面板翻面呈現（方向文字互換、金額一律顯示絕對值）。
   // 匯總沖帳排除在外：對帳單金額不可輸入負值，加總為負一律是輸入錯誤，交由 ReconciliationView 的
   // summaryNegativeTotal 即時擋下，不翻面、不變色（見 DESIGN.md 同章節適用範圍說明）
   const isReversed = mode !== 'summary' && depositAmount < 0;
@@ -178,7 +178,7 @@ export default function ReconPoolPanel({
   );
 
   // 勾選加總本身為負：在沖帳金額欄位「之前」先說明方向判斷，避免使用者先看到一個負數自動帶入的
-  // 沖帳金額卻不明所以，見 DESIGN.md「逐筆勾選加總本身為負」
+  // 沖帳金額卻不明所以
   const negativeSelectionHintBlock = showNegativeSelectionHint && (
     <div className="flex items-start gap-2 rounded-md border border-brand-tan/40 bg-brand-tan/10 p-3">
       <ArrowLeftRight size={16} className="mt-0.5 shrink-0 text-semantic-warm-dark" />

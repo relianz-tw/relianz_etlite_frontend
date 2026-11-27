@@ -1,7 +1,7 @@
 'use client';
 
 import type { FieldBBox } from '@/api/peit';
-import { buildEmptyRow, buildInitialReportsState, isSoleOrPartnership } from '../reports';
+import { buildEmptyRow, buildInitialReportsState, isSoleOrPartnership, ORG_TYPE_FIELD } from '../reports';
 import type { ReportPageSpec, VatFormCode } from '../reports/reportPages';
 import type { ReportFieldDef } from '../reports/types';
 
@@ -566,14 +566,6 @@ function applyOrgType(state: InitializationState, orgType: OrgType): Pick<Initia
   }
   return { orgType, reports };
 }
-
-/** 組織型態 → 損益表 ORG_KIND 組的欄位代碼 */
-const ORG_TYPE_FIELD: Record<Exclude<OrgType, null>, string> = {
-  share: 'ORG_1_SHARE',
-  limited: 'ORG_2_LIMITED',
-  sole: 'ORG_6_SOLE',
-  partnership: 'ORG_5_PARTNERSHIP',
-};
 
 /** 移動到某個畫面，順手把 maxVisited 推到更遠的位置（往回走不會把它拉回來） */
 function visit(state: InitializationState, target: StepTarget): InitializationState {
