@@ -11,8 +11,10 @@ import {
   IDENTIFY_MAX_SIZE_MB,
   REGISTRATION_FORM_NO,
   REGISTRATION_FORM_YEAR,
+  REGISTRATION_OFFICER_TO_COVER,
   REGISTRATION_TO_COMPANY,
   REGISTRATION_TO_COVER,
+  isMaskedValue,
   getCurrentOpenYear,
   officerRows,
   resolveToday,
@@ -109,7 +111,7 @@ export function useRegistrationIdentify(): RegistrationIdentify {
       });
 
       // 這三個都只補空白，不會蓋掉付款資料，所以不必等使用者決定、先帶入沒關係
-      applyToCover(values, state, dispatch);
+      applyToCover(values, officers, state, dispatch);
       applyToCompany(values, state, dispatch);
       applyToInvestors(officers, state, dispatch);
 
@@ -155,12 +157,27 @@ type Dispatch = ReturnType<typeof useInitialization>['dispatch'];
  * 寫進封面的共用公司識別欄位（只補空白）。SET_REPORT_FIELD 以 aiFilled=false 寫入，
  * 並由 setReportFieldSynced 自動推播到其餘每一張報表，不需要另外接線。
  */
-function applyToCover(values: Record<string, string | number>, state: InitializationState, dispatch: Dispatch) {
+function applyToCover(values: Record<string, string | number>, officers: Record<string, string | number>[], state: InitializationState, dispatch: Dispatch) {
   const cover = state.reports.CIT_COVER?.fields ?? {};
+  // 負責人的身分證字號與住居所在董監事名單裡（姓名與 REPRESENTATIVE 相同的那一列），不是固定欄位
+  const representative = String(values.REPRESENTATIVE ?? '').trim();
+  const ownerRow = representative ? officers.find(row => String(row.ROW_NAME ?? '').trim() === representative) : undefined;
+  const ownerValues: Record<string, string | number> = {};
+  for (const [from, to] of Object.entries(REGISTRATION_OFFICER_TO_COVER)) {
+    const value = ownerRow?.[from];
+    if (value !== undefined && value !== '') ownerValues[to] = value;
+  }
+
   for (const [from, to] of Object.entries(REGISTRATION_TO_COVER)) {
     const value = values[from];
     if (value === undefined || value === '') continue;
     if ((cover[to]?.value ?? '') !== '') continue;
+    dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: 'CIT_COVER', key: to, value } });
+  }
+  // 封面這兩格的原件常是遮蔽的（F12617****），登記表的完整值一律蓋過去
+  for (const [to, value] of Object.entries(ownerValues)) {
+    const current = cover[to]?.value ?? '';
+    if (current !== '' && !isMaskedValue(current)) continue;
     dispatch({ type: 'SET_REPORT_FIELD', payload: { reportId: 'CIT_COVER', key: to, value } });
   }
 }

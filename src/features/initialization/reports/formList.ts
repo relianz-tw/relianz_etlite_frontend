@@ -22,13 +22,13 @@ export const FORM_LIST: FormListItem[] = [
   { formNo: 4, formCode: 'CIT_BALANCE_SHEET', title: '資產負債表', taxType: 'cit' },
   { formNo: 5, formCode: 'CIT_INVESTORS', title: '營利事業投資人明細及分配盈餘表', taxType: 'cit' },
   { formNo: 6, formCode: 'CIT_UE', title: '未分配盈餘申報書', taxType: 'cit' },
-  { formNo: 7, formCode: 'CIT_WH_RECON', title: '各類給付扣繳、股利憑單金額與申報金額調節表', taxType: 'cit' },
+  { formNo: 7, formCode: 'CIT_WH_RECON', title: '各類給付扣繳、股利憑單金額與申報金額調節表', taxType: 'cit', optional: true },
   { formNo: 8, formCode: 'CIT_PROPERTY', title: '財產目錄', taxType: 'cit', optional: true },
   { formNo: 9, formCode: 'CIT_SHAREHOLDERS', title: '股東名簿', taxType: 'cit' },
   { formNo: 10, formCode: 'CIT_UNAMORTIZED', title: '未攤銷費用明細表', taxType: 'cit', optional: true },
   { formNo: 11, formCode: 'VAT_401', title: '營業人銷售額與稅額申報書(401)', taxType: 'vat' },
   { formNo: 12, formCode: 'VAT_403', title: '營業人銷售額與稅額申報書(403)', taxType: 'vat' },
-  { formNo: 13, formCode: 'CIT_WH_RETURN', title: '各類所得扣繳暨免扣繳憑單申報書', taxType: 'cit' },
+  { formNo: 13, formCode: 'CIT_WH_RETURN', title: '各類所得扣繳暨免扣繳憑單申報書', taxType: 'cit', optional: true },
 ];
 
 export function getFormItem(formCode: SettlementReportId): FormListItem {

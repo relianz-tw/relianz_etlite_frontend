@@ -16,11 +16,16 @@ export {
   REGISTRATION_FORM_NO,
   REGISTRATION_FORM_YEAR,
   REGISTRATION_ITEMS_CODE,
+  REGISTRATION_LOCKED_COVER_FIELDS,
+  REGISTRATION_OFFICER_TO_COVER,
   REGISTRATION_SUMMARY_GROUPS,
   REGISTRATION_TO_COMPANY,
   REGISTRATION_TO_COVER,
   hasRegistrationData,
+  isMaskedValue,
+  lockedCoverValues,
   officerRows,
+  representativeRow,
   withoutSharedFields,
 } from './registrationForm';
 

@@ -20,13 +20,9 @@ export function Step4Reports() {
 
   if (!spec) return null;
 
-  // kicker 標出目前所在段落（營所稅／營業稅），營所稅頁排在最前，索引即第幾份；整體進度由進度條呈現
-  const citTotal = state.reportPages.filter(p => !p.period).length;
-  const vatPages = state.reportPages.filter(p => p.period);
-  const vatNo = vatPages.findIndex(p => p.key === spec.key) + 1;
-  const kicker = spec.period
-    ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}・第 ${vatNo} / ${vatPages.length} 期`
-    : `營所稅結算申報・第 ${state.currentReportIndex + 1} / ${citTotal} 份`;
+  // kicker 只標出目前所在段落（營所稅／營業稅第幾期），份數一律交給底部進度列的「第 N / M 份」。
+  // 這裡原本另外寫「第 N / 9 份」，和底部的「第 N / 15 份」是兩套編號，同一頁兩個數字對不起來
+  const kicker = spec.period ? `營業稅申報・${formatPeriodLabel(spec.period.rocYear, spec.period.phase)}` : '營所稅結算申報';
   const nextLabel = state.currentReportIndex >= total - 1 ? '下一頁：確認開帳' : '下一頁';
   const nav = { onPrev: () => dispatch({ type: 'PREV_STEP' }), onNext: () => dispatch({ type: 'NEXT_STEP' }), nextLabel };
   // 封面算第 1 份，所以這裡各頁要再 +1

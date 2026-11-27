@@ -2,7 +2,7 @@
 
 import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
-import { getFormItem, omitFields, type VatFormCode, isPageFilled, resolveReportPage, type ReportPageSpec } from '../reports';
+import { getFormItem, omitFields, type VatFormCode, isPageFilled, lockedCoverValues, resolveReportPage, type ReportPageSpec } from '../reports';
 import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
 import { FormPaperPreview } from './FormPaperPreview';
 import { ReferenceLayout } from './ReferencePanel';
@@ -16,7 +16,7 @@ import { PaperStoreProvider } from './paper/PaperStore';
 import { useInitPaperStore } from './paper/useInitPaperStore';
 import { VatResultCard } from './VatResultCard';
 import { VatPeriodPicker } from './VatPeriodPicker';
-import { TriangleAlert } from 'lucide-react';
+import { Info, TriangleAlert } from 'lucide-react';
 import { ReportTable } from './ReportTable';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
 import type { StepProgressValue } from '@/components/initialization/StepProgress';
@@ -59,8 +59,16 @@ interface ReportPageViewProps {
  * 結算申報書單頁版面（步驟 3 封面、步驟 4 逐頁核對共用）：
  * 頁首卡片（標題、上一頁／下一頁、進度、上傳辨識）＋依 metadata API 動態產生的欄位卡片＋列明細表格＋頁底導覽。
  */
+/** 「下一頁」被擋住的原因：營業稅期別頁要分清楚缺的是申報書檔案、金額，還是兩個都缺 */
+function blockedHint(isVatPeriod: boolean, needsFile: boolean, needsData: boolean): string {
+  if (!isVatPeriod) return '此期別為必填，請上傳文件或手動輸入資料後再前往下一頁';
+  if (needsFile && needsData) return '此期別為必填，請上傳申報書檔案後再前往下一頁';
+  if (needsFile) return '金額已填好，還差這一期的申報書檔案，上傳後即可前往下一頁';
+  return '申報書檔案已上傳，請確認本期金額已填寫後再前往下一頁';
+}
+
 export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, nextLabel, onNext }: ReportPageViewProps) {
-  const { state, dispatch, vatUploads } = useInitialization();
+  const { state, dispatch, vatUploads, isVatFileRequired } = useInitialization();
   const { sourceFiles } = useReference();
   // 營業稅期別頁依使用者選的 401 或 403（預設 401）決定表單與資料 key，營所稅頁固定
   const { formCode, reportKey } = resolveReportPage(spec, state.vatChoices);
@@ -97,6 +105,21 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     if (rawPage) dispatch({ type: 'PULL_SHARED_FIELDS', payload: { reportId: reportKey } });
   }, [rawPage, reportKey, dispatch]);
 
+  // 登記事項表辨識過之後，公司識別欄位以它為準：這一頁上的那些欄位畫成唯讀（欄位還是要看得到，所以不從 sections 拿掉）
+  // 只鎖「登記事項表自己有值」的欄位，不然會把一個空白或錯值鎖住讓人改不掉
+  const lockedValues = lockedCoverValues(state.reports);
+  const lockedKeys = useMemo(
+    () => (lockedValues && rawPage ? Object.keys(rawPage.fieldMap).filter(key => key in lockedValues) : []),
+    // lockedValues 每次 render 都是新物件，用內容當依賴
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(lockedValues), rawPage],
+  );
+  // 這一頁上「申報書辨識值與登記事項表對不上」的欄位（值已保留登記事項表的，這裡只提醒）
+  const pageConflicts = lockedKeys.flatMap(key => {
+    const conflict = state.registrationConflicts[key];
+    return conflict ? [{ key, label: rawPage?.fieldMap[key]?.label ?? key, ...conflict }] : [];
+  });
+
   // 區塊、欄位、分組完全依 metadata，只把自動填入的欄位拿掉（不給使用者輸入）
   const autoKeyList = autoKeys.join(',');
   const hideStock = formCode === 'CIT_COVER' && state.orgType !== 'share';
@@ -106,7 +129,9 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     const orgKeys = formCode === 'CIT_INCOME_TAX' ? INCOME_TAX_HIDDEN_ORG_KEYS : [];
     return omitFields(rawPage.sections, [...autoKeyList.split(','), ...stockKeys, ...orgKeys]);
   }, [rawPage, autoKeyList, hideStock, formCode]);
-  const store = useInitPaperStore(reportKey, rawPage, autoKeys);
+  const lockedKeyList = lockedKeys.join(',');
+  const readOnlyKeys = useMemo(() => [...autoKeyList.split(','), ...lockedKeyList.split(',')].filter(Boolean), [autoKeyList, lockedKeyList]);
+  const store = useInitPaperStore(reportKey, rawPage, readOnlyKeys);
 
   // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
   // 401／403 不顯示標籤（期別已在副標與期別卡片、必填／選填在卡片徽章）；其餘文件顯示年度
@@ -127,9 +152,18 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const mainReceiptNo = [...receiptCounts.entries()].reduce<[string, number] | null>((best, entry) => (best === null || entry[1] > best[1] ? entry : best), null)?.[0];
   const receiptMismatch = receiptNo !== '' && mainReceiptNo !== undefined && receiptNo !== mainReceiptNo;
 
-  // 必填的期別需要有資料（上傳辨識成功或手填皆可）才能前進；
+  // 統一編號：以付款資料帶進來的系統登記資料為定本（見 reducer 的 payment 註解），
+  // 這一頁的申報書統編和它不同就提醒——辨識來的申報書有可能根本是別間公司的
+  const pageVatNo = String(reportFields?.HDR_VAT_NO?.value ?? '').trim();
+  const registeredTaxId = state.payment.taxId.trim();
+  const vatNoMismatch = pageVatNo !== '' && registeredTaxId !== '' && pageVatNo !== registeredTaxId;
+
+  // 必填的期別：營業稅申報書檔案與金額資料兩個都要有才能前進（金額可辨識帶入或手填）。
   // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死
-  const blocked = spec.required && !error && !isPageFilled(state.reports, reportKey);
+  const needsData = !isPageFilled(state.reports, reportKey);
+  // 原件還沒從後端撈回來、或撈失敗時不以「沒有原件」擋人（見 isVatFileRequired）
+  const needsVatFile = !!spec.period && isVatFileRequired(spec.key) && !vatUploads[spec.key];
+  const blocked = spec.required && !error && (needsData || needsVatFile);
 
   // 底部進度列右側的小字：這一頁表單辨識自哪個檔案、在原件的第幾頁（還沒辨識過的頁面不顯示）
   const formSource = state.formSources[reportKey];
@@ -143,8 +177,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
     onNext,
     nextLabel,
     nextDisabled: blocked,
-    // 必填期別尚無資料時，提示放在底部上一頁／下一頁旁，按鈕反灰的原因就在手邊
-    hint: blocked ? (spec.period ? '此期別為必填，請上傳申報書檔案後再前往下一頁' : '此期別為必填，請上傳文件或手動輸入資料後再前往下一頁') : undefined,
+    // 按鈕反灰的原因就在手邊：提示放在底部上一頁／下一頁旁，並說清楚缺的是檔案還是金額
+    hint: blocked ? blockedHint(!!spec.period, needsVatFile, needsData) : undefined,
   };
 
   return (
@@ -186,6 +220,38 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
           <p className='text-[13px] text-neutral-mid'>此份為選填，沒有這份文件可直接按「{nextLabel}」略過，確認頁會列出未填項目，可再回來補。</p>
         )}
       </StepPageHeader>
+
+      {pageConflicts.length > 0 && (
+        <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
+          <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
+          <div className='flex min-w-0 flex-col gap-1 text-sm text-neutral-dark'>
+            <p>這份文件辨識到的資料和登記事項表不一致。畫面上保留的是登記事項表的內容，請確認是不是傳錯文件：</p>
+            <ul className='flex flex-col gap-0.5'>
+              {pageConflicts.map(conflict => (
+                <li key={conflict.key} className='break-words'>
+                  {conflict.label}：這份文件「{conflict.identified}」／登記事項表「{conflict.registered}」
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {lockedKeys.length > 0 && (
+        <div className='flex items-start gap-2.5 rounded-lg border border-brand-blue/30 bg-brand-blue/5 px-4 py-3'>
+          <Info size={18} className='mt-0.5 shrink-0 text-brand-blue' />
+          <p className='text-sm text-neutral-dark'>公司基本資料帶自登記事項表，這幾格不開放修改。要更正請回到「登記資料」重新上傳登記事項表。</p>
+        </div>
+      )}
+
+      {vatNoMismatch && (
+        <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
+          <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
+          <p className='text-sm text-neutral-dark'>
+            這一頁的統一編號（{pageVatNo}）和這次開帳的公司（{registeredTaxId}）不同。請確認這份申報書是不是這間公司的，不是的話請換一份原件重新上傳。
+          </p>
+        </div>
+      )}
 
       {receiptMismatch && (
         <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>

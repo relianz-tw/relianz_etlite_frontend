@@ -271,6 +271,10 @@ export function Step2Operating() {
                   </div>
                   <span className='text-sm text-neutral-dark'>年</span>
                 </div>
+                {/* 上一頁辨識出來的是「變更登記日期」，老闆很容易直接拿來填，所以明講它不是設立年度 */}
+                <p className='text-xs text-neutral-mid'>
+                  填公司最初成立的年度。登記事項表上的「變更登記日期」是最近一次變更，不是設立年度；請看設立核准函或公司章程上的設立日期。
+                </p>
                 {state.establishYear !== null && !establishYearValid && state.openYear !== null && <p className='text-xs text-semantic-error'>設立年度要早於開帳年度（民國 {state.openYear} 年）。</p>}
               </div>
             </div>

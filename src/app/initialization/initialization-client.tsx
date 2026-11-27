@@ -45,7 +45,7 @@ const Step6Done = dynamic(
 );
 
 export function InitializationClient() {
-  const { state, dispatch, ready } = useInitialization();
+  const { state, dispatch, ready, hasUnsavedChanges } = useInitialization();
   const { currentStep, currentReportIndex } = state;
   const searchParams = useSearchParams();
   const uuid = searchParams.get('uuid');
@@ -63,18 +63,20 @@ export function InitializationClient() {
     if (scroller) scroller.scrollTop = 0;
   }, [currentStep, currentReportIndex]);
 
-  // 正在填資料時，關閉分頁或重新整理前讓瀏覽器跳出「確定要離開」確認；
-  // 合約與完成頁沒有待保存的內容，不攔。瀏覽器只會顯示內建文字，無法自訂
+  // 正在填資料、且真的有還沒存上雲端的修改時，關閉分頁或重新整理前讓瀏覽器跳出「確定要離開」確認；
+  // 合約與完成頁沒有待保存的內容，不攔。瀏覽器只會顯示內建文字，無法自訂。
+  // 有沒有未儲存修改要在事件當下才算（剛按過儲存就不該再攔），所以在 handler 裡呼叫而不是放進 deps
   const hasUnsavedProgress = isFillingStep(currentStep);
   useEffect(() => {
     if (!hasUnsavedProgress) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges()) return;
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedProgress]);
+  }, [hasUnsavedProgress, hasUnsavedChanges]);
 
   // 新分頁／換裝置要先等雲端草稿回來，避免先閃出第一步再跳到上次的進度
   if (!ready) return <StepLoading />;
