@@ -22,7 +22,7 @@ export const PARTNERSHIP_AGREEMENT_CODE = 'PARTNERSHIP_AGREEMENT';
 /** 唯一的選填文件：清單上分不出獨資或合夥，有沒有這份就是判準，獨資本來就不會有 */
 const PARTNERSHIP_AGREEMENT: RegistrationDoc = { code: PARTNERSHIP_AGREEMENT_CODE, title: '最新合夥契約', optional: true };
 
-/** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表、章程與股東名簿；行號看商業抄本，合夥另加合夥契約） */
+/** 依組織型態列出需要客戶上傳的登記文件（公司看登記事項表、章程；行號看商業抄本，合夥另加合夥契約） */
 export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
   switch (orgType) {
     case 'sole':
@@ -30,19 +30,20 @@ export function getRegistrationDocs(orgType: OrgType): RegistrationDoc[] {
     case 'partnership':
       return [APPROVAL_LETTER, BUSINESS_TRANSCRIPT, PARTNERSHIP_AGREEMENT, INVOICE_PERMIT];
     default:
-      return COMPANY_REGISTRATION_DOCS;
+      return companyRegistrationDocs(orgType === 'share');
   }
 }
 
-/** 公司（股份有限、有限）要備的五份 */
-export const COMPANY_REGISTRATION_DOCS: RegistrationDoc[] = [
-  APPROVAL_LETTER,
-  REGISTRATION_ITEMS,
-  ARTICLES,
-  INVOICE_PERMIT,
-  // 股東名簿不逐頁核對，公司（不論營運是否滿一年）一律上傳檔案
-  SHAREHOLDER_LIST,
-];
+/** 公司（股份有限、有限）共通的四份 */
+const COMPANY_BASE_DOCS: RegistrationDoc[] = [APPROVAL_LETTER, REGISTRATION_ITEMS, ARTICLES, INVOICE_PERMIT];
+
+/**
+ * 公司要備的登記文件。股東名簿不逐頁核對、直接上傳檔案，但只有股份有限公司才要——
+ * 有限公司的股東就記在登記事項表上，不會另外做一份名簿。
+ */
+export function companyRegistrationDocs(isShare: boolean): RegistrationDoc[] {
+  return isShare ? [...COMPANY_BASE_DOCS, SHAREHOLDER_LIST] : COMPANY_BASE_DOCS;
+}
 
 /**
  * 商號（獨資、合夥）要備的四份。上傳頁只知道是不是商號、分不出獨資或合夥，
@@ -89,8 +90,8 @@ export function classifyEntity(companyName: string): EntityKind | null {
  * 已經上傳過檔案的文件一律保留在清單裡：使用者改了公司名稱讓分類翻面時，
  * 原本那幾份不能從畫面上消失，否則檔案與辨識結果留在草稿裡卻看不到也刪不掉。
  */
-export function registrationDocsFor(kind: EntityKind | null, uploaded: Record<string, string> = {}): RegistrationDoc[] {
-  const picked = kind === 'company' ? COMPANY_REGISTRATION_DOCS : kind === 'business' ? BUSINESS_REGISTRATION_DOCS : ALL_REGISTRATION_DOCS;
+export function registrationDocsFor(kind: EntityKind | null, uploaded: Record<string, string> = {}, isShare = false): RegistrationDoc[] {
+  const picked = kind === 'company' ? companyRegistrationDocs(isShare) : kind === 'business' ? BUSINESS_REGISTRATION_DOCS : ALL_REGISTRATION_DOCS;
   if (picked === ALL_REGISTRATION_DOCS) return picked;
   // 這一類的清單照它自己的順序（商號的合夥契約要留在最後）；另一類已經傳過檔案的補在後面
   const codes = new Set(picked.map(doc => doc.code));

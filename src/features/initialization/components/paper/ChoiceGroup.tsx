@@ -2,7 +2,6 @@
 
 import Checkbox from '@/components/ui/Checkbox';
 import { cn } from '@/lib/utils';
-import { Zap } from 'lucide-react';
 import type { ReportChoiceDef } from '../../reports/types';
 import { CodeChip } from './CodeChip';
 import { usePaperStore } from './PaperStore';
@@ -33,8 +32,6 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
     for (const f of choice.fields) if (f.key !== key && store.get(f.key).aiFilled) store.set(f.key, isOn(f.key) ? 1 : 0);
   };
 
-  // 辨識對沒選的項目也會回 false，逐項標記會整排都亮；改成整組只在題目前面放一個閃電
-  const aiMark = choice.fields.some(f => store.get(f.key).aiFilled) ? <Zap aria-hidden='true' size={14} className='shrink-0 fill-semantic-success text-semantic-success' /> : null;
 
   const options = (
     <div
@@ -52,10 +49,7 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
 
   if (inline) {
     return (
-      <span className='inline-flex items-center gap-2 align-middle'>
-        {aiMark}
-        {options}
-      </span>
+      <span className='inline-flex items-center gap-2 align-middle'>{options}</span>
     );
   }
 
@@ -64,10 +58,7 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
       <div className='flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1'>
         {choice.officialCode && <CodeChip official={choice.officialCode} />}
         {options}
-        <span className='flex min-w-0 items-center gap-1.5 text-sm font-medium text-neutral-dark'>
-          {aiMark}
-          {choice.title}
-        </span>
+        <span className='min-w-0 text-sm font-medium text-neutral-dark'>{choice.title}</span>
         {choice.note && <span className='min-w-0 text-[13px] text-neutral-mid'>{choice.note}</span>}
       </div>
     );
@@ -78,7 +69,6 @@ export function ChoiceGroup({ choice, inline }: ChoiceGroupProps) {
     <div className='flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2'>
       <div className='flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 nav:w-[var(--label-w,max(calc((100%_-_1.5rem)_*_0.06),5.5rem))] nav:shrink-0'>
         {choice.officialCode && <CodeChip official={choice.officialCode} />}
-        {aiMark}
         <span className='text-sm font-medium text-neutral-dark'>{choice.title}</span>
         {choice.note && <span className='text-[13px] text-neutral-mid'>{choice.note}</span>}
       </div>

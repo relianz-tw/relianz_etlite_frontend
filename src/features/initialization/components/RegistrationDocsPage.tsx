@@ -27,7 +27,8 @@ export function RegistrationDocsPage() {
 
   // 公司或商號由付款資料的公司名稱判斷；判斷不出來就列全部
   const kind = classifyEntity(state.payment.companyName);
-  const docs = registrationDocsFor(kind, state.registrationFiles);
+  // 股東名簿只有股份有限公司要，判準與 inferOrgType 一樣看公司名稱
+  const docs = registrationDocsFor(kind, state.registrationFiles, state.payment.companyName.includes('股份有限公司'));
   const showSummary = !!state.registrationFiles.REGISTRATION_ITEMS && hasRegistrationData(state.reports);
 
   // 還判斷不出公司或商號時列的是兩類文件的聯集，標必填會誤導（公司不需要商業抄本），所以只有判定出來才標

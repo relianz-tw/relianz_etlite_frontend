@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { RequiredDoc } from '../reports';
-import { formatDraftDateTime } from './draftTime';
 
 interface ImportOverwriteDialogProps {
   open: boolean;
@@ -26,11 +25,11 @@ function DocRow({ doc, checked, selectable, onToggle }: { doc: RequiredDoc; chec
     <li className='flex items-center gap-2.5 py-1'>
       <Checkbox shape='circle' checked={checked} disabled={!selectable} onChange={onToggle} aria-label={`匯入${doc.label}`} />
       <span className={cn('min-w-0 flex-1 truncate text-sm', selectable ? 'text-neutral-dark' : 'text-neutral-mid')}>{doc.label}</span>
+      {/* 辨識帶入或自己手填一律只標「已有資料」，不做區隔 */}
       {doc.status !== 'empty' && (
         <span className='flex shrink-0 items-center gap-1 text-xs text-semantic-success'>
           <CircleCheck size={14} />
-          {/* 手動填的沒有匯入時間，只標「已有資料」 */}
-          {doc.importedAt ? formatDraftDateTime(doc.importedAt) : '已有資料'}
+          已有資料
         </span>
       )}
     </li>
@@ -38,7 +37,7 @@ function DocRow({ doc, checked, selectable, onToggle }: { doc: RequiredDoc; chec
 }
 
 /**
- * 上傳辨識的結果會蓋到已有資料時，先讓使用者逐份決定要匯入哪些文件（見 DESIGN.md「匯入覆蓋確認」）。
+ * 上傳辨識的結果會蓋到已有資料時，先讓使用者逐份決定要匯入哪些文件。
  * 清單是整條開帳路徑需要的文件，這次沒辨識到的也列出來但不能勾，讓使用者一眼看出還缺哪幾份。
  */
 export function ImportOverwriteDialog({ open, docs, importingKeys, onCancel, onConfirm }: ImportOverwriteDialogProps) {

@@ -1,5 +1,5 @@
 import type { InitializationState } from '../state/initializationReducer';
-import { getFormItem } from './formList';
+import { getFormItem, ORG_TYPE_FIELD } from './formList';
 import { getPageLabel, isPageFilled, resolveReportPage } from './reportPages';
 
 /** 封面不在步驟 4 的逐頁清單（它是步驟 3），但同樣是這條路徑要備齊的文件，所以補在最前面 */
@@ -23,6 +23,27 @@ export interface RequiredDoc {
 }
 
 type DocsState = Pick<InitializationState, 'reportPages' | 'vatChoices' | 'reports' | 'formSources'>;
+
+/** 開帳流程自動勾選、使用者沒碰過的欄位（損益表的組織種類，見 reducer 的 applyOrgType） */
+const AUTO_FILLED_FIELD_KEYS = Object.values(ORG_TYPE_FIELD);
+
+/** 登記事項表的董監事會自動帶進投資人明細表（見 useRegistrationIdentify 的 applyToInvestors） */
+const INVESTORS_CODE = 'CIT_INVESTORS';
+
+/**
+ * 這份文件有沒有「使用者自己的資料」。比 isPageFilled 嚴格，因為備齊清單講的是使用者備齊了幾份，
+ * 系統自動帶進去的東西不能算：組織種類是推出組織型態後自動勾的，投資人明細表的董監事則是
+ * 登記事項表辨識後自動填的（走 APPLY_IDENTIFIED_FORM，值為 aiFilled）。
+ *
+ * 投資人明細表只在還沒有 formSources 時才排除 aiFilled：有 formSources 代表申報書辨識過，
+ * 上面已經判成 identified，不會走到這裡。
+ */
+function hasOwnData(state: DocsState, reportKey: string): boolean {
+  return isPageFilled(state.reports, reportKey, {
+    ignoreFieldKeys: AUTO_FILLED_FIELD_KEYS,
+    ignoreAiFilled: reportKey === INVESTORS_CODE,
+  });
+}
 
 interface DocsSources {
   /** 401／403 的原件存在該期別頁自己身上，不在營所稅的上傳列表裡 */
@@ -54,7 +75,7 @@ export function buildRequiredDocs(state: DocsState, { vatUploads, sourceFiles }:
 
   return base.map(doc => {
     const source = state.formSources[doc.reportKey];
-    const status: RequiredDocStatus = source ? 'identified' : isPageFilled(state.reports, doc.reportKey) ? 'manual' : 'empty';
+    const status: RequiredDocStatus = source ? 'identified' : hasOwnData(state, doc.reportKey) ? 'manual' : 'empty';
     return {
       ...doc,
       status,

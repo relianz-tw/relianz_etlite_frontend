@@ -31,7 +31,7 @@ export function computeActualAmount(statementAmount: number, adjustmentsTotal: n
 
 /**
  * 反向沖帳判定（顯示用）：對帳單金額或實際存入／付出金額為負，代表本次金流方向與
- * 目前 side 相反（見 ReconciliationView 的 isReversed、DESIGN.md「Reversed Settlement Panel」）。
+ * 目前 side 相反（見 ReconciliationView 的 isReversed）。
  * 供確認／結果彈窗判斷金額要不要翻面顯示；不能改用 ReconciliationView 的 isReversed ——
  * finalizeSettle 會先把 statementAmount 歸零才開結果彈窗，那時 state 已經算不出方向了。
  */

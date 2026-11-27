@@ -13,6 +13,8 @@ interface ConfirmDialogProps {
   message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** 一定要選一個時設 false：不給關閉鈕、Escape 與點遮罩都不關（取消仍可按） */
+  dismissible?: boolean;
 }
 
 /** 通用刪除／危險操作確認彈窗，取代各處各自複製的 AlertDialog 樣式（見 VoidConfirmDialog 的 Modal 包法） */
@@ -24,6 +26,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel = '確認刪除',
   cancelLabel = '取消',
+  dismissible = true,
 }: ConfirmDialogProps) {
   if (!open) return null;
 
@@ -33,7 +36,7 @@ export default function ConfirmDialog({
   };
 
   return (
-    <Modal open onClose={onClose} title={title} widthClassName="max-w-[420px]">
+    <Modal open onClose={onClose} title={title} widthClassName="max-w-[420px]" dismissible={dismissible}>
       <div className="text-sm leading-relaxed text-neutral-dark">{message}</div>
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="outline" onClick={onClose}>

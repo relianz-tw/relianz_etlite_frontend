@@ -3,7 +3,7 @@
 import { useInitialization } from '../state/InitializationContext';
 import { useFormMetadata } from '../hooks/useFormMetadata';
 import { getFormItem, omitFields, type VatFormCode, isPageFilled, lockedCoverValues, resolveReportPage, type ReportPageSpec } from '../reports';
-import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue } from '../reports/balanceSheetLayout';
+import { BALANCE_SHEET_DATE_FIELD_KEY, getBalanceSheetDateLabel, getBalanceSheetDateValue, getBalanceSheetDateYear } from '../reports/balanceSheetLayout';
 import { FormPaperPreview } from './FormPaperPreview';
 import { ReferenceLayout } from './ReferencePanel';
 import { useReference } from '../reference/ReferenceContext';
@@ -31,6 +31,12 @@ const TAX_YEAR_FIELD_KEY = 'HDR_TAX_YEAR';
 /** 401／403 的所屬期別起訖月：由頁面的期別自動填入、不給使用者輸入 */
 const PERIOD_START_FIELD_KEY = 'HDR_PERIOD_START_MONTH';
 const PERIOD_END_FIELD_KEY = 'HDR_PERIOD_END_MONTH';
+
+/** 統一編號欄位：對不上的提醒要把它和其他欄位分開處理（它可能同時和登記事項表、開帳公司都不同） */
+const VAT_NO_FIELD_KEY = 'HDR_VAT_NO';
+
+/** 公司基本資料欄位鎖定與更正入口的說明（提醒框有／沒有對不上的事項時都要講） */
+const LOCKED_FIELDS_NOTE = '公司基本資料帶自登記事項表，這幾格不開放修改。要更正請回到「登記資料」重新上傳登記事項表。';
 
 /** 封面「股票發行狀況」勾選群組：只有股份有限公司才有股票發行，其他組織型態整組不顯示 */
 const STOCK_GROUP_CODE = 'STOCK';
@@ -74,8 +80,8 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const { formCode, reportKey } = resolveReportPage(spec, state.vatChoices);
   const { formNo, title: fallbackTitle } = getFormItem(formCode);
   const { page: rawPage, loading, error, retry } = useFormMetadata(formNo, taxYear);
-  // 標題以 metadata 的文件名稱為準，載入前先用內建名稱
-  const title = rawPage?.title ?? fallbackTitle;
+  // 標題以 metadata 的文件名稱為準，載入前先用內建名稱（年度在下面併進去）
+  const baseTitle = rawPage?.title ?? fallbackTitle;
 
   // 這份文件有所屬年度（401／403 另有期別起訖月）欄位時，自動填入頁面標示的值（辨識帶入的值也以頁面為準）
   // 資產負債表日取損益表的「所得期間迄」（沒填視為該年度 12 月 31 日）
@@ -133,13 +139,21 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const readOnlyKeys = useMemo(() => [...autoKeyList.split(','), ...lockedKeyList.split(',')].filter(Boolean), [autoKeyList, lockedKeyList]);
   const store = useInitPaperStore(reportKey, rawPage, readOnlyKeys);
 
-  // 資產負債表是某一天的狀態，標籤顯示基準日（損益表所得期間迄，沒填視為 12 月 31 日）；
-  // 401／403 不顯示標籤（期別已在副標與期別卡片、必填／選填在卡片徽章）；其餘文件顯示年度
-  // 未分配盈餘申報書是前一年度的盈餘（紙本標題「113 年度未分配盈餘申報書」），標籤顯示前一年
+  // 年度直接寫進標題（「民國 114 年度營利事業所得稅結算申報書封面」），不另外掛年度徽章：
+  // 未分配盈餘申報書是前一年度的盈餘（紙本標題「113 年度未分配盈餘申報書」）；
+  // 資產負債表是某一天的狀態，年度取基準日（損益表所得期間迄，沒填視為 12 月 31 日）那一年；
+  // 401／403 的期別已在副標與期別卡片上，標題不重複標年度
+  const titleYear = formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateYear(taxYear, incomePeriodEnd) : formCode === 'CIT_UE' ? taxYear - 1 : taxYear;
+  const title = spec.period ? baseTitle : `民國 ${titleYear} 年度${baseTitle}`;
+
+  // 資產負債表的徽章留著基準日（那是某一天，不是年度，標題看不出來）；其餘只剩紙本頁碼
   const paperPage = PAPER_PREVIEWS[formCode]?.paperPage;
   const badges = spec.period
     ? undefined
-    : [formCode === BALANCE_SHEET_CODE ? getBalanceSheetDateLabel(taxYear, incomePeriodEnd) : formCode === 'CIT_UE' ? `民國 ${taxYear - 1} 年度` : `民國 ${taxYear} 年度`, ...(paperPage ? [`紙本${paperPage}`] : [])];
+    : [
+        ...(formCode === BALANCE_SHEET_CODE ? [getBalanceSheetDateLabel(taxYear, incomePeriodEnd)] : []),
+        ...(paperPage ? [`紙本${paperPage}`] : []),
+      ];
 
   // 收件編號：同一年度的申報書每一頁都一樣。這一頁和多數頁不同時提醒使用者確認是不是這個年度的申報書
   // （各頁以出現次數最多的值為準，次數相同以最早填的頁為準）
@@ -157,6 +171,27 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
   const pageVatNo = String(reportFields?.HDR_VAT_NO?.value ?? '').trim();
   const registeredTaxId = state.payment.taxId.trim();
   const vatNoMismatch = pageVatNo !== '' && registeredTaxId !== '' && pageVatNo !== registeredTaxId;
+
+  // 這一頁所有「對不上」的事項併成一塊提醒，一個欄位只講一次：
+  // 統一編號可能同時在「申報書辨識值 vs 登記事項表」與「登記事項表 vs 開帳公司」兩邊不符，
+  // 分開講會變成兩個紅框各報一次統編，使用者只看到一片紅卻看不懂到底哪個才是對的
+  const vatConflict = pageConflicts.find(conflict => conflict.key === VAT_NO_FIELD_KEY);
+  const mismatchRows: string[] = [];
+  if (vatConflict || vatNoMismatch) {
+    const pageValueLabel = lockedKeys.includes(VAT_NO_FIELD_KEY) ? '登記事項表' : '這一頁';
+    const sources = [
+      ...(vatConflict ? [`這份文件「${vatConflict.identified}」`, `登記事項表「${vatConflict.registered}」`] : [`${pageValueLabel}「${pageVatNo}」`]),
+      ...(vatNoMismatch ? [`這次開帳的公司「${registeredTaxId}」`] : []),
+    ];
+    mismatchRows.push(`統一編號：${sources.join('／')}`);
+  }
+  for (const conflict of pageConflicts) {
+    if (conflict.key === VAT_NO_FIELD_KEY) continue;
+    mismatchRows.push(`${conflict.label}：這份文件「${conflict.identified}」／登記事項表「${conflict.registered}」`);
+  }
+  if (receiptMismatch) {
+    mismatchRows.push(`收件編號：這一頁「${receiptNo}」／其他頁「${mainReceiptNo}」，同一年度的申報書收件編號應該一致`);
+  }
 
   // 必填的期別：營業稅申報書檔案與金額資料兩個都要有才能前進（金額可辨識帶入或手填）。
   // 欄位載入失敗（如該年度尚未支援）時沒有欄位可填，放行以免使用者卡死
@@ -221,45 +256,28 @@ export function ReportPageView({ spec, taxYear, kicker, progress, showIdentify, 
         )}
       </StepPageHeader>
 
-      {pageConflicts.length > 0 && (
+      {mismatchRows.length > 0 ? (
         <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
           <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
           <div className='flex min-w-0 flex-col gap-1 text-sm text-neutral-dark'>
-            <p>這份文件辨識到的資料和登記事項表不一致。畫面上保留的是登記事項表的內容，請確認是不是傳錯文件：</p>
+            <p>這一頁有{mismatchRows.length > 1 ? '幾個' : '一個'}地方對不上，請確認是不是傳錯文件：</p>
             <ul className='flex flex-col gap-0.5'>
-              {pageConflicts.map(conflict => (
-                <li key={conflict.key} className='break-words'>
-                  {conflict.label}：這份文件「{conflict.identified}」／登記事項表「{conflict.registered}」
+              {mismatchRows.map(row => (
+                <li key={row} className='break-words'>
+                  {row}
                 </li>
               ))}
             </ul>
+            {lockedKeys.length > 0 && <p className='text-[13px] text-neutral-mid'>畫面上保留的是登記事項表的內容。{LOCKED_FIELDS_NOTE}</p>}
           </div>
         </div>
-      )}
-
-      {lockedKeys.length > 0 && (
-        <div className='flex items-start gap-2.5 rounded-lg border border-brand-blue/30 bg-brand-blue/5 px-4 py-3'>
-          <Info size={18} className='mt-0.5 shrink-0 text-brand-blue' />
-          <p className='text-sm text-neutral-dark'>公司基本資料帶自登記事項表，這幾格不開放修改。要更正請回到「登記資料」重新上傳登記事項表。</p>
-        </div>
-      )}
-
-      {vatNoMismatch && (
-        <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
-          <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
-          <p className='text-sm text-neutral-dark'>
-            這一頁的統一編號（{pageVatNo}）和這次開帳的公司（{registeredTaxId}）不同。請確認這份申報書是不是這間公司的，不是的話請換一份原件重新上傳。
-          </p>
-        </div>
-      )}
-
-      {receiptMismatch && (
-        <div role='alert' className='flex items-start gap-2.5 rounded-lg border border-semantic-error/40 bg-semantic-error/5 px-4 py-3'>
-          <TriangleAlert size={18} className='mt-0.5 shrink-0 text-semantic-error' />
-          <p className='text-sm text-neutral-dark'>
-            這一頁的收件編號（{receiptNo}）和其他頁（{mainReceiptNo}）不同。同一年度的申報書收件編號應該一致，請確認這一頁是不是民國 {taxYear} 年度的申報書。
-          </p>
-        </div>
+      ) : (
+        lockedKeys.length > 0 && (
+          <div className='flex items-start gap-2.5 rounded-lg border border-brand-blue/30 bg-brand-blue/5 px-4 py-3'>
+            <Info size={18} className='mt-0.5 shrink-0 text-brand-blue' />
+            <p className='text-sm text-neutral-dark'>{LOCKED_FIELDS_NOTE}</p>
+          </div>
+        )
       )}
 
       {loading && <p className='text-sm text-neutral-mid'>表單欄位載入中…</p>}

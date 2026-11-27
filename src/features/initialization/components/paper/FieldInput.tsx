@@ -68,14 +68,14 @@ function FieldInputBody({ field, data: stored, onChange, readOnly, autoValue, pl
 
   switch (field.type) {
     case 'money':
-      return <MoneyInput widthClassName='w-full' value={typeof data.value === 'number' ? data.value : Number(data.value) || 0} allowSign={field.allowSign} typedSign aiFilled={data.aiFilled} onChange={onChange} />;
+      return <MoneyInput widthClassName='w-full' value={typeof data.value === 'number' ? data.value : Number(data.value) || 0} allowSign={field.allowSign} typedSign onChange={onChange} />;
     case 'integer':
       return (
         <TextInput
           widthClassName='w-full'
           inputMode='numeric'
           value={data.value === '' ? '' : String(data.value)}
-          aiFilled={data.aiFilled}
+         
           onChange={e => {
             const digits = e.target.value.replace(/\D/g, '');
             onChange(digits === '' ? '' : Number(digits));
@@ -84,19 +84,19 @@ function FieldInputBody({ field, data: stored, onChange, readOnly, autoValue, pl
       );
     case 'decimal':
       return (
-        <TextInput widthClassName='w-full' inputMode='decimal' value={String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(e.target.value.replace(/[^\d.]/g, ''))} />
+        <TextInput widthClassName='w-full' inputMode='decimal' value={String(data.value)} onChange={e => onChange(e.target.value.replace(/[^\d.]/g, ''))} />
       );
     case 'percent':
       return (
         <div className='relative w-full'>
-          <TextInput widthClassName='w-full' className='pr-8 text-right' inputMode='decimal' value={String(data.value)} aiFilled={data.aiFilled} onChange={e => onChange(sanitizePercent(e.target.value))} />
+          <TextInput widthClassName='w-full' className='pr-8 text-right' inputMode='decimal' value={String(data.value)} onChange={e => onChange(sanitizePercent(e.target.value))} />
           <span aria-hidden='true' className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-neutral-mid'>
             %
           </span>
         </div>
       );
     case 'date':
-      return <DatePicker value={data.value ? new Date(data.value) : undefined} aiFilled={data.aiFilled} keepInputFocus onChange={date => onChange(date ? formatLocalDate(date) : '')} />;
+      return <DatePicker value={data.value ? new Date(data.value) : undefined} keepInputFocus onChange={date => onChange(date ? formatLocalDate(date) : '')} />;
     case 'boolean':
       return <Checkbox checked={Number(data.value) === 1} onChange={() => onChange(Number(data.value) === 1 ? 0 : 1)} aria-label={field.label} />;
     default:
@@ -117,7 +117,7 @@ function TextFieldWithWarning({ field, data, placeholder, onChange }: { field: R
         widthClassName='w-full'
         placeholder={placeholder}
         value={typeof data.value === 'string' ? data.value : String(data.value)}
-        aiFilled={data.aiFilled}
+       
         aria-invalid={warning ? true : undefined}
         onBlur={() => setTouched(true)}
         onChange={e => onChange(e.target.value)}

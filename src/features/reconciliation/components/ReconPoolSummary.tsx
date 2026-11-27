@@ -10,7 +10,7 @@ interface ReconPoolSummaryProps {
   /** 已有預覽拆帳結果才會渲染本元件；沖帳對象與差額一律以此為準，不再由前端本地累加勾選金額計算 */
   previewResult: ReconSettleResult;
   /** 排列方式：'narrow'（預設，手機 Bottom Sheet 內沿用原上下堆疊）／'wide'（桌機步驟 3 全寬卡，
-   *  上方三列改橫排，見 DESIGN.md「Recon Pool Panel — Wide Layout」） */
+   *  上方三列改橫排） */
   layout?: 'narrow' | 'wide';
   /** 銀行手續費／電商平台扣款／額外金額：留在步驟 2 輸入，步驟 3 以小字帶出方便核對「對帳單金額」
    *  為何與「實際存入/付出金額」不同，三者皆為 0／空陣列時不顯示這行 */

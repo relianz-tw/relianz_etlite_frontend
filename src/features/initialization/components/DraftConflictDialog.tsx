@@ -12,14 +12,13 @@ interface DraftConflictDialogProps {
   onLoadServer: () => void;
   /** 保留本機內容，覆蓋雲端草稿 */
   onOverwrite: () => void;
-  /** 先關掉視窗不選；之後下一次儲存若還是衝突會再跳出來 */
-  onClose: () => void;
 }
 
-/** 草稿版本衝突：另一個裝置（或另一個分頁）已更新雲端草稿，讓使用者選用哪一邊（見 DESIGN.md「草稿儲存狀態」） */
-export function DraftConflictDialog({ open, serverSavedAt, onLoadServer, onOverwrite, onClose }: DraftConflictDialogProps) {
+/** 草稿版本衝突：另一個裝置（或另一個分頁）已更新雲端草稿，讓使用者選用哪一邊 */
+export function DraftConflictDialog({ open, serverSavedAt, onLoadServer, onOverwrite }: DraftConflictDialogProps) {
   return (
-    <Modal open={open} onClose={onClose} title='資料同步' widthClassName='max-w-[480px]'>
+    // 不給關：關掉不選只會讓草稿停在存不進去的狀態，而使用者不會知道
+    <Modal open={open} onClose={() => {}} dismissible={false} title='資料同步' widthClassName='max-w-[480px]'>
       <p className='text-sm leading-relaxed text-neutral-dark'>
         另一部裝置在 {formatDraftDateTime(serverSavedAt)} 有更新過草稿，請選擇要使用哪一份。
       </p>

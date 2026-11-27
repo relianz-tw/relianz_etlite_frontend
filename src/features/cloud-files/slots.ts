@@ -32,4 +32,5 @@ export const VAT_PERIODS = [
 ];
 
 // TODO：組織型態目前只存在開帳流程 state，後端提供公司資料後改依實際型態取得
-export const REGISTRATION_SLOTS: FileSlotDef[] = getRegistrationDocs('limited');
+// 取股份有限公司（文件最齊的一種），檔案櫃才不會少掉股東名簿那一格
+export const REGISTRATION_SLOTS: FileSlotDef[] = getRegistrationDocs('share');

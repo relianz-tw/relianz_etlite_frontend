@@ -1,6 +1,10 @@
 # Design System — 友信創新 × 友植會計師事務所
 > Based on Revolut UI architecture, adapted with Relianz (友信創新) as primary brand and A.M. CPA & Associates (友植會計師事務所) as supplementary.
 
+**範圍**：本文件只記錄**系統層級**的規範——設計 token（色彩／字體／間距／圓角／陰影／斷點）與
+**跨頁面共用的元件**。個別頁面怎麼排版、某張卡片放哪些欄位這類單一頁面的事不寫在這裡，
+由程式碼與其註解自己說明。新增共用元件時先擴充本文件再實作；單一頁面的版面直接用既有元件與 token 組出來。
+
 ---
 
 ## 1. Visual Theme & Atmosphere
@@ -218,7 +222,7 @@ nav:hidden（≥ nav 1000px 不掛載）
 
 **z-index 分層**（由低到高，新增 Bottom Sheet／Sticky Action Bar 後的完整順序）：
 ```
-z-30  Sticky Action Bar（行動版底部固定操作條）、邊緣浮動按鈕（如對照面板的「對照原件」標籤）
+z-30  Sticky Action Bar（行動版底部固定操作條）、邊緣浮動按鈕（貼齊畫面左右緣的直立標籤）
 z-40  AppShell 手機固定頂部列
 z-50  Sidebar 行動版 Overlay 抽屜
 z-[55] Bottom Sheet 遮罩
@@ -388,9 +392,11 @@ Icon：lucide TriangleAlert size 20、text-semantic-error、shrink-0
   aria-hidden：true（狀態僅為輔助視覺提示，不影響欄位語意）
 Focus 樣式不變：仍套用一般 Focus border／shadow（#005FA2），聚焦後綠框暫時被取代，失焦回復
 移除時機：使用者對該欄位觸發任何 onChange（含清空）即移除，改回一般欄位樣式；不因儲存/送出而移除
-勾選框群組（ChoiceGroup）：辨識對沒選的項目也會回 false，逐項標記會整排都亮，所以選項本身不加框、不加底色，
-  整組只在題目文字前面放一個 Zap（14px，fill + 色 #377456，aria-hidden）；使用者改動群組內任何一項，整組標記一起移除
 ```
+**不適用：開帳精靈的申報書頁（營所稅、營業稅各表）。** 那裡不論資料是上傳辨識帶入還是使用者自己手填，
+一律呈現同一種「已有資料」的樣子，不做任何區隔——使用者要核對的是數字本身，標出哪幾格是 AI 填的
+只會讓整頁花掉，也讓人以為手填的那些不用檢查。`aiFilled` 在那裡仍存在於資料裡（送出時要回報
+`isManualAdjusted`、並決定表單是否預設收合），只是不畫出來。
 對應元件：`src/components/ui/TextInput.tsx`／`MoneyInput.tsx`／`Select.tsx`／`DatePicker.tsx`／
 `Textarea.tsx` 的 `aiFilled` prop；`SubjectPicker.tsx` 沿用既有 `pickedByAi` 狀態同步套用邊框樣式
 （見上方 Subject Picker 章節「AI 已為你選擇」）。
@@ -440,149 +446,6 @@ metadata `tables[]` 對應紙本表格，格子為 `layout: cell` 欄位（`tabl
 ### 起訖日期（Date Range）
 
 `dateRanges[]` 的起、迄兩個日期並排為一組，標題用 `groupName`，中間以「至」相連；迄早於起時顯示後端回傳的錯誤訊息。
-
-### 對照面板（Reference Panel）
-
-開帳精靈申報書頁（`ReportPageView`）的原件對照：使用者上傳的申報書轉成每頁一張圖，放在表單右側；點選（focus）表單欄位時，面板把該欄位在原件上的位置放大並框起來。實作見 `src/features/initialization/components/ReferencePanel.tsx`。
-
-- **顯示條件**：僅桌機（`nav:` 以上）；這一頁有辨識過的原件才出現（連展開按鈕都不給），有就自動展開，使用者手動收合後不再自動展開。手機不提供，按鈕與面板一律隱藏。
-- **收合時的展開按鈕**：浮在畫面右緣的直立標籤（`fixed right-0 top-1/2 -translate-y-1/2 z-30`），長表單捲到哪都點得到。樣式 `rounded-l-lg border border-r-0 border-neutral-blue-gray/30 bg-white shadow-level1`（浮動元素，符合陰影例外規則），內容為 `PanelRightOpen` 16px 加直書文字「對照原件」（`[writing-mode:vertical-rl]`），寬度至少 44px 符合觸控熱區。展開後的收合鈕（`ghost`、`sm`、`PanelRightClose`）在面板工具列右側。
-- **版面**：表單區與面板並排（`flex items-start gap-5`），表單區 `min-w-0 flex-1`，面板 `w-[40%] shrink-0`。
-- **展開時加寬內容欄**：內容欄最寬由 1200px 放寬到 1680px，桌機左右留白由 `1.5rem` 縮到 `1rem`（寫在捲動區的 CSS 變數 `--init-content-max-w`、`--init-content-px`，頁面內容欄與固定操作列同讀這組變數才會對齊；收合或離開該頁還原）。
-- **展開時輸入欄位改單欄**：表單區變窄，原本兩欄並排的輸入欄位（`InputGrid`、起訖日期搭收件編號）改成單欄堆疊，輸入框才有足夠寬度顯示完整內容；收合後恢復兩欄。
-- **面板容器**：`sticky top-2`、高度 = 捲動區可視高度 − 固定操作列高度（`--init-action-bar-h`）− `1rem`（上下各 `0.5rem` 留白），貼齊操作列上緣，最小 `16rem`；`overflow-hidden`、`rounded-lg border border-neutral-blue-gray/30 bg-white`，不用陰影。上方一列頁碼切換（`ChevronLeft`／`ChevronRight` ghost 按鈕加「第 N / M 頁」`text-xs text-neutral-mid`），下方為圖片視窗。
-- **圖片視窗**：`overflow-auto`（細捲軸），圖片寬度預設填滿視窗，整頁可上下捲動看完；放大不用 transform，而是把圖片寬度撐成視窗的 N 倍（視窗可左右上下捲動），再用 `scrollTo` 把目標區域捲到視窗中央。放大倍率最小 1、最大 3，目標區域約佔視窗 60%。沒有目標區域（換頁、清除聚焦）時回到最上方、倍率 1。使用者另可用工具列的放大／縮小鈕或 `Ctrl`／`⌘` 加滾輪手動調整（0.5–6 倍），換欄位或換頁即失效。
-- **退出放大**：點紅框以外的圖片區域即清除聚焦欄位與手動倍率，回到倍率 1、捲回最上方；有紅框時圖片游標為 `cursor-zoom-out` 提示可點。紅框本身疊在圖片上，點框不會觸發。
-- **紅框**：`border-2 border-semantic-error/50`（開創紅半透明，不遮住框內的字）、`bg-semantic-error/10`、`rounded-sm`，以百分比定位在圖片上，邊框寬度固定 2px。框即辨識座標本身，不額外外擴。
-- **座標來源與格式**：來自辨識 API（`/ael/peit/cit/identify`）每個欄位的 `page`、`bbox`（對角兩點 `x1,y1,x2,y2`，實測為 0–1 小數，若大於 1 則當作 0–1000 整數換算），前端換成 `{ page, x, y, w, h }`（`page` 從 1 起，其餘 0–1 相對座標、左上角為原點）並連同來源原件 id 存進草稿 state，所以換裝置也看得到紅框。表格列沒有座標。沒有座標的欄位不畫框、圖片維持原位。
-- **只顯示該表的頁**：辨識 API 回每張表出現在原件的哪幾頁（`forms[].pages`），面板只列這幾頁，頁碼切換與「第 N / M 頁」都以這個範圍計算；後端沒回頁碼時退回顯示整份原件。
-- **文件標題**：固定底部操作列的進度文字接上這一頁的文件標題（如「第 3 / 14 份・損益及稅額計算表」），沒辨識過的頁面也顯示。
-- **來源小字**：固定底部操作列的進度文字（「第 N / M 份」）同一列右側，用 `text-xs text-neutral-mid` 顯示這一頁表單辨識自哪個檔案與原件頁碼（如 `cit_pack.pdf・原件第 2–3 頁`），太長截斷、滑過顯示全文；還沒辨識過的頁面不顯示。
-- **顯示哪份原件**：營所稅頁用這張表辨識自的那份上傳檔案，其次是欄位座標指向的那份，都沒有時用最新上傳的；401／403 用該期自己上傳的申報書。PDF 在需要時才切頁（同一份只切一次）。
-- **空狀態**：尚未上傳檔案時，面板置中顯示 `FileText` 圖示加「上傳申報書檔案後，可在這裡對照原件」（`text-sm text-neutral-mid`）；切頁中顯示「對照圖片載入中…」，失敗顯示「對照圖片產生失敗，請重新上傳檔案」。
-
-### 付款資料頁（Payment Info Page）
-
-開帳精靈步驟 2（合約之後、上傳登記文件之前）。正式流程中這些資料會從付款環節帶進來，該環節尚未串接，所以先做成一頁讓人手動輸入，實作見 `src/features/initialization/components/steps/PaymentInfoPage.tsx`。頁首 `badges={['測試用']}`，表單整塊包在虛線卡裡（`rounded-lg border border-dashed border-neutral-blue-gray bg-white p-4`，同「測試用：模擬今天日期」的處理），明示它不是正式介面。
-
-- **統一編號**：`TextInput inputMode='numeric' maxLength={8}`，右側 `outline`、`sm`「查詢」，未滿 8 碼時 disabled、查詢中文字改「查詢中…」。查詢走 `GET /ael/onboarding/company-lookup`（client 已存在：`src/api/onboarding/companyLookup.ts`）。
-- **查詢結果**：成功就覆蓋公司名稱、代表人、公司地址三欄（使用者仍可手改）；後端查得到但某些欄位缺席時該欄留白，不視為錯誤；失敗以 `text-sm text-semantic-error` 顯示後端訊息（檢查碼由後端驗，前端不再自寫一份）。
-- **其餘欄位**：公司名稱、代表人姓名、公司地址、Email、手機號碼皆必填，版面與 `Step3CompanyInfo` 一致（頁內自帶 `Field` ＋ `grid-cols-1 nav:grid-cols-2`）。必填未齊或 Email／手機格式錯誤時「下一頁」disabled。
-- **往後帶**：按「下一頁」時寫入 `state.company`（統編、名稱、代表人、地址、聯絡信箱、聯絡電話），並把共用的公司識別欄位補進封面空白欄位。這一頁自己的值另存在 `state.payment`，辨識流程不會覆寫它，作為「系統登記資料」的定本。
-- **決定下一頁的文件清單**：公司名稱含「有限公司」視為公司，否則視為商號，見下一節。
-
-### 登記文件上傳頁（Registration Docs Page）
-
-開帳精靈步驟 3（付款資料之後、選組織型態之前）給客戶上傳登記文件的頁面，實作見 `src/features/initialization/components/RegistrationDocsPage.tsx`。
-
-- **列哪幾份**：依步驟 2 的公司名稱判斷。公司（名稱含「有限公司」）列五份：核准函、登記事項表、公司章程、統一發票購票證、股東名簿；商號列四份：核准函、商業抄本、合夥契約（如為合夥）、統一發票購票證。還沒有公司名稱（跳過查詢）時退回不分型態的七份全集，不擋使用者。
-- **判定結果**：說明文字下方接一塊「情境摘要區塊」，寫出依哪個公司名稱判成公司或商號（兩個值以 `font-bold text-neutral-dark` 抬起來），並說明名稱有誤可回上一頁改。不要讓這句跟一般說明一樣平鋪成灰字，使用者要確認的就是這兩個值。
-- **組織型態由這裡決定**（營運狀況頁不再問）：名稱含「股份有限公司」→ 股份有限公司；否則含「有限公司」→ 有限公司；都不是 → 獨資商號，且使用者一旦上傳「最新合夥契約」就改為合夥商號、刪除則退回獨資。
-- **獨資或合夥**：不讓使用者直接選，唯一的判準是有沒有上傳「最新合夥契約」。那一列排在商號清單的**最後**，標題帶「（如為合夥）」並附 `hint` 說明獨資不需要、上傳後會改為合夥商號；情境摘要區塊同時寫出目前被視為哪一種。
-- **必填／選填標示**：判定出公司或商號之後，每一列名稱右側接 `Badge`（必填 `tone='info'`、選填 `tone='neutral'`，與營業稅期別卡片同一套），並在「判定結果」區塊下方加一行 `text-[13px] font-medium text-neutral-dark` 的計數：「文件已全部備齊」／「必填 N / M 份已上傳」／「必填 N / M 份已上傳・另有 K 份選填未傳」（講法與步驟 4 的文件備齊清單一致）。**只有合夥契約是選填**（`RegistrationDoc.optional`，與 `FORM_LIST.optional` 同一種標法），其餘一律必填；選填那一列沒有自己的 `hint` 時補「沒有這份文件可以不傳。」。還判斷不出公司或商號時（列七份全集）不標徽章也不顯示計數——那份清單是兩類文件的聯集，標必填會誤導。目前必填未齊**不擋「下一頁」**。
-- **每一列**：`flex` 分左右，手機上下堆疊；左側狀態圖示 20px（已上傳 `CircleCheck`／`text-semantic-success`，未上傳 `FileText`／`text-neutral-mid`）加文件名稱（`text-sm font-medium text-neutral-dark`）、選用的補充說明（`text-xs text-neutral-mid`，只有需要交代「什麼情況才要傳」的文件才給），以及檔名（`text-xs text-neutral-dark`）或「尚未上傳」（`text-xs text-neutral-mid`）；右側 `outline`、`sm`「選擇檔案」／「更換檔案」，已上傳時左邊多一顆 `ghost`、`sm`、`Trash2`「刪除」（與已上傳檔案列同一套用詞與圖示）。列與列之間 `divide-y divide-neutral-blue-gray/30`。
-- **限制**：PDF 或圖片，5MB 以內（與申報書上傳區相同；辨識 API 的上限就是 5MB，放寬會讓登記事項表傳得進來卻辨識不了）。
-- **辨識**：七份文件中**只有「最新設立或變更登記事項表」會辨識**（`formNo 14`／`COMPANY_REGISTRATION`），其餘純上傳。辨識中該列圖示換 `Loader2` 旋轉、檔名位置改「辨識中…檔名」、按鈕 disabled。辨識完成後在該列下方接「登記事項表摘要卡」。
-- **辨識失敗不擋**：檔案裡沒有登記事項表時以 Notice（非阻擋提醒框）顯示「這份檔案沒有辨識到登記事項表的資料，可直接進行下一步」；後端回錯誤碼則原樣顯示後端訊息。兩種情況都不影響「下一頁」。
-
-### 登記事項表摘要卡（Registration Summary Card）
-
-登記事項表辨識後，在該列下方展開的帶入結果，實作見 `src/features/initialization/components/RegistrationSummaryCard.tsx`。這張表約 100 個欄位，但開帳流程只用得到其中十幾個，**不畫完整紙本頁、也不提供對照面板**（這一步的目的是把資料往後帶，不是逐欄核對原件）。
-
-- **容器**：`SectionCard`，標頭 `CircleCheck` 18px `text-semantic-success` 加「已從這份檔案帶入 N 項資料」。
-- **只顯示辨識到有值的欄位**，沒有值的一律不畫，避免整張卡變成百欄空表。欄位標籤與型別一律取自 metadata（`formNo 14`、`taxYear 114`）的 `fieldMap`，不寫死。
-- **兩組固定欄位**（`grid-cols-1 nav:grid-cols-2 gap-4`，輸入元件沿用 `paper/FieldInput.tsx`，保留 AI 閃電標記與型別對應）：
-  | 組 | 欄位 |
-  |---|---|
-  | 公司基本資料 | 公司名稱、統一編號、公司所在地、代表公司負責人、公司聯絡電話、變更登記日期 |
-  | 股本 | 實收資本總額、資本總額、每股金額、股份總額 |
-- **董事監察人名單**：5 欄表格（職稱／姓名或名稱／身分證號或統編／持有股份／住所），欄位標籤同樣取自 `fieldMap`；沒有名單時整塊不出現。登記表 metadata 的 `tables[]` 是空的，這張表由前端依 `sectionCode` 自行分組，**不使用** `buildReportPage` 的 `page.table`（它的 fallback 會把四組明細列擠成一張表）。
-- **底部提示**（`text-xs text-neutral-mid`，兩行）：「這些資料會自動帶入後面的公司資料與投資人明細表，之後仍可修改。」「名單僅含董監事，其餘股東請於投資人明細表補齊。」
-- **帶到後面**：公司名稱／統編／所在地／負責人／電話只補目前空白的欄位，不覆蓋使用者已輸入的值；董監事名單只在投資人明細表還沒有任何資料時帶入，並標為 AI 帶入。
-- **刪除檔案**：連同辨識資料一起清掉（卡片消失）；已經帶到公司資料與投資人明細表的值不回收，使用者可能已經改過。
-
-#### 資料不吻合提示（Registration Mismatch Dialog）
-
-辨識出來的統一編號或公司名稱與步驟 2 的付款資料不同時，先問使用者留哪一份再帶入，實作見 `src/features/initialization/components/RegistrationMismatchDialog.tsx`。
-
-- **觸發**：統編去頭尾空白後字串比、公司名稱去掉所有空白後比，任一不同即跳窗；付款資料該欄為空時不比（沒有基準）。
-- **視窗**（`Modal`，`max-w-[520px]`，標題「資料不吻合」）：一句說明，下方 `bg-surface-cream` 兩欄對照，各列統一編號與公司名稱，左為「目前系統登記資料」、右為「這份文件辨識結果」。
-- **按鈕**：`outline`「保留目前資料」（付款資料與封面都不動，辨識結果仍留在摘要卡供使用者自行修正）與主要按鈕「改用文件上的資料」（更新付款資料後照常帶入）；手機上下堆疊、主要按鈕在上。關閉視窗等同保留目前資料。
-- **改用文件資料後若公司／商號分類改變**，文件清單會跟著重算，並以 toast 告知。
-
-### 申報書上傳區（Source Upload Section）
-
-開帳精靈申報書頁的上傳與已上傳檔案是同一塊，放在頁首卡片下半部整行（標題右上不再另放上傳框），實作見 `src/features/initialization/components/SourceUploadSection.tsx`。
-
-- **沒有檔案**：整行的虛線上傳框（`rounded-lg border-[1.5px] border-dashed border-neutral-blue-gray bg-surface-off-white px-3 py-2`），左側 `Upload` 20px 城信藍，中間主文「上傳申報書快速帶入（選填）」與格式小字「PDF、JPG、PNG、HEIC，5MB 以內」，右側 `outline`、`sm`「選擇檔案」。拖放進框時邊框與底色轉 `brand-blue`／`brand-blue/5`；辨識中左側圖示換 `Loader2` 旋轉、主文改「辨識中…檔名」，格式小字同時換成等待提示「約需 20–60 秒，請先別關閉頁面」（辨識時間長，只有轉圈會讓使用者以為當掉；這行在手機也要顯示）。
-- **有檔案**：主角是檔案列，沿用 `UploadedFilePreview`（`FileCheck2` 圖示、檔名、大小、`outline` `sm`「預覽」）並多一顆「刪除」（`ghost`、`sm`、`Trash2`）。營所稅可多份，依上傳順序由上到下，列表下方靠右一顆 `outline`、`sm`、`Plus`「新增檔案」；401／403 每期只收一份，該顆按鈕文字改「重新上傳」。辨識中按鈕收起，改顯示靠右兩行：`Loader2` 旋轉加「辨識中…檔名」，下方 `text-xs text-neutral-mid` 的等待提示（同上）。
-- **範圍**：營所稅的上傳檔案整份共用（一份 PDF 含多張表），每個營所稅頁列同一組；401／403 的檔案掛在各期別頁自己身上。
-- **辨識結果訊息**：接在這塊下方，`text-xs`——未辨識到內容用 `TriangleAlert` 加 `text-semantic-warm-dark`，略過或失敗用 `TriangleAlert` 加 `text-semantic-error`。成功帶入哪幾份不寫成一行文字，改看下方的文件備齊清單。
-- **刪除**：只有使用者按「刪除」並在 `ConfirmDialog` 確認後才會移除（後端刪除成功才從列表拿掉，失敗以 toast 提示）；刪除不會清掉已帶入表單的資料，但這份檔案的欄位座標與來源記錄一併清掉。
-- **儲存位置**：後端原件 API（`/ael/initialization/draft/files`，單檔 ≤5MB、PDF ≤50 頁）；上傳失敗時檔案仍留在列表（只在記憶體）並以 toast 提示重新整理後需重傳。
-
-### 文件備齊清單（Required Docs Checklist）
-
-申報書上傳區底部的可展開清單，列出這間公司這條開帳路徑需要的每一份文件及其狀態，取代舊的「已帶入：…」一行文字。實作見 `src/features/initialization/components/RequiredDocsChecklist.tsx`。
-
-- **收合列**：`ChevronDown` 14px（展開時 `rotate-180`）加「已備齊 N / M 份文件」，`text-[13px] font-medium text-brand-blue`，熱區 `min-h-11 nav:min-h-0`。
-- **清單內容**：封面加上步驟 7 的逐頁清單（營所稅各表與 401／403 各期），份數與順序依組織型態、設立年度、開帳基準日動態算出，不寫死。每項一列 `text-[13px]`，左側狀態圖示 14px。
-- **三種狀態**：
-
-| 狀態 | 判斷 | 圖示 | 文字 |
-|---|---|---|---|
-| 已帶入 | 這份表有辨識來源 | `CircleCheck`／`text-semantic-success` | `text-neutral-dark`，右側以 `text-xs text-neutral-mid` 顯示來源檔名 |
-| 已手填 | 沒有辨識來源但已有資料 | `PencilLine`／`text-brand-blue` | `text-neutral-dark` |
-| 未填 | 兩者皆否 | `Circle`／`text-neutral-blue-gray` | `text-neutral-mid` |
-
-- **資料來源**：狀態由草稿 state 推導（辨識來源 `formSources`、資料 `isPageFilled`），不另存一份「已帶入」名單，避免兩個真相。清單本身由 `reports/requiredDocs.ts` 的 `buildRequiredDocs` 產出，與「匯入覆蓋確認」視窗共用同一份來源。
-
-### 匯入覆蓋確認（Import Overwrite Confirm）
-
-上傳申報書辨識後，若結果會蓋到已有資料，不直接覆蓋，先跳視窗讓使用者逐份決定要匯入哪些文件。實作見 `src/features/initialization/components/ImportOverwriteDialog.tsx`、`FormIdentifyPanel.tsx`。
-
-- **觸發條件**：辨識值與某個欄位的現有值不同（文字比對去頭尾空白，兩邊都是數字時以數值比）；現有為空白或值相同不算。表格列整批取代，現有列有資料且與辨識結果不同也算。完全不會蓋到既有資料就直接帶入，不跳視窗。
-- **視窗**（`Modal`，`max-w-[560px]`，標題「覆蓋原先資料」）：開頭一句「此次匯入資料內容有包含：〈文件名稱、…〉，如有重新匯入會被系統覆蓋。」，下方是文件清單。
-- **文件清單**：列出這條開帳路徑（組織型態、設立年度、開帳基準日算出）需要的**所有**文件，與文件備齊清單同一份來源，依步驟情境調整；分「必填」「選填」兩區，各有 `text-xs font-medium text-neutral-mid` 小標。必填判定：營所稅看 `FORM_LIST.optional`（財產目錄、未攤銷費用明細表、各類給付扣繳調節表、各類所得扣繳憑單申報書為選填），營業稅看期別是否落在開帳年度。清單高度上限 `max-h-[320px]` 可捲動。
-- **每一列**：左側 `Checkbox shape='circle'` 決定這份要不要匯入（這次檔案裡有辨識到的預設勾選；沒辨識到的 `disabled`，文字 `text-neutral-mid`）；右側若該份已有資料，顯示 `CircleCheck` 14px `text-semantic-success` 加匯入時間（`yyyy-MM-dd HH:mm`，取自 `formSources[].importedAt`），手動填的沒有時間，只寫「已有資料」。
-- **按鈕**：`ghost`「取消」（不改任何資料）、`outline`「只匯入勾選項目」（沒勾任何一項時 disabled）、主要按鈕「全部匯入」；手機上下堆疊、主要按鈕在上。關閉視窗（Esc、點遮罩）等同取消。
-- **匯入行為**：被勾選的文件整份覆蓋（欄位與表格列都以辨識結果為準）；沒勾的完全不動。沒被勾選的文件仍會記下原件位置，點欄位照樣框得出原件上的位置，方便對照；AI 閃電標記照常先清掉，只標這次實際填入的欄位。
-
-### 開帳銀行帳戶頁（Initialization Bank Accounts Page）
-
-開帳精靈「確認開帳」前的一步，讓客戶確認／建立／修改公司銀行帳戶的**期初餘額**，並選定日後「其他」
-銷售管道的收款帳戶，實作見 `src/features/initialization/components/BankAccountsPage.tsx`。
-頁首 kicker「銀行帳戶」、title「確認銀行帳戶期初餘額」、`badges={['客戶填寫']}`。
-
-- **期初餘額說明**：用「Notice（非阻擋提醒框）」寫明這些金額是開帳基準日的期初餘額、不是目前銀行實際
-  餘額。客戶最容易把它填成「我現在戶頭裡有多少錢」，所以這句話一定要在清單**上方**先出現，
-  不能只放在欄位下方的小字。資產負債表沒有銀行存款金額時，同一個框改寫成請客戶自行輸入。
-- **帳戶清單與新增表單**：直接重用設定頁的 `BankAccountCard` 與 `BankAccountCreateForm`，不另畫一套。
-  還沒有任何帳戶時，新增表單的「存款餘額」預填資產負債表的銀行存款金額（`aiFilled` 不套用——
-  這是前端依既有欄位推算的帶入，不是辨識結果），欄位下方小字改寫成該年度的期初餘額。
-- **勾稽摘要列**：沿用「負責人出資額 vs 資產負債表資本額」那一列的版面（`SectionCard` 內
-  `flex flex-wrap items-center justify-between gap-2 text-sm`，相符為 `font-bold text-semantic-success`、
-  不符為 `font-bold text-semantic-error` 加 `TriangleAlert` 16px），不另創樣式。
-  **只計啟用中的帳戶**，停用的帳戶不進合計。
-- **擋下一頁**：沒有啟用中帳戶、合計與資產負債表銀行存款不符、或還沒選收款帳戶時，`nextDisabled`
-  並以 `hint` 說明原因（同 `PartnersPage`）。資產負債表銀行存款為 0（未滿一年路線或客戶沒填）時
-  **不勾稽**，只要求至少一個帳戶；帳戶清單載入失敗時**不擋**，只顯示錯誤文字。
-- **收款管道選擇**：`SectionCard` + `Label required` + `Select`（只列啟用中帳戶，選項文字同
-  `InitOtherChannelDialog` 的「暱名（銀行 帳號）」），下方 `text-[13px] text-neutral-mid` 說明確認開帳後
-  會用這個帳戶建立名為「其他」的預設銷售管道、日後可於設定／收款設定調整。
-
-### 草稿儲存狀態（Draft Save Status）
-
-開帳精靈填寫步驟（步驟 2–8）的草稿儲存提示，放在固定底部操作列的按鈕列：桌機靠左（`nav:mr-auto`），手機在按鈕上方獨立一行。實作見 `src/features/initialization/components/DraftSaveStatus.tsx`。
-
-- **狀態文字**：`text-xs text-neutral-mid`，「上次儲存 14:32」（24 小時制、時：分，取自雲端回傳的儲存時間）；尚未儲存過不顯示文字；儲存失敗改 `text-semantic-error`「儲存失敗，請重試」。
-- **儲存按鈕**：`ghost`、`sm`、`Save` 圖示、文字「儲存」，點擊立即儲存並更新時間。
-- **自動儲存**：每 30 秒檢查一次，內容有變動才儲存；沒有變動不更新時間。
-- **範圍**：只在填寫步驟（2–8）顯示與儲存；合約與完成頁不顯示。
-- **儲存位置**：雲端草稿 API（`/ael/initialization/draft`），整份表單狀態（含辨識欄位座標、各原件的「已帶入」說明）存成一段 JSON，換裝置、換瀏覽器都能續填；同一分頁另有 `sessionStorage` 即時備份，重新整理不會丟尚未儲存的修改。
-- **版本衝突**：草稿有版本號（樂觀鎖）。載入時雲端版本不是這個分頁同步到的那一版，或儲存時後端回 `0409`，都跳「資料同步」視窗（`Modal`，`max-w-[480px]`）：內文「另一部裝置在 2026-11-25 10:43 有更新過草稿，請選擇要使用哪一份。」（完整日期時間 `yyyy-MM-dd HH:mm`，與底部操作列只寫時分的「上次儲存」不同）；兩顆按鈕，`outline`「保留目前版本」（以雲端目前版本為基準重送，覆蓋雲端草稿）與主要按鈕「使用最新版本」（預設選項，放棄這裡尚未儲存的修改），手機上下堆疊、主要按鈕在上。關掉視窗不選，下次儲存仍衝突會再跳出；視窗開著時暫停自動儲存。
-- **覆蓋確認**：這間公司雲端已有草稿時，後端不會直接覆寫，而是回 `0003`（data 帶 `version` 與 `savedAt`）要求確認。前端跳 `ConfirmDialog`「覆蓋雲端草稿」，內文寫出雲端那份的上次儲存時間並說明會被取代，按鈕為「先不要」與 `danger`「覆蓋」。按「覆蓋」之後這個分頁後續的儲存都帶 `overwrite`，不再重複詢問；按「先不要」當作這次沒存成功（顯示「儲存失敗，請重試」），自動儲存不再追問，下次使用者自己按「儲存」才會再問一次。`0003` 在這個後端也是通用驗證錯誤碼，所以要同時看 data 是不是草稿版本資訊才當成覆蓋確認。
-- **完成後**：開帳完成時後端自動刪除草稿並封存原件，前端不呼叫刪除。
 
 ### Navigation — Sidebar（側邊欄導覽）
 
@@ -681,41 +544,6 @@ Font: Noto Sans TC 12px, font-weight 600
 應收／應付狀態標示：沿用 Badge 元件、`variant="muted"`——應收 `tone="info"`、應付 `tone="neutral"`。
 對應元件：`src/features/reconciliation/components/ReconHistoryCard.tsx`（沖帳紀錄列的交易狀態欄）。
 
-### 申報對帳任務（側邊欄任務卡 + 任務清單項目）
-
-用於 401／403 申報書與帳簿發票的對帳提示。對應元件：`src/features/vat-reconcile/`。
-
-```
-側邊欄任務卡（SidebarTaskCard）
-  位置：導覽清單下方、公司名稱上方，固定不隨選單捲動；外層 border-t border-surface-cream p-3
-  卡片：bg-surface-off-white, radius 10px, padding 12px, 無陰影；整張為 <Link>
-  標題列：lucide ListChecks 16px + 「申報對帳」(brand-primary, 14px, semibold)；
-          有待處理 → 右側 Badge solid neutral 顯示待處理期數；全部符合 → 右側 CircleCheck 16px (semantic-success)
-  六格色條（1/3/5/7/9/11 期）：高 6px、radius 3px、gap 4px
-          已符合 semantic-success、待處理 neutral-mid、未上傳申報 neutral-blue-gray
-  說明列：12px neutral-dark，如「115 年 · 2 期待處理」
-  載入中：色條與說明列改為 surface-cream 實色區塊（不用 spinner / skeleton）
-  失敗：說明列 12px semantic-error「無法取得對帳結果」，點擊進任務頁重試
-  手機：頂部列選單鈕右上角 8px neutral-dark 圓點（有待處理才顯示）
-
-任務清單項目（TaskItem）
-  容器：bg-surface-off-white, radius 10px, padding 16px 20px, 項目間 gap 12px
-  編號：28px 圓形 brand-primary 底、白字 13px semibold（沿用 Step Number Badge 語意）
-  標題 15px semibold；說明 13px neutral-mid；剩餘金額標籤 12px neutral-mid + 數值 18px semibold tabular-nums
-  動作按鈕：「一鍵新增發票簿」primary；「新增交易」outline；手機版按鈕撐滿寬度（min-h 44px）
-
-期別格（PeriodTile）
-  白底、radius 10px、border 2px；選取 brand-primary、未選 neutral-blue-gray/30
-  內容：表單類型（401/403，12px neutral-mid）、期別（Noto Serif TC 18px）、Badge
-  Badge：已符合 → muted success；待處理 N → solid neutral；未上傳申報 → muted neutral
-
-比對表（CompareFormView）
-  沿用開帳 401／403 紙本對照版面（VatFormView）：大區塊卡片、小節標題、群組小標、圈號 chip、
-  小計淡藍底與「＝」、扣除項「−」、金額｜稅額成對；每個欄位的輸入框改為唯讀三欄「帳簿試算｜已申報｜差額」
-  有差額的列：bg-brand-tan/10 底，差額數字 bold；沒有任何數字的列預設收合，小計列一律顯示
-  手機（< nav）：三個數字改為單行文字「帳簿／申報／差額」，不橫向捲動
-```
-
 ### Sortable Table Header
 
 用於可點擊排序的表格欄位標題（如帳簿、營業稅中心的列表表頭）。
@@ -750,6 +578,18 @@ Hover：文字與圖示轉為 #005FA2（城信藍），無底色變化
 
 對應元件：`src/features/business-tax/components/InvoiceTable.tsx`、`InvoiceCards.tsx`。
 
+### 金額顯示（Currency Display）
+
+**全站通則**：任何帶 `$` 的金額顯示，負值一律改用會計慣用括號表示法而非負號，
+如 `-6300` 顯示為 `($6,300)`；由 `src/lib/utils.ts` 的 `fmtCurrency` 統一處理，
+系統內不存在 `-$6,300` 或 `$-6,300` 這兩種形式。
+
+例外是方向本身已經翻轉、畫面上以文字說明方向的情境（如反向沖帳面板）：那類畫面傳入
+`fmtCurrency` 前先取絕對值，不顯示括號。
+
+數字一律 `tabular-nums`，同一欄的數字右緣對齊；`$` 與數字黏在一起（`items-baseline gap-0.5`），
+不把 `$` 單獨貼在欄位左緣。
+
 ### Record Row（欄位化紀錄列，桌機）
 
 用於桌機版資訊密度高的紀錄清單（如沖帳中心交易清單／沖帳紀錄），以「時間或日期為主軸」的
@@ -781,7 +621,7 @@ Amount Cell：
   欄寬：附屬金額欄至少 w-28（112px）、主要（emphasis）金額欄至少 w-32（128px），
   確保六位數＋會計括號負值（如 `($10,000)`）在 font-mono text-sm 下不被擠壓換行
 
-  負值：依全站通則（見上方 Reversed Settlement Panel 章節）改用會計括號表示法，
+  負值：依全站通則（見上方「金額顯示」）改用會計括號表示法，
   括號與 $ 同色（emphasis 欄 text-neutral-mid、附屬欄 text-neutral-blue-gray），
   包在 $ 與數字外層（`(` 貼在 $ 前、`)` 貼在數字後），不破壞 tabular-nums 右緣對齊
 
@@ -958,135 +798,6 @@ Flow Stepper 標示「跨頁面步驟」的整體進度，兩者用途不同、�
 ```
 
 對應元件：`src/components/initialization/StepProgress.tsx`（由 `StepPageHeader` 的 `progress` 放在固定底部操作列）。
-
-### Group Chip（沖帳管道／廠商選擇 chip）
-
-用途：沖帳中心「選擇銷售管道／廠商」步驟的桌機橫向 chips（見 Step Number Badge 區塊），第一項固定為
-唯讀總覽「全部管道／全部廠商」，其後為可切換的個別管道／廠商。總覽項需與個別項一眼可辨——不只是選取
-狀態不同，選取前就要能區分——故總覽項獨立為卡片並永久填色，個別項整組包在淺底框容器內，形成兩塊
-背景區隔，取代單純的細分隔線。
-
-```
-「全部」卡片（allGroup，永久填色，不論是否選取，與個別項分開排版）：
-  容器：rounded-md（6px）、border 1px、px-4 py-2.5、flex-col、gap-0.5、shrink-0
-  未選取：border-neutral-blue-gray/30、bg-surface-cream、標籤 font-semibold text-neutral-dark、
-    筆數/金額 text-neutral-mid
-  已選取：border-brand-blue、bg-brand-blue（實心）、標籤 font-semibold text-white、
-    筆數/金額 text-white/80
-
-個別項群組容器：flex-1、flex-wrap、gap-2、rounded-md、border border-neutral-blue-gray/20、
-  bg-surface-off-white、p-2（與卡片白底／全部卡片米杏色形成第三種背景色，兩塊區域一眼可辨）
-
-個別項（白底外框，僅選取時轉色）：
-  容器：rounded-md（6px）、border 1px、bg-white、px-3 py-1.5、flex-col、gap-0.5、shrink-0
-  未選取：border-neutral-blue-gray/30（hover 轉 bg-surface-cream）、
-    標籤 font-normal text-neutral-dark、筆數/金額 text-neutral-mid
-  已選取：border-brand-blue、bg-surface-cream、標籤 font-semibold text-brand-blue、
-    筆數/金額 text-brand-blue
-```
-對應元件：`src/features/reconciliation/components/ReconGroupSidebar.tsx`。
-
-### Allocation Row（沖帳對象分配列）
-
-用途：一筆實際存入／付出金額需要分配給多個對象（銀行帳戶／會計科目）時，以「主對象自動補足
-未分配金額＋可增減的分出列」呈現（如沖帳中心的沖帳對象分配）。窄欄容器（如沖帳中心右欄
-340px 面板）一律採上下堆疊排版，不左右並排。
-
-```
-主對象列：rounded-lg（10px）、border-[1.5px] border-brand-blue/40、bg-brand-blue/5、p-3
-分出列：  rounded-lg（10px）、border border-neutral-blue-gray/30、bg #FFFFFF、p-3
-列間距：8px（gap-2）
-
-角色徽章：沿用 Status Badge 元件（variant="muted"）
-  主對象 → tone="info"（bg rgba(0,95,162,0.1)、文字 #005FA2）
-  分出   → tone="neutral"（bg #EAE5E3、文字 #797C80）
-
-對象下拉：h-10、rounded-lg、border-[1.5px] border-neutral-blue-gray/50，樣式比照 Form Inputs；
-  選單列出銀行帳戶（顯示目前餘額）與可用會計科目（餘額未提供時顯示「—」），
-  已被其他列選走的固定科目於選單中 disabled
-
-副標文字（帳號／科目代碼／餘額）：Noto Sans TC 12px（text-xs）、#797C80（neutral-mid）
-分配金額：font-mono、tabular-nums，16px（text-base）font-semibold、#3A3830；
-  金額為負（分出總額超額）時轉 #DD6B5F（semantic-error）
-
-彙總列：上緣 border-t 1px rgba(154,167,185,0.3)（neutral-blue-gray/20）、mt-3 pt-3
-  左側說明：12px（text-xs）#797C80
-  右側總額：16px（text-base）font-semibold tabular-nums #3A3830
-
-新增對象按鈕：Button variant="outline" size="sm" icon={Plus}，滿版寬度，
-  與同容器內其他「新增」按鈕（如額外金額編輯器）視覺一致
-移除按鈕：圖示按鈕（lucide Trash2），h-7 w-7，hover 轉 #DD6B5F（semantic-error）
-```
-對應元件：`src/features/reconciliation/components/ReconTargetAllocation.tsx`、
-`src/features/reconciliation/components/ReconTargetSelect.tsx`。
-
-### Recon Pool Panel — Wide Layout（沖帳金額面板寬版排列）
-
-用途：沖帳金額面板（`ReconPoolPanel`）預設為窄欄（約 340px，逐筆沖帳右欄／行動版 Bottom Sheet），
-欄位一律上下堆疊。當面板改置於 Step Page Switch 的全寬步驟卡內（如匯總沖帳步驟 2）時，改用
-`layout="wide"` 切成多欄網格，避免單一欄位橫向拉成整排、留白過多。窄欄排版不受影響。
-
-```
-列 1（min-[1300px]:grid-cols-2、gap-4；< 1300px 仍單欄堆疊）：
-  此對帳單是否含折讓、退貨 ｜ 對帳單金額
-列 2（應收 min-[1300px]:grid-cols-2；應付僅銀行手續費一欄，不留空白格）：
-  銀行手續費 ｜ 電商平台扣款（含已選憑證提示）
-列 3（整排，不進網格）：額外金額（OtherDeductionsEditor）
-列 4（整排，不進網格，narrow／wide 排列相同）：收款日／付款日 + 沖帳對象分配
-  （ReconTargetAllocation）合併同一區塊——後者標頭本身已顯示「收款方式 · 實際收款金額 $X」，
-  不另外重複一份金額摘要，避免同一數字出現兩次、日期又與收款方式分開顯示造成介面凌亂
-底部列：flex justify-end，主要動作按鈕改 w-auto（不再 w-full），actionHint／actionError 置於按鈕下方靠右
-```
-對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`（`layout?: 'narrow' | 'wide'`，
-預設 `'narrow'`）。
-
-### Reversed Settlement Panel（負值／反向沖帳面板）
-
-用途：沖帳金額面板（見上方 Allocation Row 所屬的 `ReconPoolPanel`）算出的實際存入／付出金額為負時
-（如逐筆沖帳勾到退款、折讓性質的負值交易），代表方向反了——應收側變成要付出、應付側變成要收入。
-此時不視為錯誤擋下，而是整個面板翻面呈現，讓使用者用原本方向操作即可送出。
-
-**僅適用逐筆沖帳（`perTxn`）**。匯總沖帳（`summary`）對帳單金額欄位不可輸入負值，加總為負
-一律是銀行手續費／電商平台扣款／額外金額等減項吃掉本金的輸入錯誤，不套用本節的翻面與 tint，
-外框維持平常的 `border-brand-blue` ＋ `bg-white`；改以 `text-semantic-error` 錯誤文字＋停用
-「確認沖帳」按鈕呈現，比照一般驗證錯誤（見下方「全站通則」段落前的錯誤提示規範）。
-
-```
-外框：border-[1.5px] border-brand-tan（#BE9F86）＋ bg-brand-tan/5，取代平常的 border-brand-blue ＋ bg-white
-  （友善棕是系統內唯一的暖色 accent，與城信藍成對比，明確標示「非常態」但不誤讀為錯誤）
-
-方向翻轉：所有方向性文字改用「實際 side」而非原始 side——
-  實際存入金額 ↔ 實際付出金額、收款日 ↔ 付款日、收款方式 ↔ 付款方式
-金額顯示：一律取絕對值（正值），不出現負號；分出對象分配（Allocation Row）同樣收正值＋翻轉後的方向
-```
-對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`。
-
-#### 逐筆勾選加總本身為負（如全選退款／折讓交易）
-
-與上方「整面翻面」情境不同：這裡是使用者勾選的交易本身加總就是負數，屬預期中的正常狀態，
-**不**套用整塊 `bg-brand-tan/5` tint（外框維持平常的 `border-brand-blue` ＋ `bg-white`），
-避免過度警示；插在「沖帳金額／對帳單金額」欄位「之前」，先說明方向判斷再讓使用者看到
-自動帶入的負數金額，避免不明所以：
-
-```
-提示框：border border-brand-tan/40、bg-brand-tan/10、rounded-md、p-3，
-  左側 icon 用 lucide ArrowLeftRight（size 16），文字色 #84724D（semantic-warm-dark）
-  內容：粗體一行「本次沖帳已轉為『應付／應收』」＋ 說明段落（判斷依據、
-  下方付款日/收款日與付款/收款方式已依此方向切換）
-
-金額列標題與數字：維持一般 #3A3830（neutral-dark），不得使用 semantic-error 紅字
-——紅色保留給真正的錯誤（如憑證金額不等值、分配超額）
-```
-對應元件：`src/features/reconciliation/components/ReconPoolPanel.tsx`。
-
-**全站通則**：任何帶 `$` 的金額顯示，負值一律改用會計慣用括號表示法而非負號，
-如 `-6300` 顯示為 `($6,300)`；由 `src/lib/utils.ts` 的 `fmtCurrency` 統一處理，系統內不存在
-`-$6,300` 或 `$-6,300` 這兩種形式。上方「整面翻轉」的情境（本節開頭）是例外——那類面板傳入
-`fmtCurrency` 前已先取絕對值，不會顯示括號。
-
-反向沖帳時，確認彈窗／結果彈窗一併翻面：金額移動類欄位（沖銷金額、對帳單金額、沖帳總額、
-本次付款）一律取絕對值；餘額類欄位（應收金額、付款餘額、沖前／沖後餘額）維持會計括號表示法，
-讓使用者看得出原單方向。對應 `src/features/reconciliation/settle.ts` 的 `isReversedSettleResult`。
 
 ### Subject Picker（分頁式科目選擇器）
 
