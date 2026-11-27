@@ -24,6 +24,12 @@ export const ASSET_TOTAL_KEY = 'BS_1000';
 export const LIABILITY_TOTAL_KEY = 'BS_2000';
 export const LIABILITY_EQUITY_TOTAL_KEY = 'BS_9000';
 
+/**
+ * 「銀行存款」欄位（1112）。銀行帳戶頁用它勾稽公司各銀行帳戶的期初餘額合計，
+ * 不含庫存現金（1111）與約當現金（1113）——那兩項不會開成銀行帳戶管理。
+ */
+export const BANK_DEPOSIT_KEY = 'BS_1112';
+
 /** 資產負債表日欄位：由頁面依封面會計年度結束月自動填入、不給使用者輸入 */
 export const BALANCE_SHEET_DATE_FIELD_KEY = 'HDR_BS_DATE';
 

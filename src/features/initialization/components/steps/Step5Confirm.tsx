@@ -7,6 +7,7 @@ import { ORG_TYPE_LABEL, findFormInMessage, formTitleOf, getCurrentOpenYear, get
 import { orgTypeMatchesName } from '../../reports/registrationDocs';
 import { toOpeningBalancePayload } from '../../reports/balanceSheetMapping';
 import { buildConfirmForms } from '../../reports/confirmPayload';
+import { createDefaultOtherChannel } from '@/api/channelRules';
 import { saveInitializationCompany, saveOpeningBalance } from '@/api/initialization';
 import { confirmCit, saveOpeningDate } from '@/api/peit';
 import { StepPageHeader } from '@/components/initialization/StepPageHeader';
@@ -117,6 +118,14 @@ export function Step5Confirm() {
         ...toOpeningBalancePayload(balanceSheetFields, balancePage),
       }).catch(() => {});
     }
+    // 開帳資料都寫入後才建預設銷售管道「其他」（收款帳戶由上一頁的銀行帳戶頁選定）。
+    // 開帳本身已經完成，建管道失敗不回頭擋使用者：設定頁與第一次新增銷項交易時都還有既有的開通入口可補
+    if (state.receivingAccountUuid) {
+      await createDefaultOtherChannel(state.receivingAccountUuid).catch(() => {
+        toast.error('預設銷售管道「其他」建立失敗，可於「設定 / 收款設定」手動啟用');
+      });
+    }
+
     setSubmitting(false);
     dispatch({ type: 'NEXT_STEP' });
   };

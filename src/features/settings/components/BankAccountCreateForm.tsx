@@ -25,11 +25,16 @@ interface BankAccountCreateFormProps {
   onCreated: () => void;
   /** 未提供時不顯示取消鈕（如開帳完成頁必須新增，不可取消） */
   onCancel?: () => void;
+  /** 存款餘額的預設值（開帳精靈帶入資產負債表的銀行存款金額） */
+  defaultBalance?: number;
+  /** 覆寫存款餘額欄位下方的說明小字 */
+  balanceHint?: string;
 }
 
-/** 新增銀行帳戶表單（設定頁「收款設定」與開帳完成頁共用） */
-export default function BankAccountCreateForm({ onCreated, onCancel }: BankAccountCreateFormProps) {
-  const [newAccount, setNewAccount] = useState(EMPTY_NEW_ACCOUNT);
+/** 新增銀行帳戶表單（設定頁「收款設定」與開帳精靈銀行帳戶頁共用） */
+export default function BankAccountCreateForm({ onCreated, onCancel, defaultBalance, balanceHint }: BankAccountCreateFormProps) {
+  const emptyAccount = { ...EMPTY_NEW_ACCOUNT, balance: defaultBalance ?? 0 };
+  const [newAccount, setNewAccount] = useState(emptyAccount);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -53,7 +58,7 @@ export default function BankAccountCreateForm({ onCreated, onCancel }: BankAccou
         isActive: true,
         remark: newAccount.remark,
       });
-      setNewAccount(EMPTY_NEW_ACCOUNT);
+      setNewAccount(emptyAccount);
       onCreated();
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
@@ -63,7 +68,8 @@ export default function BankAccountCreateForm({ onCreated, onCancel }: BankAccou
   };
 
   return (
-    <div className="rounded-md border border-dashed border-neutral-blue-gray/50 p-4">
+    // 自帶白底，理由同 BankAccountCard（開帳精靈的銀行帳戶頁沒有外層白卡片）
+    <div className="rounded-md border border-dashed border-neutral-blue-gray/50 bg-white p-4">
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-3 nav:grid-cols-2">
           <div>
@@ -78,7 +84,7 @@ export default function BankAccountCreateForm({ onCreated, onCancel }: BankAccou
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-neutral-dark">存款餘額</label>
             <MoneyInput value={newAccount.balance} onChange={v => setNewAccount(a => ({ ...a, balance: v }))} />
-            <p className="mt-1 text-xs text-neutral-mid">僅限於首次設定時使用，系統將不再詢問</p>
+            <p className="mt-1 text-xs text-neutral-mid">{balanceHint ?? '僅限於首次設定時使用，系統將不再詢問'}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 nav:grid-cols-[1fr_120px_1fr_1fr]">

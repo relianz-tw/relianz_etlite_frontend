@@ -7,6 +7,7 @@ import {
   initializationReducer,
   isStaleFlow,
   restoredStep,
+  STEP,
   type InitializationAction,
   type InitializationState,
 } from './initializationReducer';
@@ -62,9 +63,9 @@ interface HistoryStepState {
 /** 自動儲存的檢查間隔：內容有變動才會真的儲存 */
 const AUTOSAVE_INTERVAL_MS = 30_000;
 
-/** 步驟 2–8 正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
+/** 付款資料到確認頁正在填資料，離開頁面前需要確認；合約頁與完成頁沒有待保存內容 */
 export function isFillingStep(step: number): boolean {
-  return step >= 2 && step <= 8;
+  return step >= STEP.PAYMENT && step <= STEP.CONFIRM;
 }
 
 interface InitializationContextValue {

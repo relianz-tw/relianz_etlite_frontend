@@ -1,6 +1,6 @@
 'use client';
 
-import { createChannelRule, listChannelRules, updateChannelRule } from '@/api/channelRules';
+import { createChannelRule, createDefaultOtherChannel, listChannelRules, updateChannelRule } from '@/api/channelRules';
 import type { ChannelRuleDto } from '@/api/types';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { getFriendlyErrorMessage } from '@/lib/errors';
 import { CirclePlus, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { BankAccountRecord, ChannelRuleRecord } from '../data';
-import { formatSettlement, SETTLEMENT_STYLE } from '../data';
+import { formatSettlement } from '../data';
 import ChannelRuleDialog from './ChannelRuleDialog';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 import InitOtherChannelDialog from './InitOtherChannelDialog';
@@ -79,15 +79,7 @@ export default function ChannelRuleSection({ accounts }: ChannelRuleSectionProps
   };
 
   const handleInitOther = async (receivingAccountUuid: string) => {
-    await createChannelRule({
-      channelName: '其他',
-      settlementStyle: SETTLEMENT_STYLE.WEEKLY,
-      settlementAmount: 1,
-      receivingAccountUuid,
-      remark: '',
-      isActive: true,
-      initDefaultOther: true,
-    });
+    await createDefaultOtherChannel(receivingAccountUuid);
     loadRules();
   };
 

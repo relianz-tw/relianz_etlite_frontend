@@ -1,7 +1,7 @@
 'use client';
 
 import { listBankAccounts } from '@/api/bankAccounts';
-import { createChannelRule, listChannelRules } from '@/api/channelRules';
+import { createChannelRule, createDefaultOtherChannel, listChannelRules } from '@/api/channelRules';
 import { listInvoiceBookPeriods, listInvoiceBooks } from '@/api/invoiceBook';
 import { createVendor, initDefaultOtherVendor, listVendors } from '@/api/vendors';
 import type { BankAccountDto, ChannelRuleDto, InvoiceBookDto, VendorDto } from '@/api/types';
@@ -19,7 +19,6 @@ import ChannelRuleDialog from '@/features/settings/components/ChannelRuleDialog'
 import InitOtherChannelDialog from '@/features/settings/components/InitOtherChannelDialog';
 import VendorDialog from '@/features/settings/components/VendorDialog';
 import type { BankAccountRecord, ChannelRuleRecord, VendorRecord } from '@/features/settings/data';
-import { SETTLEMENT_STYLE } from '@/features/settings/data';
 import { getFriendlyErrorMessage } from '@/lib/errors';
 import { parseInvoicePeriodValue, pickDefaultInvoicePeriod, sortInvoicePeriodOptions, toInvoicePeriodOption } from '@/lib/invoicePeriod';
 import type { InvoicePeriodOption } from '@/lib/invoicePeriod';
@@ -95,19 +94,6 @@ const NOT_WIRED_BADGE = (
   </Badge>
 );
 
-/** 建立固定名稱「其他」的預設銷售管道（手動開通對話框與新增銷項自動開通共用） */
-function createOtherChannel(receivingAccountUuid: string): Promise<ChannelRuleDto> {
-  return createChannelRule({
-    channelName: '其他',
-    settlementStyle: SETTLEMENT_STYLE.WEEKLY,
-    settlementAmount: 1,
-    receivingAccountUuid,
-    remark: '',
-    isActive: true,
-    initDefaultOther: true,
-  });
-}
-
 /** BankAccountDto → BankAccountRecord，比照 PaymentSettingsTab 既有的轉換方式，供 ChannelRuleDialog 使用 */
 function toBankAccountRecord(dto: BankAccountDto): BankAccountRecord {
   return {
@@ -175,7 +161,7 @@ export default function TransactionMetaCard({
         setBankAccountsLoaded(true);
         const receiving = accounts.find(a => a.isDefaultReceivingAccount) ?? accounts[0];
         if (receiving) {
-          await createOtherChannel(receiving.bankAccountUuid);
+          await createDefaultOtherChannel(receiving.bankAccountUuid);
           list = await listChannelRules();
         } else {
           onBankAccountMissingChange?.(true);
@@ -269,7 +255,7 @@ export default function TransactionMetaCard({
   // 各公司「其他」管道的 uuid 不同，但名稱固定為「其他」；尚未開通前強制先完成此步驟才能新增其他管道
   const hasOtherChannel = channelRules.some(c => c.channelName === '其他');
   const handleInitOtherChannel = async (receivingAccountUuid: string) => {
-    const created = await createOtherChannel(receivingAccountUuid);
+    const created = await createDefaultOtherChannel(receivingAccountUuid);
     setChannelRules(list => [...list, created]);
     onChange({ channel: created.channelUuid });
   };

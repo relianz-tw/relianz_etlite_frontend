@@ -81,7 +81,7 @@ export interface ReportData {
  * 畫面流程的版本號。步驟編號是存進草稿的，流程一改舊草稿的數字就對不上畫面，
  * 所以每次調整步驟順序都要加一，RESTORE_STATE 會據此把對不上的草稿退回第一步（資料保留）。
  */
-export const FLOW_VERSION = 3;
+export const FLOW_VERSION = 4;
 
 /**
  * 這份草稿是不是改版前存的（沒有這個欄位的舊草稿也算）。步驟編號對不上現在的畫面，位置不能信。
@@ -195,7 +195,14 @@ export interface InitializationState {
   /** 負責人及合夥人資料（獨資／合夥才使用） */
   partners: Partner[];
 
-  // 步驟 6
+  /**
+   * 銀行帳戶頁選定的主要收款帳戶（bankAccountUuid）。
+   * 銀行帳戶本身是即時寫進後端的實體，不存草稿；這裡只記客戶挑了哪一戶，
+   * 「確認開帳」成功後用它建立預設銷售管道「其他」（見 Step5Confirm）。
+   */
+  receivingAccountUuid: string;
+
+  // 完成
   completed: boolean;
 }
 
@@ -258,6 +265,7 @@ export const initialState: InitializationState = {
 
   registrationFiles: {},
   partners: [],
+  receivingAccountUuid: '',
 
   completed: false,
 };
@@ -323,16 +331,20 @@ export type InitializationAction =
   | { type: 'CLEAR_REPORT'; payload: { reportId: ReportKey } }
   | { type: 'SET_PARTNERS'; payload: Partner[] }
 
+  // 銀行帳戶頁
+  | { type: 'SET_RECEIVING_ACCOUNT'; payload: string }
+
   // 完成
   | { type: 'COMPLETE' };
 
 // ==================== 步驟導航邏輯 ====================
 // 步驟順序：1=合約　2=付款資料（測試用，代替尚未串接的付款環節）　3=登記文件上傳　4=營運狀況
 //          5=負責人／合夥人資料（僅滿一年的獨資、合夥）　6=封面／公司資料　7=逐頁核對報表（僅滿一年）
-//          8=確認　9=完成
+//          8=銀行帳戶　9=確認　10=完成
 // 付款資料排最前面，是因為那裡的統一編號決定了要上傳哪一組登記文件（公司或商號）；
 // 登記文件接在後面，是因為後端辨識登記事項表會把公司基本資料帶入更後面的頁面
-// 步驟 4 選「未滿一年」時無結算申報書可核對，6 之後直接跳到 8（確認），略過步驟 7 的報表頁
+// 步驟 4 選「未滿一年」時無結算申報書可核對，6 之後直接跳到銀行帳戶頁，略過步驟 7 的報表頁
+// 銀行帳戶頁排在確認之前，是因為它要拿步驟 7 資產負債表的銀行存款來勾稽各帳戶的期初餘額
 // 改動這個順序時記得同步 FLOW_VERSION、utils/stepper.ts 與 app/initialization/initialization-client.tsx
 
 /**
@@ -348,8 +360,9 @@ export const STEP = {
   PARTNERS: 5,
   COMPANY: 6,
   REPORTS: 7,
-  CONFIRM: 8,
-  DONE: 9,
+  BANK_ACCOUNTS: 8,
+  CONFIRM: 9,
+  DONE: 10,
 } as const;
 
 export interface StepTarget {
@@ -369,21 +382,25 @@ function needsPartnersPage(state: Pick<InitializationState, 'operatingStatus' | 
 
 export function getPrevStep(state: InitializationState): StepTarget {
   switch (state.currentStep) {
-    case 2:
-      return { step: 1, reportIndex: 0 };
-    case 3:
-      return { step: 2, reportIndex: 0 };
-    case 4:
-      return { step: 3, reportIndex: 0 };
-    case 5:
-      return { step: 4, reportIndex: 0 };
-    case 6:
-      return needsPartnersPage(state) ? { step: 5, reportIndex: 0 } : { step: 4, reportIndex: 0 };
-    case 7:
-      if (state.currentReportIndex > 0) return { step: 7, reportIndex: state.currentReportIndex - 1 };
-      return { step: 6, reportIndex: 0 };
-    case 8:
-      return state.operatingStatus === 'over_one_year' ? { step: 7, reportIndex: Math.max(state.reportPages.length - 1, 0) } : { step: 6, reportIndex: 0 };
+    case STEP.PAYMENT:
+      return { step: STEP.TERMS, reportIndex: 0 };
+    case STEP.REGISTRATION_DOCS:
+      return { step: STEP.PAYMENT, reportIndex: 0 };
+    case STEP.OPERATING:
+      return { step: STEP.REGISTRATION_DOCS, reportIndex: 0 };
+    case STEP.PARTNERS:
+      return { step: STEP.OPERATING, reportIndex: 0 };
+    case STEP.COMPANY:
+      return needsPartnersPage(state) ? { step: STEP.PARTNERS, reportIndex: 0 } : { step: STEP.OPERATING, reportIndex: 0 };
+    case STEP.REPORTS:
+      if (state.currentReportIndex > 0) return { step: STEP.REPORTS, reportIndex: state.currentReportIndex - 1 };
+      return { step: STEP.COMPANY, reportIndex: 0 };
+    case STEP.BANK_ACCOUNTS:
+      return state.operatingStatus === 'over_one_year'
+        ? { step: STEP.REPORTS, reportIndex: Math.max(state.reportPages.length - 1, 0) }
+        : { step: STEP.COMPANY, reportIndex: 0 };
+    case STEP.CONFIRM:
+      return { step: STEP.BANK_ACCOUNTS, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -391,23 +408,25 @@ export function getPrevStep(state: InitializationState): StepTarget {
 
 export function getNextStep(state: InitializationState): StepTarget {
   switch (state.currentStep) {
-    case 1:
-      return { step: 2, reportIndex: 0 };
-    case 2:
-      return { step: 3, reportIndex: 0 };
-    case 3:
-      return { step: 4, reportIndex: 0 };
-    case 4:
-      return needsPartnersPage(state) ? { step: 5, reportIndex: 0 } : { step: 6, reportIndex: 0 };
-    case 5:
-      return { step: 6, reportIndex: 0 };
-    case 6:
-      return state.operatingStatus === 'over_one_year' ? { step: 7, reportIndex: 0 } : { step: 8, reportIndex: 0 };
-    case 7:
-      if (state.currentReportIndex < state.reportPages.length - 1) return { step: 7, reportIndex: state.currentReportIndex + 1 };
-      return { step: 8, reportIndex: 0 };
-    case 8:
-      return { step: 9, reportIndex: 0 };
+    case STEP.TERMS:
+      return { step: STEP.PAYMENT, reportIndex: 0 };
+    case STEP.PAYMENT:
+      return { step: STEP.REGISTRATION_DOCS, reportIndex: 0 };
+    case STEP.REGISTRATION_DOCS:
+      return { step: STEP.OPERATING, reportIndex: 0 };
+    case STEP.OPERATING:
+      return needsPartnersPage(state) ? { step: STEP.PARTNERS, reportIndex: 0 } : { step: STEP.COMPANY, reportIndex: 0 };
+    case STEP.PARTNERS:
+      return { step: STEP.COMPANY, reportIndex: 0 };
+    case STEP.COMPANY:
+      return state.operatingStatus === 'over_one_year' ? { step: STEP.REPORTS, reportIndex: 0 } : { step: STEP.BANK_ACCOUNTS, reportIndex: 0 };
+    case STEP.REPORTS:
+      if (state.currentReportIndex < state.reportPages.length - 1) return { step: STEP.REPORTS, reportIndex: state.currentReportIndex + 1 };
+      return { step: STEP.BANK_ACCOUNTS, reportIndex: 0 };
+    case STEP.BANK_ACCOUNTS:
+      return { step: STEP.CONFIRM, reportIndex: 0 };
+    case STEP.CONFIRM:
+      return { step: STEP.DONE, reportIndex: 0 };
     default:
       return { step: state.currentStep, reportIndex: state.currentReportIndex };
   }
@@ -643,6 +662,9 @@ export function initializationReducer(state: InitializationState, action: Initia
 
     case 'SET_PARTNERS':
       return { ...state, partners: action.payload };
+
+    case 'SET_RECEIVING_ACCOUNT':
+      return { ...state, receivingAccountUuid: action.payload };
 
     case 'SET_OPERATING_STATUS':
       return { ...state, operatingStatus: action.payload };
